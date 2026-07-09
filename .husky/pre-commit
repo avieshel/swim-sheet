@@ -1,0 +1,14 @@
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -n "$STAGED_FILES" ]; then
+  RESULT=$(echo "$STAGED_FILES" | xargs trufflehog filesystem --no-verification --results=unverified 2>/dev/null)
+  if [ -n "$RESULT" ]; then
+    echo "$RESULT"
+    echo "❌ Commit blocked: potential secrets detected."
+    exit 1
+  fi
+  echo "✅ No secrets detected."
+fi
+
+npx lint-staged
+cd client && npx tsc -b --noEmit

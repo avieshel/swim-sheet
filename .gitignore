@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+*.log
+test-results
+playwright-report
+server/data/
+server/tsconfig.tsbuildinfo

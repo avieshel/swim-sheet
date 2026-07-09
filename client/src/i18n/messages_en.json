@@ -1,0 +1,19 @@
+{
+  "addSwimmer": "Add Swimmer",
+  "editSwimmer": "Edit Swimmer",
+  "deleteSwimmer": "Delete Swimmer",
+  "addSession": "Add Session",
+  "editSession": "Edit Session",
+  "deleteSession": "Delete Session",
+  "addDrill": "Add Drill",
+  "editDrill": "Edit Drill",
+  "deleteDrill": "Delete Drill",
+  "dashboard": "Dashboard",
+  "sessions": "Sessions",
+  "swimmers": "Swimmers",
+  "coachDashboardTitle": "Coach Dashboard",
+  "totalDistance": "Total Distance",
+  "averageEffort": "Average Effort",
+  "editSwimmers": "Edit Swimmers",
+  "laneViewComingSoon": "Lane view coming soon"
+}
