@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT } from '../api/settings'
+import { getAppVersion } from '../utils/version'
 
 interface SettingsForm {
   team_name: string
@@ -469,10 +470,18 @@ export const Settings: React.FC = () => {
       {/* App Info */}
       <section className="mt-8">
         <h2 className="font-label-caps text-primary mb-4 px-3">App Info</h2>
-        <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant">
+        <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-label-sm text-on-surface">Version</span>
-            <span className="font-body-md text-on-surface-variant">{__APP_VERSION__}</span>
+            <span className="font-body-md text-on-surface-variant">{getAppVersion().version}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-label-sm text-on-surface">Commit</span>
+            <span className="font-body-md text-on-surface-variant">{getAppVersion().commit}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-label-sm text-on-surface">Built</span>
+            <span className="font-body-md text-on-surface-variant">{getAppVersion().built.replace('T', ' ').replace(/\.\d+Z/, '')} UTC</span>
           </div>
         </div>
       </section>
