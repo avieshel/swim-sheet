@@ -10,5 +10,5 @@ if [ -n "$STAGED_FILES" ]; then
   echo "✅ No secrets detected."
 fi
 
-npx lint-staged
+(cd client && npx lint-staged)
 cd client && npx tsc -b --noEmit
