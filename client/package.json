@@ -15,7 +15,6 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@rolldown/binding-darwin-arm64": "^1.0.3",
     "dexie": "^4.4.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
