@@ -10,7 +10,7 @@ The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-fir
 - All CRUD operates against local IndexedDB via Dexie
 - The app works fully offline — the server is only needed for sync and first-time load
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
-- Schema versioning: current version is 1
+- Schema versioning: current version is 2
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
 
 ### Session → SessionRun (Template/Instance) Pattern
@@ -22,8 +22,9 @@ The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-fir
 ### Timed Groups persist in LaneDrillResult
 - Timing data is stored as a JSON blob in the `LaneDrillResult` table
 - Keyed by `group_id` (UUID) — supports multiple groups per physical lane
-- All timestamps are group-relative (0 = group start)
-- The JSON blob contains `laneElapsed` and per-swimmer offsets/laps/done times
+- All timestamps are session-relative (sessionElapsed = Date.now() - session_started_at - paused_duration)
+- Timing data is stored as a flat key-value map in an in-memory `TimestampStore` (backed by `Map<string, number>`) for live editing; keys use a hierarchical scheme enabling prefix-delete for clear operations
+- LaneDrillResult persists a **snapshot** (JSON blob of `drillStart`/`drillEnd`/`sessionStartedAt`/`swimmers[]`) only at save/complete time
 - This is a client-only table (not mirrored on server)
 
 ### Rich Drills (DrillItem[])
@@ -67,6 +68,7 @@ A student/athlete registered by the coach.
 | `name` | `name` | string/TEXT | Required |
 | `group` | `group_name` | string/TEXT | Optional (e.g. "U17", "Masters") |
 | `notes` | `notes` | string/TEXT | Optional |
+| `status` | `status` | 'active' \| 'inactive'/TEXT | Default 'active' |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
@@ -114,6 +116,9 @@ A single execution of a Session template.
 | `poolLength` | `pool_length` | number/INTEGER | Overridable from template |
 | `notes` | `notes` | string/TEXT | Optional |
 | `status` | `status` | 'active' \| 'completed'/TEXT | Run state |
+| `sessionStartedAt` | `session_started_at` | number/REAL | Wall-clock ms when session timer started |
+| `sessionPausedAt` | `session_paused_at` | number/REAL | Wall-clock ms when timer last paused |
+| `sessionPauseDuration` | `session_pause_duration` | number/REAL | Total accumulated pause time (ms) |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
@@ -173,16 +178,44 @@ JSON blob storage for timed group timing data.
 | `data` | string | JSON blob with timing data |
 | `updatedAt` | string | ISO 8601 |
 
-JSON blob structure:
+In-memory `TimestampStore` key hierarchy (flat key-value map, session-relative ms):
+```
+session::<runId>::group::<groupId>::drill::<drillId>::group-start       — lane-level Go
+session::<runId>::group::<groupId>::drill::<drillId>::group-done        — lane-level Finish
+session::<runId>::group::<groupId>::drill::<drillId>::swimmer::<sid>::start    — individual start
+session::<runId>::group::<groupId>::drill::<drillId>::swimmer::<sid>::done     — individual done
+session::<runId>::group::<groupId>::drill::<drillId>::swimmer::<sid>::lap::<n> — lap splits
+```
+
+Effective timestamps (fallback to group-level): `start ?? group-start`, `done ?? group-done`
+
+Key helpers (`K.*` in `timestampStore.ts`) take `(rid, gid, did, sid)` — `K.swimmerStart`, `K.swimmerDone`, `K.swimmerLap`, `K.swimmerGroupStart`, `K.swimmerGroupDone`.
+
+`TimestampStore` interface:
+```ts
+interface TimestampStore {
+  readonly version: number
+  get(key: string): number | undefined
+  set(key: string, value: number): void
+  batchStop(runId, groupId, drillId, swimmerIds, sessionElapsed): void
+  clearDrill(runId, groupId, drillId): void
+  clearSwimmer(runId, groupId, drillId, swimmerId): void
+  clearGroup(runId, groupId): void
+}
+```
+
+Saved `LaneDrillResult.data` JSON blob (snapshot at drill-complete time):
 ```json
 {
-  "laneElapsed": 0,
+  "drillStart": 0,
+  "drillEnd": 120000,
+  "sessionStartedAt": 1718000000000,
   "swimmers": [
     {
       "dbId": "uuid",
       "name": "Swimmer Name",
-      "offsetFromLaneStart": null,
-      "finalElapsed": null,
+      "startedAt": null,
+      "completedAt": null,
       "laps": [],
       "completed": false,
       "strokeCount": null
@@ -191,7 +224,7 @@ JSON blob structure:
 }
 ```
 
-Constraints: `0 ≤ offsetFromLaneStart ≤ laps[i] ≤ finalElapsed ≤ laneElapsed`
+Constraints: `startedAt ≤ laps[i] ≤ completedAt`, `drillStart ≤ all swimmer timestamps ≤ drillEnd`
 
 ### LibraryDrill (Client Only)
 Global drill library with builtin defaults and user customizations.

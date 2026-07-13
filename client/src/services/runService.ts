@@ -1,5 +1,5 @@
 import {
-  addSessionRun, updateSessionRun, getSessionRun, getAllSessionRuns, getActiveRun,
+  addSessionRun, updateSessionRun, getSessionRun, getActiveRun,
   completeSessionRun, getRunDrillsForRun, getRunDrill, addRunDrill, deleteRunDrill, updateRunDrill,
   getSwimmersForRun, getRunSwimmersForRun, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer,
   getLaneDrillResults, getLaneDrillResult, setLaneDrillResult, deleteLaneDrillResult,
@@ -12,7 +12,6 @@ import type { SafeSessionRun, SafeRunDrill, SafeLaneDrillResult } from '../db/sc
 export const runService = {
   getActive: () => getActiveRun(),
   get: (id: string) => getSessionRun(id),
-  listAll: () => getAllSessionRuns(),
   create: (data: SafeSessionRun) => addSessionRun(data),
   update: (id: string, data: Partial<SafeSessionRun>) => updateSessionRun(id, data),
   complete: (id: string) => completeSessionRun(id),
@@ -56,6 +55,9 @@ export const runService = {
       poolLength: runData.poolLength,
       notes: runData.notes || '',
       status: 'active',
+      session_started_at: Date.now(),
+      session_paused_at: null,
+      session_pause_duration: 0,
     })
 
     let runDrillOrder = 0

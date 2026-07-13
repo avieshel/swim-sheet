@@ -48,6 +48,8 @@
   --color-on-background: #191c1e;
   --color-on-secondary: #ffffff;
   --color-on-secondary-container: #445d80;
+  --color-disabled: #b0b8bc;
+  --color-on-disabled: #5a6368;
 
   --font-headline-lg: Montserrat, sans-serif;
   --font-body-lg: Inter, sans-serif;

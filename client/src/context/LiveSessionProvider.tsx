@@ -1,29 +1,41 @@
-import React, { useReducer, useEffect } from 'react'
-import type { ReactNode } from 'react'
+import React, { useReducer, useState, useMemo, useCallback } from 'react'
+import type { ReactNode, Dispatch } from 'react'
 import { LiveSessionContext, initialState, liveSessionReducer } from './LiveSessionContext'
-import type { TimedGroup } from './LiveSessionContext'
+import type { LiveSessionAction, TimerAction } from './LiveSessionContext'
+import { createTimestampStore } from '../timing/timestampStore'
 
 export const LiveSessionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(liveSessionReducer, initialState)
+  const [sessionElapsed, setSessionElapsed] = useState(0)
+  const [sessionRunning, setSessionRunning] = useState(false)
+  const store = useMemo(() => createTimestampStore(), [])
 
-  useEffect(() => {
-    if (state.groups.length === 0 && !state.runId) {
-      const groups: TimedGroup[] = Array.from({ length: 8 }, (_, i) => ({
-        id: crypto.randomUUID(),
-        lane: i + 1,
-        name: `Lane ${i + 1}`,
-        swimmers: [],
-        elapsed: 0,
-        running: false,
-        currentRunDrillId: null,
-        drillOverride: null,
-      }))
-      dispatch({ type: 'ADD_GROUPS', payload: groups })
+  const wrappedDispatch = useCallback<Dispatch<LiveSessionAction | TimerAction>>((action) => {
+    if (action.type === 'START_SESSION_TIMER') {
+      setSessionRunning(true)
+      return
     }
-  }, [state.groups.length, state.runId, dispatch])
+    if (action.type === 'PAUSE_SESSION_TIMER') {
+      setSessionRunning(false)
+      return
+    }
+    switch (action.type) {
+      case 'CLEAR':
+        setSessionElapsed(0)
+        setSessionRunning(false)
+        break
+      default:
+        break
+    }
+    dispatch(action as LiveSessionAction)
+  }, [])
+
+  const tick = useCallback((delta: number) => {
+    setSessionElapsed(prev => prev + delta)
+  }, [])
 
   return (
-    <LiveSessionContext.Provider value={{ state, dispatch }}>
+    <LiveSessionContext.Provider value={{ state, dispatch: wrappedDispatch, store, sessionElapsed, sessionRunning, groups: state.groups, tick }}>
       {children}
     </LiveSessionContext.Provider>
   )

@@ -42,14 +42,14 @@ export function createSwimmersRouter(db: Database): Router {
 
   router.post('/', (req, res) => {
     try {
-      const { name, group_name, notes } = req.body
+      const { name, group_name, notes, status } = req.body
       if (!name || typeof name !== 'string' || name.trim() === '') {
         return res.status(400).json({ error: 'Validation failed', details: { name: 'required' } })
       }
       const id = randomUUID()
       const now = new Date().toISOString()
-      db.prepare('INSERT INTO swimmers (id, name, group_name, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(id, name.trim(), group_name?.trim() || null, notes?.trim() || null, now, now)
+      db.prepare('INSERT INTO swimmers (id, name, group_name, notes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(id, name.trim(), group_name?.trim() || null, notes?.trim() || null, status || 'active', now, now)
       const swimmer = db.prepare('SELECT * FROM swimmers WHERE id = ?').get(id)
       res.status(201).json(swimmer)
     } catch (error) {
@@ -59,13 +59,13 @@ export function createSwimmersRouter(db: Database): Router {
 
   router.put('/:id', (req, res) => {
     try {
-      const { name, group_name, notes } = req.body
+      const { name, group_name, notes, status } = req.body
       if (!name || typeof name !== 'string' || name.trim() === '') {
         return res.status(400).json({ error: 'Validation failed', details: { name: 'required' } })
       }
       const now = new Date().toISOString()
-      const info = db.prepare('UPDATE swimmers SET name=?, group_name=?, notes=?, updated_at=? WHERE id=?')
-        .run(name.trim(), group_name?.trim() || null, notes?.trim() || null, now, req.params.id)
+      const info = db.prepare('UPDATE swimmers SET name=?, group_name=?, notes=?, status=?, updated_at=? WHERE id=?')
+        .run(name.trim(), group_name?.trim() || null, notes?.trim() || null, status || 'active', now, req.params.id)
       if (info.changes === 0) return res.status(404).json({ error: 'Swimmer not found' })
       const swimmer = db.prepare('SELECT * FROM swimmers WHERE id = ?').get(req.params.id)
       res.json(swimmer)

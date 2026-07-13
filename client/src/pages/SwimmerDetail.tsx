@@ -16,6 +16,7 @@ export const SwimmerDetail: React.FC = () => {
   const [editName, setEditName] = useState('')
   const [editGroup, setEditGroup] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [editStatus, setEditStatus] = useState<'active' | 'inactive'>('active')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -37,6 +38,7 @@ export const SwimmerDetail: React.FC = () => {
       setEditName(s.name)
       setEditGroup(s.group || '')
       setEditNotes(s.notes || '')
+      setEditStatus(s.status || 'active')
       const runList = await getRunsForSwimmer(id)
       const withTemplates = await Promise.all(
         runList.map(async (r: SessionRun) => {
@@ -55,6 +57,7 @@ export const SwimmerDetail: React.FC = () => {
     setEditName(swimmer.name)
     setEditGroup(swimmer.group || '')
     setEditNotes(swimmer.notes || '')
+    setEditStatus(swimmer.status || 'active')
     setShowEditModal(true)
   }
 
@@ -122,6 +125,13 @@ export const SwimmerDetail: React.FC = () => {
                   {swimmer.group}
                 </span>
               )}
+              <span className={`inline-block mt-2 ml-2 px-3 py-1 rounded text-label-sm font-bold ${
+                swimmer.status === 'inactive'
+                  ? 'bg-surface-variant text-on-surface-variant'
+                  : 'bg-green-100 text-green-700'
+              }`}>
+                {swimmer.status === 'inactive' ? 'Inactive' : 'Active'}
+              </span>
               {swimmer.notes && (
                 <p className="font-body-md text-body-md text-on-surface-variant mt-2">{swimmer.notes}</p>
               )}
@@ -185,9 +195,10 @@ export const SwimmerDetail: React.FC = () => {
       </div>
 
       <SwimmerFormModal
+        key={showEditModal ? id ?? 'edit' : 'closed'}
         open={showEditModal}
         editingId={id ?? null}
-        initialData={{ name: editName, group: editGroup, notes: editNotes }}
+        initialData={{ name: editName, group: editGroup, notes: editNotes, status: editStatus }}
         onSave={async (data) => {
           if (!id) return
           await updateSwimmer(id, data)

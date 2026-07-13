@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
-import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, patchLibraryDrills, resetLibraryToDefaults } from '../api/drills'
+import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills } from '../api/drills'
 import type { LibraryDrill, SafeLibraryDrill } from '../api/drills'
 import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, type SimilarDrill } from '../utils/drillHelpers'
@@ -38,19 +38,20 @@ export const DrillBank: React.FC = () => {
     onConfirm: () => {},
   })
 
+  useEffect(() => {
+    deduplicateLibraryDrills().then(() => patchLibraryDrills()).then(() => listLibraryDrills()).then(d => {
+      setDrills(d)
+      setLoading(false)
+    })
+  }, [])
+
   const loadDrills = async () => {
+    await deduplicateLibraryDrills()
     await patchLibraryDrills()
     const d = await listLibraryDrills()
     setDrills(d)
     setLoading(false)
   }
-
-  useEffect(() => {
-    patchLibraryDrills().then(() => listLibraryDrills()).then(d => {
-      setDrills(d)
-      setLoading(false)
-    })
-  }, [])
 
   const openEditor = (drill?: LibraryDrill) => {
     if (drill) {
@@ -272,6 +273,7 @@ export const DrillBank: React.FC = () => {
 
       {/* Drill Editor Modal */}
       <DrillEditorModal
+        key={showEditor ? editingDrill.id ?? 'new' : 'closed'}
         open={showEditor}
         title={editingDrill.id ? 'Edit Bank Drill' : 'New Bank Drill'}
         initialData={showEditor ? editingDrill as DrillFormData : undefined}

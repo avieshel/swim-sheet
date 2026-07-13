@@ -53,4 +53,8 @@ export function seedLibraryDrills(): Promise<void> {
   return drillService.seedLibrary()
 }
 
+export function deduplicateLibraryDrills(): Promise<number> {
+  return drillService.deduplicateLibrary()
+}
+
 export type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../db/schema'

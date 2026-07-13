@@ -12,7 +12,7 @@ vi.mock('../../services/sessionService', () => ({
   },
 }))
 
-import { listSessions, getSession, createSession, updateSession, deleteSession, getSessionRuns, listCompletedRuns } from '../sessions'
+import { listSessions, getSession, createSession, updateSession, deleteSession, listCompletedRuns } from '../sessions'
 import { sessionService } from '../../services/sessionService'
 import type { SafeSession } from '../../db/schema'
 
@@ -54,14 +54,6 @@ describe('sessions API', () => {
     vi.mocked(sessionService.delete).mockResolvedValue(undefined)
     await deleteSession('s1')
     expect(sessionService.delete).toHaveBeenCalledWith('s1')
-  })
-
-  it('getSessionRuns delegates to sessionService.getRuns', async () => {
-    const expected = [{ id: 'r1', sessionId: 's1' }]
-    vi.mocked(sessionService.getRuns).mockResolvedValue(expected)
-    const result = await getSessionRuns('s1')
-    expect(sessionService.getRuns).toHaveBeenCalledWith('s1')
-    expect(result).toBe(expected)
   })
 
   it('listCompletedRuns delegates to sessionService.getCompletedRuns', async () => {

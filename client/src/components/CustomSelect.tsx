@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export interface SelectOption {
   value: string | number
   label: string
+  badge?: ReactNode
 }
 
 interface CustomSelectProps {
@@ -38,7 +39,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, options, onCh
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-2 py-1.5 text-sm outline-none rounded-t-md transition-colors text-left"
       >
-        <span className="truncate">{selectedOption ? selectedOption.label : 'Select...'}</span>
+        <span className="truncate flex items-center gap-1">{selectedOption ? selectedOption.label : 'Select...'}{selectedOption?.badge}</span>
         <span className="material-symbols-outlined text-sm transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
           expand_more
         </span>
@@ -55,11 +56,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, options, onCh
                   onChange(opt.value)
                   setIsOpen(false)
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-container/20 transition-colors ${
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-container/20 transition-colors flex items-center gap-1 ${
                   value === opt.value ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface'
                 }`}
               >
                 {opt.label}
+                {opt.badge}
               </button>
             ))}
           </div>

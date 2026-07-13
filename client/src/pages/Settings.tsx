@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
+import { CustomSelect } from '../components/CustomSelect'
 
 interface SettingsForm {
   team_name: string
+  coach_name: string
+  team_names: string[]
   pool_length: string
   distance_units: string
   notification_enabled: boolean
@@ -15,12 +18,28 @@ interface SettingsForm {
   data_retention_days: string
 }
 
+const SEA_CREATURES = [
+  'Sharks', 'Stingrays', 'Dolphins', 'Whales', 'Seals',
+  'Orcas', 'Barracudas', 'Marlins', 'Turtles', 'Manatees',
+  'Otters', 'Penguins', 'Lobsters', 'Crabs', 'Starfish',
+]
+
+function suggestTeamNames(name: string): string[] {
+  const trimmed = name.trim()
+  if (!trimmed) return []
+  const possessive = trimmed.endsWith('s') ? `${trimmed}'` : `${trimmed}'s`
+  const shuffled = [...SEA_CREATURES].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, 5).map(c => `${possessive} ${c}`)
+}
+
 export const Settings: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<SettingsForm>({
     team_name: '',
+    coach_name: '',
+    team_names: [],
     pool_length: '25',
     distance_units: 'meters',
     notification_enabled: true,
@@ -32,8 +51,12 @@ export const Settings: React.FC = () => {
   })
   const [showResetConfirm, setShowResetConfirm] = useState(false)
 
+  // Team names state
+  const [newTeamName, setNewTeamName] = useState('')
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
   // Equipment state
-  const [equipmentItems, setEquipmentItems] = useState<string[]>([])
+  const [equipmentItems, setEquipmentItems] = useState<string[]>(DEFAULT_EQUIPMENT)
   const [newEquipName, setNewEquipName] = useState('')
 
   // Storage state
@@ -49,6 +72,8 @@ export const Settings: React.FC = () => {
           const data = await response.json()
           setForm({
             team_name: data.team_name || '',
+            coach_name: data.coach_name || '',
+            team_names: data.team_names || [],
             pool_length: (data.pool_length || 25).toString(),
             distance_units: data.distance_units || 'meters',
             notification_enabled: !!data.notification_enabled,
@@ -59,13 +84,28 @@ export const Settings: React.FC = () => {
             data_retention_days: (data.data_retention_days || 90).toString(),
           })
         }
-      } catch { void 0
-      } finally {
-        setLoading(false)
-      }
+      } catch {
+      // If the backend is unavailable (e.g., during local dev without the server),
+      // fall back to sensible defaults so the Settings page still renders.
+      setForm({
+        team_name: '',
+        coach_name: '',
+        team_names: [],
+        pool_length: '25',
+        distance_units: 'meters',
+        notification_enabled: true,
+        sync_interval: '30000',
+        theme: 'auto',
+        font_size: 'medium',
+        auto_save: true,
+        data_retention_days: '90',
+      })
+    } finally {
+      setLoading(false)
     }
-    loadSettings()
-  }, [])
+  }
+  loadSettings()
+}, [])
 
   useEffect(() => {
     getEquipmentOptions().then(setEquipmentItems)
@@ -74,6 +114,24 @@ export const Settings: React.FC = () => {
   useEffect(() => {
     estimateDbSize().then(setStorageInfo)
   }, [])
+
+  const handleTeamNameAdd = () => {
+    const name = newTeamName.trim()
+    if (!name || form.team_names.includes(name)) return
+    setForm(prev => ({ ...prev, team_names: [...prev.team_names, name] }))
+    setNewTeamName('')
+    setSuggestions([])
+  }
+
+  const handleTeamNameRemove = (item: string) => {
+    setForm(prev => ({ ...prev, team_names: prev.team_names.filter(i => i !== item) }))
+  }
+
+  const handleCoachNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setForm(prev => ({ ...prev, coach_name: val }))
+    setSuggestions(suggestTeamNames(val))
+  }
 
   const handleEquipAdd = () => {
     const name = newEquipName.trim().toLowerCase()
@@ -170,21 +228,82 @@ export const Settings: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
         {/* Profile Settings */}
         <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Profile Settings</h2>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Coach Profile</h2>
           <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
-                <label htmlFor="team_name" className="font-label-sm text-on-surface block mb-2">
-                  Team Name
+                <label htmlFor="coach_name" className="font-label-sm text-on-surface block mb-2">
+                  Coach Name
                 </label>
                 <input
                   type="text"
-                  id="team_name"
-                  name="team_name"
-                  value={form.team_name}
-                  onChange={handleInputChange}
+                  id="coach_name"
+                  name="coach_name"
+                  value={form.coach_name}
+                  onChange={handleCoachNameChange}
+                  placeholder="e.g. Alex"
                   className="w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                 />
+              </div>
+
+              <div>
+                <label className="font-label-sm text-on-surface block mb-2">
+                  Teams
+                </label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {form.team_names.map(item => (
+                    <div key={item} className="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-3 py-1.5 rounded-full text-sm font-bold">
+                      <span>{item}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleTeamNameRemove(item)}
+                        className="ml-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTeamName}
+                    onChange={e => setNewTeamName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleTeamNameAdd() } }}
+                    placeholder="Add a team..."
+                    className="flex-1 bg-surface text-on-surface px-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleTeamNameAdd}
+                    disabled={!newTeamName.trim()}
+                    className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none text-sm"
+                  >
+                    Add
+                  </button>
+                </div>
+                {suggestions.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-on-surface-variant mb-1.5">Suggestions based on coach name:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestions.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            if (!form.team_names.includes(s)) {
+                              setForm(prev => ({ ...prev, team_names: [...prev.team_names, s] }))
+                            }
+                            setSuggestions([])
+                          }}
+                          className="text-xs px-2.5 py-1 rounded-full bg-primary-container/40 text-primary hover:bg-primary-container/70 transition-colors cursor-pointer border-none"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -466,6 +585,31 @@ export const Settings: React.FC = () => {
           </div>
         )}
       </form>
+
+      {/* Language */}
+      <section>
+        <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Language</h2>
+        <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+          <div className="space-y-4">
+            <div>
+              <label className="font-label-sm text-on-surface block mb-2">
+                Application Language
+              </label>
+              <CustomSelect
+                value={localStorage.getItem('selectedLanguage') || 'en'}
+                options={[
+                  { value: 'en', label: 'English' },
+                  { value: 'he', label: 'עברית', badge: <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-200 text-amber-800">Beta</span> },
+                ]}
+                onChange={(val) => {
+                  localStorage.setItem('selectedLanguage', val as string);
+                  window.location.reload();
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* App Info */}
       <section className="mt-8">

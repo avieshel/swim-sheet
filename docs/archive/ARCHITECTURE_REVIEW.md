@@ -162,10 +162,12 @@ The following business operations are implemented directly inside page/component
 ### 3.4 Service-level state management mixed into LiveSessionContext
 
 The context reducer (`client/src/context/LiveSessionContext.tsx`) contains business rules that should belong in a service:
-- `SWIMMER_START`: Auto-assigns `offsetFromLaneStart = g.elapsed` for unstarted swimmers (line 120)
-- `SWIMMER_COMPLETE`: Auto-appends elapsed to laps, auto-pauses timer when all done (lines 194–211)
-- `SPLIT_GROUP`: Clones timer state to new group (lines 318–339)
-- `MOVE_SWIMMER_TO_GROUP`: Resets all timing data on move (lines 340–368)
+- `SWIMMER_START` / `SWIMMER_LAP` / `SWIMMER_COMPLETE`: Use `state.sessionElapsed` as timestamp (auto-reads from global clock rather than accepting `elapsed` payload)
+- `START_DRILL_FOR_GROUP`: Sets `startedAt = state.sessionElapsed` for all unstarted swimmers in a group
+- `SWIMMER_COMPLETE`: Auto-appends sessionElapsed to `laps`, sets `completedAt` and `completed: true`
+- `SET_GROUP_DRILL`: Records `drillStart = state.sessionElapsed` when switching drills
+- `SPLIT_GROUP`: Clones timer state to new group
+- `MOVE_SWIMMER_TO_GROUP`: Resets all timing data on move
 
 ---
 

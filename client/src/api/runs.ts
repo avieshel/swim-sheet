@@ -11,10 +11,6 @@ export function getRun(id: string): Promise<SessionRun | undefined> {
   return runService.get(id)
 }
 
-export function listAllRuns(): Promise<SessionRun[]> {
-  return runService.listAll()
-}
-
 export function createRun(data: SafeSessionRun): Promise<string> {
   return runService.create(data)
 }
@@ -39,10 +35,6 @@ export function getRunDrills(runId: string): Promise<RunDrill[]> {
 
 export function getRunDrill(id: string): Promise<RunDrill | undefined> {
   return runService.getDrill(id)
-}
-
-export function createRunDrill(data: SafeRunDrill): Promise<string> {
-  return runService.addDrill(data)
 }
 
 export function updateRunDrill(id: string, data: Partial<SafeRunDrill>): Promise<void> {

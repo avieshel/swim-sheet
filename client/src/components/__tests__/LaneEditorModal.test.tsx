@@ -28,15 +28,13 @@ const makeGroup = (id: string, lane: number, name: string, swimmers: TimedGroup[
   lane,
   name,
   swimmers,
-  elapsed: 0,
-  running: false,
   currentRunDrillId: null,
   drillOverride: null,
 })
 
 const defaultGroups: TimedGroup[] = [
   makeGroup('g1', 1, 'Lane 1', [
-    { id: 1, dbId: '1', name: 'Alice', offsetFromLaneStart: null, finalElapsed: null, laps: [], completed: false, strokeCount: null },
+    { id: 1, dbId: '1', name: 'Alice', completed: false, strokeCount: null },
   ]),
   makeGroup('g2', 2, 'Lane 2', []),
 ]
@@ -52,6 +50,8 @@ describe('LaneEditorModal', () => {
         onAddGroup={vi.fn()}
         onRemoveGroup={vi.fn()}
         onMoveSwimmer={vi.fn()}
+        onUpdateGroupName={vi.fn()}
+        onResetGroup={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -70,6 +70,8 @@ describe('LaneEditorModal', () => {
         onAddGroup={vi.fn()}
         onRemoveGroup={vi.fn()}
         onMoveSwimmer={vi.fn()}
+        onUpdateGroupName={vi.fn()}
+        onResetGroup={vi.fn()}
         onClose={onClose}
       />
     )
@@ -88,6 +90,8 @@ describe('LaneEditorModal', () => {
         onAddGroup={vi.fn()}
         onRemoveGroup={vi.fn()}
         onMoveSwimmer={vi.fn()}
+        onUpdateGroupName={vi.fn()}
+        onResetGroup={vi.fn()}
         onClose={vi.fn()}
       />
     )
@@ -107,6 +111,8 @@ describe('LaneEditorModal', () => {
         onAddGroup={vi.fn()}
         onRemoveGroup={vi.fn()}
         onMoveSwimmer={vi.fn()}
+        onUpdateGroupName={vi.fn()}
+        onResetGroup={vi.fn()}
         onClose={vi.fn()}
       />
     )

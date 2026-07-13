@@ -4,6 +4,7 @@ interface SwimmerFormData {
   name: string
   group: string
   notes: string
+  status: 'active' | 'inactive'
 }
 
 interface SwimmerFormModalProps {
@@ -24,11 +25,12 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
   const [name, setName] = useState(initialData?.name ?? '')
   const [group, setGroup] = useState(initialData?.group ?? '')
   const [notes, setNotes] = useState(initialData?.notes ?? '')
+  const [status, setStatus] = useState<'active' | 'inactive'>(initialData?.status ?? 'active')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
-    onSave({ name: name.trim(), group: group.trim(), notes: notes.trim() })
+    onSave({ name: name.trim(), group: group.trim(), notes: notes.trim(), status })
   }
 
   if (!open) return null
@@ -82,6 +84,33 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
                 onChange={e => setNotes(e.target.value)}
                 placeholder="e.g. Primary: Freestyle"
               />
+            </div>
+          </div>
+          <div>
+            <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Status</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStatus('active')}
+                className={`flex-1 h-10 rounded-lg font-label-sm transition-all cursor-pointer border-2 ${
+                  status === 'active'
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-transparent text-on-surface-variant border-outline-variant hover:bg-surface-container'
+                }`}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatus('inactive')}
+                className={`flex-1 h-10 rounded-lg font-label-sm transition-all cursor-pointer border-2 ${
+                  status === 'inactive'
+                    ? 'bg-error text-on-error border-error'
+                    : 'bg-transparent text-on-surface-variant border-outline-variant hover:bg-surface-container'
+                }`}
+              >
+                Inactive
+              </button>
             </div>
           </div>
           <div className="pt-4 flex gap-3">

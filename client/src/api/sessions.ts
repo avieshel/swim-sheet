@@ -21,10 +21,6 @@ export function deleteSession(id: string): Promise<void> {
   return sessionService.delete(id)
 }
 
-export function getSessionRuns(sessionId: string): Promise<SessionRun[]> {
-  return sessionService.getRuns(sessionId)
-}
-
 export function listCompletedRuns(): Promise<SessionRun[]> {
   return sessionService.getCompletedRuns()
 }

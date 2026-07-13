@@ -23,7 +23,7 @@ export async function getSwimmer(id: string): Promise<Swimmer | undefined> {
 export async function addSwimmer(data: SafeSwimmer): Promise<string> {
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
-  await db.swimmers.add({ ...data, id, createdAt: now, updatedAt: now })
+  await db.swimmers.add({ ...data, status: data.status ?? 'active', id, createdAt: now, updatedAt: now })
   return id
 }
 
@@ -266,6 +266,9 @@ export async function createRunFromTemplate(sessionId: string, runData: { date: 
     poolLength: runData.poolLength,
     notes: runData.notes || '',
     status: 'active',
+    session_started_at: Date.now(),
+    session_paused_at: null,
+    session_pause_duration: 0,
   })
 
   let runDrillOrder = 0
@@ -406,6 +409,18 @@ export const DEFAULT_EQUIPMENT = ['fins', 'zoomers', 'paddles', 'pullbuoy', 'sno
 
 export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
   const now = new Date().toISOString()
+
+  // Upsert by name: if a drill with the same name already exists, update it
+  const existing = await db.libraryDrills.where('name').equals(data.name).first()
+  if (existing) {
+    await db.libraryDrills.update(existing.id, {
+      ...data,
+      source: data.source || existing.source || 'personal',
+      updatedAt: now,
+    })
+    return existing.id
+  }
+
   const id = crypto.randomUUID()
   const drill: LibraryDrill = {
     ...data,
@@ -608,6 +623,45 @@ export async function patchLibraryDrills(): Promise<void> {
       })
     }
   }
+}
+
+export async function deduplicateLibraryDrills(): Promise<number> {
+  const all = await db.libraryDrills.toArray()
+  const groups = new Map<string, LibraryDrill[]>()
+  for (const d of all) {
+    const g = groups.get(d.name) || []
+    g.push(d)
+    groups.set(d.name, g)
+  }
+
+  let removed = 0
+  for (const [, drills] of groups) {
+    if (drills.length <= 1) continue
+
+    // Keep the best entry: prefer builtin source, then most complete data
+    drills.sort((a, b) => {
+      const aScore = (a.source === 'builtin' ? 2 : 0)
+        + (a.description ? 1 : 0)
+        + ((a.labels?.length || 0) > 0 ? 1 : 0)
+        + (a.focus && a.focus !== 'none' ? 1 : 0)
+      const bScore = (b.source === 'builtin' ? 2 : 0)
+        + (b.description ? 1 : 0)
+        + ((b.labels?.length || 0) > 0 ? 1 : 0)
+        + (b.focus && b.focus !== 'none' ? 1 : 0)
+      return bScore - aScore
+    })
+    const [keep, ...rest] = drills
+
+    for (const dup of rest) {
+      // Merge items from duplicate if the kept drill has no items
+      if (dup.items && dup.items.length > 0 && (!keep.items || keep.items.length === 0)) {
+        await db.libraryDrills.update(keep.id, { items: dup.items, updatedAt: new Date().toISOString() })
+      }
+      await db.libraryDrills.delete(dup.id)
+      removed++
+    }
+  }
+  return removed
 }
 
 export async function resetLibraryToDefaults(): Promise<void> {

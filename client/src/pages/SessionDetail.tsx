@@ -334,6 +334,7 @@ export const SessionDetail: React.FC = () => {
 
       {/* Drill Editor Modal */}
       <DrillEditorModal
+        key={showRichEditor ? editingLibraryId ?? richDrill.id ?? 'new' : 'closed'}
         open={showRichEditor}
         title={editingLibraryId ? 'Edit Bank Drill' : richDrill.id ? 'Edit Drill' : 'New Drill'}
         initialData={showRichEditor ? richDrill as DrillFormData : undefined}

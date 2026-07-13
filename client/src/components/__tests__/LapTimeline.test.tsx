@@ -10,24 +10,24 @@ describe('LapTimeline', () => {
         laps={[]}
         totalDistance={100}
         poolLength={25}
-        laneElapsed={120000}
-        offsetFromLaneStart={0}
-        finalElapsed={null}
+        drillDuration={120000}
+        startedAt={0}
+        completedAt={null}
       />
     )
     expect(container.textContent).toContain('Start')
     expect(container.textContent).toContain('0:00:00')
   })
 
-  it('renders finish marker when finalElapsed is provided', () => {
+  it('renders finish marker when completedAt is provided', () => {
     const { container } = render(
       <LapTimeline
         laps={[]}
         totalDistance={100}
         poolLength={25}
-        laneElapsed={120000}
-        offsetFromLaneStart={0}
-        finalElapsed={100000}
+        drillDuration={120000}
+        startedAt={0}
+        completedAt={100000}
       />
     )
     expect(container.textContent).toContain('Finish')
@@ -39,9 +39,9 @@ describe('LapTimeline', () => {
         laps={[30000, 60000]}
         totalDistance={100}
         poolLength={25}
-        laneElapsed={120000}
-        offsetFromLaneStart={0}
-        finalElapsed={null}
+        drillDuration={120000}
+        startedAt={0}
+        completedAt={null}
       />
     )
     expect(container.textContent).toContain('0:30:00')
@@ -54,9 +54,9 @@ describe('LapTimeline', () => {
         laps={[]}
         totalDistance={200}
         poolLength={25}
-        laneElapsed={240000}
-        offsetFromLaneStart={0}
-        finalElapsed={null}
+        drillDuration={240000}
+        startedAt={0}
+        completedAt={null}
       />
     )
     expect(container.textContent).toContain('0m')
@@ -72,9 +72,9 @@ describe('LapTimeline', () => {
         laps={[]}
         totalDistance={100}
         poolLength={25}
-        laneElapsed={120000}
-        offsetFromLaneStart={0}
-        finalElapsed={null}
+        drillDuration={120000}
+        startedAt={0}
+        completedAt={null}
       />
     )
     expect(container.textContent).not.toContain('Double-tap track')
@@ -86,9 +86,9 @@ describe('LapTimeline', () => {
         laps={[]}
         totalDistance={100}
         poolLength={25}
-        laneElapsed={120000}
-        offsetFromLaneStart={0}
-        finalElapsed={null}
+        drillDuration={120000}
+        startedAt={0}
+        completedAt={null}
         onChange={vi.fn()}
       />
     )
@@ -101,23 +101,23 @@ describe('LapTimeline', () => {
         laps={[]}
         totalDistance={100}
         poolLength={25}
-        laneElapsed={120000}
-        offsetFromLaneStart={5000}
-        finalElapsed={null}
+        drillDuration={120000}
+        startedAt={5000}
+        completedAt={null}
       />
     )
     expect(container.textContent).toContain('Start')
   })
 
-  it('renders with finalElapsed lap data correctly', () => {
+  it('renders with completedAt lap data correctly', () => {
     const { container } = render(
       <LapTimeline
         laps={[30000, 60000, 95000]}
         totalDistance={200}
         poolLength={50}
-        laneElapsed={120000}
-        offsetFromLaneStart={0}
-        finalElapsed={95000}
+        drillDuration={120000}
+        startedAt={0}
+        completedAt={95000}
         onChange={vi.fn()}
       />
     )

@@ -14,7 +14,9 @@ export const SwimmersList: React.FC = () => {
   const [formName, setFormName] = useState('')
   const [formGroup, setFormGroup] = useState('')
   const [formNotes, setFormNotes] = useState('')
+  const [formStatus, setFormStatus] = useState<'active' | 'inactive'>('active')
   const [deleteTarget, setDeleteTarget] = useState<Swimmer | null>(null)
+  // removed unused showConfirm state
 
   const filteredSwimmers = useMemo(() => {
     if (!search.trim()) return swimmers
@@ -38,6 +40,7 @@ export const SwimmersList: React.FC = () => {
     setFormName('')
     setFormGroup('')
     setFormNotes('')
+    setFormStatus('active')
     setShowModal(true)
   }
 
@@ -46,6 +49,7 @@ export const SwimmersList: React.FC = () => {
     setFormName(s.name)
     setFormGroup(s.group || '')
     setFormNotes(s.notes || '')
+    setFormStatus(s.status || 'active')
     setShowModal(true)
   }
 
@@ -136,39 +140,31 @@ export const SwimmersList: React.FC = () => {
           )}
         </section>
       ) : (
-        <section className="r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
+        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredSwimmers.map(s => (
             <div
               key={s.id}
               className="bg-surface-container-lowest rounded-xl custom-shadow p-5 border-2 border-transparent hover:border-primary transition-all group"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex gap-4">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface-variant flex-shrink-0 bg-surface-container-high flex items-center justify-center">
-                    <span className="material-symbols-outlined text-3xl text-on-surface-variant">person</span>
-                  </div>
-                  <div>
-                    <Link to={`/swimmers/${s.id}`} className="no-underline">
-                      <h3 className="font-headline-md text-headline-md text-on-surface hover:text-primary transition-colors">{s.name}</h3>
-                    </Link>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {s.group && (
-                        <span className="bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase">
-                          {s.group}
-                        </span>
-                      )}
-                      {s.notes && (
-                        <span className="text-on-surface-variant font-label-sm text-label-sm">{s.notes}</span>
-                      )}
-                    </div>
+              <div className="flex items-start gap-4 mb-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface-variant flex-shrink-0 bg-surface-container-high flex items-center justify-center">
+                  <span className="material-symbols-outlined text-3xl text-on-surface-variant">person</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Link to={`/swimmers/${s.id}`} className="no-underline">
+                    <h3 className="font-headline-md text-headline-md text-on-surface hover:text-primary transition-colors truncate">{s.name}</h3>
+                  </Link>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    {s.group && (
+                      <span className="bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase">
+                        {s.group}
+                      </span>
+                    )}
+                    {s.notes && (
+                      <span className="text-on-surface-variant font-label-sm text-label-sm truncate max-w-[200px]">{s.notes}</span>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={() => openEditModal(s)}
-                  className="material-symbols-outlined text-outline hover:text-primary transition-colors"
-                >
-                  more_vert
-                </button>
               </div>
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-surface-container-low p-3 rounded-lg">
@@ -177,9 +173,9 @@ export const SwimmersList: React.FC = () => {
                 </div>
                 <div className="bg-surface-container-low p-3 rounded-lg">
                   <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">STATUS</span>
-                  <span className="flex items-center gap-1.5 text-green-600 font-bold text-sm">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    Active
+                  <span className={`flex items-center gap-1.5 font-bold text-sm ${s.status === 'inactive' ? 'text-on-surface-variant' : 'text-green-600'}`}>
+                    <span className={`w-2 h-2 rounded-full ${s.status === 'inactive' ? 'bg-outline' : 'bg-green-500'}`}></span>
+                    {s.status === 'inactive' ? 'Inactive' : 'Active'}
                   </span>
                 </div>
               </div>
@@ -197,12 +193,12 @@ export const SwimmersList: React.FC = () => {
                 >
                   <span className="material-symbols-outlined">edit</span>
                 </button>
-                <button
-                  onClick={() => setDeleteTarget(s)}
-                  className="w-12 h-touch-target-min border-2 border-error/30 text-error rounded-lg flex items-center justify-center hover:bg-error-container transition-all"
-                >
-                  <span className="material-symbols-outlined">delete</span>
-                </button>
+<button
+                        onClick={() => { setDeleteTarget(s); }}
+                      className="w-12 h-touch-target-min border-2 border-error/30 text-error rounded-lg flex items-center justify-center hover:bg-error-container transition-all"
+                    >
+                      <span className="material-symbols-outlined">delete</span>
+                    </button>
               </div>
             </div>
           ))}
@@ -235,9 +231,10 @@ export const SwimmersList: React.FC = () => {
       </button>
 
       <SwimmerFormModal
+        key={showModal ? editingId ?? 'add' : 'closed'}
         open={showModal}
         editingId={editingId}
-        initialData={editingId ? { name: formName, group: formGroup, notes: formNotes } : undefined}
+        initialData={editingId ? { name: formName, group: formGroup, notes: formNotes, status: formStatus } : undefined}
         onSave={async (data) => {
           if (editingId) {
             await updateSwimmer(editingId, data)

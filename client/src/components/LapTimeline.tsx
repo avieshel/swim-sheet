@@ -2,20 +2,20 @@ import { useRef, useState } from 'react'
 import { formatTime } from '../utils/formatTime'
 import { addLap as addCumLap, moveLap } from '../utils/lapEditing'
 
-export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offsetFromLaneStart, finalElapsed, onChange, onChangeStartOffset, onChangeDoneTime }: {
+export function LapTimeline({ laps, totalDistance, poolLength, drillDuration, startedAt, completedAt, onChange, onChangeStartOffset, onChangeDoneTime }: {
   laps: number[];
   totalDistance: number;
   poolLength: number;
-  laneElapsed: number;
-  offsetFromLaneStart: number;
-  finalElapsed?: number | null;
+  drillDuration: number;
+  startedAt: number;
+  completedAt?: number | null;
   onChange?: (newLaps: number[]) => void;
   onChangeStartOffset?: (newOffset: number) => void;
   onChangeDoneTime?: (newDoneTime: number) => void;
 }) {
-  const offset = offsetFromLaneStart ?? 0
-  const hasDone = finalElapsed !== null && finalElapsed !== undefined
-  const finishTime = hasDone ? finalElapsed! : laneElapsed
+  const offset = startedAt ?? 0
+  const hasDone = completedAt !== null && completedAt !== undefined
+  const finishTime = hasDone ? completedAt! : offset + drillDuration
 
   type Marker = { id: string; type: 'start' | 'lap' | 'finish'; laneCum: number; lapIndex?: number }
   const allMarkers: Marker[] = []
@@ -25,15 +25,15 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
   const displayLaps = (() => {
     if (laps.length === 0) return []
     const last = laps[laps.length - 1]
-    const lastAtFinish = hasDone && Math.abs(last - finalElapsed!) < 1
+    const lastAtFinish = hasDone && Math.abs(last - completedAt!) < 1
     return lastAtFinish ? laps.slice(0, -1) : laps
   })()
   displayLaps.forEach((cum, i) => {
     allMarkers.push({ id: `lap-${i}`, type: 'lap', laneCum: cum, lapIndex: i })
   })
 
-  if (hasDone && finalElapsed !== null) {
-    allMarkers.push({ id: 'finish', type: 'finish', laneCum: finalElapsed })
+  if (hasDone && completedAt !== null) {
+    allMarkers.push({ id: 'finish', type: 'finish', laneCum: completedAt })
   }
 
   allMarkers.sort((a, b) => a.laneCum - b.laneCum)
@@ -47,9 +47,9 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
   const windowStart = offset
   const windowEnd = finishTime
   const windowSpan = windowEnd - windowStart
-  const distPosPct = (d: number) => laneElapsed > 0 && windowSpan > 0
-    ? ((windowStart + (d / totalDistance) * windowSpan) / laneElapsed) * 100
-    : laneElapsed > 0 ? (d / totalDistance) * 100 : 0
+  const distPosPct = (d: number) => drillDuration > 0 && windowSpan > 0
+    ? ((windowStart + (d / totalDistance) * windowSpan) / drillDuration) * 100
+    : drillDuration > 0 ? (d / totalDistance) * 100 : 0
 
   const trackRef = useRef<HTMLDivElement>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -58,13 +58,13 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
   const hasMoved = useRef(false)
   const lastTapTime = useRef(0)
 
-  const posPct = (laneCum: number) => laneElapsed > 0 ? (laneCum / laneElapsed) * 100 : 0
+  const posPct = (laneCum: number) => drillDuration > 0 ? (laneCum / drillDuration) * 100 : 0
 
   const getPointerLaneCum = (clientX: number) => {
     if (!trackRef.current) return 0
     const rect = trackRef.current.getBoundingClientRect()
     const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-    return pct * laneElapsed
+    return pct * drillDuration
   }
 
   const handleMarkerPointerDown = (marker: Marker, e: React.PointerEvent) => {
@@ -110,7 +110,7 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
         onChangeStartOffset(constrained)
       } else if (marker.type === 'finish' && onChangeDoneTime) {
         const lastLapCum = displayLaps.length > 0 ? displayLaps[displayLaps.length - 1] : offset
-        const constrained = Math.max(lastLapCum + 1, Math.min(laneElapsed, newLaneCum))
+        const constrained = Math.max(lastLapCum + 1, Math.min(drillDuration, newLaneCum))
         onChangeDoneTime(constrained)
       }
     }
@@ -162,7 +162,7 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
   timeLabels.sort((a, b) => a.laneCum - b.laneCum)
 
   return (
-    <div className="w-full mt-2 pt-2 border-t border-outline-variant/30 select-none touch-none">
+    <div className="w-full mt-2 pt-2 border-t border-outline-variant/30 select-none touch-none" dir="ltr">
       {/* Level 1: Start/Finish text labels at the edges */}
       <div className="relative h-3.5 mb-px">
         <span className="absolute text-[9px] font-mono font-semibold text-on-surface-variant leading-none" style={{ left: `${posPct(offset)}%`, lineHeight: '12px' }}>Start</span>
@@ -187,7 +187,7 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
         ))}
         {(!hasDone || posPct(finishTime) < 98) && (
           <span className="absolute text-[9px] font-mono tabular-nums text-on-surface-variant font-semibold" style={{ left: '100%', transform: 'translateX(-100%)', lineHeight: '12px' }}>
-            {formatTime(laneElapsed)}
+            {formatTime(drillDuration)}
           </span>
         )}
       </div>
@@ -199,7 +199,7 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
         onPointerUp={onChange ? handleTrackPointerUp : undefined}
       >
         {/* Track line — highlight the swimmer's window */}
-        <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-0.5 bg-outline-variant/30 rounded-full pointer-events-none" />
+        <div className="absolute top-1/2 -translate-y-1/2 start-0 end-0 h-0.5 bg-outline-variant/30 rounded-full pointer-events-none" />
         <div className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-primary/30 pointer-events-none"
           style={{
             left: `${posPct(offset)}%`,
@@ -208,7 +208,7 @@ export function LapTimeline({ laps, totalDistance, poolLength, laneElapsed, offs
         />
 
         {onChange && (
-          <div className="absolute top-0 left-0 right-0 h-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+          <div className="absolute top-0 start-0 end-0 h-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
             <span className="text-[8px] text-primary font-semibold">Double-tap track to add lap</span>
           </div>
         )}

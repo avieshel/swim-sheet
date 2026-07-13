@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addLap, moveLap, removeLap, splitsToCumulative, cumulativeToSplits } from './lapEditing'
+import { addLap, moveLap, removeLap } from './lapEditing'
 
 describe('addLap', () => {
   it('inserts a lap in the middle', () => {
@@ -139,28 +139,4 @@ describe('removeLap', () => {
   })
 })
 
-describe('split <-> cumulative conversion', () => {
-  it('converts splits to cumulative', () => {
-    expect(splitsToCumulative([32000, 33000, 31000])).toEqual([32000, 65000, 96000])
-  })
 
-  it('converts cumulative to splits', () => {
-    expect(cumulativeToSplits([32000, 65000, 96000])).toEqual([32000, 33000, 31000])
-  })
-
-  it('round-trips correctly', () => {
-    const splits = [32000, 33000, 31000, 34000]
-    const cum = splitsToCumulative(splits)
-    expect(cumulativeToSplits(cum)).toEqual(splits)
-  })
-
-  it('handles empty arrays', () => {
-    expect(splitsToCumulative([])).toEqual([])
-    expect(cumulativeToSplits([])).toEqual([])
-  })
-
-  it('handles single-element arrays', () => {
-    expect(splitsToCumulative([32000])).toEqual([32000])
-    expect(cumulativeToSplits([32000])).toEqual([32000])
-  })
-})

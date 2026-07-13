@@ -63,7 +63,7 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
       </main>
 
       {/* BottomNavBar (Mobile) */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-end px-2 pb-3 pt-1 bg-surface-container shadow-[0px_-4px_20px_rgba(0,0,0,0.12)] z-50 rounded-t-xl safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 start-0 w-full flex justify-around items-end px-2 pb-3 pt-1 bg-surface-container shadow-[0px_-4px_20px_rgba(0,0,0,0.12)] z-50 rounded-t-xl safe-area-bottom">
         {navItems.map(item => (
           <Link
             key={item.path}
@@ -93,7 +93,7 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
           onClick={closeDrawer}
         >
           <div
-            className="fixed top-0 left-0 h-full w-72 max-w-[85vw] bg-surface-container-lowest shadow-2xl z-[70] flex flex-col"
+             className="fixed top-0 start-0 h-full w-72 max-w-[85vw] bg-surface-container-lowest shadow-2xl z-[70] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-4 py-4 border-b border-outline-variant">

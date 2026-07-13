@@ -1,37 +1,34 @@
 import { useEffect, useState } from 'react'
-import { swimmers } from '../api'
+import { listSwimmers } from '../api/swimmers'
+import { type Swimmer } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
 import type { TimedGroup } from '../context/LiveSessionContext'
 
-interface DbSwimmer {
-  id: string
-  name: string
-  group: string
-  notes: string
-  createdAt: string
-  updatedAt: string
-}
-
 interface LaneEditorModalProps {
-  state: { groups: TimedGroup[] }
+  state: { groups: TimedGroup[]; runId?: string | null }
   editorScrollToLane: number | null
   onScrollHandled: () => void
-  onAddSwimmerToLane: (sw: DbSwimmer, gid: string) => void
+  onAddSwimmerToLane: (sw: Swimmer, gid: string) => void
   onAddGroup: (lane: number, name: string, id?: string) => void
   onRemoveGroup: (groupId: string) => void
   onMoveSwimmer: (swimmerId: number, fromGroupId: string, toGroupId: string) => void
+  onUpdateGroupName: (groupId: string, name: string) => void
+  onResetGroup: (groupId: string) => void
   onClose: () => void
 }
 
 export function LaneEditorModal({
   state, editorScrollToLane, onScrollHandled,
-  onAddSwimmerToLane, onAddGroup, onRemoveGroup, onMoveSwimmer, onClose,
+  onAddSwimmerToLane, onAddGroup, onRemoveGroup, onMoveSwimmer, onUpdateGroupName, onResetGroup, onClose,
 }: LaneEditorModalProps) {
-  const [allSwimmers, setAllSwimmers] = useState<DbSwimmer[]>([])
+  const [allSwimmers, setAllSwimmers] = useState<Swimmer[]>([])
   const [unassignedSearch, setUnassignedSearch] = useState('')
   const [removingGroupId, setRemovingGroupId] = useState<string | null>(null)
+  const [editingNameGroupId, setEditingNameGroupId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [resettingGroupId, setResettingGroupId] = useState<string | null>(null)
 
-  useEffect(() => { swimmers.listSwimmers().then(setAllSwimmers) }, [])
+  useEffect(() => { listSwimmers().then(setAllSwimmers) }, [])
 
   const assignedIds = new Set(state.groups.flatMap(g => g.swimmers.map(s => s.dbId)))
   const unassignedPool = allSwimmers.filter(s => !assignedIds.has(s.id))
@@ -121,7 +118,36 @@ export function LaneEditorModal({
             <div key={group.id} data-lane={group.lane} className="bg-surface-container-low rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <span className="bg-primary-container text-on-primary-container text-xs font-bold px-2 py-0.5 rounded-md">Lane {group.lane}</span>
-                <span className="font-bold text-sm text-on-surface">{group.name}</span>
+                {editingNameGroupId === group.id ? (
+                  <input
+                    type="text"
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    className="flex-1 bg-surface-container-lowest border-b-2 border-primary p-0.5 text-sm font-bold outline-none rounded-t min-w-0"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') setEditingNameGroupId(null)
+                      if (e.key === 'Enter') {
+                        onUpdateGroupName(group.id, editingName)
+                        setEditingNameGroupId(null)
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="font-bold text-sm text-on-surface min-w-0 truncate">{group.name}</span>
+                )}
+                <button onClick={() => {
+                  if (editingNameGroupId === group.id) {
+                    onUpdateGroupName(group.id, editingName)
+                    setEditingNameGroupId(null)
+                  } else {
+                    setEditingName(group.name)
+                    setEditingNameGroupId(group.id)
+                  }
+                }}
+                  className="h-5 w-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer shrink-0">
+                  <span className="material-symbols-outlined text-[10px]">edit</span>
+                </button>
                 <span className="text-xs text-on-surface-variant">{group.swimmers.length} swimmer{group.swimmers.length !== 1 ? 's' : ''}</span>
                 {group.swimmers.length === 0 && (
                   <button onClick={() => setRemovingGroupId(group.id)}
@@ -163,6 +189,15 @@ export function LaneEditorModal({
                   </div>
                 </div>
               ))}
+              {group.swimmers.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-outline-variant/30">
+                  <button onClick={() => setResettingGroupId(group.id)}
+                    className="text-xs text-error font-semibold flex items-center gap-1 hover:underline cursor-pointer">
+                    <span className="material-symbols-outlined text-xs">refresh</span>
+                    Reset lane
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -176,6 +211,18 @@ export function LaneEditorModal({
             destructive={true}
             onConfirm={() => { onRemoveGroup(removingGroupId); setRemovingGroupId(null) }}
             onCancel={() => setRemovingGroupId(null)}
+          />
+        )}
+        {resettingGroupId && (
+          <ConfirmDialog
+            open={true}
+            title="Reset lane?"
+            message={`Clear all timing data for this lane and return to the first drill? Swimmers will remain assigned.`}
+            confirmLabel="Reset"
+            cancelLabel="Cancel"
+            destructive={true}
+            onConfirm={() => { onResetGroup(resettingGroupId); setResettingGroupId(null) }}
+            onCancel={() => setResettingGroupId(null)}
           />
         )}
         <div className="flex gap-2 mt-4 shrink-0">

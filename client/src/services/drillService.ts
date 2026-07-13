@@ -1,7 +1,7 @@
 import {
   getDrillsForSession, getDrill, addDrill, updateDrill, deleteDrill,
   getAllLibraryDrills, addLibraryDrill, updateLibraryDrill, deleteLibraryDrill,
-  seedLibraryDrills, patchLibraryDrills, resetLibraryToDefaults,
+  seedLibraryDrills, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills,
 } from '../db/dao'
 import type { SafeDrill, SafeLibraryDrill } from '../db/schema'
 
@@ -20,4 +20,5 @@ export const drillService = {
   patchLibrary: () => patchLibraryDrills(),
   resetLibraryToDefaults: () => resetLibraryToDefaults(),
   seedLibrary: () => seedLibraryDrills(),
+  deduplicateLibrary: () => deduplicateLibraryDrills(),
 }

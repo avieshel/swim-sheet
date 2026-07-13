@@ -5,6 +5,7 @@ export interface Swimmer {
   name: string
   group: string
   notes: string
+  status: 'active' | 'inactive'
   createdAt: string
   updatedAt: string
 }
@@ -61,6 +62,9 @@ export interface SessionRun {
   poolLength: number
   notes: string
   status: 'active' | 'completed'
+  session_started_at: number | null
+  session_paused_at: number | null
+  session_pause_duration: number
   createdAt: string
   updatedAt: string
 }
@@ -170,6 +174,42 @@ class SwimSheetDB extends Dexie {
       laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
       libraryDrills: 'id, name, stroke, focus, updatedAt',
       _meta: 'key',
+    })
+
+    this.version(2).stores({
+      swimmers: 'id, name, status, updatedAt',
+      sessions: 'id, createdAt, updatedAt',
+      drills: 'id, session_id, focus, updatedAt',
+      sessionRuns: 'id, session_id, status, date, updatedAt',
+      runDrills: 'id, run_id, parent_drill_id, updatedAt',
+      runSwimmers: 'id, run_id, swimmer_id',
+      laps: 'id, run_drill_id, swimmer_id, createdAt',
+      laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
+      libraryDrills: 'id, name, stroke, focus, updatedAt',
+      _meta: 'key',
+    }).upgrade(async tx => {
+      await tx.table('swimmers').toCollection().modify(s => {
+        s.status = 'active'
+      })
+    })
+
+    this.version(3).stores({
+      swimmers: 'id, name, status, updatedAt',
+      sessions: 'id, createdAt, updatedAt',
+      drills: 'id, session_id, focus, updatedAt',
+      sessionRuns: 'id, session_id, status, date, updatedAt',
+      runDrills: 'id, run_id, parent_drill_id, updatedAt',
+      runSwimmers: 'id, run_id, swimmer_id',
+      laps: 'id, run_drill_id, swimmer_id, createdAt',
+      laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
+      libraryDrills: 'id, name, stroke, focus, updatedAt',
+      _meta: 'key',
+    }).upgrade(async tx => {
+      await tx.table('sessionRuns').toCollection().modify(r => {
+        r.session_started_at = r.session_started_at ?? null
+        r.session_paused_at = r.session_paused_at ?? null
+        r.session_pause_duration = r.session_pause_duration ?? 0
+      })
     })
   }
 }

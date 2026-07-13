@@ -32,7 +32,7 @@ vi.mock('../../services/runService', () => ({
   },
 }))
 
-import { getActiveRun, getRun, listAllRuns, createRun, updateRun, completeRun, createRunFromTemplate, getRunDrills, getRunDrill, createRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, clearSwimmerFromLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap } from '../runs'
+import { getActiveRun, getRun, createRun, updateRun, completeRun, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, clearSwimmerFromLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap } from '../runs'
 import { runService } from '../../services/runService'
 import type { SafeSessionRun, SafeLaneDrillResult, SafeLap } from '../../db/schema'
 
@@ -54,14 +54,6 @@ describe('runs API', () => {
     vi.mocked(runService.get).mockResolvedValue(expected)
     const result = await getRun('r1')
     expect(runService.get).toHaveBeenCalledWith('r1')
-    expect(result).toBe(expected)
-  })
-
-  it('listAllRuns delegates to runService.listAll', async () => {
-    const expected = [{ id: 'r1' }, { id: 'r2' }]
-    vi.mocked(runService.listAll).mockResolvedValue(expected)
-    const result = await listAllRuns()
-    expect(runService.listAll).toHaveBeenCalledOnce()
     expect(result).toBe(expected)
   })
 
@@ -110,14 +102,6 @@ describe('runs API', () => {
     const result = await getRunDrill('rd1')
     expect(runService.getDrill).toHaveBeenCalledWith('rd1')
     expect(result).toBe(expected)
-  })
-
-  it('createRunDrill delegates to runService.addDrill', async () => {
-    const data = { runId: 'r1', name: 'Test', distance: 100, stroke: 'freestyle' as const, order: 0 }
-    vi.mocked(runService.addDrill).mockResolvedValue('new-id')
-    const result = await createRunDrill(data)
-    expect(runService.addDrill).toHaveBeenCalledWith(data)
-    expect(result).toBe('new-id')
   })
 
   it('updateRunDrill delegates to runService.updateDrill', async () => {

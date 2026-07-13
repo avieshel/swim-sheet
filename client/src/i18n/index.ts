@@ -3,10 +3,13 @@ import en from './messages_en.json';
 
 type Bundle = Record<string, string>;
 
-const bundles: Record<string, Bundle> = { en };
+import he from './messages_he.json';
 
-// Determine language – only the first part (e.g., "en" from "en‑US")
-const lang = (navigator.language || 'en').split('-')[0];
+const bundles: Record<string, Bundle> = { en, he };
+
+// Determine language – stored preference overrides navigator
+const storedLang = typeof localStorage !== 'undefined' ? localStorage.getItem('selectedLanguage') : null;
+const lang = (storedLang || (navigator.language || 'en')).split('-')[0];
 const messages: Bundle = bundles[lang] ?? bundles.en;
 
 /**

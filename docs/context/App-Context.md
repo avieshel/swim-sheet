@@ -73,6 +73,12 @@ Sessions are reusable templates. When a coach starts a session on the Live page,
 ### Timed Groups (Live View)
 The live view uses Timed Groups instead of a single global timer. Each group has its own independent clock. Groups can be split (duplicating timer state), swimmers can be moved between groups, and multiple groups can share a physical lane.
 
+### Duplicate Drill Prevention & Dedup
+
+`addLibraryDrill` (DAO) upserts by name — if a drill with the same name exists, it updates the existing record instead of creating a duplicate. This prevents the main source of duplicates: `addDrill` auto-saving session drills to the library.
+
+On DrillBank load, `deduplicateLibraryDrills()` runs as a one-time cleanup: it groups library drills by exact name, keeps the most complete entry (preferring built-in source), and deletes the rest.
+
 ### Two-Agent Workflow
 - **Planner** (cloud model): Design, architecture decisions, task breakdown, code review
 - **Coder** (local model): File creation, implementation, testing

@@ -68,7 +68,7 @@ Reducer actions contain business logic:
 Move these rules to `runService.ts` or a `timingService.ts`.
 
 **Priority**: Low
-**Status**: Open
+**Status**: Done — Reducer reduced to ~18 structure-only actions. All timestamp logic moved to `TimestampStore` (`timing/timestampStore.ts`). Lane-level batch stop in LiveDeck uses `store.batchStop()`.
 
 ---
 
@@ -79,7 +79,7 @@ Move these rules to `runService.ts` or a `timingService.ts`.
 `useEffect` in LiveSessionContext creates 8 empty TimedGroups when state is empty. The context should be agnostic of lane count. Initialize only when a session starts.
 
 **Priority**: Medium
-**Status**: Open
+**Status**: Done — `useEffect` removed. Groups initialized only via `INIT` action dispatched from `LiveSessionProvider` when a session starts.
 
 ---
 
@@ -187,6 +187,28 @@ When creating a drill (in DrillBank or SessionDetail), detect similar existing d
 - `client/src/pages/SessionDetail.tsx` — similarity check against session + library drills
 
 **Priority**: Medium
+**Status**: Done
+
+---
+
+## A-017: Drill bank dedup — Prevent and clean up duplicate library drills ✅
+
+**Source**: User complaint — drill bank showed many duplicate drills
+
+Two changes:
+
+1. **`addLibraryDrill` upserts by name** — if a library drill with the same name already exists, it updates the existing record instead of creating a new one. This prevents the main source of duplicates: `addDrill` auto-saving session drills to the library (each session drill creation was creating a new library entry even if one with the same name existed).
+
+2. **`deduplicateLibraryDrills()` batch cleanup** — runs on DrillBank load. Groups all library drills by exact name, keeps the most complete entry (builtin source preferred, then description/labels/focus completeness), and deletes the rest. Items are merged from duplicates if the kept drill has none.
+
+**Files modified**:
+- `client/src/db/dao.ts` — `addLibraryDrill`: upsert by name; new `deduplicateLibraryDrills()`
+- `client/src/services/drillService.ts` — exposes `deduplicateLibrary()`
+- `client/src/api/drills.ts` — exports `deduplicateLibraryDrills()`
+- `client/src/pages/DrillBank.tsx` — calls dedup on initial load and after saves/resets
+- `docs/context/App-Context.md` — design decisions entry
+
+**Priority**: High
 **Status**: Done
 
 ---

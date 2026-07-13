@@ -4,7 +4,6 @@ const mockDao = vi.hoisted(() => ({
   addSessionRun: vi.fn(),
   updateSessionRun: vi.fn(),
   getSessionRun: vi.fn(),
-  getAllSessionRuns: vi.fn(),
   getActiveRun: vi.fn(),
   completeSessionRun: vi.fn(),
   getRunDrillsForRun: vi.fn(),
@@ -57,14 +56,6 @@ describe('runService', () => {
       expect(result).toEqual(expected)
     })
 
-    it('listAll calls getAllSessionRuns', async () => {
-      const expected = [{ id: 'r1' }, { id: 'r2' }]
-      mockDao.getAllSessionRuns.mockResolvedValue(expected)
-      const result = await runService.listAll()
-      expect(mockDao.getAllSessionRuns).toHaveBeenCalledOnce()
-      expect(result).toEqual(expected)
-    })
-
     it('create calls addSessionRun with data', async () => {
       const data = { session_id: 's1', date: '2024-01-01', poolName: 'Pool', poolLength: 25, notes: '', status: 'active' as const }
       mockDao.addSessionRun.mockResolvedValue('new-id')
@@ -102,14 +93,6 @@ describe('runService', () => {
       const result = await runService.getDrill('rd1')
       expect(mockDao.getRunDrill).toHaveBeenCalledExactlyOnceWith('rd1')
       expect(result).toEqual(expected)
-    })
-
-    it('addDrill calls addRunDrill with data', async () => {
-      const data = { run_id: 'r1', name: 'Drill', stroke: 'freestyle', distance: 100, order: 0, notes: '' }
-      mockDao.addRunDrill.mockResolvedValue('new-id')
-      const result = await runService.addDrill(data)
-      expect(mockDao.addRunDrill).toHaveBeenCalledExactlyOnceWith(data)
-      expect(result).toBe('new-id')
     })
 
     it('deleteDrill calls deleteRunDrill with id', async () => {

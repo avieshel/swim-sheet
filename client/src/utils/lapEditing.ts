@@ -22,20 +22,9 @@ export function removeLap(laps: number[], index: number): number[] {
   return laps.filter((_, i) => i !== index)
 }
 
-export function splitsToCumulative(splits: number[]): number[] {
-  const out: number[] = []
-  let s = 0
-  for (const v of splits) { s += v; out.push(s) }
-  return out
-}
-
-export function cumulativeToSplits(cumulatives: number[]): number[] {
-  return cumulatives.map((v, i) => i === 0 ? v : v - cumulatives[i - 1])
-}
-
-export function laneRelativeToSplits(laneLaps: number[], offsetFromLaneStart: number): number[] {
-  return laneLaps.map((v, i) => {
-    const prev = i > 0 ? laneLaps[i - 1] : offsetFromLaneStart
+export function timestampSplits(laps: number[], startedAt: number): number[] {
+  return laps.map((v, i) => {
+    const prev = i > 0 ? laps[i - 1] : startedAt
     return v - prev
   })
 }

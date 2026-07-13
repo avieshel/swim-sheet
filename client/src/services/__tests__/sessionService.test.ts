@@ -7,7 +7,6 @@ const mockDao = vi.hoisted(() => ({
   updateSession: vi.fn(),
   deleteSession: vi.fn(),
   getDrillsForSession: vi.fn(),
-  getRunsForSession: vi.fn(),
   getCompletedRuns: vi.fn(),
   getActiveRun: vi.fn(),
 }))
@@ -63,14 +62,6 @@ describe('sessionService', () => {
     mockDao.getDrillsForSession.mockResolvedValue(expected)
     const result = await sessionService.getDrills('1')
     expect(mockDao.getDrillsForSession).toHaveBeenCalledExactlyOnceWith('1')
-    expect(result).toEqual(expected)
-  })
-
-  it('getRuns calls getRunsForSession with sessionId', async () => {
-    const expected = [{ id: 'r1', session_id: '1' }]
-    mockDao.getRunsForSession.mockResolvedValue(expected)
-    const result = await sessionService.getRuns('1')
-    expect(mockDao.getRunsForSession).toHaveBeenCalledExactlyOnceWith('1')
     expect(result).toEqual(expected)
   })
 
