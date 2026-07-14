@@ -58,7 +58,7 @@ describe('SwimmerFormModal', () => {
     await user.type(nameInput, 'Test Swimmer')
     const submitBtn = screen.getByText('Add Swimmer')
     await user.click(submitBtn)
-    expect(onSave).toHaveBeenCalledWith({ name: 'Test Swimmer', group: '', notes: '' })
+    expect(onSave).toHaveBeenCalledWith({ name: 'Test Swimmer', group: '', notes: '', status: 'active' })
   })
 
   it('calls onClose on cancel', async () => {
