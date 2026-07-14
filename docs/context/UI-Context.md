@@ -46,6 +46,14 @@
 ### Icons
 Material Symbols Outlined throughout. Icon naming uses `data-icon` attributes (e.g., `pool`, `search`, `groups`, `timer`, `analytics`, `edit`, `add`).
 
+### PWA / Home Screen Icons
+- **Source**: `favicon.svg` — text-based wordmark "Swim Sheet" (two lines) in Helvetica Neue bold, white on primary teal `#00677f` rounded square
+- **Generated PNGs** (direct render from SVG):
+  - `public/icons/apple-touch-icon-180.png` (180×180, iOS recommended)
+  - `public/icons/icon-192.png` (192×192)
+  - `public/icons/icon-512.png` (512×512)
+- **Regeneration**: `node scripts/generate-icons.mjs` (uses sharp)
+
 ### Dark Mode
 Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 
