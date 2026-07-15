@@ -41,6 +41,11 @@ export function LaneEditorModal({
   const sortedGroups = [...state.groups].sort((a, b) => a.lane - b.lane)
   const laneOptions = [...new Set(state.groups.map(g => g.lane))].sort((a, b) => a - b)
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>

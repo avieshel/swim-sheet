@@ -4,7 +4,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { listSessions, getSession, createSession, deleteSession, listCompletedRuns } from '../api/sessions'
 import { getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
-import { aggregateByStroke, detectFocus } from '../utils/drillHelpers'
+import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/drillHelpers'
 import type { SessionRun } from '../api/runs'
 
 interface SessionWithTotals extends Session {
@@ -53,7 +53,7 @@ export const SessionsList: React.FC = () => {
           return {
             ...s,
             drillCount: drills.length,
-            totalDistance: drills.reduce((sum, d) => sum + d.distance, 0),
+            totalDistance: drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0),
             strokeBreakdown: breakdown,
             focusAreas: detectFocus(drills),
           }
@@ -75,7 +75,7 @@ export const SessionsList: React.FC = () => {
           return {
             ...s,
             drillCount: drills.length,
-            totalDistance: drills.reduce((sum, d) => sum + d.distance, 0),
+            totalDistance: drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0),
             strokeBreakdown: breakdown,
             focusAreas: detectFocus(drills),
           } as SessionWithTotals
@@ -114,8 +114,44 @@ export const SessionsList: React.FC = () => {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading templates...</p>
+    <div>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+        <div>
+          <div className="h-8 w-48 bg-surface-variant rounded animate-pulse" />
+          <div className="h-4 w-72 bg-surface-variant rounded mt-2 animate-pulse" />
+        </div>
+        <div className="h-12 w-36 bg-surface-variant rounded-xl animate-pulse" />
+      </div>
+      <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant animate-pulse">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-surface-variant flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="h-5 w-36 bg-surface-variant rounded" />
+                  <div className="h-5 w-5 bg-surface-variant rounded" />
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="h-3 w-12 bg-surface-variant rounded" />
+                  <div className="h-3 w-3 bg-surface-variant rounded" />
+                  <div className="h-3 w-14 bg-surface-variant rounded" />
+                  <div className="h-3 w-3 bg-surface-variant rounded" />
+                  <div className="h-3 w-16 bg-surface-variant rounded" />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              <div className="h-5 w-16 bg-surface-variant rounded-full" />
+              <div className="h-5 w-20 bg-surface-variant rounded-full" />
+              <div className="h-5 w-14 bg-surface-variant rounded-full" />
+            </div>
+            <div className="pt-3 border-t border-outline-variant/30">
+              <div className="h-4 w-28 bg-surface-variant rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 
@@ -123,8 +159,8 @@ export const SessionsList: React.FC = () => {
     <div>
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
-          <h2 className="font-headline-lg text-headline-lg text-on-surface">Session Templates</h2>
-          <p className="text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
+          <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Session Templates</h2>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
         </div>
         <button
           onClick={() => setShowNewForm(true)}
@@ -190,66 +226,74 @@ export const SessionsList: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
+        <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
           {sessions.map(s => (
             <div
               key={s.id}
-              className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant hover:border-primary transition-all cursor-pointer shadow-sm hover:shadow-md"
+              className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant hover:border-primary/40 transition-all cursor-pointer shadow-sm hover:shadow-md group"
               onClick={() => navigate(`/sessions/${s.id}`)}
             >
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-headline-md text-headline-md text-on-surface font-bold">{s.name}</h3>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                  className="p-1.5 rounded-lg text-outline hover:text-error hover:bg-error-container transition-colors"
-                >
-                  <span className="material-symbols-outlined text-lg">delete</span>
-                </button>
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-xl">description</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-headline-md text-headline-md text-on-surface font-bold truncate">{s.name}</h3>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
+                      className="p-1.5 text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">straighten</span>
+                      {s.poolLength}m
+                    </span>
+                    <span className="text-outline">·</span>
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">fitness_center</span>
+                      {s.drillCount} drills
+                    </span>
+                    <span className="text-outline">·</span>
+                    <span className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">distance</span>
+                      {s.totalDistance}m
+                    </span>
+                  </div>
+                </div>
               </div>
 
-              <p className="text-label-sm text-on-surface-variant mb-3">{s.poolLength}m default pool</p>
-
-              {/* Totals row */}
-              <div className="flex gap-4 mb-3 text-label-sm">
-                <span className="flex items-center gap-1 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-sm">fitness_center</span>
-                  {s.drillCount} drills
-                </span>
-                <span className="flex items-center gap-1 text-on-surface-variant">
-                  <span className="material-symbols-outlined text-sm">straighten</span>
-                  {s.totalDistance}m
-                </span>
-              </div>
-
-              {/* Notes/Focus */}
               {s.notes && (
                 <p className="text-label-sm text-on-surface-variant italic mb-2 truncate">{s.notes}</p>
               )}
 
-              {/* Stroke breakdown chips */}
-              {s.strokeBreakdown.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {s.strokeBreakdown.map(b => (
-                    <span
-                      key={b.stroke}
-                      className={`${strokeColors[b.stroke] || 'bg-surface-variant'} text-white text-[10px] font-bold px-2 py-0.5 rounded-full`}
-                    >
-                      {b.stroke} {b.meters}m
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Chips row */}
+              <div className="flex flex-wrap gap-1 items-center mb-3">
+                {s.strokeBreakdown.map(b => (
+                  <span
+                    key={b.stroke}
+                    className={`${strokeColors[b.stroke] || 'bg-surface-variant'} text-white text-[10px] font-bold px-2 py-0.5 rounded-full`}
+                  >
+                    {b.stroke} {b.meters}m
+                  </span>
+                ))}
+                {s.focusAreas.map(f => (
+                  <span key={f} className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                    {f}
+                  </span>
+                ))}
+              </div>
 
-              {/* Focus badges */}
-              {s.focusAreas.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {s.focusAreas.map(f => (
-                    <span key={f} className="bg-secondary-container text-on-secondary-container text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {f}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Action button */}
+              <div className="pt-3 border-t border-outline-variant/30">
+                <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
+                  Open Template
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                </span>
+              </div>
             </div>
           ))}
         </div>

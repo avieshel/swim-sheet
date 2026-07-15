@@ -65,6 +65,13 @@ export const Settings: React.FC = () => {
   const [cleaningUp, setCleaningUp] = useState(false)
 
   useEffect(() => {
+    if (showResetConfirm) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [showResetConfirm])
+
+  useEffect(() => {
     const loadSettings = async () => {
       try {
         const response = await fetch('/api/v1/settings')
@@ -78,11 +85,14 @@ export const Settings: React.FC = () => {
             distance_units: data.distance_units || 'meters',
             notification_enabled: !!data.notification_enabled,
             sync_interval: (data.sync_interval || 30000).toString(),
-            theme: data.theme || 'auto',
+            theme: data.theme === 'light' ? 'pool' : (data.theme || 'auto'),
             font_size: data.font_size || 'medium',
             auto_save: !!data.auto_save,
             data_retention_days: (data.data_retention_days || 90).toString(),
           })
+          if (data.theme && data.theme !== 'auto') {
+            document.documentElement.dataset.theme = data.theme
+          }
         }
       } catch {
       // If the backend is unavailable (e.g., during local dev without the server),
@@ -229,7 +239,7 @@ export const Settings: React.FC = () => {
         {/* Profile Settings */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Coach Profile</h2>
-          <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
                 <label htmlFor="coach_name" className="font-label-sm text-on-surface block mb-2">
@@ -250,7 +260,7 @@ export const Settings: React.FC = () => {
                 <label className="font-label-sm text-on-surface block mb-2">
                   Teams
                 </label>
-                <div className="flex flex-wrap gap-2 mb-3">
+                <div className="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
                   {form.team_names.map(item => (
                     <div key={item} className="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-3 py-1.5 rounded-full text-sm font-bold">
                       <span>{item}</span>
@@ -312,7 +322,7 @@ export const Settings: React.FC = () => {
         {/* Application Preferences */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Application Preferences</h2>
-          <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
                 <label htmlFor="pool_length" className="font-label-sm text-on-surface block mb-2">
@@ -365,23 +375,6 @@ export const Settings: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label htmlFor="theme" className="font-label-sm text-on-surface block mb-2">
-                  Theme
-                </label>
-                <select
-                  id="theme"
-                  name="theme"
-                  value={form.theme}
-                  onChange={handleInputChange}
-                  className="w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="auto">Automatic</option>
-                </select>
-              </div>
-
               <div className="flex items-center justify-between">
                 <label className="font-label-sm text-on-surface">
                   Auto-save Sessions
@@ -402,9 +395,9 @@ export const Settings: React.FC = () => {
         {/* Sync Settings */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Equipment</h2>
-          <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 min-h-[2rem]">
                 {equipmentItems.map(item => (
                   <div key={item} className="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-3 py-1.5 rounded-full text-sm font-bold">
                     <span>{item}</span>
@@ -450,7 +443,7 @@ export const Settings: React.FC = () => {
         {/* Sync Settings */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Sync Settings</h2>
-          <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
                 <label htmlFor="sync_interval" className="font-label-sm text-on-surface block mb-2">
@@ -488,7 +481,7 @@ export const Settings: React.FC = () => {
         {/* Data Management */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Data Management</h2>
-          <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               {storageInfo && (
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
@@ -586,10 +579,10 @@ export const Settings: React.FC = () => {
         )}
       </form>
 
-      {/* Language */}
+      {/* Language & Theme */}
       <section>
-        <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Language</h2>
-        <div className="bg-surface-container-lowest rounded-2xl md:rounded-3xl p-4 md:p-6 border border-outline-variant">
+        <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">App Configuration</h2>
+        <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
           <div className="space-y-4">
             <div>
               <label className="font-label-sm text-on-surface block mb-2">
@@ -605,6 +598,29 @@ export const Settings: React.FC = () => {
                   localStorage.setItem('selectedLanguage', val as string);
                   window.location.reload();
                 }}
+              />
+            </div>
+            <div>
+              <label htmlFor="theme" className="font-label-sm text-on-surface block mb-2">
+                Theme
+              </label>
+              <CustomSelect
+                value={form.theme}
+                options={[
+                  { value: 'pool', label: 'Pool (Light)' },
+                  { value: 'open-water', label: 'Open Water (Dark)' },
+                  { value: 'auto', label: 'Automatic' },
+                ]}
+                onChange={(val) => {
+                  const newEvent = { target: { name: 'theme', value: val } } as React.ChangeEvent<HTMLSelectElement>
+                  handleInputChange(newEvent)
+                  if (val === 'auto') {
+                    delete document.documentElement.dataset.theme
+                  } else {
+                    document.documentElement.dataset.theme = val as string
+                  }
+                }}
+                className="w-full"
               />
             </div>
           </div>

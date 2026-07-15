@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { EquipmentIcons, type EquipmentType } from './EquipmentIcons'
 import { CustomSelect } from './CustomSelect'
 import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, strokeOptions } from '../constants/drill'
@@ -72,6 +72,13 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
 
 export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose, showTags }) => {
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
 
   if (!open) return null
 

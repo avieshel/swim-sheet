@@ -28,7 +28,7 @@ export interface SavedDrillData {
   swimmers: SavedSwimmerData[]
 }
 
-function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId }: {
+function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId, loading }: {
   group: TimedGroup;
   runDrills: RunDrill[];
   laneDrillResults: LaneDrillResult[];
@@ -39,6 +39,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
   onResetDrill: (groupId: string) => void;
   onClearSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
   onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: number[]; startedAt?: number; completedAt?: number }) => void;
+  loading?: boolean;
 }) {
   const getLaneLabel = (lane: number) => {
     if (lane === 1) return 'FAST'
@@ -210,7 +211,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
   }
 
   return (
-    <div className={`glass-panel rounded-2xl p-3 sm:p-4 lg:p-5 transition-all bg-surface-container-lowest border ${isCompletedDrill ? 'border-emerald-500/30' : sessionRunning ? 'border-primary shadow-lg shadow-primary/10' : 'border-outline-variant'}`}>
+    <div className={`rounded-2xl p-3 sm:p-4 lg:p-5 transition-all bg-surface-container-lowest border shadow-sm ${isCompletedDrill ? 'border-emerald-500/30' : sessionRunning ? 'border-primary shadow-lg shadow-primary/10' : 'border-outline-variant'}`}>
       {/* Group Header */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
@@ -280,7 +281,14 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
       </div>
 
       {/* Current Drill */}
-      {currentDrillIndex >= 0 ? (
+      {loading ? (
+        <div className="mb-3 p-4 rounded-xl border border-outline-variant/20 bg-surface-container-low">
+          <div className="space-y-2">
+            <div className="h-4 w-1/3 bg-surface-variant rounded animate-pulse" />
+            <div className="h-5 w-2/3 bg-surface-variant rounded animate-pulse" />
+          </div>
+        </div>
+      ) : currentDrillIndex >= 0 ? (
         <div className={`mb-3 p-4 rounded-xl border ${isCompletedDrill ? 'bg-emerald-50 border-emerald-200' : 'bg-surface-container-low border-outline-variant/20'}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -326,7 +334,17 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
       )}
 
       {/* Next Drill Preview */}
-      {currentDrillIndex >= 0 && nextDrill && (
+      {loading ? (
+        <div className="mb-3 p-3 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/40">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3 w-12 bg-surface-variant rounded animate-pulse" />
+              <div className="h-4 w-2/3 bg-surface-variant rounded animate-pulse" />
+            </div>
+            <div className="h-7 w-20 bg-surface-variant rounded-full animate-pulse shrink-0 ml-2" />
+          </div>
+        </div>
+      ) : currentDrillIndex >= 0 && nextDrill ? (
         <div className="mb-3 p-3 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/40">
           <div className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-0.5">Next</div>
           <div className="flex items-center justify-between">
@@ -340,11 +358,37 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Swimmers */}
       <div className="space-y-2 mb-3">
-        {isCompletedDrill && savedData ? (
+        {loading ? (
+          Array.from({ length: Math.max(1, liveGroup.swimmers.length || 1) }).map((_, i) => (
+            <div key={i} className="bg-surface-container rounded-xl border border-outline-variant/20 h-[188px] animate-pulse">
+              <div className="p-3 h-full flex flex-col gap-1">
+                <div className="flex gap-3 flex-1">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-surface-variant shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-4 w-24 bg-surface-variant rounded" />
+                      <div className="h-5 w-16 bg-surface-variant rounded" />
+                    </div>
+                  </div>
+                  <div className="w-1/2 flex flex-col gap-1">
+                    <div className="h-3 w-12 bg-surface-variant rounded ml-auto" />
+                    <div className="h-4 w-20 bg-surface-variant rounded ml-auto" />
+                  </div>
+                </div>
+                <div className="h-px bg-outline-variant/20" />
+                <div className="flex gap-1 justify-center">
+                  {Array.from({ length: 4 }).map((_, bi) => (
+                    <div key={bi} className="h-7 w-14 bg-surface-variant rounded-full" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))
+        ) : isCompletedDrill && savedData ? (
           savedData.swimmers?.map((saved: SavedSwimmerData, idx: number) => (
             <SavedSwimmerRow
               key={idx}
@@ -429,6 +473,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
 
   const initializedRef = useRef(false)
   const [sessionStartedAt] = useState(() => Date.now())
+  const [drillsLoaded, setDrillsLoaded] = useState(false)
 
   useEffect(() => {
     dispatch({ type: 'START_SESSION_TIMER' })
@@ -442,6 +487,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
         initializedRef.current = true
         dispatch({ type: 'SET_ALL_DRILLS', payload: { runDrillId: sorted[0].id } })
       }
+      setDrillsLoaded(true)
     })
     getLaneResults(run.id).then(results => setLaneDrillResults(results))
     getSession(run.session_id).then(s => setTemplateName(s?.name || 'Unknown'))
@@ -678,6 +724,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
                 onResetDrill={handleResetDrill}
                 onClearSwimmer={handleClearSwimmer}
                 onEditSavedSwimmer={handleEditSavedSwimmer}
+                loading={!drillsLoaded}
               />
             ))}
           </div>

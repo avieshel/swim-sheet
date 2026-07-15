@@ -16,12 +16,6 @@ interface SavedSwimmerRowProps {
 }
 
 export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer }: SavedSwimmerRowProps) {
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(/\s+/)
-    return parts.length > 1
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase()
-  }
 
   const laps = saved.laps ?? []
   const effectiveSplitStart = saved.startedAt ?? savedData.drillStart ?? 0
@@ -40,19 +34,9 @@ export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEd
     <div className="bg-surface-container rounded-xl border border-outline-variant/20 h-[188px]">
       <div className="p-3 h-full flex flex-col gap-1">
         <div className="flex gap-3 flex-1 min-h-0">
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-surface-container-highest border-2 border-emerald-400 flex items-center justify-center shrink-0 relative">
-              <span className="text-[10px] font-bold text-on-surface">{getInitials(saved.name)}</span>
-              {saved.completed && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[10px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-on-surface text-sm md:text-base truncate">{saved.name}</div>
-              <div className="font-display-timer text-lg tabular-nums tracking-tight text-primary">{displayTime}</div>
-            </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-on-surface text-sm md:text-base truncate">{saved.name}</div>
+            <div className="font-display-timer text-lg tabular-nums tracking-tight text-primary">{displayTime}</div>
           </div>
           <div className="shrink-0 border-l border-outline-variant/30 w-1/2 flex flex-col gap-0.5">
             <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 pl-2">
@@ -64,7 +48,7 @@ export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEd
               <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
                 <span className="text-on-surface-variant w-5 text-right text-[10px]">Go</span>
                 <span className="text-on-surface font-semibold">{goOffset != null ? `+${formatTime(goOffset).replace(/^00:/, '')}` : '00:00'}</span>
-                {lapEditMode[`saved-${saved.dbId}`] && goOffset != null && (
+                {lapEditMode[`saved-${saved.dbId}`] && goOffset != null ? (
                   <button
                     onClick={() => {
                       const entry = savedData.swimmers.find((s: SavedSwimmerData) => s.dbId === saved.dbId)
@@ -75,6 +59,8 @@ export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEd
                       }
                     }}
                     className="w-3 h-3 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
+                ) : (
+                  <span className="w-3 h-3 shrink-0 inline-block" />
                 )}
               </div>
               {splits.length > 0 && (
@@ -84,7 +70,7 @@ export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEd
                     const diff = prevSplit !== null ? split - prevSplit : null
                     return (
                       <div key={i} className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                        {lapEditMode[`saved-${saved.dbId}`] && (
+                        {lapEditMode[`saved-${saved.dbId}`] ? (
                           <button
                             onClick={() => {
                               const newLaps = removeLap(laps, i)
@@ -92,6 +78,8 @@ export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEd
                               if (entry) onEditSavedSwimmer(group.id, group.currentRunDrillId!, entry.dbId, { laps: newLaps })
                             }}
                             className="w-3 h-3 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
+                        ) : (
+                          <span className="w-3 h-3 shrink-0 inline-block" />
                         )}
                         <span className="text-on-surface-variant w-5 text-right text-[10px]">#{i + 1}</span>
                         <span className="text-on-surface font-semibold">{formatTime(split)}</span>
@@ -162,13 +150,6 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
   const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
   const storeVersion = store.version
 
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(/\s+/)
-    return parts.length > 1
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase()
-  }
-
   const startedAt = useMemo(() =>
     (runId && drillId && swimmer.dbId)
       ? effectiveStart(store, runId, group.id, swimmer.dbId, drillId) ?? null
@@ -238,14 +219,6 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
                 className="h-4 w-4 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
                 <span className="material-symbols-outlined text-[10px]">keyboard_arrow_down</span>
               </button>
-            </div>
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-surface-container-highest border-2 border-primary flex items-center justify-center shrink-0 relative">
-              <span className="text-[9px] font-bold text-on-surface">{getInitials(swimmer.name)}</span>
-              {swimmer.completed && (
-                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[8px] text-white" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
-                </div>
-              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-on-surface text-sm md:text-base truncate">{swimmer.name}</div>

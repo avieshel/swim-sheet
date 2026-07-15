@@ -60,8 +60,44 @@ export const SwimmersList: React.FC = () => {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading swimmers...</p>
+    <div>
+      <section className="mb-4 md:mb-8 space-y-3 md:space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="h-8 w-48 bg-surface-variant rounded animate-pulse" />
+            <div className="h-4 w-64 bg-surface-variant rounded mt-1 animate-pulse" />
+          </div>
+        </div>
+        <div className="h-12 bg-surface-container-low rounded-t-lg animate-pulse" />
+      </section>
+      <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="bg-surface-container-lowest rounded-xl p-5 border-2 border-transparent animate-pulse">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-16 h-16 rounded-full bg-surface-variant shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-5 w-32 bg-surface-variant rounded" />
+                <div className="h-4 w-20 bg-surface-variant rounded" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="bg-surface-container-low p-3 rounded-lg space-y-1">
+                <div className="h-3 w-12 bg-surface-variant rounded" />
+                <div className="h-6 w-8 bg-surface-variant rounded" />
+              </div>
+              <div className="bg-surface-container-low p-3 rounded-lg space-y-1">
+                <div className="h-3 w-12 bg-surface-variant rounded" />
+                <div className="h-5 w-16 bg-surface-variant rounded" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1 h-touch-target-min bg-surface-variant rounded-lg" />
+              <div className="w-12 h-touch-target-min bg-surface-variant rounded-lg" />
+              <div className="w-12 h-touch-target-min bg-surface-variant rounded-lg" />
+            </div>
+          </div>
+        ))}
+      </section>
     </div>
   )
 
@@ -144,7 +180,7 @@ export const SwimmersList: React.FC = () => {
           {filteredSwimmers.map(s => (
             <div
               key={s.id}
-              className="bg-surface-container-lowest rounded-xl custom-shadow p-5 border-2 border-transparent hover:border-primary transition-all group"
+              className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant shadow-sm hover:border-primary/40 transition-all group"
             >
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface-variant flex-shrink-0 bg-surface-container-high flex items-center justify-center">
@@ -189,16 +225,16 @@ export const SwimmersList: React.FC = () => {
                 </Link>
                 <button
                   onClick={() => openEditModal(s)}
-                  className="w-12 h-touch-target-min border-2 border-outline-variant text-on-surface-variant rounded-lg flex items-center justify-center hover:bg-surface-container transition-all"
+                  className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
                   <span className="material-symbols-outlined">edit</span>
                 </button>
-<button
-                        onClick={() => { setDeleteTarget(s); }}
-                      className="w-12 h-touch-target-min border-2 border-error/30 text-error rounded-lg flex items-center justify-center hover:bg-error-container transition-all"
-                    >
-                      <span className="material-symbols-outlined">delete</span>
-                    </button>
+                <button
+                  onClick={() => { setDeleteTarget(s); }}
+                  className="p-2 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                >
+                  <span className="material-symbols-outlined">delete</span>
+                </button>
               </div>
             </div>
           ))}
@@ -225,7 +261,7 @@ export const SwimmersList: React.FC = () => {
         aria-label="Add Swimmer"
       >
         <span className="material-symbols-outlined text-3xl md:text-[32px]">add</span>
-        <span className="absolute right-full mr-4 bg-inverse-surface text-inverse-on-surface px-3 py-1 rounded-lg font-label-sm text-label-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none hidden md:block">
+        <span className="absolute right-full mr-4 bg-inverse-surface text-inverse-on-surface px-3 py-1 rounded-lg font-label-sm text-label-sm whitespace-nowrap pointer-events-none hidden md:block opacity-70">
           Add Swimmer
         </span>
       </button>

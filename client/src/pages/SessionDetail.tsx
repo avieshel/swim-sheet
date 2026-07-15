@@ -207,8 +207,79 @@ export const SessionDetail: React.FC = () => {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading...</p>
+    <div className="animate-pulse">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="h-4 w-4 bg-surface-variant rounded" />
+        <div className="h-4 w-32 bg-surface-variant rounded" />
+      </div>
+      <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant mb-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="h-7 w-48 bg-surface-variant rounded mb-2" />
+            <div className="h-4 w-32 bg-surface-variant rounded mb-1" />
+            <div className="h-4 w-64 bg-surface-variant rounded" />
+          </div>
+          <div className="h-8 w-8 bg-surface-variant rounded" />
+        </div>
+      </div>
+      <div className="r-grid mb-6" style={{ '--grid-min': '160px', '--grid-gap': 'clamp(0.5rem, 1.5vw, 1rem)' } as React.CSSProperties}>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="bg-surface-container-lowest rounded-2xl p-3 md:p-4 border border-outline-variant" style={i === 2 ? { gridColumn: 'span 2' } : undefined}>
+            <div className="h-3 w-20 bg-surface-variant rounded mb-2" />
+            <div className="h-6 w-16 bg-surface-variant rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="r-grid" style={{ '--grid-min': 'min(100%, 400px)' } as React.CSSProperties}>
+        <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant min-h-[40vh] md:min-h-[60vh]">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-6 w-24 bg-surface-variant rounded" />
+            <div className="flex gap-2">
+              <div className="h-10 md:h-12 w-28 bg-surface-variant rounded-lg" />
+              <div className="h-10 md:h-12 w-24 bg-surface-variant rounded-lg" />
+            </div>
+          </div>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl mb-2">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex flex-col gap-1">
+                  <div className="h-3 w-3 bg-surface-variant rounded" />
+                  <div className="h-3 w-3 bg-surface-variant rounded" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="h-4 w-40 bg-surface-variant rounded" />
+                  <div className="h-3 w-64 bg-surface-variant rounded" />
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <div className="h-8 w-8 bg-surface-variant rounded-lg" />
+                <div className="h-8 w-8 bg-surface-variant rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden lg:block">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant min-h-[40vh] md:min-h-[60vh]">
+            <div className="flex items-center justify-between mb-4">
+              <div className="h-6 w-20 bg-surface-variant rounded" />
+              <div className="h-4 w-20 bg-surface-variant rounded" />
+            </div>
+            <div className="h-10 bg-surface-container-low rounded-t-lg mb-4" />
+            <div className="h-8 bg-surface-container-low rounded-lg mb-4" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-surface-container-low rounded-xl p-3 mb-2 border border-outline-variant/30">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 space-y-1">
+                    <div className="h-4 w-28 bg-surface-variant rounded" />
+                    <div className="h-3 w-20 bg-surface-variant rounded" />
+                  </div>
+                  <div className="h-6 w-6 bg-surface-variant rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
   if (!session) return (
@@ -228,7 +299,7 @@ export const SessionDetail: React.FC = () => {
       </button>
 
       {/* Template Metadata */}
-      <div className="bg-surface-container-lowest rounded-xl p-4 md:p-6 border border-outline-variant mb-6">
+      <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant mb-6">
         {editingMeta ? (
           <div>
             <div className="r-grid" style={{ '--grid-min': '240px' } as React.CSSProperties}>
@@ -273,7 +344,7 @@ export const SessionDetail: React.FC = () => {
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">{session.name}</h1>
                 {focusAreas.length > 0 && focusAreas.map(f => (
-                  <span key={f} className="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span key={f} className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">
                     {f}
                   </span>
                 ))}
@@ -413,10 +484,10 @@ export const SessionDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Main content: Drills + Drill Bank (responsive two-column) */}
+      {/* Main content: Drills + Drills panel (responsive two-column) */}
       <div className="r-grid" style={{ '--grid-min': 'min(100%, 400px)' } as React.CSSProperties}>
         {/* Drill List */}
-        <div className="bg-surface-container-lowest rounded-xl p-4 md:p-6 border border-outline-variant min-h-[40vh] md:min-h-[60vh]">
+        <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant min-h-[40vh] md:min-h-[60vh]">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <h3 className="font-headline-md text-on-surface m-0">Drills</h3>
             <div className="flex gap-2">
@@ -425,7 +496,7 @@ export const SessionDetail: React.FC = () => {
                 className="h-10 md:h-12 px-3 md:px-4 bg-surface-container-high text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container-highest active:scale-95 transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-lg">library_books</span>
-                <span className="hidden sm:inline">Drill Bank</span>
+                <span className="hidden sm:inline">Drills</span>
               </button>
               <button
                 onClick={() => openRichEditor()}
@@ -438,7 +509,7 @@ export const SessionDetail: React.FC = () => {
           </div>
 
           {drills.length === 0 ? (
-            <p className="font-body-md text-body-md text-on-surface-variant py-8 text-center">No drills yet. Use the <strong>Drill Bank</strong> or add a custom drill.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant py-8 text-center">No drills yet. Use the <strong>Drills</strong> panel or add a custom drill.</p>
           ) : (
             <div className="space-y-2">
               {drills.map((d, i) => (
@@ -463,9 +534,9 @@ export const SessionDetail: React.FC = () => {
                     <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-on-surface truncate">{d.name}</span>
-                          {d.tag === 'warmup' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">Warmup</span>}
-                          {d.tag === 'main-set' && <span className="text-[9px] bg-primary text-on-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">Main Set</span>}
-                          {d.tag === 'cooldown' && <span className="text-[9px] bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded font-bold uppercase tracking-tighter">Cooldown</span>}
+                          {d.tag === 'warmup' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Warmup</span>}
+                          {d.tag === 'main-set' && <span className="text-[9px] bg-primary text-on-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Main Set</span>}
+                          {d.tag === 'cooldown' && <span className="text-[9px] bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Cooldown</span>}
                           <span className="text-[10px] bg-primary text-on-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(d)}m</span>
                           {d.repeatCount > 1 && <span className="text-[10px] bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded font-bold">{d.repeatCount}x</span>}
                         </div>
@@ -505,9 +576,9 @@ export const SessionDetail: React.FC = () => {
                       </div>
                       {(d.focus !== 'none' || (d.labels && d.labels.length > 0)) && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
-                          {d.focus !== 'none' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">{d.focus}</span>}
+                          {d.focus !== 'none' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">{d.focus}</span>}
                           {d.labels?.map(l => (
-                            <span key={l} className="text-[9px] bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">{l}</span>
+                            <span key={l} className="text-[9px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase font-bold tracking-wider">{l}</span>
                           ))}
                         </div>
                       )}
@@ -535,19 +606,19 @@ export const SessionDetail: React.FC = () => {
           )}
         </div>
 
-        {/* Drill Bank Panel — hidden on mobile unless toggled, always visible on wider screens */}
+        {/* Drills Panel — hidden on mobile unless toggled, always visible on wider screens */}
         <div className={`${showDrillBank ? 'block' : 'hidden lg:block'}`}>
-          <div className="bg-surface-container-lowest rounded-xl p-4 md:p-5 border border-outline-variant lg:sticky lg:top-28 min-h-[40vh] md:min-h-[60vh] flex flex-col">
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant lg:sticky lg:top-28 min-h-[40vh] md:min-h-[60vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-headline-md text-on-surface m-0 flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">library_books</span>
-                Drill Bank
+                Drills
               </h3>
               <button
                 onClick={() => navigate('/drills')}
                 className="text-xs text-primary font-bold hover:underline cursor-pointer bg-transparent border-none"
               >
-                Manage Bank
+                Manage Drills
               </button>
             </div>
             
@@ -586,7 +657,7 @@ export const SessionDetail: React.FC = () => {
                       <button
                         key={tag}
                         onClick={() => toggleTagFilter(tag)}
-                        className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-tight transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
+                        className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
                       >
                         {tag}
                       </button>
@@ -620,7 +691,7 @@ export const SessionDetail: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 mb-1">
                           <h4 className="font-bold text-sm text-on-surface truncate m-0">{libDrill.name}</h4>
-                          <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(libDrill)}m</span>
+                          <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">{getDrillTotalDistance(libDrill)}m</span>
                         </div>
                         {libDrill.description && (
                           <p className="text-[10px] text-on-surface-variant italic line-clamp-2 leading-relaxed mb-2">{libDrill.description}</p>
@@ -646,10 +717,10 @@ export const SessionDetail: React.FC = () => {
 
                     <div className="flex flex-wrap gap-1 items-center">
                       {libDrill.focus && libDrill.focus !== 'none' && (
-                        <span className="text-[8px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">{libDrill.focus}</span>
+                        <span className="text-[8px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">{libDrill.focus}</span>
                       )}
                       {(libDrill.labels || []).map(l => (
-                        <span key={l} className="text-[8px] bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">{l}</span>
+                        <span key={l} className="text-[8px] bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">{l}</span>
                       ))}
                       {!libDrill.items?.length && (
                         <span className={`${strokeColors[libDrill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-[8px] font-bold px-1.5 py-0.5 rounded uppercase`}>{libDrill.stroke}</span>

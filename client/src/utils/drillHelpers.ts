@@ -3,10 +3,17 @@ export function getDrillTotalDistance(d: { items?: { distance: number; repeatCou
   return d.items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * (d.repeatCount || 1)
 }
 
-export function aggregateByStroke(drills: { stroke: string; distance: number }[]): { stroke: string; meters: number }[] {
+export function aggregateByStroke(drills: { stroke?: string; distance?: number; repeatCount?: number; items?: { stroke?: string; distance: number; repeatCount: number }[] }[]): { stroke: string; meters: number }[] {
   const map = new Map<string, number>()
   for (const d of drills) {
-    map.set(d.stroke, (map.get(d.stroke) || 0) + d.distance)
+    if (d.items && d.items.length > 0) {
+      for (const item of d.items) {
+        const dist = item.distance * item.repeatCount * (d.repeatCount || 1)
+        map.set(item.stroke || d.stroke || 'freestyle', (map.get(item.stroke || d.stroke || 'freestyle') || 0) + dist)
+      }
+    } else {
+      map.set(d.stroke || 'freestyle', (map.get(d.stroke || 'freestyle') || 0) + (d.distance || 0))
+    }
   }
   return Array.from(map.entries()).map(([stroke, meters]) => ({ stroke, meters }))
 }
@@ -79,13 +86,20 @@ export function findSimilarDrills(
   return results.sort((a, b) => b.score - a.score)
 }
 
-export function detectFocus(drills: { stroke: string; distance: number }[]): string[] {
+export function detectFocus(drills: { stroke?: string; distance?: number; repeatCount?: number; items?: { stroke?: string; distance: number; repeatCount: number }[] }[]): string[] {
   const focus: string[] = []
-  const totalDistance = drills.reduce((sum, d) => sum + d.distance, 0)
+  const totalDistance = drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0)
   if (totalDistance === 0) return focus
   const strokeMeters = new Map<string, number>()
   for (const d of drills) {
-    strokeMeters.set(d.stroke, (strokeMeters.get(d.stroke) || 0) + d.distance)
+    if (d.items && d.items.length > 0) {
+      for (const item of d.items) {
+        const dist = item.distance * item.repeatCount * (d.repeatCount || 1)
+        strokeMeters.set(item.stroke || d.stroke || 'freestyle', (strokeMeters.get(item.stroke || d.stroke || 'freestyle') || 0) + dist)
+      }
+    } else {
+      strokeMeters.set(d.stroke || 'freestyle', (strokeMeters.get(d.stroke || 'freestyle') || 0) + (d.distance || 0))
+    }
   }
   const maxStroke = [...strokeMeters.entries()].sort((a, b) => b[1] - a[1])[0]
   if (maxStroke) {

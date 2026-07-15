@@ -20,6 +20,13 @@ export const SwimmerDetail: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  useEffect(() => {
+    if (showDeleteConfirm || showEditModal) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [showDeleteConfirm, showEditModal])
+
   const triggerExport = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface SwimmerFormData {
   name: string
@@ -26,6 +26,13 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
   const [group, setGroup] = useState(initialData?.group ?? '')
   const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [status, setStatus] = useState<'active' | 'inactive'>(initialData?.status ?? 'active')
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

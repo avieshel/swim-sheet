@@ -399,7 +399,7 @@ export async function deleteLap(id: string): Promise<void> {
   await db.laps.delete(id)
 }
 
-// ── Library Drills (Drill Bank) ────────────────────────────
+  // ── Library Drills ─────────────────────────────────────────
 
 export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
   return db.libraryDrills.orderBy('name').toArray()

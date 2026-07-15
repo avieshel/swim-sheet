@@ -208,7 +208,7 @@ export function LapTimeline({ laps, totalDistance, poolLength, drillDuration, st
         />
 
         {onChange && (
-          <div className="absolute top-0 start-0 end-0 h-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+          <div className="absolute top-0 start-0 end-0 h-full opacity-30 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
             <span className="text-[8px] text-primary font-semibold">Double-tap track to add lap</span>
           </div>
         )}
