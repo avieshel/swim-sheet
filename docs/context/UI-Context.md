@@ -180,11 +180,12 @@ Real-time coaching view with Timed Groups.
 6. Coach uses swimmer-level buttons for individual swimmer control
 7. "Complete" button ends the session, saves all data, returns to setup
 
-**Swimmer-level buttons** (4 compact buttons: Start, Lap, Finish, SC — always visually active, no disabled state):
-- **Start** (emerald) — Writes `start` via `store.set(K.swimmerStart(...), sessionElapsed)` if not already set; no-op otherwise.
+**Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
+- **Start** (emerald) — Writes `start` via `store.set(K.swimmerStart(...), sessionElapsed)` if not already set; disabled after started.
 - **Lap** (blue) — Records `lap::<n>` if swimmer has effective start and no effective done; no-op otherwise.
 - **Finish** (primary-container tonal) — Writes `done` if not already set; no-op otherwise. If last active swimmer in the group, also writes `group-done` for all swimmers.
-- **Stroke Count** (orange) — Always works; prompts for stroke count input.
+
+**Stroke count** is no longer a separate button. Each lap row in the swimmer card has an inline `StrokeCountStepper` with `[–]` / number display / `[+]` controls. Tap the number to keyboard-edit. Stroke counts are per-lap and editable both during live timing and after saving.
 
 **Timestamp store keys** (hierarchical, session-relative milliseconds):
 - `session::<runId>::group::<groupId>::drill::<drillId>::group-start` — lane-level Go
@@ -220,9 +221,26 @@ interface TimestampStore {
 - No auto-start on drill navigation — coach scrolls freely, starts drill when ready (writes `group-start` for all)
 - Session timer can run independently of any individual swimmer being started
 
+**Swimmer card layout** (lap-focused, no fixed height):
+```
+┌──────────────────────────────────────┐
+│ Jane Smith    Done   3 laps 01:23.4  │ ← compact header (name + status + lap count + time)
+├──────────────────────────────────────┤
+│ #1  25.5s  +1.2s  14 [–] [+]        │ ← lap row with inline stroke count stepper
+│ #2  27.1s  +1.9s  15 [–] [+]        │
+│ #3  26.8s  -0.3s   — [–] [+]        │ ← tap to enter
+│                                      │
+│ Go +0.0                              │ ← offset from group earliest start
+│ Fin  01:23.4                         │
+├──────────────────────────────────────┤
+│ [▶Start] [●Lap] [■Finish]           │ ← 3-button control bar
+└──────────────────────────────────────┘
+```
+The saved-state variant replaces active buttons with a "Saved" badge but keeps stroke count steppers editable.
+
 **Button model:**
-- Swimmer-level buttons (Start, Lap, Finish, SC) are always visually active — no `disabled` attribute, no conditional styling
-- Handlers are smart: Start writes `start` if not already set (no-op otherwise); Lap records if swimmer actively swimming (no-op otherwise); Finish writes `done` and optionally `group-done` for last swimmer; SC always works
+- Swimmer-level buttons: Start (emerald), Lap (blue), Finish (primary-container tonal) — no SC button (replaced by inline per-lap stepper)
+- Start is disabled after swimmer has started; Lap and Finish are always active (handlers are idempotent)
 - Lane-level Lap button is disabled when drill not started
 - Lane-level Start/Finish is always active (emerald when idle, red when running)
 - Lane-level Reset appears only when drill is running
@@ -241,6 +259,14 @@ App preferences.
 ---
 
 ## Key Components
+
+### StrokeCountStepper
+Inline stroke count input for each lap row in the swimmer card. Replaces the old `prompt()`-based SC button.
+
+- `[-]` decrements, `[+]` increments, tap number to keyboard-edit (Enter confirms, Escape cancels)
+- Displays current count or `—` if none entered
+- Compact: fits in ~60px within a lap row
+- Works in both live and saved swimmer states — stroke counts are always editable
 
 ### LapTimeline
 Interactive horizontal timeline widget for lap visualization and editing. Shown for saved/reviewed swimmers.

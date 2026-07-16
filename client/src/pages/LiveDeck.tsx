@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
-import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
+import { LiveSessionContext, type TimedGroup, type LapEntry } from '../context/LiveSessionContext'
 import { K, effectiveStart, effectiveDone } from '../timing/timestampStore'
 import { getActiveRun, completeRun, addSwimmerToRun, getRunDrills, getLaneResults, addLap, removeSwimmerFromRun, setLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, clearSwimmerFromLaneResult, getLaneResult, getRunSwimmers, getRunSwimmerLinks } from '../api/runs'
 import { getSession } from '../api/sessions'
@@ -16,9 +16,8 @@ export interface SavedSwimmerData {
   name: string
   startedAt: number | null
   completedAt: number | null
-  laps: number[]
+  laps: LapEntry[]
   completed: boolean
-  strokeCount: number | null
 }
 
 export interface SavedDrillData {
@@ -38,7 +37,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
   onCompleteDrill: (groupId: string) => void;
   onResetDrill: (groupId: string) => void;
   onClearSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
-  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: number[]; startedAt?: number; completedAt?: number }) => void;
+  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number }) => void;
   loading?: boolean;
 }) {
   const getLaneLabel = (lane: number) => {
@@ -134,7 +133,9 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
         lapCount = n
       } else break
     }
-    store.set(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, lapCount + 1), sessionElapsed)
+    const lapIdx = lapCount + 1
+    store.set(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, lapIdx), sessionElapsed)
+    dispatch({ type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: liveGroup.id, swimmerId, lapIndex: lapIdx, count: 18 } })
   }
 
   const handleSwimmerComplete = (swimmerId: number) => {
@@ -205,7 +206,9 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
             lapCount = n
           } else break
         }
-        store.set(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, lapCount + 1), sessionElapsed)
+        const lapIdx = lapCount + 1
+        store.set(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, lapIdx), sessionElapsed)
+        dispatch({ type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: liveGroup.id, swimmerId: swimmer.id, lapIndex: lapIdx, count: 18 } })
       }
     }
   }
@@ -413,8 +416,6 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
               onStart={handleSwimmerStart}
               onLap={handleSwimmerLap}
               onComplete={handleSwimmerComplete}
-              lapEditMode={lapEditMode}
-              toggleLapEdit={toggleLapEdit}
               handleMoveSwimmer={handleMoveSwimmer}
             />
           ))
@@ -523,12 +524,13 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
           const swimmerStart = effectiveStart(store, run.id, group.id, swimmer.dbId, drillId) ?? 0
           if (laps.length > 0) {
             const splits = timestampSplits(laps, swimmerStart)
-            for (const splitTime of splits) {
+            for (let li = 0; li < splits.length; li++) {
+              const splitTime = splits[li]
               await addLap({
                 run_drill_id: drillId,
                 swimmer_id: swimmer.dbId,
                 time: splitTime / 1000,
-                stroke_count: swimmer.strokeCount || 0,
+                stroke_count: swimmer.lapStrokeCounts[li + 1] ?? 0,
                 effort: '',
                 notes: '',
               })
@@ -562,12 +564,15 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
       swimmers: group.swimmers.map(s => {
         const ss = s.dbId ? effectiveStart(store, run.id, group.id, s.dbId, drillId) ?? null : null
         const sd = s.dbId ? effectiveDone(store, run.id, group.id, s.dbId, drillId) ?? null : null
-        const laps: number[] = []
+        const laps: LapEntry[] = []
         if (s.dbId) {
           for (let n = 1; ; n++) {
             const val = store.get(K.swimmerLap(run.id, group.id, drillId, s.dbId, n))
             if (val == null) break
-            laps.push(val)
+            const entry: LapEntry = { time: val }
+            const sc = s.lapStrokeCounts[n]
+            if (sc) entry.strokeCount = sc
+            laps.push(entry)
           }
         }
         return {
@@ -577,7 +582,6 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
           completedAt: sd,
           laps,
           completed: s.completed,
-          strokeCount: s.strokeCount,
         }
       }),
     }
@@ -629,7 +633,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
     setLaneDrillResults(refreshed)
   }
 
-  const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: number[]; startedAt?: number; completedAt?: number }) => {
+  const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number }) => {
     const result = await getLaneResult(run.id, groupId, runDrillId)
     if (!result) return
     const data: SavedDrillData = JSON.parse(result.data)
@@ -829,7 +833,7 @@ export const LiveDeck: React.FC = () => {
                 dbId: link.swimmer_id,
                 name: sw?.name || 'Unknown',
                 completed: false,
-                strokeCount: null,
+                lapStrokeCounts: {},
               }
             }),
             currentRunDrillId: null,
@@ -873,7 +877,7 @@ export const LiveDeck: React.FC = () => {
                 dbId: link.swimmer_id,
                 name: sw?.name || 'Unknown',
                 completed: false,
-                strokeCount: null,
+                lapStrokeCounts: {},
               }
             }),
             currentRunDrillId: null,

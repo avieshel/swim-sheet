@@ -4,12 +4,18 @@ import type { TimestampStore } from '../timing/timestampStore'
 
 // ── Data model ──────────────────────────────────────────────
 
+export interface LapEntry {
+  time: number
+  strokeCount?: number
+}
+
 export interface Swimmer {
   id: number
   dbId?: string
   name: string
   completed: boolean
-  strokeCount: number | null
+  lapStrokeCounts: Record<number, number>
+  strokeCount?: number | null
 }
 
 export interface TimedGroup {
@@ -34,6 +40,7 @@ export type LiveSessionAction =
   | { type: 'ADD_GROUPS'; payload: TimedGroup[] }
   | { type: 'ADD_SWIMMER'; payload: { groupId: string; name: string; dbId?: string } }
   | { type: 'REMOVE_SWIMMER'; payload: { groupId: string; swimmerId: number } }
+  | { type: 'SWIMMER_LAP_STROKE_COUNT'; payload: { groupId: string; swimmerId: number; lapIndex: number; count?: number } }
   | { type: 'SWIMMER_STROKE_COUNT'; payload: { groupId: string; swimmerId: number; count: number } }
   | { type: 'SWIMMER_COMPLETE'; payload: { groupId: string; swimmerId: number } }
   | { type: 'SET_GROUP_DRILL'; payload: { groupId: string; runDrillId: string } }
@@ -84,11 +91,11 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
                     dbId: action.payload.dbId,
                     name: action.payload.name,
                     completed: false,
-                    strokeCount: null,
+                    lapStrokeCounts: {},
                   },
-                ],
+                ]
               }
-            : g
+              : g
         ),
       }
     case 'REMOVE_SWIMMER':
@@ -108,12 +115,38 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
             ? {
                 ...g,
                 swimmers: g.swimmers.map(s =>
-                  s.id === action.payload.swimmerId ? { ...s, strokeCount: action.payload.count } : s
+                  s.id === action.payload.swimmerId
+                    ? { ...s, strokeCount: action.payload.count }
+                    : s
                 ),
               }
             : g
         ),
       }
+    case 'SWIMMER_LAP_STROKE_COUNT': {
+      const { groupId, swimmerId, lapIndex, count } = action.payload
+      return {
+        ...state,
+        groups: state.groups.map(g =>
+          g.id === groupId
+            ? {
+                ...g,
+                swimmers: g.swimmers.map(s =>
+                  s.id === swimmerId
+                    ? {
+                        ...s,
+                        lapStrokeCounts: count !== undefined
+                          ? { ...s.lapStrokeCounts, [lapIndex]: count }
+                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                          : (() => { const { [lapIndex]: _, ...rest } = s.lapStrokeCounts; return rest })(),
+                      }
+                    : s
+                ),
+              }
+            : g
+        ),
+      }
+    }
     case 'SWIMMER_COMPLETE':
       return {
         ...state,
@@ -196,6 +229,7 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
                   ...s,
                   completed: false,
                   strokeCount: null,
+                  lapStrokeCounts: {},
                 })),
               }
             : g
@@ -210,7 +244,7 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
                 ...g,
                 swimmers: g.swimmers.map(s =>
                   s.id === action.payload.swimmerId
-                    ? { ...s, completed: false, strokeCount: null }
+                    ? { ...s, completed: false, strokeCount: null, lapStrokeCounts: {} }
                     : s
                 ),
               }
@@ -250,6 +284,7 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
         ...swimmer,
         completed: false,
         strokeCount: null,
+        lapStrokeCounts: {},
       }
 
       return {

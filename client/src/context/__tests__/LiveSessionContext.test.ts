@@ -13,6 +13,7 @@ function makeLane(id: string, laneNum: number, swimmerNames = ['Alice', 'Bob']):
       name,
       completed: false,
       strokeCount: null,
+      lapStrokeCounts: {},
     })),
     currentRunDrillId: 'drill-1',
     drillOverride: null,
@@ -106,14 +107,13 @@ describe('CLEAR_GROUP_SWIMMER_DATA', () => {
   it('clears swimmer data for that group only', () => {
     const state = runReducer(makeInit(2, ['Alice']), [
       { type: 'SWIMMER_COMPLETE', payload: { groupId: '1', swimmerId: 110 } },
-      { type: 'SWIMMER_STROKE_COUNT', payload: { groupId: '2', swimmerId: 120, count: 14 } },
+      { type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: '2', swimmerId: 120, lapIndex: 1, count: 14 } },
       { type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: '1' } },
     ])
     expect(state.groups[0].swimmers[0].completed).toBe(false)
-    expect(state.groups[0].swimmers[0].strokeCount).toBeNull()
     expect(state.groups[0].drillOverride).toBeNull()
     // Group 2 is unaffected
-    expect(state.groups[1].swimmers[0].strokeCount).toBe(14)
+    expect(state.groups[1].swimmers[0].lapStrokeCounts[1]).toBe(14)
   })
 })
 
@@ -125,13 +125,44 @@ describe('SWIMMER_CLEAR', () => {
   it('clears one swimmer without affecting the other', () => {
     const state = runReducer(makeInit(1, ['Alice', 'Bob']), [
       { type: 'SWIMMER_COMPLETE', payload: { groupId: '1', swimmerId: 110 } },
-      { type: 'SWIMMER_STROKE_COUNT', payload: { groupId: '1', swimmerId: 111, count: 14 } },
+      { type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: '1', swimmerId: 111, lapIndex: 1, count: 14 } },
       { type: 'SWIMMER_CLEAR', payload: { groupId: '1', swimmerId: 110 } },
     ])
     expect(state.groups[0].swimmers[0].completed).toBe(false)
-    expect(state.groups[0].swimmers[0].strokeCount).toBeNull()
     expect(state.groups[0].swimmers[1].completed).toBe(false)
-    expect(state.groups[0].swimmers[1].strokeCount).toBe(14)
+    expect(state.groups[0].swimmers[1].lapStrokeCounts[1]).toBe(14)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════
+// SWIMMER_LAP_STROKE_COUNT
+// ══════════════════════════════════════════════════════════════
+
+describe('SWIMMER_LAP_STROKE_COUNT', () => {
+  it('sets stroke count for a specific lap', () => {
+    const state = liveSessionReducer(makeInit(), {
+      type: 'SWIMMER_LAP_STROKE_COUNT',
+      payload: { groupId: '1', swimmerId: 110, lapIndex: 1, count: 14 },
+    })
+    expect(state.groups[0].swimmers[0].lapStrokeCounts[1]).toBe(14)
+  })
+
+  it('sets stroke count for a different lap without affecting the first', () => {
+    const state = runReducer(makeInit(), [
+      { type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: '1', swimmerId: 110, lapIndex: 1, count: 14 } },
+      { type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: '1', swimmerId: 110, lapIndex: 2, count: 16 } },
+    ])
+    expect(state.groups[0].swimmers[0].lapStrokeCounts[1]).toBe(14)
+    expect(state.groups[0].swimmers[0].lapStrokeCounts[2]).toBe(16)
+  })
+
+  it('does not affect other swimmers', () => {
+    const state = liveSessionReducer(makeInit(1, ['Alice', 'Bob']), {
+      type: 'SWIMMER_LAP_STROKE_COUNT',
+      payload: { groupId: '1', swimmerId: 110, lapIndex: 1, count: 14 },
+    })
+    expect(state.groups[0].swimmers[0].lapStrokeCounts[1]).toBe(14)
+    expect(state.groups[0].swimmers[1].lapStrokeCounts).toEqual({})
   })
 })
 

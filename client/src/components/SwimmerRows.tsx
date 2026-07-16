@@ -1,8 +1,9 @@
 import React, { useContext, useMemo } from 'react'
-import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
+import { LiveSessionContext, type TimedGroup, type LapEntry } from '../context/LiveSessionContext'
 import { K, effectiveStart, effectiveDone } from '../timing/timestampStore'
-import { removeLap, timestampSplits } from '../utils/lapEditing'
+import { timestampSplits, removeLapEntry, updateStrokeCount } from '../utils/lapEditing'
 import { formatTime } from '../utils/formatTime'
+import { StrokeCountStepper } from './StrokeCountStepper'
 import type { SavedDrillData, SavedSwimmerData } from '../pages/LiveDeck'
 
 interface SavedSwimmerRowProps {
@@ -12,121 +13,140 @@ interface SavedSwimmerRowProps {
   sessionElapsed: number
   lapEditMode: Record<string, boolean>
   toggleLapEdit: (key: string) => void
-  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: number[]; startedAt?: number; completedAt?: number }) => void
+  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number }) => void
 }
 
 export function SavedSwimmerRow({ saved, savedData, group, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer }: SavedSwimmerRowProps) {
-
-  const laps = saved.laps ?? []
+  const lapEntries = saved.laps ?? []
   const effectiveSplitStart = saved.startedAt ?? savedData.drillStart ?? 0
-  const splits = laps.length > 0 ? timestampSplits(laps, effectiveSplitStart) : []
+  const lapTimes = lapEntries.map(e => e.time)
+  const splits = lapTimes.length > 0 ? timestampSplits(lapTimes, effectiveSplitStart) : []
+
   const displayTime = (() => {
     const start = saved.startedAt ?? savedData.drillStart
     if (saved.completedAt != null && start != null) return formatTime(saved.completedAt - start)
     if (start != null) return formatTime((savedData.drillEnd ?? sessionElapsed) - start)
     return '--:--.--'
   })()
+
   const goOffset = saved.startedAt != null && savedData.drillStart != null
     ? saved.startedAt - savedData.drillStart
     : null
 
+  const isEditing = lapEditMode[`saved-${saved.dbId}`]
+
   return (
-    <div className="bg-surface-container rounded-xl border border-outline-variant/20 h-[188px]">
-      <div className="p-3 h-full flex flex-col gap-1">
-        <div className="flex gap-3 flex-1 min-h-0">
-          <div className="flex-1 min-w-0">
-            <div className="font-bold text-on-surface text-sm md:text-base truncate">{saved.name}</div>
-            <div className="font-display-timer text-lg tabular-nums tracking-tight text-primary">{displayTime}</div>
-          </div>
-          <div className="shrink-0 border-l border-outline-variant/30 w-1/2 flex flex-col gap-0.5">
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 pl-2">
-              <div className={`shrink-0 flex justify-end ${laps.length === 0 ? 'invisible' : ''}`}>
-                <button onClick={() => toggleLapEdit(`saved-${saved.dbId}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none">
-                  <span className="material-symbols-outlined text-sm">{lapEditMode[`saved-${saved.dbId}`] ? 'check' : 'edit_note'}</span>
-                </button>
-              </div>
-              <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                <span className="text-on-surface-variant w-5 text-right text-[10px]">Go</span>
-                <span className="text-on-surface font-semibold">{goOffset != null ? `+${formatTime(goOffset).replace(/^00:/, '')}` : '00:00'}</span>
-                {lapEditMode[`saved-${saved.dbId}`] && goOffset != null ? (
+    <div className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-1.5">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <div className="font-bold text-on-surface text-base md:text-lg truncate leading-tight">{saved.name}</div>
+          <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">Saved</span>
+        </div>
+        <div className="flex items-start gap-1.5 shrink-0">
+          <div className="flex flex-col items-start">
+            <div className="font-display-timer text-xl md:text-2xl tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
+            {goOffset != null && goOffset > 0 && (
+              <span className="font-mono text-[10px] tabular-nums text-on-surface-variant flex items-center gap-0.5 mt-0.5">
+                (+{(goOffset / 1000).toFixed(2)}s)
+                {isEditing && (
                   <button
                     onClick={() => {
                       const entry = savedData.swimmers.find((s: SavedSwimmerData) => s.dbId === saved.dbId)
                       if (entry) {
                         const offset = (saved.startedAt ?? 0) - (savedData.drillStart ?? 0)
-                        const adjustedLaps = saved.laps?.map(l => l - offset) ?? []
+                        const adjustedLaps = lapEntries.map(e => ({ ...e, time: e.time - offset }))
                         onEditSavedSwimmer(group.id, group.currentRunDrillId!, entry.dbId, { laps: adjustedLaps, startedAt: undefined })
                       }
                     }}
                     className="w-3 h-3 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
-                ) : (
-                  <span className="w-3 h-3 shrink-0 inline-block" />
                 )}
-              </div>
-              {splits.length > 0 && (
-                <div className="flex flex-col gap-0.5 shrink-0">
-                  {splits.map((split: number, i: number) => {
-                    const prevSplit = i > 0 ? splits[i - 1] : null
-                    const diff = prevSplit !== null ? split - prevSplit : null
-                    return (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                        {lapEditMode[`saved-${saved.dbId}`] ? (
-                          <button
-                            onClick={() => {
-                              const newLaps = removeLap(laps, i)
-                              const entry = savedData.swimmers.find((s: SavedSwimmerData) => s.dbId === saved.dbId)
-                              if (entry) onEditSavedSwimmer(group.id, group.currentRunDrillId!, entry.dbId, { laps: newLaps })
-                            }}
-                            className="w-3 h-3 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
-                        ) : (
-                          <span className="w-3 h-3 shrink-0 inline-block" />
-                        )}
-                        <span className="text-on-surface-variant w-5 text-right text-[10px]">#{i + 1}</span>
-                        <span className="text-on-surface font-semibold">{formatTime(split)}</span>
-                        {diff !== null && (
-                          <span className={`${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
-                            {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="mt-auto shrink-0 flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                <span className="text-on-surface-variant w-5 text-right text-[10px]">Fin</span>
-                <span className="text-primary font-semibold">{displayTime}</span>
-              </div>
-            </div>
+              </span>
+            )}
           </div>
-        </div>
-        <hr className="border-outline-variant/20" />
-        <div className="flex gap-1 flex-wrap justify-center">
-          <button disabled
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
-          >
-            <span className="material-symbols-outlined text-[11px]">play_arrow</span>
-            <span>Start</span>
-          </button>
-          <button disabled
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
-          >
-            <span className="material-symbols-outlined text-[11px]">flag</span>
-            <span>Lap</span>
-          </button>
-          <button disabled
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
-          >
-            <span className="material-symbols-outlined text-[11px]">check</span>
-            <span>Finish</span>
-          </button>
-          <button disabled
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
-          >
-            <span className="material-symbols-outlined text-[11px]">tag</span>
-            <span>SC</span>
+          <button onClick={() => toggleLapEdit(`saved-${saved.dbId}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none -mr-1 mt-0.5">
+            <span className="material-symbols-outlined text-sm">{isEditing ? 'check' : 'more_horiz'}</span>
           </button>
         </div>
+      </div>
+
+      {/* Lap rows with stroke count */}
+      {lapEntries.length > 0 && (
+        <div className="px-3 py-1 space-y-0.5">
+          {lapEntries.map((entry, i) => {
+            const split = splits[i]
+            const prevSplit = i > 0 ? splits[i - 1] : null
+            const diff = prevSplit !== null ? split - prevSplit : null
+            const sc = entry.strokeCount
+            return (
+              <div key={i} className="flex items-center gap-1.5 text-xs font-mono tabular-nums">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {isEditing ? (
+                    <button
+                      onClick={() => {
+                        const newLaps = removeLapEntry(lapEntries, i)
+                        onEditSavedSwimmer(group.id, group.currentRunDrillId!, saved.dbId, { laps: newLaps })
+                      }}
+                      className="w-3.5 h-3.5 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
+                  ) : (
+                    <span className="w-3.5 shrink-0 inline-block" />
+                  )}
+                  <span className="text-on-surface-variant shrink-0">lap #{i + 1}</span>
+                  <span className="text-outline-variant/40 shrink-0">|</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(split)}</span>
+                    {diff !== null && (
+                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
+                        {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-outline-variant/40 shrink-0">|</span>
+                  <span className="text-on-surface-variant shrink-0">
+                    SC:{' '}
+                    {sc != null ? (
+                      <span className="text-on-surface font-bold">{sc}</span>
+                    ) : (
+                      <span className="text-on-surface-variant/60">--</span>
+                    )}
+                  </span>
+                </div>
+                <div className="ml-auto shrink-0">
+                  <StrokeCountStepper
+                    value={sc}
+                    onChange={count => {
+                      const newLaps = updateStrokeCount(lapEntries, i, count)
+                      onEditSavedSwimmer(group.id, group.currentRunDrillId!, saved.dbId, { laps: newLaps })
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Divider + saved controls */}
+      <hr className="border-outline-variant/20 mx-3" />
+      <div className="px-3 py-2 flex gap-1.5 justify-center">
+        <button disabled
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
+        >
+          <span className="material-symbols-outlined text-[11px]">play_arrow</span>
+          <span>Start</span>
+        </button>
+        <button disabled
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
+        >
+          <span className="material-symbols-outlined text-[11px]">flag</span>
+          <span>Lap</span>
+        </button>
+        <button disabled
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold shrink-0 bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50"
+        >
+          <span className="material-symbols-outlined text-[11px]">check</span>
+          <span>Finish</span>
+        </button>
       </div>
     </div>
   )
@@ -141,12 +161,10 @@ interface ActiveSwimmerRowProps {
   onStart: (swimmerId: number) => void
   onLap: (swimmerId: number) => void
   onComplete: (swimmerId: number) => void
-  lapEditMode: Record<string, boolean>
-  toggleLapEdit: (key: string) => void
   handleMoveSwimmer: (swimmerId: number, direction: 'up' | 'down') => void
 }
 
-export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, lapEditMode, toggleLapEdit, handleMoveSwimmer }: ActiveSwimmerRowProps) {
+export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, handleMoveSwimmer }: ActiveSwimmerRowProps) {
   const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
   const storeVersion = store.version
 
@@ -170,7 +188,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionElapsed, startedAt, swimmer.completed, runId, group.id, drillId, swimmer.dbId, storeVersion])
 
-  const laps = useMemo(() => {
+  const lapTimes = useMemo(() => {
     const result: number[] = []
     if (runId && drillId && swimmer.dbId) {
       for (let n = 1; ; n++) {
@@ -184,9 +202,9 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
   }, [runId, group.id, drillId, swimmer.dbId, storeVersion])
 
   const splits = useMemo(() => {
-    if (laps.length === 0) return []
-    return timestampSplits(laps, startedAt ?? 0)
-  }, [laps, startedAt])
+    if (lapTimes.length === 0) return []
+    return timestampSplits(lapTimes, startedAt ?? 0)
+  }, [lapTimes, startedAt])
 
   const groupEarliest = useMemo(() => {
     if (!runId || !drillId) return null
@@ -205,95 +223,116 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
     return startedAt - groupEarliest
   }, [startedAt, groupEarliest])
 
+  const hasIndividualStart = useMemo(() =>
+    (runId && drillId && swimmer.dbId)
+      ? store.get(K.swimmerStart(runId, group.id, drillId, swimmer.dbId)) != null
+      : false,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [runId, group.id, drillId, swimmer.dbId, storeVersion]
+  )
+
   return (
-    <div className="bg-surface-container rounded-xl border border-outline-variant/20 h-[188px]">
-      <div className="p-3 h-full flex flex-col gap-1">
-        <div className="flex gap-3 flex-1 min-h-0">
-          <div className="flex-1 min-w-0 flex items-center gap-2">
-            <div className="flex flex-col gap-0.5 shrink-0">
-              <button onClick={() => handleMoveSwimmer(swimmer.id, 'up')} disabled={idx === 0}
-                className="h-4 w-4 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-[10px]">keyboard_arrow_up</span>
-              </button>
-              <button onClick={() => handleMoveSwimmer(swimmer.id, 'down')} disabled={idx >= group.swimmers.length - 1}
-                className="h-4 w-4 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-[10px]">keyboard_arrow_down</span>
-              </button>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-on-surface text-sm md:text-base truncate">{swimmer.name}</div>
-              <div className="font-display-timer text-base md:text-lg tabular-nums tracking-tight text-primary">{displayTime}</div>
-            </div>
+    <div className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-1.5">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <div className="flex flex-col gap-px shrink-0">
+            <button onClick={() => handleMoveSwimmer(swimmer.id, 'up')} disabled={idx === 0}
+              className="h-3.5 w-3.5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
+              <span className="material-symbols-outlined text-[8px]">keyboard_arrow_up</span>
+            </button>
+            <button onClick={() => handleMoveSwimmer(swimmer.id, 'down')} disabled={idx >= group.swimmers.length - 1}
+              className="h-3.5 w-3.5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
+              <span className="material-symbols-outlined text-[8px]">keyboard_arrow_down</span>
+            </button>
           </div>
-          <div className="shrink-0 border-l border-outline-variant/30 w-1/2 flex flex-col gap-0.5">
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5 pl-2">
-              <div className={`shrink-0 flex justify-end ${laps.length === 0 ? 'invisible' : ''}`}>
-                <button onClick={() => toggleLapEdit(`active-${swimmer.id}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none">
-                  <span className="material-symbols-outlined text-sm">{lapEditMode[`active-${swimmer.id}`] ? 'check' : 'edit_note'}</span>
-                </button>
-              </div>
-              <div className="shrink-0 flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                <span className="text-on-surface-variant w-5 text-right text-[10px]">Go</span>
-                <span className="text-on-surface font-semibold">{goOffset != null ? `+${formatTime(goOffset).replace(/^00:/, '')}` : '00:00'}</span>
-              </div>
-              {splits.length > 0 && (
-                <div className="flex flex-col gap-0.5 shrink-0">
-                  {splits.map((split, i) => {
-                    const prevSplit = i > 0 ? splits[i - 1] : null
-                    const diff = prevSplit !== null ? split - prevSplit : null
-                    return (
-                      <div key={i} className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                        <span className="text-on-surface-variant w-5 text-right text-[10px]">#{i + 1}</span>
-                        <span className="text-on-surface font-semibold">{formatTime(split)}</span>
-                        {diff !== null && (
-                          <span className={`${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
-                            {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
+          <div className="font-bold text-on-surface text-base md:text-lg truncate leading-tight">{swimmer.name}</div>
+          {swimmer.completed && (
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">Done</span>
+          )}
+        </div>
+        <div className="flex items-start gap-1.5 shrink-0">
+          <div className="flex flex-col items-start">
+            <div className="font-display-timer text-xl md:text-2xl tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
+            {goOffset != null && goOffset > 0 && (
+              <span className="font-mono text-[10px] tabular-nums text-on-surface-variant mt-0.5">(+{(goOffset / 1000).toFixed(2)}s)</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Lap rows with stroke count */}
+      {lapTimes.length > 0 && (
+        <div className="px-3 py-1 space-y-0.5">
+          {lapTimes.map((_, i) => {
+            const split = splits[i]
+            const prevSplit = i > 0 ? splits[i - 1] : null
+            const diff = prevSplit !== null ? split - prevSplit : null
+            const sc = swimmer.lapStrokeCounts[i + 1]
+            return (
+              <div key={i} className="flex items-center gap-1.5 text-xs font-mono tabular-nums">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-3.5 shrink-0 inline-block" />
+                  <span className="text-on-surface-variant shrink-0">lap #{i + 1}</span>
+                  <span className="text-outline-variant/40 shrink-0">|</span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(split)}</span>
+                    {diff !== null && (
+                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
+                        {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-outline-variant/40 shrink-0">|</span>
+                  <span className="text-on-surface-variant shrink-0">
+                    SC:{' '}
+                    {sc != null ? (
+                      <span className="text-on-surface font-bold">{sc}</span>
+                    ) : (
+                      <span className="text-on-surface-variant/60">--</span>
+                    )}
+                  </span>
                 </div>
-              )}
-              <div className="mt-auto shrink-0 flex items-center gap-1.5 text-[11px] font-mono tabular-nums whitespace-nowrap">
-                <span className="text-on-surface-variant w-5 text-right text-[10px]">Fin</span>
-                <span className="text-primary font-semibold">{startedAt != null ? displayTime : '--:--.--'}</span>
+                <div className="ml-auto shrink-0">
+                  <StrokeCountStepper
+                    value={sc}
+                    onChange={count => dispatch({
+                      type: 'SWIMMER_LAP_STROKE_COUNT',
+                      payload: { groupId: group.id, swimmerId: swimmer.id, lapIndex: i + 1, count },
+                    })}
+                  />
+                </div>
               </div>
-            </div>
-          </div>
+            )
+          })}
         </div>
-        <hr className="border-outline-variant/20" />
-        <div className="flex gap-1 flex-wrap justify-center">
-          <button
-            onClick={() => onStart(swimmer.id)}
-            disabled={laps.length > 0}
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-emerald-600 text-white hover:brightness-110 active:scale-95 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100"
-          >
-            <span className="material-symbols-outlined text-[11px]">play_arrow</span>
-            <span>Start</span>
-          </button>
-          <button
-            onClick={() => onLap(swimmer.id)}
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-blue-600 text-white hover:brightness-110 active:scale-95 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[11px]">flag</span>
-            <span>Lap</span>
-          </button>
-          <button
-            onClick={() => onComplete(swimmer.id)}
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[11px]">check</span>
-            <span>Finish</span>
-          </button>
-          <button
-            onClick={() => { const count = prompt('Stroke count', '14'); if (count !== null) { const n = parseInt(count, 10); if (!isNaN(n)) dispatch({ type: 'SWIMMER_STROKE_COUNT', payload: { groupId: group.id, swimmerId: swimmer.id, count: n } }) } }}
-            className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-orange-500 text-white hover:brightness-110 active:scale-95 shrink-0"
-          >
-            <span className="material-symbols-outlined text-[11px]">tag</span>
-            <span>SC</span>
-          </button>
-        </div>
+      )}
+
+      {/* Controls */}
+      <hr className="border-outline-variant/20 mx-3" />
+      <div className="px-3 py-2 flex gap-1.5 justify-center">
+        <button
+          onClick={() => onStart(swimmer.id)}
+          disabled={hasIndividualStart || swimmer.completed}
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-emerald-600 text-white hover:brightness-110 active:scale-95 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+        >
+          <span className="material-symbols-outlined text-[11px]">play_arrow</span>
+          <span>Start</span>
+        </button>
+        <button
+          onClick={() => onLap(swimmer.id)}
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-blue-600 text-white hover:brightness-110 active:scale-95 shrink-0"
+        >
+          <span className="material-symbols-outlined text-[11px]">flag</span>
+          <span>Lap</span>
+        </button>
+        <button
+          onClick={() => onComplete(swimmer.id)}
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-[11px] md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 shrink-0"
+        >
+          <span className="material-symbols-outlined text-[11px]">check</span>
+          <span>Finish</span>
+        </button>
       </div>
     </div>
   )

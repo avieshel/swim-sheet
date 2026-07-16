@@ -59,6 +59,16 @@ Swimmer ──< RunSwimmer >── SessionRun ──> Session (template)
                                     └──< LaneDrillResult
 ```
 
+### LapEntry (Client-only type)
+A single lap's data — time (required) and optional stroke count. Used in reducer state and JSON persistence.
+
+```ts
+interface LapEntry {
+  time: number       // session-relative ms
+  strokeCount?: number
+}
+```
+
 ### Swimmer
 A student/athlete registered by the coach.
 
@@ -149,6 +159,19 @@ Links a swimmer to a SessionRun.
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
+### LiveSessionContext.Swimmer (In-memory reducer state)
+Represents a swimmer during an active session. Stroke counts are stored per-lap (1-indexed) in a sparse Record. Timestamps live in the TimestampStore; this state holds non-timing metadata.
+
+```ts
+interface Swimmer {
+  id: number
+  dbId?: string
+  name: string
+  completed: boolean
+  lapStrokeCounts: Record<number, number>  // lapIndex → strokes, sparse
+}
+```
+
 ### Lap
 A recorded lap time.
 
@@ -216,15 +239,19 @@ Saved `LaneDrillResult.data` JSON blob (snapshot at drill-complete time):
       "name": "Swimmer Name",
       "startedAt": null,
       "completedAt": null,
-      "laps": [],
-      "completed": false,
-      "strokeCount": null
+      "laps": [
+        { "time": 12345, "strokeCount": 14 },
+        { "time": 45678 }
+      ],
+      "completed": false
     }
   ]
 }
 ```
 
-Constraints: `startedAt ≤ laps[i] ≤ completedAt`, `drillStart ≤ all swimmer timestamps ≤ drillEnd`
+Each `laps` entry is a `LapEntry`: `{ time: number; strokeCount?: number }`. Stroke count is optional and can be added/updated after the lap is recorded — the tuple is self-contained so edits (remove, reorder) never orphan stroke count data.
+
+Constraints: `startedAt ≤ laps[i].time ≤ completedAt`, `drillStart ≤ all swimmer timestamps ≤ drillEnd`
 
 ### LibraryDrill (Client Only)
 Global drill library with builtin defaults and user customizations.
