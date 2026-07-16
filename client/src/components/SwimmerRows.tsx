@@ -1,10 +1,37 @@
-import React, { useContext, useMemo } from 'react'
+import React, { useContext, useMemo, useState } from 'react'
 import { LiveSessionContext, type TimedGroup, type LapEntry } from '../context/LiveSessionContext'
 import { K, effectiveStart, effectiveDone } from '../timing/timestampStore'
 import { timestampSplits, removeLapEntry, updateStrokeCount } from '../utils/lapEditing'
 import { formatTime } from '../utils/formatTime'
-import { StrokeCountStepper } from './StrokeCountStepper'
 import type { SavedDrillData, SavedSwimmerData } from '../pages/LiveDeck'
+
+function StrokeCountStepper({ value, onChange }: {
+  value: number | undefined
+  onChange: (val: number | undefined) => void
+}) {
+  const [preset, setPreset] = useState(18)
+
+  return (
+    <span className="inline-flex items-center gap-0.5 select-none">
+      <button onClick={() => onChange(value === preset ? undefined : preset)}
+        className={`h-5 px-1.5 rounded text-xs font-mono font-bold transition-all cursor-pointer leading-none ${
+          value === preset
+            ? 'bg-primary text-on-primary shadow-xs'
+            : 'bg-surface-variant text-on-surface-variant hover:bg-primary-container/60'
+        }`}
+      >
+        {preset}
+      </button>
+      <span className="w-px h-4 bg-outline-variant/30 mx-0.5" />
+      <button onClick={() => setPreset(p => Math.max(0, p - 1))}
+        className="w-5 h-5 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none"
+      >–</button>
+      <button onClick={() => setPreset(p => p + 1)}
+        className="w-5 h-5 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none"
+      >+</button>
+    </span>
+  )
+}
 
 interface SavedSwimmerRowProps {
   saved: SavedSwimmerData
