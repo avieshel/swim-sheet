@@ -25,7 +25,6 @@ export interface DbDrill {
   stroke: string
   distance: number
   drill_order: number
-  tag?: string
   created_at?: string
   updated_at?: string
 }
@@ -50,7 +49,6 @@ export interface DbRunDrill {
   distance: number
   drill_order: number
   notes?: string
-  tag?: string
   created_at?: string
   updated_at?: string
 }
@@ -366,15 +364,6 @@ export function initDb(db: Database) {
   const swimmerColumns = db.prepare("PRAGMA table_info(swimmers)").all() as { name: string }[]
   if (!swimmerColumns.some(c => c.name === 'status')) {
     db.prepare("ALTER TABLE swimmers ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run()
-  }
-
-  const drillColumns = db.prepare("PRAGMA table_info(drills)").all() as { name: string }[]
-  if (!drillColumns.some(c => c.name === 'tag')) {
-    db.prepare("ALTER TABLE drills ADD COLUMN tag TEXT").run()
-  }
-  const runDrillColumns = db.prepare("PRAGMA table_info(run_drills)").all() as { name: string }[]
-  if (!runDrillColumns.some(c => c.name === 'tag')) {
-    db.prepare("ALTER TABLE run_drills ADD COLUMN tag TEXT").run()
   }
 
   db.prepare(`CREATE INDEX IF NOT EXISTS idx_drills_session_id ON drills(session_id)`).run()

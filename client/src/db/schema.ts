@@ -49,7 +49,6 @@ export interface Drill {
   description: string
   stroke: string
   distance: number
-  tag?: 'warmup' | 'main-set' | 'cooldown'
   createdAt: string
   updatedAt: string
 }
@@ -81,7 +80,6 @@ export interface RunDrill {
   interval?: string
   equipment?: string[]
   parent_drill_id?: string
-  tag?: string
   createdAt: string
   updatedAt: string
 }

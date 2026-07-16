@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'prompt',
         includeAssets: ['favicon.svg', 'icons/*.png'],
         manifest: {
-          name: 'LaneLogic Coaching',
+          name: 'Swim Sheet',
           short_name: 'SwimSheet',
           description: 'Swim coaching session management and timing',
           start_url: '/',

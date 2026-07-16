@@ -115,7 +115,7 @@ The service worker is configured with `registerType: 'prompt'` — updates downl
 
 1. User opens the app — the current version works immediately.
 2. A new version is deployed — the new service worker downloads in the background.
-3. When ready, a non-intrusive banner appears: *"A new version of LaneLogic is available"* with **Update** and **Dismiss** buttons.
+3. When ready, a non-intrusive banner appears: *"A new version of Swim Sheet is available"* with **Update** and **Dismiss** buttons.
 4. The user taps **Update** to activate the new version (the page reloads).
 5. The user can tap **Dismiss** to continue with the current version — the update is applied on next reload.
 

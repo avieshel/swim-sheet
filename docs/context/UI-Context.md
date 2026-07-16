@@ -1,6 +1,6 @@
 # SwimSheet UI Context
 
-## Design System: "LaneLogic Coaching" (Material 3-inspired)
+## Design System: "Swim Sheet" (Material 3-inspired)
 
 ### Colors
 - **Primary**: `#00677f` — aqua/teal
@@ -60,7 +60,7 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 ## Layout
 
 ### App Shell
-- **Sticky TopAppBar**: Pool icon + "LaneLogic Coaching" title. Desktop nav links (Home, Swimmers, Sessions, Live). Team name chip.
+- **Sticky TopAppBar**: Pool icon + "Swim Sheet" title. Desktop nav links (Home, Swimmers, Sessions, Live). Team name chip.
 - **Bottom Nav (mobile)**: 4 tabs — Home, Swimmers, Sessions, Live. Active tab highlighted with `bg-secondary-container` / filled icon.
 - **Main content**: `max-w-7xl mx-auto` container with responsive padding.
 - **Desktop**: TopAppBar nav replaces bottom nav.

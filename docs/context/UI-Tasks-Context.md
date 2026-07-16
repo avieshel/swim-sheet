@@ -88,7 +88,7 @@ References `__APP_VERSION__` which wasn't defined in Vite config. Added `define:
 - `layout-responsive.spec.ts` — 5 tests fail because page.evaluate seeds DB before Dexie is open
 - `live-deck.spec.ts` — same issue
 - `persistence.spec.ts` — same issue
-- `drill-timer.spec.ts` — title mismatch (`SwimSheet|Live|Deck` vs `LaneLogic Coaching`)
+- `drill-timer.spec.ts` — title mismatch (`SwimSheet|Live|Deck` vs `Swim Sheet`)
 
 **Fix**: Add `waitForFunction(() => (window as any).db?.isOpen?.())` before all page.evaluate calls. Fix title regex.
 

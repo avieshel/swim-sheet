@@ -22,7 +22,6 @@ export interface DrillFormData {
   focus: string
   labels: string[]
   description: string
-  tag?: 'warmup' | 'main-set' | 'cooldown'
   id?: string
   distance?: number
   stroke?: string
@@ -37,7 +36,6 @@ interface DrillEditorModalProps {
   onSave: (data: DrillFormData) => void
   onDelete?: () => void
   onClose: () => void
-  showTags?: boolean
 }
 
 const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
@@ -50,7 +48,6 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
       focus: initialData.focus || 'none',
       labels: initialData.labels || [],
       description: initialData.description || '',
-      tag: initialData.tag,
       id: initialData.id,
       distance: initialData.distance,
       stroke: initialData.stroke,
@@ -66,11 +63,10 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
     focus: 'none',
     labels: [],
     description: '',
-    tag: undefined,
   }
 }
 
-export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose, showTags }) => {
+export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose }) => {
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
 
   useEffect(() => {
@@ -212,26 +208,6 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                 )}
               </div>
             </div>
-
-            {showTags && (
-              <div>
-                <label className="block font-label-caps text-on-surface-variant mb-2">Session Role / Tag</label>
-                <div className="flex gap-2">
-                  {(['warmup', 'main-set', 'cooldown'] as const).map(t => {
-                    const active = form.tag === t
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setForm({ ...form, tag: active ? undefined : t })}
-                        className={`flex-1 py-2 rounded-full border text-xs font-bold capitalize transition-all cursor-pointer ${active ? 'bg-primary text-on-primary border-primary' : 'border-outline text-on-surface-variant'}`}
-                      >
-                        {t === 'main-set' ? 'Main Set' : t.charAt(0).toUpperCase() + t.slice(1)}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Items List */}
             <div>

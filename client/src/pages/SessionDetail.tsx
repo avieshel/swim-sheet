@@ -42,7 +42,6 @@ export const SessionDetail: React.FC = () => {
     focus: 'none',
     labels: [],
     description: '',
-    tag: undefined,
   })
 
   const [similarWarning, setSimilarWarning] = useState<{ similars: SimilarDrill[]; data: DrillFormData; proceedSave: () => void } | null>(null)
@@ -116,7 +115,6 @@ export const SessionDetail: React.FC = () => {
         focus: 'none',
         labels: [],
         description: '',
-        tag: undefined,
       })
       setEditingLibraryId(null)
     }
@@ -409,7 +407,6 @@ export const SessionDetail: React.FC = () => {
         open={showRichEditor}
         title={editingLibraryId ? 'Edit Bank Drill' : richDrill.id ? 'Edit Drill' : 'New Drill'}
         initialData={showRichEditor ? richDrill as DrillFormData : undefined}
-        showTags={true}
         onSave={async (data) => {
           const save = async () => {
             if (editingLibraryId) {
@@ -532,11 +529,8 @@ export const SessionDetail: React.FC = () => {
                       </button>
                     </div>
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2">
                           <span className="font-bold text-on-surface truncate">{d.name}</span>
-                          {d.tag === 'warmup' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Warmup</span>}
-                          {d.tag === 'main-set' && <span className="text-[9px] bg-primary text-on-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Main Set</span>}
-                          {d.tag === 'cooldown' && <span className="text-[9px] bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Cooldown</span>}
                           <span className="text-[10px] bg-primary text-on-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(d)}m</span>
                           {d.repeatCount > 1 && <span className="text-[10px] bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded font-bold">{d.repeatCount}x</span>}
                         </div>

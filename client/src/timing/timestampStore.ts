@@ -1,5 +1,4 @@
 // ── Key conventions ──────────────────────────────────────────
-// session::<runId>::group::<groupId>::drill::<drillId>::swimmer::<swimmerId>::tag
 //
 // Tags:
 //   group-start   – lane-level Go

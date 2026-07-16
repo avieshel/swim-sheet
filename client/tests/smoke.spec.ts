@@ -6,7 +6,7 @@ test('App loads — DB, nav, dashboard present', async ({ page }) => {
 
   const header = page.locator('header');
   await expect(header).toBeVisible({ timeout: 5000 });
-  await expect(page.locator('text=LaneLogic Coaching').first()).toBeVisible();
+  await expect(page.locator('text=Swim Sheet').first()).toBeVisible();
 
   await expect(page.locator('a[href="/"]').first()).toBeVisible();
   await expect(page.locator('a[href="/swimmers"]').first()).toBeVisible();

@@ -89,7 +89,6 @@ export const runService = {
           equipment: Array.from(equipmentSet),
           parent_drill_id: drill.id,
           notes: drill.description || '',
-          tag: drill.tag || undefined,
         })
       } else {
         for (let r = 0; r < drill.repeatCount; r++) {
@@ -109,7 +108,6 @@ export const runService = {
                 equipment: item.equipment,
                 parent_drill_id: drill.id,
                 notes: drill.description || '',
-                tag: drill.tag || undefined,
               })
             }
           }

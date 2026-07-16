@@ -12,7 +12,7 @@ export const UpdatePrompt: React.FC = () => {
     <div className="fixed bottom-28 md:bottom-16 left-1/2 -translate-x-1/2 z-[100] w-[90vw] max-w-md animate-slide-up">
       <div className="bg-surface-container-lowest rounded-2xl px-5 py-4 shadow-2xl border border-outline-variant">
         <p className="font-body-md font-semibold text-on-surface mb-3">
-          A new version of LaneLogic is available
+          A new version of Swim Sheet is available
         </p>
         <div className="flex gap-3">
           <button
