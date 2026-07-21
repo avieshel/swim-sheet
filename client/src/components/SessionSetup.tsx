@@ -174,20 +174,39 @@ export function SessionSetup({ onStart }: { onStart: () => void }) {
             {allSwimmers.map(sw => (
               <div key={sw.id} className="flex items-center justify-between p-2 bg-surface-container-low rounded-lg">
                 <span className="font-body-md text-body-md text-on-surface">{sw.name}</span>
-                <div className="flex gap-1 flex-wrap justify-end">
-                  {Array.from({ length: laneCount }, (_, i) => i + 1).map(lane => (
-                    <button
-                      key={lane}
-                      onClick={() => toggleSwimmer(sw.id, lane)}
-                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        assignments[sw.id] === lane
-                          ? 'bg-primary text-on-primary'
-                          : 'bg-surface-container-highest text-on-surface-variant hover:bg-primary-container/30'
-                      }`}
-                    >
-                      {lane}
-                    </button>
-                  ))}
+                <div className="flex items-center gap-1">
+                  <select
+                    value={assignments[sw.id] ?? ''}
+                    onChange={e => {
+                      const val = e.target.value
+                      if (val === '') {
+                        setAssignments(prev => { const n = { ...prev }; delete n[sw.id]; return n })
+                      } else {
+                        toggleSwimmer(sw.id, Number(val))
+                      }
+                    }}
+                    className="md:hidden w-14 h-8 rounded-lg text-xs font-bold bg-surface-container-highest text-on-surface-variant border border-outline-variant px-1 cursor-pointer"
+                  >
+                    <option value="">Lane</option>
+                    {Array.from({ length: laneCount }, (_, i) => i + 1).map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                  <div className="hidden md:flex gap-1 flex-wrap justify-end">
+                    {Array.from({ length: laneCount }, (_, i) => i + 1).map(lane => (
+                      <button
+                        key={lane}
+                        onClick={() => toggleSwimmer(sw.id, lane)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          assignments[sw.id] === lane
+                            ? 'bg-primary text-on-primary'
+                            : 'bg-surface-container-highest text-on-surface-variant hover:bg-primary-container/30'
+                        }`}
+                      >
+                        {lane}
+                      </button>
+                    ))}
+                  </div>
                   <button
                     onClick={() => setLaneCount(laneCount + 1)}
                     className="w-8 h-8 rounded-lg text-xs font-bold bg-surface-container-highest text-on-surface-variant hover:bg-primary-container/30 transition-all cursor-pointer border border-dashed border-outline-variant flex items-center justify-center"

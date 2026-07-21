@@ -5,7 +5,7 @@ const BASE = 'http://localhost:5173';
 test('live deck page loads', async ({ page }) => {
   await page.goto(BASE);
   await page.waitForLoadState('networkidle');
-  await expect(page).toHaveTitle(/SwimSheet|Live|Deck/);
+  await expect(page).toHaveTitle(/Swim Sheet/);
 });
 
 test('reducer module is accessible via dynamic import', async ({ page }) => {

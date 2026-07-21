@@ -6,6 +6,14 @@ export const strokeColors: Record<string, string> = {
   im: 'bg-amber-100 text-amber-700',
 }
 
+export const strokeColorsSolid: Record<string, string> = {
+  freestyle: 'bg-blue-400',
+  backstroke: 'bg-emerald-400',
+  breaststroke: 'bg-purple-400',
+  butterfly: 'bg-pink-400',
+  im: 'bg-amber-400',
+}
+
 export const strokeOptions = [
   { value: 'freestyle', label: 'Freestyle' },
   { value: 'backstroke', label: 'Backstroke' },

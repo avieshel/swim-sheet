@@ -104,6 +104,29 @@ export interface LaneDrillResult {
   updatedAt: string
 }
 
+// ── Live timing DTOs (serialized into LaneDrillResult.data) ──
+
+export interface LapEntry {
+  time: number
+  strokeCount?: number
+}
+
+export interface SavedSwimmerData {
+  dbId: string
+  name: string
+  startedAt: number | null
+  completedAt: number | null
+  laps: LapEntry[]
+  completed: boolean
+}
+
+export interface SavedDrillData {
+  drillStart: number
+  drillEnd: number | null
+  sessionStartedAt: number
+  swimmers: SavedSwimmerData[]
+}
+
 export interface DbMeta {
   key: string
   value: string

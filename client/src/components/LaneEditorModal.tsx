@@ -151,7 +151,7 @@ export function LaneEditorModal({
                   }
                 }}
                   className="h-5 w-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer shrink-0">
-                  <span className="material-symbols-outlined text-[10px]">edit</span>
+                  <span className="material-symbols-outlined text-label-sm">edit</span>
                 </button>
                 <span className="text-xs text-on-surface-variant">{group.swimmers.length} swimmer{group.swimmers.length !== 1 ? 's' : ''}</span>
                 {group.swimmers.length === 0 && (

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addLap, moveLap, removeLap } from './lapEditing'
+import { addLap, moveLap, timestampSplits, removeLapEntry, updateStrokeCount } from './lapEditing'
 
 describe('addLap', () => {
   it('inserts a lap in the middle', () => {
@@ -101,42 +101,79 @@ describe('moveLap', () => {
   })
 })
 
-describe('removeLap', () => {
-  it('removes a middle lap', () => {
-    const laps = [32000, 65000, 96000, 127000]
-    const result = removeLap(laps, 1)
-    expect(result).toEqual([32000, 96000, 127000])
+describe('timestampSplits', () => {
+  it('computes splits from startedAt as zero anchor', () => {
+    const laps = [10000, 25000, 45000]
+    const result = timestampSplits(laps, 5000)
+    expect(result).toEqual([5000, 15000, 20000])
   })
 
-  it('removes the first lap', () => {
-    const laps = [32000, 65000, 96000]
-    const result = removeLap(laps, 0)
-    expect(result).toEqual([65000, 96000])
-  })
-
-  it('removes the Done marker (last element)', () => {
-    const laps = [32000, 65000, 96000, 127000]
-    const result = removeLap(laps, 3)
-    expect(result).toEqual([32000, 65000, 96000])
-  })
-
-  it('does nothing for an invalid index', () => {
-    const laps = [32000, 65000]
-    const result = removeLap(laps, 5)
-    expect(result).toEqual([32000, 65000])
-  })
-
-  it('does nothing for negative index', () => {
+  it('handles single lap', () => {
     const laps = [32000]
-    const result = removeLap(laps, -1)
+    const result = timestampSplits(laps, 0)
     expect(result).toEqual([32000])
   })
 
-  it('removes the only lap', () => {
-    const laps = [64000]
-    const result = removeLap(laps, 0)
+  it('handles empty laps', () => {
+    const result = timestampSplits([], 5000)
     expect(result).toEqual([])
+  })
+
+  it('first lap is relative to startedAt, not 0', () => {
+    const laps = [10000]
+    const result = timestampSplits(laps, 10000)
+    expect(result).toEqual([0])
   })
 })
 
+describe('removeLapEntry', () => {
+  it('removes a lap entry by index', () => {
+    const entries = [{ time: 10000 }, { time: 20000 }, { time: 30000 }]
+    const result = removeLapEntry(entries, 1)
+    expect(result).toEqual([{ time: 10000 }, { time: 30000 }])
+  })
 
+  it('preserves strokeCount on remaining entries', () => {
+    const entries = [{ time: 10000, strokeCount: 18 }, { time: 20000, strokeCount: 20 }]
+    const result = removeLapEntry(entries, 0)
+    expect(result).toEqual([{ time: 20000, strokeCount: 20 }])
+  })
+
+  it('returns same array for invalid index', () => {
+    const entries = [{ time: 10000 }]
+    const result = removeLapEntry(entries, 5)
+    expect(result).toBe(entries)
+  })
+
+  it('returns same array for negative index', () => {
+    const entries = [{ time: 10000 }]
+    const result = removeLapEntry(entries, -1)
+    expect(result).toBe(entries)
+  })
+})
+
+describe('updateStrokeCount', () => {
+  it('sets stroke count for a lap', () => {
+    const entries = [{ time: 10000 }, { time: 20000 }]
+    const result = updateStrokeCount(entries, 0, 18)
+    expect(result).toEqual([{ time: 10000, strokeCount: 18 }, { time: 20000 }])
+  })
+
+  it('clears stroke count when count is undefined', () => {
+    const entries = [{ time: 10000, strokeCount: 18 }, { time: 20000 }]
+    const result = updateStrokeCount(entries, 0)
+    expect(result).toEqual([{ time: 10000 }, { time: 20000 }])
+  })
+
+  it('preserves other entries unchanged', () => {
+    const entries = [{ time: 10000, strokeCount: 18 }, { time: 20000, strokeCount: 20 }]
+    const result = updateStrokeCount(entries, 1, 22)
+    expect(result).toEqual([{ time: 10000, strokeCount: 18 }, { time: 20000, strokeCount: 22 }])
+  })
+
+  it('returns same array for invalid index', () => {
+    const entries = [{ time: 10000 }]
+    const result = updateStrokeCount(entries, 5, 18)
+    expect(result).toBe(entries)
+  })
+})

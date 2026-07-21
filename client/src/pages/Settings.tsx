@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT } from '../api/settings'
+import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, deleteAllData, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
 import { CustomSelect } from '../components/CustomSelect'
 
@@ -50,6 +50,7 @@ export const Settings: React.FC = () => {
     data_retention_days: '90',
   })
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showResetAllDataConfirm, setShowResetAllDataConfirm] = useState(false)
 
   // Team names state
   const [newTeamName, setNewTeamName] = useState('')
@@ -63,6 +64,7 @@ export const Settings: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<{ bytes: number; tables: Record<string, number> } | null>(null)
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null)
   const [cleaningUp, setCleaningUp] = useState(false)
+  const [resettingAllData, setResettingAllData] = useState(false)
 
   useEffect(() => {
     if (showResetConfirm) {
@@ -72,50 +74,25 @@ export const Settings: React.FC = () => {
   }, [showResetConfirm])
 
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const response = await fetch('/api/v1/settings')
-        if (response.ok) {
-          const data = await response.json()
-          setForm({
-            team_name: data.team_name || '',
-            coach_name: data.coach_name || '',
-            team_names: data.team_names || [],
-            pool_length: (data.pool_length || 25).toString(),
-            distance_units: data.distance_units || 'meters',
-            notification_enabled: !!data.notification_enabled,
-            sync_interval: (data.sync_interval || 30000).toString(),
-            theme: data.theme === 'light' ? 'pool' : (data.theme || 'auto'),
-            font_size: data.font_size || 'medium',
-            auto_save: !!data.auto_save,
-            data_retention_days: (data.data_retention_days || 90).toString(),
-          })
-          if (data.theme && data.theme !== 'auto') {
-            document.documentElement.dataset.theme = data.theme
-          }
-        }
-      } catch {
-      // If the backend is unavailable (e.g., during local dev without the server),
-      // fall back to sensible defaults so the Settings page still renders.
+    getSettings().then(data => {
       setForm({
-        team_name: '',
-        coach_name: '',
-        team_names: [],
-        pool_length: '25',
-        distance_units: 'meters',
-        notification_enabled: true,
-        sync_interval: '30000',
-        theme: 'auto',
-        font_size: 'medium',
-        auto_save: true,
-        data_retention_days: '90',
+        team_name: data.team_name || '',
+        coach_name: data.coach_name || '',
+        team_names: data.team_names || [],
+        pool_length: (data.pool_length || 25).toString(),
+        distance_units: data.distance_units || 'meters',
+        notification_enabled: !!data.notification_enabled,
+        sync_interval: (data.sync_interval || 30000).toString(),
+        theme: data.theme === 'light' ? 'pool' : (data.theme || 'auto'),
+        font_size: data.font_size || 'medium',
+        auto_save: !!data.auto_save,
+        data_retention_days: (data.data_retention_days || 90).toString(),
       })
-    } finally {
-      setLoading(false)
-    }
-  }
-  loadSettings()
-}, [])
+      if (data.theme && data.theme !== 'auto') {
+        document.documentElement.dataset.theme = data.theme
+      }
+    }).finally(() => setLoading(false))
+  }, [])
 
   useEffect(() => {
     getEquipmentOptions().then(setEquipmentItems)
@@ -195,29 +172,55 @@ export const Settings: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-
-    try {
-      await fetch('/api/v1/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      navigate('/')
-    } catch { void 0
-    } finally {
-      setSaving(false)
-    }
+    await updateSettings({
+      team_name: form.team_name,
+      coach_name: form.coach_name,
+      team_names: form.team_names,
+      pool_length: Number(form.pool_length),
+      distance_units: form.distance_units,
+      notification_enabled: form.notification_enabled,
+      sync_interval: Number(form.sync_interval),
+      theme: form.theme,
+      font_size: form.font_size,
+      auto_save: form.auto_save,
+      data_retention_days: Number(form.data_retention_days),
+    })
+    navigate('/')
+    setSaving(false)
   }
 
   const handleReset = async () => {
+    await resetSettings()
+    setForm({
+      team_name: '',
+      coach_name: '',
+      team_names: [],
+      pool_length: '25',
+      distance_units: 'meters',
+      notification_enabled: true,
+      sync_interval: '30000',
+      theme: 'auto',
+      font_size: 'medium',
+      auto_save: true,
+      data_retention_days: '90',
+    })
+    setShowResetConfirm(false)
+    navigate('/')
+  }
+
+  const handleResetAllData = async () => {
+    setResettingAllData(true)
     try {
-      await fetch('/api/v1/settings/reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      setShowResetConfirm(false)
-      navigate('/')
-    } catch { void 0
+      await deleteAllData()
+      setShowResetAllDataConfirm(false)
+      setCleanupMsg('All data has been reset')
+      const info = await estimateDbSize()
+      setStorageInfo(info)
+      setTimeout(() => navigate('/'), 1000)
+    } catch (err) {
+      setCleanupMsg('Reset failed: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setResettingAllData(false)
     }
   }
 
@@ -539,6 +542,15 @@ export const Settings: React.FC = () => {
                 </button>
 
                 <button
+                  type="button"
+                  onClick={() => setShowResetAllDataConfirm(true)}
+                  disabled={resettingAllData}
+                  className="flex-1 bg-error-container text-on-error-container font-bold px-6 py-4 rounded-xl hover:bg-error transition-all active:scale-95 cursor-pointer border-none disabled:opacity-50"
+                >
+                  {resettingAllData ? 'Resetting...' : 'Reset All Data'}
+                </button>
+
+                <button
                   type="submit"
                   disabled={saving}
                   className="flex-1 bg-primary text-white font-bold px-6 py-4 rounded-xl hover:shadow-xl hover:bg-primary-hover active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none"
@@ -549,6 +561,35 @@ export const Settings: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Reset All Data Confirmation Dialog */}
+        {showResetAllDataConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-surface-container-lowest rounded-3xl p-8 max-w-md w-full border border-outline-variant shadow-2xl">
+              <h3 className="font-headline-md text-headline-md font-bold text-error mb-4">Reset All Data?</h3>
+              <p className="text-on-surface-variant font-body-md mb-6">
+                This will delete all swimmers, sessions, and timing data. This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowResetAllDataConfirm(false)}
+                  className="flex-1 bg-surface text-on-surface font-bold px-6 py-3 rounded-xl hover:bg-surface-variant transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetAllData}
+                  disabled={resettingAllData}
+                  className="flex-1 bg-error text-on-error font-bold px-6 py-3 rounded-xl hover:bg-error-hover transition-all disabled:opacity-50"
+                >
+                  {resettingAllData ? 'Resetting...' : 'Reset All Data'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Reset Confirmation Dialog */}
         {showResetConfirm && (
@@ -592,7 +633,7 @@ export const Settings: React.FC = () => {
                 value={localStorage.getItem('selectedLanguage') || 'en'}
                 options={[
                   { value: 'en', label: 'English' },
-                  { value: 'he', label: 'עברית', badge: <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-200 text-amber-800">Beta</span> },
+                  { value: 'he', label: 'עברית', badge: <span className="text-caption-caps font-bold px-1 py-0.5 rounded bg-amber-200 text-amber-800">Beta</span> },
                 ]}
                 onChange={(val) => {
                   localStorage.setItem('selectedLanguage', val as string);

@@ -12,11 +12,9 @@ function makeLane(id: string, laneNum: number, swimmerNames = ['Alice', 'Bob']):
       dbId: `swimmer-${id}-${i}`,
       name,
       completed: false,
-      strokeCount: null,
       lapStrokeCounts: {},
     })),
     currentRunDrillId: 'drill-1',
-    drillOverride: null,
   }
 }
 
@@ -111,7 +109,6 @@ describe('CLEAR_GROUP_SWIMMER_DATA', () => {
       { type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: '1' } },
     ])
     expect(state.groups[0].swimmers[0].completed).toBe(false)
-    expect(state.groups[0].drillOverride).toBeNull()
     // Group 2 is unaffected
     expect(state.groups[1].swimmers[0].lapStrokeCounts[1]).toBe(14)
   })
@@ -185,8 +182,8 @@ describe('REMOVE_GROUP', () => {
   it('removes empty group', () => {
     const stateWithEmpty: LiveSessionState = {
       groups: [
-        { id: '1', lane: 1, name: 'Lane 1', swimmers: [], currentRunDrillId: null, drillOverride: null },
-        { id: '2', lane: 2, name: 'Lane 2', swimmers: [], currentRunDrillId: null, drillOverride: null },
+        { id: '1', lane: 1, name: 'Lane 1', swimmers: [], currentRunDrillId: null },
+        { id: '2', lane: 2, name: 'Lane 2', swimmers: [], currentRunDrillId: null },
       ],
       runId: 'run-1',
     }
@@ -203,5 +200,43 @@ describe('REMOVE_GROUP', () => {
       payload: { groupId: '1' },
     })
     expect(state.groups).toHaveLength(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════
+// MOVE_SWIMMER_TO_GROUP
+// ══════════════════════════════════════════════════════════════
+
+describe('MOVE_SWIMMER_TO_GROUP', () => {
+  it('moves swimmer from source to destination group', () => {
+    const state = runReducer(makeInit(2, ['Alice', 'Bob']), [
+      { type: 'MOVE_SWIMMER_TO_GROUP', payload: { swimmerId: 110, fromGroupId: '1', toGroupId: '2' } },
+    ])
+    expect(state.groups[0].swimmers.map(s => s.name)).toEqual(['Bob'])
+    expect(state.groups[1].swimmers.map(s => s.name)).toEqual(['Alice', 'Bob', 'Alice'])
+  })
+
+  it('resets completed and lapStrokeCounts on moved swimmer', () => {
+    const initial = runReducer(makeInit(2, ['Alice']), [
+      { type: 'SWIMMER_COMPLETE', payload: { groupId: '1', swimmerId: 110 } },
+      { type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: '1', swimmerId: 110, lapIndex: 1, count: 14 } },
+    ])
+    const state = liveSessionReducer(initial, {
+      type: 'MOVE_SWIMMER_TO_GROUP',
+      payload: { swimmerId: 110, fromGroupId: '1', toGroupId: '2' },
+    })
+    const moved = state.groups[1].swimmers.find(s => s.name === 'Alice')
+    expect(moved).toBeDefined()
+    expect(moved!.completed).toBe(false)
+    expect(moved!.lapStrokeCounts).toEqual({})
+  })
+
+  it('does nothing if swimmer not found', () => {
+    const initial = makeInit(2)
+    const state = liveSessionReducer(initial, {
+      type: 'MOVE_SWIMMER_TO_GROUP',
+      payload: { swimmerId: 999, fromGroupId: '1', toGroupId: '2' },
+    })
+    expect(state).toEqual(initial)
   })
 })

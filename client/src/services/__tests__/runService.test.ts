@@ -18,19 +18,29 @@ const mockDao = vi.hoisted(() => ({
   getRunsForSwimmer: vi.fn(),
   getLaneDrillResults: vi.fn(),
   getLaneDrillResult: vi.fn(),
-  setLaneDrillResult: vi.fn(),
   deleteLaneDrillResult: vi.fn(),
   deleteLaneDrillResultsForGroup: vi.fn(),
   deleteLaneDrillResultsForRun: vi.fn(),
-  clearSwimmerFromLaneDrillResult: vi.fn(),
   addLap: vi.fn(),
   getLapsForRunDrill: vi.fn(),
   getLapsForSwimmerInRun: vi.fn(),
   getSession: vi.fn(),
   getDrillsForSession: vi.fn(),
+  getAllSessions: vi.fn(),
+  addSession: vi.fn(),
+  addDrill: vi.fn(),
+  searchSwimmers: vi.fn(),
+  addSwimmer: vi.fn(),
+}))
+
+const mockDb = vi.hoisted(() => ({
+  laneDrillResults: {
+    where: vi.fn(),
+  },
 }))
 
 vi.mock('../../db/dao', () => mockDao)
+vi.mock('../../db/schema', () => ({ db: mockDb }))
 
 const { runService } = await import('../runService')
 
@@ -164,12 +174,19 @@ describe('runService', () => {
       expect(result).toEqual(expected)
     })
 
-    it('setLaneResult calls setLaneDrillResult with data', async () => {
+    it('setLaneResult upserts via db', async () => {
       const data = { run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: false, data: '{}' }
-      mockDao.setLaneDrillResult.mockResolvedValue('lr-id')
+      const mockChain = {
+        first: vi.fn().mockResolvedValue(undefined),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockAdd = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.add = mockAdd
+
       const result = await runService.setLaneResult(data)
-      expect(mockDao.setLaneDrillResult).toHaveBeenCalledExactlyOnceWith(data)
-      expect(result).toBe('lr-id')
+      expect(mockDb.laneDrillResults.where).toHaveBeenCalledWith({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1' })
+      expect(result).toMatch(/^[0-9a-f-]{36}$/)
+      expect(mockAdd).toHaveBeenCalledOnce()
     })
 
     it('deleteLaneResult calls deleteLaneDrillResult with id', async () => {
@@ -190,10 +207,38 @@ describe('runService', () => {
       expect(mockDao.deleteLaneDrillResultsForRun).toHaveBeenCalledExactlyOnceWith('r1')
     })
 
-    it('clearSwimmerFromLaneResult calls clearSwimmerFromLaneDrillResult with all params', async () => {
-      mockDao.clearSwimmerFromLaneDrillResult.mockResolvedValue(undefined)
-      await runService.clearSwimmerFromLaneResult('r1', 'g1', 'rd1', 'sw1')
-      expect(mockDao.clearSwimmerFromLaneDrillResult).toHaveBeenCalledExactlyOnceWith('r1', 'g1', 'rd1', 'sw1')
+    it('deleteSwimmerFromLaneResult removes swimmer from db record', async () => {
+      const mockResult = {
+        id: 'lr1',
+        data: JSON.stringify({ swimmers: [{ dbId: 'sw1' }, { dbId: 'sw2' }] }),
+        completed: true,
+      }
+      const mockChain = {
+        first: vi.fn().mockResolvedValue(mockResult),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+
+      await runService.deleteSwimmerFromLaneResult('r1', 'g1', 'rd1', 'sw1')
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      const updated = JSON.parse(mockUpdate.mock.calls[0][1].data)
+      expect(updated.swimmers).toEqual([{ dbId: 'sw2' }])
+    })
+
+    it('updateLaneResultSwimmer patches the matching swimmer and persists', async () => {
+      mockDao.getLaneDrillResult.mockResolvedValue({
+        id: 'lr1', run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 2, completed: true,
+        data: JSON.stringify({ swimmers: [{ dbId: 'sw1', name: 'Old', laps: [] }] }),
+      })
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+
+      await runService.updateLaneResultSwimmer('r1', 'g1', 'rd1', 'sw1', { name: 'New', completedAt: 123 })
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      const saved = JSON.parse(mockUpdate.mock.calls[0][1].data)
+      expect(saved.swimmers[0].name).toBe('New')
+      expect(saved.swimmers[0].completedAt).toBe(123)
     })
   })
 
@@ -304,6 +349,135 @@ describe('runService', () => {
     it('propagates errors', async () => {
       mockDao.getSession.mockRejectedValue(new Error('DB error'))
       await expect(runService.createFromTemplate('s1', runData)).rejects.toThrow('DB error')
+    })
+  })
+
+  describe('completeRunWithLaps', () => {
+    it('persists laps with ms-to-s conversion and completes run', async () => {
+      mockDao.addLap.mockResolvedValue('lap-id')
+      mockDao.completeSessionRun.mockResolvedValue(undefined)
+
+      await runService.completeRunWithLaps('r1', [
+        { runDrillId: 'rd1', swimmerId: 'sw1', time: 32000, strokeCount: 18 },
+        { runDrillId: 'rd1', swimmerId: 'sw2', time: 65000, strokeCount: 22 },
+      ])
+
+      expect(mockDao.addLap).toHaveBeenCalledTimes(2)
+      expect(mockDao.addLap).toHaveBeenNthCalledWith(1, {
+        run_drill_id: 'rd1', swimmer_id: 'sw1', time: 32, stroke_count: 18, effort: '', notes: '',
+      })
+      expect(mockDao.addLap).toHaveBeenNthCalledWith(2, {
+        run_drill_id: 'rd1', swimmer_id: 'sw2', time: 65, stroke_count: 22, effort: '', notes: '',
+      })
+      expect(mockDao.completeSessionRun).toHaveBeenCalledWith('r1')
+    })
+
+    it('completes run even with no laps', async () => {
+      mockDao.completeSessionRun.mockResolvedValue(undefined)
+      await runService.completeRunWithLaps('r1', [])
+      expect(mockDao.addLap).not.toHaveBeenCalled()
+      expect(mockDao.completeSessionRun).toHaveBeenCalledWith('r1')
+    })
+  })
+
+  describe('createQuickStartRun', () => {
+    it('finds existing default session and creates run', async () => {
+      mockDao.getAllSessions.mockResolvedValue([
+        { id: 'sys1', name: 'Quick 100m freestyle (default)', notes: '' },
+      ])
+      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)', poolLength: 25 })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        { id: 'd1', name: '100m Freestyle', items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }], repeatCount: 1, timingMode: 'individual', order: 0, description: '' },
+      ])
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+      mockDao.addSessionRun.mockResolvedValue('run1')
+      mockDao.getRunDrillsForRun.mockResolvedValue([{ id: 'rd1' }])
+
+      const result = await runService.createQuickStartRun()
+
+      expect(mockDao.getAllSessions).toHaveBeenCalledOnce()
+      expect(mockDao.addSession).not.toHaveBeenCalled()
+      expect(mockDao.addSessionRun).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'sys1', status: 'active' })
+      )
+      expect(result).toEqual({ runId: 'run1', drillId: 'rd1' })
+    })
+
+    it('creates default session when none exists', async () => {
+      mockDao.getAllSessions.mockResolvedValue([])
+      mockDao.addSession.mockResolvedValue('sys1')
+      mockDao.addDrill.mockResolvedValue('d1')
+      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)', poolLength: 25 })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        { id: 'd1', name: '100m Freestyle', items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }], repeatCount: 1, timingMode: 'individual', order: 0, description: '' },
+      ])
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+      mockDao.addSessionRun.mockResolvedValue('run1')
+      mockDao.getRunDrillsForRun.mockResolvedValue([{ id: 'rd1' }])
+
+      const result = await runService.createQuickStartRun()
+
+      expect(mockDao.addSession).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Quick 100m freestyle (default)', notes: '' })
+      )
+      expect(mockDao.addDrill).toHaveBeenCalledWith(
+        expect.objectContaining({ session_id: 'sys1', name: '100m Freestyle' })
+      )
+      expect(result).toEqual({ runId: 'run1', drillId: 'rd1' })
+    })
+
+    it('throws when session template not found after creation', async () => {
+      mockDao.getAllSessions.mockResolvedValue([])
+      mockDao.addSession.mockResolvedValue('sys1')
+      mockDao.addDrill.mockResolvedValue('d1')
+      mockDao.getSession.mockResolvedValue(undefined)
+
+      await expect(runService.createQuickStartRun()).rejects.toThrow('Session template not found')
+    })
+
+    it('throws when no run drills created', async () => {
+      mockDao.getAllSessions.mockResolvedValue([
+        { id: 'sys1', name: 'Quick 100m freestyle (default)', notes: '' },
+      ])
+      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)', poolLength: 25 })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        { id: 'd1', name: '100m Freestyle', items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }], repeatCount: 1, timingMode: 'individual', order: 0, description: '' },
+      ])
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+      mockDao.addSessionRun.mockResolvedValue('run1')
+      mockDao.getRunDrillsForRun.mockResolvedValue([])
+
+      await expect(runService.createQuickStartRun()).rejects.toThrow('Failed to create run drill for quick start')
+    })
+  })
+
+  describe('promoteAndLinkSwimmer', () => {
+    it('renames synthetic dbId to real dbId and persists laps', async () => {
+      mockDao.searchSwimmers.mockResolvedValue([])
+      mockDao.addSwimmer.mockResolvedValue('real1')
+      mockDao.getLaneDrillResults.mockResolvedValue([
+        {
+          id: 'lr1', run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, completed: true,
+          data: JSON.stringify({ swimmers: [{ dbId: 'synth1', name: 'Alice', laps: [{ time: 32000, strokeCount: 18 }], startedAt: 1000, completedAt: 33000, completed: true }] }),
+        },
+      ])
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+      mockDao.addLap.mockResolvedValue(undefined)
+      mockDao.getSessionRun.mockResolvedValue({ id: 'r1', notes: '{"virtualSwimmers":[{"dbId":"synth1","lane":1}]}' })
+      mockDao.addSwimmerToRun.mockResolvedValue(undefined)
+      mockDao.updateSessionRun.mockResolvedValue(undefined)
+
+      const result = await runService.promoteAndLinkSwimmer('r1', 'synth1', 'Alice')
+
+      expect(result).toBe('real1')
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      const saved = JSON.parse(mockUpdate.mock.calls[0][1].data)
+      expect(saved.swimmers[0].dbId).toBe('real1')
+      expect(mockDao.addLap).toHaveBeenCalledOnce()
+      expect(mockDao.addLap).toHaveBeenCalledWith(
+        expect.objectContaining({ swimmer_id: 'real1', time: 32 })
+      )
     })
   })
 })

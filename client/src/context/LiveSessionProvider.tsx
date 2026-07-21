@@ -2,13 +2,13 @@ import React, { useReducer, useState, useMemo, useCallback } from 'react'
 import type { ReactNode, Dispatch } from 'react'
 import { LiveSessionContext, initialState, liveSessionReducer } from './LiveSessionContext'
 import type { LiveSessionAction, TimerAction } from './LiveSessionContext'
-import { createTimestampStore } from '../timing/timestampStore'
+import { createLiveTimingStore } from '../timing/liveTiming'
 
 export const LiveSessionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(liveSessionReducer, initialState)
   const [sessionElapsed, setSessionElapsed] = useState(0)
   const [sessionRunning, setSessionRunning] = useState(false)
-  const store = useMemo(() => createTimestampStore(), [])
+  const store = useMemo(() => createLiveTimingStore(), [])
 
   const wrappedDispatch = useCallback<Dispatch<LiveSessionAction | TimerAction>>((action) => {
     if (action.type === 'START_SESSION_TIMER') {

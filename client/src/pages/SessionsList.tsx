@@ -5,6 +5,7 @@ import { listSessions, getSession, createSession, deleteSession, listCompletedRu
 import { getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/drillHelpers'
+import { strokeColorsSolid } from '../constants/drill'
 import type { SessionRun } from '../api/runs'
 
 interface SessionWithTotals extends Session {
@@ -12,14 +13,6 @@ interface SessionWithTotals extends Session {
   totalDistance: number
   strokeBreakdown: { stroke: string; meters: number }[]
   focusAreas: string[]
-}
-
-const strokeColors: Record<string, string> = {
-  freestyle: 'bg-blue-400',
-  backstroke: 'bg-emerald-400',
-  breaststroke: 'bg-purple-400',
-  butterfly: 'bg-pink-400',
-  im: 'bg-amber-400',
 }
 
 export const SessionsList: React.FC = () => {
@@ -249,17 +242,17 @@ export const SessionsList: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">straighten</span>
+                      <span className="material-symbols-outlined text-sm">straighten</span>
                       {s.poolLength}m
                     </span>
                     <span className="text-outline">·</span>
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">fitness_center</span>
+                      <span className="material-symbols-outlined text-sm">fitness_center</span>
                       {s.drillCount} drills
                     </span>
                     <span className="text-outline">·</span>
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">distance</span>
+                      <span className="material-symbols-outlined text-sm">distance</span>
                       {s.totalDistance}m
                     </span>
                   </div>
@@ -275,13 +268,13 @@ export const SessionsList: React.FC = () => {
                 {s.strokeBreakdown.map(b => (
                   <span
                     key={b.stroke}
-                    className={`${strokeColors[b.stroke] || 'bg-surface-variant'} text-white text-[10px] font-bold px-2 py-0.5 rounded-full`}
+                    className={`${strokeColorsSolid[b.stroke] || 'bg-surface-variant'} text-white text-label-sm font-bold px-2 py-0.5 rounded-full`}
                   >
                     {b.stroke} {b.meters}m
                   </span>
                 ))}
                 {s.focusAreas.map(f => (
-                  <span key={f} className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                  <span key={f} className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">
                     {f}
                   </span>
                 ))}

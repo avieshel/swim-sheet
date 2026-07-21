@@ -69,4 +69,91 @@ describe('SwimmerFormModal', () => {
     await user.click(cancelBtn)
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  const roster = [
+    { id: 'abc', name: 'Alex Rivera', group: 'U17', notes: 'Freestyle', status: 'active' },
+    { id: 'def', name: 'Jordan Lee', group: 'U15', notes: '', status: 'active' },
+  ]
+
+  it('shows existing swimmers in the dropdown when opened', () => {
+    render(
+      <SwimmerFormModal
+        open={true}
+        editingId={null}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        rosterSwimmers={roster}
+      />
+    )
+    expect(screen.getByText('Alex Rivera')).toBeTruthy()
+    expect(screen.getByText('Jordan Lee')).toBeTruthy()
+  })
+
+  it('blocks case-insensitive duplicate creation and shows an error', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const { container } = render(
+      <SwimmerFormModal
+        open={true}
+        editingId={null}
+        onSave={onSave}
+        onClose={vi.fn()}
+        rosterSwimmers={roster}
+      />
+    )
+    const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement
+    await user.type(nameInput, 'alex rivera')
+    await user.click(screen.getByText('Add Swimmer'))
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByText(/already exists/i)).toBeTruthy()
+  })
+
+  it('always renders a reserved error label so the modal size stays constant', () => {
+    const { container } = render(
+      <SwimmerFormModal open={true} editingId={null} onSave={vi.fn()} onClose={vi.fn()} />
+    )
+    const errorLabel = container.querySelector('[data-testid="swimmer-form-error"]')
+    expect(errorLabel).toBeTruthy()
+    expect(errorLabel?.textContent).toBe('')
+  })
+
+  it('allows saving when the duplicate is the swimmer being edited', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const { container } = render(
+      <SwimmerFormModal
+        open={true}
+        editingId="abc"
+        initialData={{ name: 'Alex Rivera', group: 'U17', notes: 'Freestyle' }}
+        onSave={onSave}
+        onClose={vi.fn()}
+        rosterSwimmers={roster}
+      />
+    )
+    const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Alex Rivera')
+    await user.click(screen.getByText('Save Changes'))
+    expect(onSave).toHaveBeenCalledWith({ name: 'Alex Rivera', group: 'U17', notes: 'Freestyle', status: 'active' })
+  })
+
+  it('re-links to an existing swimmer selected from the dropdown', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const { container } = render(
+      <SwimmerFormModal
+        open={true}
+        editingId={null}
+        onSave={onSave}
+        onClose={vi.fn()}
+        rosterSwimmers={roster}
+      />
+    )
+    const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement
+    await user.type(nameInput, 'Jor')
+    const suggestion = await screen.findByText('Jordan Lee')
+    await user.click(suggestion)
+    await user.click(screen.getByText('Add Swimmer'))
+    expect(onSave).toHaveBeenCalledWith({ name: 'Jordan Lee', group: 'U15', notes: '', status: 'active', selectedDbId: 'def' })
+  })
 })

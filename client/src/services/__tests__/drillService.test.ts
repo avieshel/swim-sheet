@@ -26,10 +26,10 @@ describe('drillService', () => {
   })
 
   describe('template drills', () => {
-    it('getForSession calls getDrillsForSession with sessionId', async () => {
+    it('getDrills calls getDrillsForSession with sessionId', async () => {
       const expected = [{ id: 'd1', name: 'Drill 1' }]
       mockDao.getDrillsForSession.mockResolvedValue(expected)
-      const result = await drillService.getForSession('s1')
+      const result = await drillService.getDrills('s1')
       expect(mockDao.getDrillsForSession).toHaveBeenCalledExactlyOnceWith('s1')
       expect(result).toEqual(expected)
     })

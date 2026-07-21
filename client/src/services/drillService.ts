@@ -6,7 +6,7 @@ import {
 import type { SafeDrill, SafeLibraryDrill } from '../db/schema'
 
 export const drillService = {
-  getForSession: (sessionId: string) => getDrillsForSession(sessionId),
+  getDrills: (sessionId: string) => getDrillsForSession(sessionId),
   get: (id: string) => getDrill(id),
   create: (data: SafeDrill) => addDrill(data),
   update: (id: string, data: Partial<SafeDrill>) => updateDrill(id, data),

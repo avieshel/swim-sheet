@@ -151,25 +151,29 @@ Global drill library.
 - Rich drill editor modal (sets, intervals, equipment)
 - Seed defaults and reset capability
 
-### LiveDeck (`/live`)
-Real-time coaching view with Timed Groups.
+### LiveDeck (`/`)
+Real-time coaching view with Timed Groups. This is the root route — the app's default entry point.
 
-**Session Setup** (no active run):
-- Template picker, date (default today), pool name, pool length
-- Swimmer assignment: searchable picker, assign to lanes
-- "Start Session" button
+**Quick Timer Auto-Start** (no active run, initial mount):
+- LiveDeck automatically creates a quick-start session and enters the active run view with:
+  - 2 lanes: Lane 1 ("Michael Phelps" — 1 swimmer), Lane 2 ("Katie Ledecky" + "Caeleb Dressel" — 2 swimmers, hints at multi-swimmer capability)
+  - Default drill: 100m Freestyle
+  - Auto-start is `useRef`-guarded — fires only once per mount when no active run exists
+  - Per-lane controls: "Add Swimmer" (saves a real roster swimmer) and "Temp Swimmer" (adds a random famous swimmer name)
+- After completing a session, `autoStartedRef` is reset — next visit to `/` auto-starts a fresh quick-time session (no intermediate landing screen)
 
 **Active Run View** (run in progress):
 - **Session header box**: session name, "Live" indicator with pulsing dot, wall-time start (e.g. "Started 14:30"), date/pool/drill count, Play/Pause toggle, Lane Editor (pencil icon), Clear, Complete buttons
 - Group cards in responsive grid (1–4 columns)
 - Each group has: name (pencil icon opens LaneEditorModal for name editing, swimmer management, lane reset), lane number, drill timer display, drill selector — no inline editing on the card
 - **No per-lane timers** — a single global session clock ticks once per 10ms via `tick()` exposed from context
-- All timestamps stored in a flat ref-based `TimestampStore` (no re-renders on writes)
+ - All timestamps stored in a flat ref-based `TimestampStore` (no re-renders on writes)
+- `TimestampStore` is wrapped by a `LiveTimingStore` (`timing/liveTiming.ts`) that speaks drill/swimmer semantics: capture methods (`markSwimmerStart/Lap/Done`, `markGroupStart/Lap`, `batchStopSwimmers`) and query methods (`getSwimmerTiming`, `getDrillTiming`). UI handlers call these instead of `store.set(K.*)` and never reconstruct split times.
 - Session timer auto-starts on mount via `START_SESSION_TIMER`
 
 **Lane-level controls** (in the group controls area):
-- **Start/Finish** (toggle) — Green "Start" when drill not started: writes `group-start` key for every swimmer in the group via `store.set(K.swimmerGroupStart(...), sessionElapsed)`. Red "Finish" when running: batch stops all unfinished swimmers via `store.batchStop()` (writes `group-done` for each), marks them completed. Auto-save effect then persists drill data and advances to next drill.
-- **Lap/Reset** (toggle) — Blue "Lap" when drill is running (disabled when drill not started): records a `lap::<n>` timestamp for ALL active swimmers. Outlined "Reset" when drill has been started: opens confirmation dialog, then calls `store.clearDrill()` to prefix-delete all drill keys, resets swimmer data. When drill is completed, shows a disabled "Completed" badge.
+- **Start/Finish** (toggle) — Green "Start" when drill not started: `store.markGroupStart(...)` for every swimmer in the group. Red "Finish" when running: `store.batchStopSwimmers(...)` for all unfinished swimmers (writes `group-done` for each), marks them completed. Auto-save effect then persists drill data and advances to next drill.
+- **Lap/Reset** (toggle) — Blue "Lap" when drill is running (disabled when drill not started): `store.markGroupLap(...)` records a `lap::<n>` timestamp for ALL active swimmers. Outlined "Reset" when drill has been started: opens confirmation dialog, then `store.clearDrill()` resets swimmer data. When drill is completed, shows a disabled "Completed" badge.
 
 **Session lifecycle:**
 1. Coach selects a session marked as 'live' → sees it in Active Run View
@@ -181,11 +185,11 @@ Real-time coaching view with Timed Groups.
 7. "Complete" button ends the session, saves all data, returns to setup
 
 **Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
-- **Start** (emerald) — Writes `start` via `store.set(K.swimmerStart(...), sessionElapsed)` if not already set; disabled after started.
-- **Lap** (blue) — Records `lap::<n>` if swimmer has effective start and no effective done; no-op otherwise.
-- **Finish** (primary-container tonal) — Writes `done` if not already set; no-op otherwise. If last active swimmer in the group, also writes `group-done` for all swimmers.
+- **Start** (emerald) — `store.markSwimmerStart(...)` if not already started; disabled after started.
+- **Lap** (blue) — `store.markSwimmerLap(...)` appends `lap::<n>` if swimmer has a start and no done; no-op otherwise.
+- **Finish** (primary-container tonal) — `store.markSwimmerDone(...)` if not already set; no-op otherwise. If last active swimmer in the group, also `store.batchStopSwimmers(...)` for all swimmers.
 
-**Stroke count** is no longer a separate button. Each lap row in the swimmer card has an inline `StrokeCountStepper` with `[–]` / number display / `[+]` controls. Tap the number to keyboard-edit. Stroke counts are per-lap and editable both during live timing and after saving.
+**Stroke count** is no longer a separate button. Each lap row in the swimmer card has an inline `StrokeCountStepper` with `[–]` / preset display / `[+]` controls. SC starts as `--` (unset) for every new lap. Tapping the preset button sets it to the preset value; tapping again when the value matches the preset clears it back to `--`. Stroke counts are per-lap and editable both during live timing and after saving.
 
 **Timestamp store keys** (hierarchical, session-relative milliseconds):
 - `session::<runId>::group::<groupId>::drill::<drillId>::group-start` — lane-level Go
@@ -211,6 +215,8 @@ interface TimestampStore {
 }
 ```
 
+**Persistence projection:** "Submitting" a drill is a pure projection, not ad-hoc timestamp reconstruction in the view. `api/runs.buildLaneResult({ runId, groupId, drillId, sessionStartedAt, now, live: LiveDrillTiming, swimmers })` returns the `SavedDrillData` blob (using `timestampSplits`); `handleCompleteDrill` stringifies it into `setLaneResult`. `handleComplete` collects laps via `store.getDrillTiming(...)` + `timestampSplits` and calls `api/runs.completeRunWithLaps(...)`.
+
 **Timing model:**
 - One global session timer: `sessionElapsed` ticks via `tick()` exposed from context
 - Each swimmer's elapsed = `effectiveDone - effectiveStart` (or `sessionElapsed - effectiveStart` if not done)
@@ -226,8 +232,8 @@ interface TimestampStore {
 ┌──────────────────────────────────────┐
 │ Jane Smith    Done   3 laps 01:23.4  │ ← compact header (name + status + lap count + time)
 ├──────────────────────────────────────┤
-│ #1  25.5s  +1.2s  14 [–] [+]        │ ← lap row with inline stroke count stepper
-│ #2  27.1s  +1.9s  15 [–] [+]        │
+│ #1  25.5s  +1.2s   — [–] [+]        │ ← lap row with inline stroke count stepper
+│ #2  27.1s  +1.9s  14 [–] [+]        │ ← tap preset to set, tap again to clear
 │ #3  26.8s  -0.3s   — [–] [+]        │ ← tap to enter
 │                                      │
 │ Go +0.0                              │ ← offset from group earliest start
@@ -245,7 +251,7 @@ The saved-state variant replaces active buttons with a "Saved" badge but keeps s
 - Lane-level Start/Finish is always active (emerald when idle, red when running)
 - Lane-level Reset appears only when drill is running
 
-**Saved/reviewed swimmer cards** show LapTimeline with `drillDuration`, `startedAt`, `completedAt` props instead of the old `laneElapsed`/`offsetFromLaneStart`/`finalElapsed`.
+**Saved/reviewed swimmer cards** show elapsed time and lap splits instead of the old LapTimeline.
 
 ### Settings (`/settings`)
 App preferences.
@@ -261,25 +267,14 @@ App preferences.
 ## Key Components
 
 ### StrokeCountStepper
-Inline stroke count input for each lap row in the swimmer card. Replaces the old `prompt()`-based SC button.
+Inline stroke count control for each lap row in the swimmer card. Replaces the old `prompt()`-based SC button.
 
-- `[-]` decrements, `[+]` increments, tap number to keyboard-edit (Enter confirms, Escape cancels)
-- Displays current count or `—` if none entered
+- `[−]` decrements the preset, `[+]` increments it; tap the preset number to apply it to the lap
+- Initially SC shows `--` (unset) for every new lap
+- Tapping the preset when the lap has no SC sets it; tapping it again when the value matches clears it back to `--`
+- Displays current count or `--` if none entered
 - Compact: fits in ~60px within a lap row
 - Works in both live and saved swimmer states — stroke counts are always editable
-
-### LapTimeline
-Interactive horizontal timeline widget for lap visualization and editing. Shown for saved/reviewed swimmers.
-
-- Props: `drillDuration` (drill total ms), `startedAt` (swimmer start session-ms), `completedAt` (swimmer finish session-ms or null)
-- **Time labels row**: Session-absolute timestamps proportionally positioned
-- **Track with markers**: Start (|), lap dots (●), Finish (|)
-- **Distance labels row**: Auto-calculated from poolLength
-- **Interactions**:
-  - Drag any marker (constrained between neighbors)
-  - Tap empty track to insert lap
-  - Tap lap dot to delete (not start/finish)
-  - Changes committed immediately via dispatch or direct persistence
 - **Touch support**: Pointer Events, 5px drag threshold, `touch-none` CSS, 12px hit targets
 
 ### ConfirmDialog
@@ -289,7 +284,7 @@ Reusable confirmation modal for destructive actions (delete, reset).
 Styled select dropdown used in drill editor and session setup.
 
 ### SwimmerFormModal (shared)
-Add/edit swimmer form with name, group, notes fields. Used by SwimmersList and SwimmerDetail.
+Add/edit swimmer form with name, group, notes, status fields. Used by SwimmersList, SwimmerDetail, and the Live view. The `name` field has an autocomplete dropdown (`rosterSwimmers` prop) that opens showing the **entire roster** when the modal opens (so the coach can see existing swimmers and avoid duplicates); as they type it filters to matches. Selecting a roster swimmer sets `selectedDbId` and the form acts as an edit/update of that existing record. **Duplicate prevention**: on submit, if the typed name (case-insensitive) matches an existing roster swimmer (other than the one being edited) and no roster swimmer was explicitly selected, the save is blocked. The error is shown in a dedicated, always-rendered error label (reserved height, so the modal size never changes) that sits above the autocomplete dropdown (higher z-index + solid background) so it is never shadowed by the open dropdown. The coach must either pick the existing swimmer from the dropdown or use a different name. This guarantees no two roster swimmers share a name. In the Live view the modal is rendered both per active swimmer card (via `ActiveSwimmerRow`) and per completed/saved swimmer card (via `SavedSwimmerRow`) — clicking any swimmer's name opens it pre-filled, so the coach can always reach add/edit from the live screen. Saving either updates an existing roster swimmer, promotes a quick swimmer into a real roster entry, or re-links it to an existing roster swimmer selected from the autocomplete. For a saved (completed-drill) card, edits also update the saved snapshot (`handleEditSavedSwimmer`) and `promoteAndLinkSwimmer` rewrites the snapshot `dbId`, so the coach can build their swimmer base as they progress rather than pre-loading everyone.
 
 ### DrillEditorModal (shared)
 Rich drill editor with support for:

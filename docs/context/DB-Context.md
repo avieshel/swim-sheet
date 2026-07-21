@@ -159,6 +159,8 @@ Links a swimmer to a SessionRun.
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
+**Uniqueness constraint:** a `swimmer_id` may be linked to a `run_id` at most once (one lane per run). `addSwimmerToRun` *moves* the swimmer to the requested lane if a `(run_id, swimmer_id)` link already exists (it updates the lane rather than inserting a duplicate). In the live view, re-pointing a temp/"wanna be" swimmer to an already-allocated real swimmer triggers a confirmation dialog that *moves* them (removes the old lane's live allocation + saved `LaneDrillResult` entry, then re-points), never creating a duplicate.
+
 ### LiveSessionContext.Swimmer (In-memory reducer state)
 Represents a swimmer during an active session. Stroke counts are stored per-lap (1-indexed) in a sparse Record. Timestamps live in the TimestampStore; this state holds non-timing metadata.
 

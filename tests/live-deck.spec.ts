@@ -4,9 +4,9 @@ test.describe('Live Deck', () => {
   test('allows starting lane timer, tracking lap and stroke count for a swimmer', async ({ page }) => {
     // Seed database with a template, drill, swimmer, and active run via evaluate
     await page.goto('/');
+    await page.waitForFunction(() => (window as any).db?.isOpen?.(), null, { timeout: 5000 });
     await page.evaluate(async () => {
       const db = (window as any).db;
-      await new Promise(r => setTimeout(r, 200));
 
       const now = new Date().toISOString();
       const sessionId = crypto.randomUUID();

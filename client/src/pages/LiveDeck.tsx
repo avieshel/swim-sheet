@@ -1,58 +1,66 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
-import { LiveSessionContext, type TimedGroup, type LapEntry } from '../context/LiveSessionContext'
-import { K, effectiveStart, effectiveDone } from '../timing/timestampStore'
-import { getActiveRun, completeRun, addSwimmerToRun, getRunDrills, getLaneResults, addLap, removeSwimmerFromRun, setLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, clearSwimmerFromLaneResult, getLaneResult, getRunSwimmers, getRunSwimmerLinks } from '../api/runs'
+import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
+import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
+import { getActiveRun, addSwimmerToRun, createQuickStartRun, updateRun, getRunDrills, getLaneResults, removeSwimmerFromRun, setLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, completeRunWithLaps, buildLaneResult, getRunSwimmers, getRunSwimmerLinks } from '../api/runs'
+import type { CompleteRunLap } from '../api/runs'
 import { getSession } from '../api/sessions'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import type { SessionRun, RunDrill, LaneDrillResult, Swimmer as DbSwimmer } from '../api/runs'
 import { timestampSplits } from '../utils/lapEditing'
 import { formatTime, formatWallTime } from '../utils/formatTime'
 import { LaneEditorModal } from '../components/LaneEditorModal'
-import { SessionSetup } from '../components/SessionSetup'
 import { ActiveSwimmerRow, SavedSwimmerRow } from '../components/SwimmerRows'
+import { SwimmerFormModal } from '../components/SwimmerFormModal'
+import { listSwimmers, createSwimmer } from '../api/swimmers'
+import { listTempSwimmerNames } from '../api/constants'
 
-export interface SavedSwimmerData {
-  dbId: string
-  name: string
-  startedAt: number | null
-  completedAt: number | null
-  laps: LapEntry[]
-  completed: boolean
-}
-
-export interface SavedDrillData {
-  drillStart: number
-  drillEnd: number | null
-  sessionStartedAt: number
-  swimmers: SavedSwimmerData[]
-}
-
-function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId, loading }: {
+function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId, loading, rosterSwimmers, onSwimmerSaved }: {
   group: TimedGroup;
   runDrills: RunDrill[];
   laneDrillResults: LaneDrillResult[];
-  laneCount: number;
   runId: string | null;
   onAddSwimmer: (groupId: string) => void;
   onCompleteDrill: (groupId: string) => void;
   onResetDrill: (groupId: string) => void;
   onClearSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
-  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number }) => void;
+  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number; name?: string; dbId?: string }) => void;
   loading?: boolean;
+  rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>;
+  onSwimmerSaved?: () => void;
 }) {
-  const getLaneLabel = (lane: number) => {
-    if (lane === 1) return 'FAST'
-    if (lane === 4) return 'MID'
-    if (lane === 5) return 'SLOW'
-    return 'MID'
-  }
+  const isFastLane = (lane: number) => lane === 1
   const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const liveGroup = groups.find(g => g.id === group.id) ?? group
+
+  const findExistingAllocation = (dbId: string): { groupId: string; groupName: string } | null => {
+    const match = groups.find(g => g.id !== liveGroup.id && g.swimmers.some(s => s.dbId === dbId))
+    if (!match) return null
+    const swimmer = match.swimmers.find(s => s.dbId === dbId)
+    if (!swimmer) return null
+    return { groupId: match.id, groupName: match.name }
+  }
+
   const [showResetDrillConfirm, setShowResetDrillConfirm] = useState(false)
   const [confirmClearSwimmer, setConfirmClearSwimmer] = useState<{ swimmerId: number; dbId?: string } | null>(null)
   const [lapEditMode, setLapEditMode] = useState<Record<string, boolean>>({})
+  const [showAddModal, setShowAddModal] = useState(false)
 
   const toggleLapEdit = (key: string) => setLapEditMode(prev => ({ ...prev, [key]: !prev[key] }))
+
+  const handleAddSwimmerSave = async (data: { name: string; group: string; notes: string; status: string; selectedDbId?: string }) => {
+    setShowAddModal(false)
+    if (!runId) return
+    if (data.selectedDbId) {
+      dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: data.name, dbId: data.selectedDbId } })
+      await addSwimmerToRun(runId, data.selectedDbId, liveGroup.lane).catch(() => {})
+      onSwimmerSaved?.()
+      return
+    }
+    const newId = await createSwimmer({ name: data.name, group: data.group, notes: data.notes, status: data.status as 'active' | 'inactive' })
+    dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: data.name, dbId: newId } })
+    await addSwimmerToRun(runId, newId, liveGroup.lane).catch(() => {})
+    onSwimmerSaved?.()
+  }
 
   const currentDrillIndex = runDrills.findIndex(d => d.id === liveGroup.currentRunDrillId)
   const baseDrill = runDrills.find(d => d.id === liveGroup.currentRunDrillId)
@@ -62,7 +70,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
 
   const drillStarted = (() => {
     if (!runId || !liveGroup.currentRunDrillId) return false
-    return liveGroup.swimmers.some(s => s.dbId && effectiveStart(store, runId, liveGroup.id, s.dbId, liveGroup.currentRunDrillId!) != null)
+    return liveGroup.swimmers.some(s => s.dbId && store.getSwimmerTiming(runId, liveGroup.id, liveGroup.currentRunDrillId!, s.dbId).startedAt != null)
   })()
   const isDrillRunning = drillStarted && !isCompletedDrill
 
@@ -103,9 +111,10 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
     let anyActive = false
     for (const s of liveGroup.swimmers) {
       if (!s.dbId) continue
-      const start = effectiveStart(store, runId, gid, s.dbId, did)
+      const t = store.getSwimmerTiming(runId, gid, did, s.dbId)
+      const start = t.startedAt ?? undefined
       if (start != null && (earliest == null || start < earliest)) earliest = start
-      const done = effectiveDone(store, runId, gid, s.dbId, did)
+      const done = t.completedAt ?? undefined
       if (start != null && done == null) anyActive = true
       if (done != null && (latest == null || done > latest)) latest = done
     }
@@ -117,48 +126,35 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
-    if (store.get(K.swimmerStart(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId)) != null) return
-    store.set(K.swimmerStart(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId), sessionElapsed)
+    store.markSwimmerStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
   }
 
   const handleSwimmerLap = (swimmerId: number) => {
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
-    if (effectiveDone(store, runId, liveGroup.id, swimmer.dbId, liveGroup.currentRunDrillId!) != null) return
-    if (effectiveStart(store, runId, liveGroup.id, swimmer.dbId, liveGroup.currentRunDrillId!) == null) return
-    let lapCount = 0
-    for (let n = 1; ; n++) {
-      if (store.get(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, n)) != null) {
-        lapCount = n
-      } else break
-    }
-    const lapIdx = lapCount + 1
-    store.set(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, lapIdx), sessionElapsed)
-    dispatch({ type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: liveGroup.id, swimmerId, lapIndex: lapIdx, count: 18 } })
+    store.markSwimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
   }
 
   const handleSwimmerComplete = (swimmerId: number) => {
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
-    if (store.get(K.swimmerDone(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId)) != null) return
-    store.set(K.swimmerDone(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId), sessionElapsed)
+    store.markSwimmerDone(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
     dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId } })
     const otherActive = liveGroup.swimmers.filter(s => s.id !== swimmerId && !s.completed)
     if (otherActive.length === 0) {
-      for (const s of liveGroup.swimmers) {
-        if (s.dbId) store.set(K.swimmerGroupDone(runId, liveGroup.id, liveGroup.currentRunDrillId!, s.dbId), sessionElapsed)
-      }
+      const remaining = liveGroup.swimmers.filter(s => s.dbId).map(s => s.dbId!)
+      store.batchStopSwimmers(runId, liveGroup.id, liveGroup.currentRunDrillId, remaining, sessionElapsed)
     }
   }
 
   const handleBatchLaneStop = () => {
     if (!runId || !liveGroup.currentRunDrillId) return
-    const swimmersNeedingStop = liveGroup.swimmers
+    const active = liveGroup.swimmers
       .filter(s => s.dbId && !s.completed)
       .map(s => s.dbId!)
-    store.batchStop(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmersNeedingStop, sessionElapsed)
+    store.batchStopSwimmers(runId, liveGroup.id, liveGroup.currentRunDrillId, active, sessionElapsed)
     for (const swimmer of liveGroup.swimmers) {
       if (!swimmer.completed) {
         dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId: swimmer.id } })
@@ -173,7 +169,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
     } else {
       for (const swimmer of liveGroup.swimmers) {
         if (swimmer.dbId) {
-          store.set(K.swimmerGroupStart(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId), sessionElapsed)
+          store.markGroupStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
         }
       }
     }
@@ -198,28 +194,19 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
 
   const handleDrillLap = () => {
     if (!runId || !liveGroup.currentRunDrillId) return
-    for (const swimmer of liveGroup.swimmers) {
-      if (swimmer.dbId && !swimmer.completed) {
-        let lapCount = 0
-        for (let n = 1; ; n++) {
-          if (store.get(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, n)) != null) {
-            lapCount = n
-          } else break
-        }
-        const lapIdx = lapCount + 1
-        store.set(K.swimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId!, swimmer.dbId, lapIdx), sessionElapsed)
-        dispatch({ type: 'SWIMMER_LAP_STROKE_COUNT', payload: { groupId: liveGroup.id, swimmerId: swimmer.id, lapIndex: lapIdx, count: 18 } })
-      }
-    }
+    const active = liveGroup.swimmers
+      .filter(s => s.dbId && !s.completed)
+      .map(s => s.dbId!)
+    store.markGroupLap(runId, liveGroup.id, liveGroup.currentRunDrillId, active, sessionElapsed)
   }
 
   return (
-    <div className={`rounded-2xl p-3 sm:p-4 lg:p-5 transition-all bg-surface-container-lowest border shadow-sm ${isCompletedDrill ? 'border-emerald-500/30' : sessionRunning ? 'border-primary shadow-lg shadow-primary/10' : 'border-outline-variant'}`}>
+    <div className={`rounded-2xl p-3 sm:p-4 lg:p-5 transition-all bg-surface-container-lowest border shadow-sm container-type-inline ${isCompletedDrill ? 'border-emerald-500/30' : sessionRunning ? 'border-primary shadow-lg shadow-primary/10' : 'border-outline-variant'}`}>
       {/* Group Header */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <span className="font-headline-md lg:font-headline-lg text-primary">{liveGroup.name}</span>
-          <span className={`px-2 py-0.5 rounded text-label-sm font-bold ${getLaneLabel(liveGroup.lane) === 'FAST' ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant text-on-surface-variant'}`}>
+          <span className={`px-2 py-0.5 rounded text-label-sm font-bold ${isFastLane(liveGroup.lane) ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant text-on-surface-variant'}`}>
             L{liveGroup.lane}
           </span>
           <button onClick={() => onAddSwimmer(liveGroup.id)}
@@ -231,11 +218,11 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
 
       {/* Group-Level Controls + Timer */}
       <div className="mb-4 p-4 rounded-xl bg-surface-container">
-        <div className={`flex ${laneCount >= 3 ? 'flex-col items-center gap-2' : 'items-center justify-between gap-3'}`}>
+        <div className="group-controls-row flex">
           <div className="font-display-timer text-[clamp(1.5rem,6vw,2.6rem)] text-on-surface tabular-nums tracking-tight">
             {isCompletedDrill ? formatTime(savedData?.drillEnd != null && savedData?.drillStart != null ? savedData.drillEnd - savedData.drillStart : 0) : formatTime(drillDuration)}
           </div>
-          <div className={`flex gap-1.5 ${laneCount >= 3 ? 'flex-wrap justify-center' : 'shrink-0'}`}>
+          <div className="group-buttons-row flex gap-1.5">
             {isCompletedDrill ? (
               <button disabled className="flex items-center gap-1 h-10 md:h-11 px-4 md:px-5 rounded-full text-sm font-bold bg-disabled text-on-disabled cursor-not-allowed">
                 <span className="material-symbols-outlined text-base">check_circle</span>
@@ -295,11 +282,11 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
         <div className={`mb-3 p-4 rounded-xl border ${isCompletedDrill ? 'bg-emerald-50 border-emerald-200' : 'bg-surface-container-low border-outline-variant/20'}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-0.5">
+              <div className="text-label-caps text-on-surface-variant mb-0.5">
                 Drill {currentDrillIndex + 1} of {runDrills.length}
               </div>
               <div className="font-bold text-on-surface text-sm md:text-base truncate flex items-center gap-2">{baseDrill?.name}
-                <span className={`text-emerald-600 font-bold flex items-center gap-0.5 text-[11px] ${isCompletedDrill ? '' : 'invisible'}`}><span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Complete</span>
+                <span className={`text-emerald-600 font-bold flex items-center gap-0.5 text-label-sm ${isCompletedDrill ? '' : 'invisible'}`}><span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Complete</span>
               </div>
             </div>
             <div className="flex gap-1 shrink-0 items-start">
@@ -318,7 +305,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
         </div>
       ) : runDrills.length > 0 ? (
         <div className="mb-3 p-4 rounded-xl border border-dashed border-primary/30 bg-surface-container-low">
-          <div className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-2">Select a drill</div>
+          <div className="text-label-caps text-on-surface-variant mb-2">Select a drill</div>
           <div className="space-y-1">
             {runDrills.map((d, idx) => (
               <button key={d.id} onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: d.id } })}
@@ -349,7 +336,7 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
         </div>
       ) : currentDrillIndex >= 0 && nextDrill ? (
         <div className="mb-3 p-3 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/40">
-          <div className="text-[11px] uppercase tracking-wider text-on-surface-variant font-semibold mb-0.5">Next</div>
+          <div className="text-label-caps text-on-surface-variant mb-0.5">Next</div>
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <div className="font-medium text-sm text-on-surface truncate">{nextDrill.name}</div>
@@ -398,10 +385,16 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
               saved={saved}
               savedData={savedData}
               group={liveGroup}
+              runId={runId}
+              runDrillId={liveGroup.currentRunDrillId}
               sessionElapsed={sessionElapsed}
               lapEditMode={lapEditMode}
               toggleLapEdit={toggleLapEdit}
               onEditSavedSwimmer={onEditSavedSwimmer}
+              rosterSwimmers={rosterSwimmers}
+              onSwimmerSaved={onSwimmerSaved}
+              currentGroupId={liveGroup.id}
+              findExistingAllocation={findExistingAllocation}
             />
           ))
         ) : (
@@ -417,12 +410,37 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
               onLap={handleSwimmerLap}
               onComplete={handleSwimmerComplete}
               handleMoveSwimmer={handleMoveSwimmer}
+              rosterSwimmers={rosterSwimmers}
+              onSwimmerSaved={onSwimmerSaved}
+              currentGroupId={liveGroup.id}
+              findExistingAllocation={findExistingAllocation}
             />
           ))
         )}
       </div>
 
-      {/* Add swimmer + Reset Group */}
+      {/* Add swimmer */}
+      <div className="mb-3 flex gap-2">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex-1 py-2.5 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-base">add</span>
+          Add Swimmer
+        </button>
+        <button
+          onClick={() => {
+            const randomName = listTempSwimmerNames()[Math.floor(Math.random() * listTempSwimmerNames().length)]
+            const quickDbId = `quick-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+            dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: randomName, dbId: quickDbId } })
+          }}
+          title="Add a temporary (unregistered) swimmer"
+          className="py-2.5 px-3 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
+        >
+          <span className="material-symbols-outlined text-base">casino</span>
+          Temp Swimmer
+        </button>
+      </div>
 
       <ConfirmDialog
         open={confirmClearSwimmer !== null}
@@ -458,6 +476,15 @@ function GroupCard({ group, runDrills, laneDrillResults, laneCount, onAddSwimmer
         onConfirm={handleResetDrillConfirm}
         onCancel={() => setShowResetDrillConfirm(false)}
       />
+
+      <SwimmerFormModal
+        key={showAddModal ? 'add-open' : 'add-closed'}
+        open={showAddModal}
+        editingId={null}
+        onSave={handleAddSwimmerSave}
+        onClose={() => setShowAddModal(false)}
+        rosterSwimmers={rosterSwimmers}
+      />
     </div>
   )
 }
@@ -471,6 +498,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
   const [showResetSessionConfirm, setShowResetSessionConfirm] = useState(false)
   const [showLaneEditor, setShowLaneEditor] = useState(false)
   const [editorScrollToLane, setEditorScrollToLane] = useState<number | null>(null)
+  const [rosterSwimmers, setRosterSwimmers] = useState<DbSwimmer[]>([])
 
   const initializedRef = useRef(false)
   const [sessionStartedAt] = useState(() => Date.now())
@@ -492,7 +520,12 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
     })
     getLaneResults(run.id).then(results => setLaneDrillResults(results))
     getSession(run.session_id).then(s => setTemplateName(s?.name || 'Unknown'))
+    listSwimmers().then(setRosterSwimmers)
   }, [run.id, dispatch])
+
+  const refreshRoster = () => {
+    listSwimmers().then(setRosterSwimmers)
+  }
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -509,37 +542,29 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
 
   const activeGroups = groups.filter(g => g.swimmers.length > 0)
 
+
   const handleComplete = async () => {
+    const laps: CompleteRunLap[] = []
     for (const group of groups) {
       const drillId = group.currentRunDrillId
       if (!drillId) continue
+      const live = store.getDrillTiming(run.id, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
       for (const swimmer of group.swimmers) {
-        if (swimmer.dbId) {
-          const laps: number[] = []
-          for (let n = 1; ; n++) {
-            const val = store.get(K.swimmerLap(run.id, group.id, drillId, swimmer.dbId, n))
-            if (val == null) break
-            laps.push(val)
-          }
-          const swimmerStart = effectiveStart(store, run.id, group.id, swimmer.dbId, drillId) ?? 0
-          if (laps.length > 0) {
-            const splits = timestampSplits(laps, swimmerStart)
-            for (let li = 0; li < splits.length; li++) {
-              const splitTime = splits[li]
-              await addLap({
-                run_drill_id: drillId,
-                swimmer_id: swimmer.dbId,
-                time: splitTime / 1000,
-                stroke_count: swimmer.lapStrokeCounts[li + 1] ?? 0,
-                effort: '',
-                notes: '',
-              })
-            }
-          }
+        if (!swimmer.dbId || swimmer.dbId.startsWith('quick-')) continue
+        const lt = live.swimmers.find(l => l.dbId === swimmer.dbId)
+          ?? { dbId: swimmer.dbId, startedAt: null, completedAt: null, lapTimestamps: [] as number[] }
+        const splits = lt.startedAt != null ? timestampSplits(lt.lapTimestamps, lt.startedAt) : []
+        for (let li = 0; li < splits.length; li++) {
+          laps.push({
+            runDrillId: drillId,
+            swimmerId: swimmer.dbId,
+            time: splits[li],
+            strokeCount: swimmer.lapStrokeCounts[li + 1] ?? 0,
+          })
         }
       }
     }
-    await completeRun(run.id)
+    await completeRunWithLaps(run.id, laps)
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
@@ -548,43 +573,21 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
     const group = groups.find(g => g.id === groupId)
     if (!group || !group.currentRunDrillId) return
     const drillId = group.currentRunDrillId
-    let drillStart: number | undefined
-    let drillEnd: number | undefined
-    for (const s of group.swimmers) {
-      if (!s.dbId) continue
-      const start = effectiveStart(store, run.id, group.id, s.dbId, drillId)
-      if (start != null && (drillStart == null || start < drillStart)) drillStart = start
-      const done = effectiveDone(store, run.id, group.id, s.dbId, drillId)
-      if (done != null && (drillEnd == null || done > drillEnd)) drillEnd = done
-    }
-    const timingData = {
-      drillStart: drillStart ?? 0,
-      drillEnd: drillEnd ?? sessionElapsed,
-      sessionStartedAt: sessionStartedAt,
-      swimmers: group.swimmers.map(s => {
-        const ss = s.dbId ? effectiveStart(store, run.id, group.id, s.dbId, drillId) ?? null : null
-        const sd = s.dbId ? effectiveDone(store, run.id, group.id, s.dbId, drillId) ?? null : null
-        const laps: LapEntry[] = []
-        if (s.dbId) {
-          for (let n = 1; ; n++) {
-            const val = store.get(K.swimmerLap(run.id, group.id, drillId, s.dbId, n))
-            if (val == null) break
-            const entry: LapEntry = { time: val }
-            const sc = s.lapStrokeCounts[n]
-            if (sc) entry.strokeCount = sc
-            laps.push(entry)
-          }
-        }
-        return {
-          dbId: s.dbId,
-          name: s.name,
-          startedAt: ss,
-          completedAt: sd,
-          laps,
-          completed: s.completed,
-        }
-      }),
-    }
+    const live = store.getDrillTiming(run.id, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
+    const timingData = buildLaneResult({
+      runId: run.id,
+      groupId: group.id,
+      drillId,
+      sessionStartedAt,
+      now: sessionElapsed,
+      live,
+      swimmers: group.swimmers.map(s => ({
+        dbId: s.dbId ?? '',
+        name: s.name,
+        completed: s.completed,
+        lapStrokeCounts: s.lapStrokeCounts,
+      })),
+    })
     await setLaneResult({
       run_id: run.id,
       group_id: group.id,
@@ -628,31 +631,15 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
   }
 
   const handleClearSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string) => {
-    await clearSwimmerFromLaneResult(run.id, groupId, runDrillId, swimmerDbId)
+    await deleteSwimmerFromLaneResult(run.id, groupId, runDrillId, swimmerDbId)
     const refreshed = await getLaneResults(run.id)
     setLaneDrillResults(refreshed)
   }
 
-  const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number }) => {
-    const result = await getLaneResult(run.id, groupId, runDrillId)
-    if (!result) return
-    const data: SavedDrillData = JSON.parse(result.data)
-    const swimmer = data.swimmers.find((s: SavedSwimmerData) => s.dbId === swimmerDbId)
-    if (swimmer) {
-      if (updates.laps !== undefined) swimmer.laps = updates.laps
-      if ('startedAt' in updates) swimmer.startedAt = updates.startedAt ?? null
-      if ('completedAt' in updates) swimmer.completedAt = updates.completedAt ?? null
-      await setLaneResult({
-        run_id: run.id,
-        group_id: groupId,
-        lane: result.lane,
-        run_drill_id: runDrillId,
-        completed: result.completed,
-        data: JSON.stringify(data),
-      })
-      const refreshed = await getLaneResults(run.id)
-      setLaneDrillResults(refreshed)
-    }
+  const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number; name?: string; dbId?: string }) => {
+    await updateLaneResultSwimmer(run.id, groupId, runDrillId, swimmerDbId, updates)
+    const refreshed = await getLaneResults(run.id)
+    setLaneDrillResults(refreshed)
   }
 
   const handleResetDrill = (groupId: string) => {
@@ -665,13 +652,13 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="font-headline-md text-on-surface truncate">{templateName}</h2>
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-label-caps">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Live
             </span>
           </div>
           <p className="text-label-sm text-on-surface-variant truncate">{run.date} &middot; {run.poolName} &middot; {run.poolLength}m &middot; {runDrills.length} drills</p>
-          <p className="text-[11px] text-on-surface-variant/70 mt-0.5">Started {formatWallTime(sessionStartedAt)}</p>
+          <p className="text-label-sm text-on-surface-variant/70 mt-0.5">Started {formatWallTime(sessionStartedAt)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -717,7 +704,6 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
                 group={group}
                 runDrills={runDrills}
                 laneDrillResults={laneDrillResults}
-                laneCount={activeGroups.length}
                 runId={run.id}
                 onAddSwimmer={(groupId) => {
                   const g = groups.find(gr => gr.id === groupId)
@@ -729,6 +715,8 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
                 onClearSwimmer={handleClearSwimmer}
                 onEditSavedSwimmer={handleEditSavedSwimmer}
                 loading={!drillsLoaded}
+                rosterSwimmers={rosterSwimmers}
+                onSwimmerSaved={refreshRoster}
               />
             ))}
           </div>
@@ -749,6 +737,8 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
           if (existingSwimmer) {
             dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: fromGroupId, swimmerId: existingSwimmer.id } })
             await removeSwimmerFromRun(run.id, swimmer.id)
+            const fromDrillId = groups.find(g => g.id === fromGroupId)?.currentRunDrillId
+            if (fromDrillId) await deleteSwimmerFromLaneResult(run.id, fromGroupId, fromDrillId, swimmer.id)
           }
           const targetGroup = groups.find(g => g.id === toGroupId)
           dispatch({ type: 'ADD_SWIMMER', payload: { groupId: toGroupId, name: swimmer.name, dbId: swimmer.id } })
@@ -789,10 +779,13 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
           dispatch({ type: 'REMOVE_GROUP', payload: { groupId } })
         }}
         onMoveSwimmer={(swimmerId, fromGroupId, toGroupId) => {
-          const sw = groups.find(g => g.id === fromGroupId)?.swimmers.find(s => s.id === swimmerId)
-          if (!sw) return
-          dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: fromGroupId, swimmerId } })
-          dispatch({ type: 'ADD_SWIMMER', payload: { groupId: toGroupId, name: sw.name, dbId: sw.dbId } })
+          const toGroup = groups.find(g => g.id === toGroupId)
+          if (!toGroup) return
+          dispatch({ type: 'MOVE_SWIMMER_TO_GROUP', payload: { swimmerId, fromGroupId, toGroupId } })
+          if (toGroup.currentRunDrillId) {
+            store.clearDrill(run.id, toGroupId, toGroup.currentRunDrillId)
+          }
+          dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: toGroupId } })
         }}
         onUpdateGroupName={(groupId, name) => dispatch({ type: 'UPDATE_GROUP_CONFIG', payload: { groupId, updates: { name } } })}
         onResetGroup={handleResetGroup}
@@ -807,40 +800,137 @@ export const LiveDeck: React.FC = () => {
   const [activeRun, setActiveRun] = useState<SessionRun | null>(null)
   const [checking, setChecking] = useState(true)
 
+  const handleQuickStart = async () => {
+    const { runId, drillId } = await createQuickStartRun()
+    const virtualSwimmers = [
+      { name: 'Michael Phelps', dbId: `quick-${Date.now()}`, lane: 1 },
+      { name: 'Katie Ledecky', dbId: `quick-${Date.now() + 1}`, lane: 2 },
+      { name: 'Caeleb Dressel', dbId: `quick-${Date.now() + 2}`, lane: 2 },
+    ]
+    const notes = { isQuickStart: true, version: 2, virtualSwimmers }
+    await updateRun(runId, { notes: JSON.stringify(notes) })
+    const groups: TimedGroup[] = [
+      {
+        id: crypto.randomUUID(),
+        lane: 1, name: 'Lane 1',
+        swimmers: [{
+          id: Date.now() + Math.random(),
+          dbId: virtualSwimmers[0].dbId,
+          name: virtualSwimmers[0].name,
+          completed: false,
+          lapStrokeCounts: {},
+        }],
+        currentRunDrillId: drillId,
+      },
+      {
+        id: crypto.randomUUID(),
+        lane: 2, name: 'Lane 2',
+        swimmers: virtualSwimmers.filter(vs => vs.lane === 2).map((vs, idx) => ({
+          id: Date.now() + idx + Math.random(),
+          dbId: vs.dbId,
+          name: vs.name,
+          completed: false,
+          lapStrokeCounts: {},
+        })),
+        currentRunDrillId: drillId,
+      },
+    ]
+    dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId } })
+    const run = await getActiveRun()
+    setActiveRun(run ?? null)
+  }
+
   useEffect(() => {
     let cancelled = false
     const init = async () => {
       const run = (await getActiveRun()) ?? null
       if (cancelled) return
-      setActiveRun(run)
       if (run) {
-        const links = await getRunSwimmerLinks(run.id)
-        const allSwimmers = await getRunSwimmers(run.id)
-        if (cancelled) return
-        const swimmerMap = new Map(allSwimmers.map(s => [s.id, s]))
-        const maxLane = links.length > 0 ? Math.max(...links.map(l => l.lane)) : 8
-        const groups: TimedGroup[] = Array.from({ length: maxLane }, (_, i) => {
-          const laneNum = i + 1
-          const laneLinks = links.filter(l => l.lane === laneNum)
-          return {
-            id: crypto.randomUUID(),
-            lane: laneNum,
-            name: `Lane ${laneNum}`,
-            swimmers: laneLinks.map((link, idx) => {
+        setActiveRun(run)
+        const notes = run.notes ? (JSON.parse(run.notes) as { isQuickStart?: boolean; virtualSwimmers?: { name: string; dbId: string; lane: number }[] } | null) : null
+        if (notes?.isQuickStart && notes.virtualSwimmers && notes.virtualSwimmers.length > 0) {
+          const drills = await getRunDrills(run.id)
+          const defaultDrillId = drills[0]?.id ?? null
+          const links = await getRunSwimmerLinks(run.id)
+          const allSwimmers = await getRunSwimmers(run.id)
+          if (cancelled) return
+          const swimmerMap = new Map(allSwimmers.map(s => [s.id, s]))
+          const laneMap = new Map<number, TimedGroup>()
+          const groups: TimedGroup[] = []
+          for (const vs of notes.virtualSwimmers) {
+            let g = laneMap.get(vs.lane)
+            if (!g) {
+              g = {
+                id: crypto.randomUUID(),
+                lane: vs.lane,
+                name: `Lane ${vs.lane}`,
+                swimmers: [],
+                currentRunDrillId: defaultDrillId,
+              }
+              laneMap.set(vs.lane, g)
+              groups.push(g)
+            }
+            g.swimmers.push({
+              id: Date.now() + Math.random(),
+              dbId: vs.dbId,
+              name: vs.name,
+              completed: false,
+              lapStrokeCounts: {},
+            })
+          }
+          for (const link of links) {
+            let g = laneMap.get(link.lane)
+            if (!g) {
+              g = {
+                id: crypto.randomUUID(),
+                lane: link.lane,
+                name: `Lane ${link.lane}`,
+                swimmers: [],
+                currentRunDrillId: defaultDrillId,
+              }
+              laneMap.set(link.lane, g)
+              groups.push(g)
+            }
+            if (!g.swimmers.some(s => s.dbId === link.swimmer_id)) {
               const sw = swimmerMap.get(link.swimmer_id)
-              return {
-                id: Date.now() + idx + Math.random(),
+              g.swimmers.push({
+                id: Date.now() + Math.random(),
                 dbId: link.swimmer_id,
                 name: sw?.name || 'Unknown',
                 completed: false,
                 lapStrokeCounts: {},
-              }
-            }),
-            currentRunDrillId: null,
-            drillOverride: null,
+              })
+            }
           }
-        })
-        dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId: run.id } })
+          dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId: run.id } })
+        } else {
+          const links = await getRunSwimmerLinks(run.id)
+          const allSwimmers = await getRunSwimmers(run.id)
+          if (cancelled) return
+          const swimmerMap = new Map(allSwimmers.map(s => [s.id, s]))
+          const maxLane = links.length > 0 ? Math.max(...links.map(l => l.lane)) : 8
+          const groups: TimedGroup[] = Array.from({ length: maxLane }, (_, i) => {
+            const laneNum = i + 1
+            const laneLinks = links.filter(l => l.lane === laneNum)
+            return {
+              id: crypto.randomUUID(),
+              lane: laneNum,
+              name: `Lane ${laneNum}`,
+              swimmers: laneLinks.map((link, idx) => {
+                const sw = swimmerMap.get(link.swimmer_id)
+                return {
+                  id: Date.now() + idx + Math.random(),
+                  dbId: link.swimmer_id,
+                  name: sw?.name || 'Unknown',
+                  completed: false,
+                  lapStrokeCounts: {},
+                }
+              }),
+              currentRunDrillId: null,
+            }
+          })
+          dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId: run.id } })
+        }
       }
       if (!cancelled) setChecking(false)
     }
@@ -848,47 +938,21 @@ export const LiveDeck: React.FC = () => {
     return () => { cancelled = true }
   }, [dispatch])
 
+  const autoStartedRef = useRef(false)
+
+  useEffect(() => {
+    if (!checking && !activeRun && !autoStartedRef.current) {
+      autoStartedRef.current = true
+      void handleQuickStart()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checking, activeRun])
+
   if (checking) return <div className="flex items-center justify-center py-20"><p className="text-on-surface-variant">Loading...</p></div>
 
   if (activeRun) {
-    return <ActiveRunView run={activeRun} onComplete={() => { dispatch({ type: 'CLEAR' }); setActiveRun(null) }} />
+    return <ActiveRunView run={activeRun} onComplete={() => { dispatch({ type: 'CLEAR' }); setActiveRun(null); autoStartedRef.current = false }} />
   }
 
-  return <SessionSetup onStart={() => {
-    const init = async () => {
-      const run = (await getActiveRun()) ?? null
-      setActiveRun(run)
-      if (run) {
-        const links = await getRunSwimmerLinks(run.id)
-        const allSwimmers = await getRunSwimmers(run.id)
-        const swimmerMap = new Map(allSwimmers.map(s => [s.id, s]))
-        const maxLane = links.length > 0 ? Math.max(...links.map(l => l.lane)) : 8
-        const groups: TimedGroup[] = Array.from({ length: maxLane }, (_, i) => {
-          const laneNum = i + 1
-          const laneLinks = links.filter(l => l.lane === laneNum)
-          return {
-            id: crypto.randomUUID(),
-            lane: laneNum,
-            name: `Lane ${laneNum}`,
-            swimmers: laneLinks.map((link, idx) => {
-              const sw = swimmerMap.get(link.swimmer_id)
-              return {
-                id: Date.now() + idx + Math.random(),
-                dbId: link.swimmer_id,
-                name: sw?.name || 'Unknown',
-                completed: false,
-                lapStrokeCounts: {},
-              }
-            }),
-            currentRunDrillId: null,
-            drillOverride: null,
-          }
-        })
-        dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId: run.id } })
-      }
-      setChecking(false)
-    }
-    setChecking(true)
-    init()
-  }} />
+  return <div className="flex items-center justify-center py-20"><p className="text-on-surface-variant">Starting timer...</p></div>
 }

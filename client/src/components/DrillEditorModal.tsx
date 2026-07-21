@@ -163,7 +163,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                             labels: active ? labels.filter(l => l !== label) : [...labels, label]
                           })
                         }}
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                        className={`px-3 py-1 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
                       >
                         {label}
                       </button>
@@ -198,7 +198,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                               labels: active ? labels.filter(l => l !== label) : [...labels, label]
                             })
                           }}
-                          className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                          className={`px-3 py-1 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
                         >
                           {label}
                         </button>
@@ -229,7 +229,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                   <div key={item.id} className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/30 relative group">
                     <div className="flex flex-wrap md:flex-nowrap items-end gap-3">
                       <div className="w-16 shrink-0">
-                        <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">Reps</label>
+                        <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Reps</label>
                         <input
                           type="number"
                           min="1"
@@ -293,7 +293,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         />
                       </div>
                       <div className="w-20 shrink-0">
-                        <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">Interval</label>
+                        <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Interval</label>
                         <input
                           type="text"
                           value={item.interval || ''}
@@ -307,7 +307,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         />
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0 pb-1 flex-wrap">
+                      <div className="grid grid-cols-4 gap-1 pb-1">
                         {EQUIPMENT_OPTIONS.map(opt => {
                           const active = item.equipment?.includes(opt.id)
                           return (
@@ -323,10 +323,10 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                                 }
                                 setForm({ ...form, items: newItems })
                               }}
-                              className={`min-w-[44px] min-h-[44px] rounded-lg flex flex-col items-center justify-center transition-all border cursor-pointer ${active ? 'bg-secondary text-on-secondary border-secondary shadow-sm' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'}`}
+                              className={`rounded-lg flex flex-col items-center justify-center transition-all border cursor-pointer ${active ? 'bg-secondary text-on-secondary border-secondary shadow-sm' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'}`}
                             >
                               <EquipmentIcons type={opt.id as EquipmentType} className="w-4 h-4 mb-0.5" />
-                              <span className="text-[7px] font-bold uppercase tracking-tighter leading-none">{opt.label}</span>
+                              <span className="text-caption font-bold uppercase tracking-tighter leading-none">{opt.label}</span>
                             </button>
                           )
                         })}

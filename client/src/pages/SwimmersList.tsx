@@ -192,7 +192,7 @@ export const SwimmersList: React.FC = () => {
                   </Link>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {s.group && (
-                      <span className="bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded text-[11px] font-bold tracking-wider uppercase">
+                      <span className="bg-secondary-container/30 text-on-secondary-container px-2 py-0.5 rounded text-label-caps font-bold tracking-wider uppercase">
                         {s.group}
                       </span>
                     )}
@@ -205,7 +205,7 @@ export const SwimmersList: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-surface-container-low p-3 rounded-lg">
                   <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">GROUP</span>
-                  <span className="font-display-timer text-[24px] text-primary">{s.group || '—'}</span>
+                  <span className="font-display-timer text-headline-lg text-primary">{s.group || '—'}</span>
                 </div>
                 <div className="bg-surface-container-low p-3 rounded-lg">
                   <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">STATUS</span>
@@ -220,7 +220,7 @@ export const SwimmersList: React.FC = () => {
                   to={`/swimmers/${s.id}`}
                   className="flex-1 h-touch-target-min bg-primary text-on-primary rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all no-underline"
                 >
-                  <span className="material-symbols-outlined text-[20px]">analytics</span>
+                  <span className="material-symbols-outlined text-xl">analytics</span>
                   View Stats
                 </Link>
                 <button
@@ -271,6 +271,7 @@ export const SwimmersList: React.FC = () => {
         open={showModal}
         editingId={editingId}
         initialData={editingId ? { name: formName, group: formGroup, notes: formNotes, status: formStatus } : undefined}
+        rosterSwimmers={swimmers}
         onSave={async (data) => {
           if (editingId) {
             await updateSwimmer(editingId, data)

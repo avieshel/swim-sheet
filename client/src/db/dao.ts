@@ -1,5 +1,5 @@
 import { db } from './schema'
-import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLaneDrillResult, SafeLibraryDrill } from './schema'
+import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
 
 // ── Swimmers ──────────────────────────────────────────────
 
@@ -211,19 +211,6 @@ export async function getLaneDrillResult(runId: string, groupId: string, runDril
   return db.laneDrillResults.where({ run_id: runId, group_id: groupId, run_drill_id: runDrillId }).first()
 }
 
-export async function setLaneDrillResult(data: SafeLaneDrillResult): Promise<string> {
-  const existing = await db.laneDrillResults.where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id }).first()
-  const now = new Date().toISOString()
-  if (existing) {
-    await db.laneDrillResults.update(existing.id!, { ...data, updatedAt: now })
-    return existing.id!
-  } else {
-    const id = crypto.randomUUID()
-    await db.laneDrillResults.add({ ...data, id, updatedAt: now })
-    return id
-  }
-}
-
 export async function deleteLaneDrillResult(id: string): Promise<void> {
   await db.laneDrillResults.delete(id)
 }
@@ -234,18 +221,6 @@ export async function deleteLaneDrillResultsForGroup(runId: string, groupId: str
 
 export async function deleteLaneDrillResultsForRun(runId: string): Promise<void> {
   await db.laneDrillResults.where('run_id').equals(runId).delete()
-}
-
-export async function clearSwimmerFromLaneDrillResult(runId: string, groupId: string, runDrillId: string, swimmerDbId: string): Promise<void> {
-  const result = await db.laneDrillResults.where({ run_id: runId, group_id: groupId, run_drill_id: runDrillId }).first()
-  if (!result) return
-  const data = JSON.parse(result.data)
-  data.swimmers = data.swimmers.filter((s: { dbId: string }) => s.dbId !== swimmerDbId)
-  await db.laneDrillResults.update(result.id!, {
-    data: JSON.stringify(data),
-    completed: data.swimmers.length > 0 ? result.completed : false,
-    updatedAt: new Date().toISOString(),
-  })
 }
 
 /**
@@ -341,8 +316,11 @@ export async function addSwimmerToRun(runId: string, swimmerId: string, lane: nu
   const existing = await db.runSwimmers
     .where({ run_id: runId, swimmer_id: swimmerId })
     .first()
-  if (!existing) {
-    const now = new Date().toISOString()
+  const now = new Date().toISOString()
+  if (existing) {
+    // A swimmer is allocated to exactly one lane per run — move them rather than duplicate.
+    await db.runSwimmers.update(existing.id, { lane, updatedAt: now })
+  } else {
     await db.runSwimmers.add({ id: crypto.randomUUID(), run_id: runId, swimmer_id: swimmerId, lane, createdAt: now, updatedAt: now })
   }
 }
@@ -1017,4 +995,17 @@ export async function cleanupOldData(retentionDays: number): Promise<number> {
   })
 
   return oldRuns.length
+}
+
+export async function deleteAllData(): Promise<void> {
+  await db.transaction('rw', [db.swimmers, db.sessions, db.drills, db.sessionRuns, db.runDrills, db.runSwimmers, db.laps, db.laneDrillResults], async () => {
+    await db.swimmers.where('id').above(' ').delete()
+    await db.sessions.where('id').above(' ').delete()
+    await db.drills.where('id').above(' ').delete()
+    await db.sessionRuns.where('id').above(' ').delete()
+    await db.runDrills.where('id').above(' ').delete()
+    await db.runSwimmers.where('id').above(' ').delete()
+    await db.laps.where('id').above(' ').delete()
+    await db.laneDrillResults.where('id').above(' ').delete()
+  })
 }

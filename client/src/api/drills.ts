@@ -4,7 +4,7 @@ import type { SafeDrill, Drill, SafeLibraryDrill, LibraryDrill } from '../db/sch
 // ── Template Drills ──
 
 export function getSessionDrills(sessionId: string): Promise<Drill[]> {
-  return drillService.getForSession(sessionId)
+  return drillService.getDrills(sessionId)
 }
 
 export function getDrill(id: string): Promise<Drill | undefined> {

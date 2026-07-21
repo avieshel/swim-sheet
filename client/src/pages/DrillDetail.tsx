@@ -2,16 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getDrill } from '../api/drills'
 import { getSession } from '../api/sessions'
+import { strokeColors } from '../constants/drill'
 import type { Drill } from '../api/drills'
 import type { Session } from '../api/sessions'
-
-const strokeColors: Record<string, string> = {
-  freestyle: 'bg-blue-100 text-blue-700',
-  backstroke: 'bg-emerald-100 text-emerald-700',
-  breaststroke: 'bg-purple-100 text-purple-700',
-  butterfly: 'bg-pink-100 text-pink-700',
-  im: 'bg-amber-100 text-amber-700',
-}
 
 export const DrillDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -61,7 +54,7 @@ export const DrillDetail: React.FC = () => {
           </div>
           <div>
             <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">{drill.name}</h1>
-            <span className={`inline-block mt-1 ${strokeColors[drill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-[10px] font-bold px-2 py-0.5 rounded-full`}>
+            <span className={`inline-block mt-1 ${strokeColors[drill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>
               {drill.stroke}
             </span>
           </div>

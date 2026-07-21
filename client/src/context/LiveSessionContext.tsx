@@ -1,13 +1,9 @@
 import { createContext } from 'react'
 import type { Dispatch } from 'react'
-import type { TimestampStore } from '../timing/timestampStore'
+import type { LiveTimingStore } from '../timing/liveTiming'
+import { createLiveTimingStore } from '../timing/liveTiming'
 
 // ── Data model ──────────────────────────────────────────────
-
-export interface LapEntry {
-  time: number
-  strokeCount?: number
-}
 
 export interface Swimmer {
   id: number
@@ -15,7 +11,6 @@ export interface Swimmer {
   name: string
   completed: boolean
   lapStrokeCounts: Record<number, number>
-  strokeCount?: number | null
 }
 
 export interface TimedGroup {
@@ -24,7 +19,6 @@ export interface TimedGroup {
   name: string
   swimmers: Swimmer[]
   currentRunDrillId: string | null
-  drillOverride: { name?: string; distance?: number; stroke?: string } | null
 }
 
 export interface LiveSessionState {
@@ -35,26 +29,23 @@ export interface LiveSessionState {
 // ── Actions (structure-only, no timestamps) ─────────────────
 
 export type LiveSessionAction =
-  | { type: 'INIT_FROM_RUN'; payload: { groups: TimedGroup[]; runId: string } }
-  | { type: 'CLEAR' }
-  | { type: 'ADD_GROUPS'; payload: TimedGroup[] }
-  | { type: 'ADD_SWIMMER'; payload: { groupId: string; name: string; dbId?: string } }
-  | { type: 'REMOVE_SWIMMER'; payload: { groupId: string; swimmerId: number } }
-  | { type: 'SWIMMER_LAP_STROKE_COUNT'; payload: { groupId: string; swimmerId: number; lapIndex: number; count?: number } }
-  | { type: 'SWIMMER_STROKE_COUNT'; payload: { groupId: string; swimmerId: number; count: number } }
-  | { type: 'SWIMMER_COMPLETE'; payload: { groupId: string; swimmerId: number } }
-  | { type: 'SET_GROUP_DRILL'; payload: { groupId: string; runDrillId: string } }
-  | { type: 'SET_ALL_DRILLS'; payload: { runDrillId: string } }
-  | { type: 'SET_GROUP_DRILL_OVERRIDE'; payload: { groupId: string; override: { name?: string; distance?: number; stroke?: string } } }
-  | { type: 'CLEAR_GROUP_DRILL_OVERRIDE'; payload: { groupId: string } }
-  | { type: 'UPDATE_GROUP_CONFIG'; payload: { groupId: string; updates: Partial<Pick<TimedGroup, 'name' | 'lane'>> } }
-  | { type: 'ADD_GROUP'; payload: { lane: number; name: string; id?: string } }
-  | { type: 'REMOVE_GROUP'; payload: { groupId: string } }
-  | { type: 'CLEAR_GROUP_SWIMMER_DATA'; payload: { groupId: string } }
-  | { type: 'SWIMMER_CLEAR'; payload: { groupId: string; swimmerId: number } }
-  | { type: 'SPLIT_GROUP'; payload: { sourceGroupId: string; swimmerIds: number[]; newGroupName: string } }
-  | { type: 'MOVE_SWIMMER_TO_GROUP'; payload: { swimmerId: number; fromGroupId: string; toGroupId: string } }
-  | { type: 'REORDER_SWIMMERS'; payload: { groupId: string; swimmerIds: number[] } }
+   | { type: 'INIT_FROM_RUN'; payload: { groups: TimedGroup[]; runId: string } }
+   | { type: 'CLEAR' }
+   | { type: 'ADD_SWIMMER'; payload: { groupId: string; name: string; dbId?: string } }
+   | { type: 'REMOVE_SWIMMER'; payload: { groupId: string; swimmerId: number } }
+   | { type: 'RENAME_SWIMMER'; payload: { groupId: string; swimmerId: number; name: string } }
+   | { type: 'UPDATE_SWIMMER_DBID'; payload: { groupId: string; swimmerId: number; dbId: string } }
+   | { type: 'SWIMMER_LAP_STROKE_COUNT'; payload: { groupId: string; swimmerId: number; lapIndex: number; count?: number } }
+    | { type: 'SWIMMER_COMPLETE'; payload: { groupId: string; swimmerId: number } }
+   | { type: 'SET_GROUP_DRILL'; payload: { groupId: string; runDrillId: string } }
+   | { type: 'SET_ALL_DRILLS'; payload: { runDrillId: string } }
+   | { type: 'UPDATE_GROUP_CONFIG'; payload: { groupId: string; updates: Partial<Pick<TimedGroup, 'name' | 'lane'>> } }
+   | { type: 'ADD_GROUP'; payload: { lane: number; name: string; id?: string } }
+   | { type: 'REMOVE_GROUP'; payload: { groupId: string } }
+   | { type: 'CLEAR_GROUP_SWIMMER_DATA'; payload: { groupId: string } }
+   | { type: 'SWIMMER_CLEAR'; payload: { groupId: string; swimmerId: number } }
+   | { type: 'MOVE_SWIMMER_TO_GROUP'; payload: { swimmerId: number; fromGroupId: string; toGroupId: string } }
+   | { type: 'REORDER_SWIMMERS'; payload: { groupId: string; swimmerIds: number[] } }
 
 // ── Initial state ───────────────────────────────────────────
 
@@ -75,8 +66,6 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
       }
     case 'CLEAR':
       return initialState
-    case 'ADD_GROUPS':
-      return { ...state, groups: action.payload }
     case 'ADD_SWIMMER':
       return {
         ...state,
@@ -98,32 +87,48 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
               : g
         ),
       }
-    case 'REMOVE_SWIMMER':
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.payload.groupId
-            ? { ...g, swimmers: g.swimmers.filter(s => s.id !== action.payload.swimmerId) }
-            : g
-        ),
-      }
-    case 'SWIMMER_STROKE_COUNT':
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.payload.groupId
-            ? {
-                ...g,
-                swimmers: g.swimmers.map(s =>
-                  s.id === action.payload.swimmerId
-                    ? { ...s, strokeCount: action.payload.count }
-                    : s
-                ),
-              }
-            : g
-        ),
-      }
-    case 'SWIMMER_LAP_STROKE_COUNT': {
+case 'REMOVE_SWIMMER':
+       return {
+         ...state,
+         groups: state.groups.map(g =>
+           g.id === action.payload.groupId
+             ? { ...g, swimmers: g.swimmers.filter(s => s.id !== action.payload.swimmerId) }
+             : g
+         ),
+       }
+     case 'RENAME_SWIMMER':
+       return {
+         ...state,
+         groups: state.groups.map(g =>
+           g.id === action.payload.groupId
+             ? {
+                 ...g,
+                 swimmers: g.swimmers.map(s =>
+                   s.id === action.payload.swimmerId
+                     ? { ...s, name: action.payload.name }
+                     : s
+                 ),
+               }
+             : g
+         ),
+       }
+     case 'UPDATE_SWIMMER_DBID':
+       return {
+         ...state,
+         groups: state.groups.map(g =>
+           g.id === action.payload.groupId
+             ? {
+                 ...g,
+                 swimmers: g.swimmers.map(s =>
+                   s.id === action.payload.swimmerId
+                     ? { ...s, dbId: action.payload.dbId }
+                     : s
+                 ),
+               }
+             : g
+         ),
+       }
+     case 'SWIMMER_LAP_STROKE_COUNT': {
       const { groupId, swimmerId, lapIndex, count } = action.payload
       return {
         ...state,
@@ -175,20 +180,6 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
         ...state,
         groups: state.groups.map(g => ({ ...g, currentRunDrillId: action.payload.runDrillId })),
       }
-    case 'SET_GROUP_DRILL_OVERRIDE':
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.payload.groupId ? { ...g, drillOverride: action.payload.override } : g
-        ),
-      }
-    case 'CLEAR_GROUP_DRILL_OVERRIDE':
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.payload.groupId ? { ...g, drillOverride: null } : g
-        ),
-      }
     case 'UPDATE_GROUP_CONFIG':
       return {
         ...state,
@@ -205,7 +196,6 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
           name: action.payload.name,
           swimmers: [],
           currentRunDrillId: null,
-          drillOverride: null,
         }],
       }
     case 'REMOVE_GROUP':
@@ -224,13 +214,11 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
           g.id === action.payload.groupId
             ? {
                 ...g,
-                drillOverride: null,
-                swimmers: g.swimmers.map(s => ({
-                  ...s,
-                  completed: false,
-                  strokeCount: null,
-                  lapStrokeCounts: {},
-                })),
+            swimmers: g.swimmers.map(s => ({
+              ...s,
+              completed: false,
+              lapStrokeCounts: {},
+            })),
               }
             : g
         ),
@@ -244,60 +232,35 @@ export function liveSessionReducer(state: LiveSessionState, action: LiveSessionA
                 ...g,
                 swimmers: g.swimmers.map(s =>
                   s.id === action.payload.swimmerId
-                    ? { ...s, completed: false, strokeCount: null, lapStrokeCounts: {} }
+                    ? { ...s, completed: false, lapStrokeCounts: {} }
                     : s
                 ),
               }
             : g
         ),
       }
-    case 'SPLIT_GROUP': {
-      const source = state.groups.find(g => g.id === action.payload.sourceGroupId)
-      if (!source) return state
-
-      const splitSwimmers = source.swimmers.filter(s => action.payload.swimmerIds.includes(s.id))
-      const remainingSwimmers = source.swimmers.filter(s => !action.payload.swimmerIds.includes(s.id))
-
-      const newGroup: TimedGroup = {
-        ...source,
-        id: crypto.randomUUID(),
-        name: action.payload.newGroupName,
-        swimmers: splitSwimmers,
-      }
-
-      return {
-        ...state,
-        groups: state.groups
-          .map(g => g.id === action.payload.sourceGroupId ? { ...g, swimmers: remainingSwimmers } : g)
-          .concat(newGroup)
-          .filter(g => g.swimmers.length > 0),
-      }
-    }
     case 'MOVE_SWIMMER_TO_GROUP': {
-      const swimmer = state.groups
-        .find(g => g.id === action.payload.fromGroupId)
-        ?.swimmers.find(s => s.id === action.payload.swimmerId)
-
-      if (!swimmer) return state
-
-      const resetSwimmer: Swimmer = {
-        ...swimmer,
-        completed: false,
-        strokeCount: null,
-        lapStrokeCounts: {},
-      }
-
+      const { swimmerId, fromGroupId, toGroupId } = action.payload
+      let moved: Swimmer | undefined
+      const afterRemove = state.groups.map(g => {
+        if (g.id !== fromGroupId) return g
+        moved = g.swimmers.find(s => s.id === swimmerId)
+        return { ...g, swimmers: g.swimmers.filter(s => s.id !== swimmerId) }
+      })
+      if (!moved) return state
       return {
         ...state,
-        groups: state.groups.map(g => {
-          if (g.id === action.payload.fromGroupId) {
-            return { ...g, swimmers: g.swimmers.filter(s => s.id !== action.payload.swimmerId) }
-          }
-          if (g.id === action.payload.toGroupId) {
-            return { ...g, swimmers: [...g.swimmers, resetSwimmer] }
-          }
-          return g
-        }).filter(g => g.swimmers.length > 0),
+        groups: afterRemove.map(g =>
+          g.id === toGroupId
+            ? {
+                ...g,
+                swimmers: [
+                  ...g.swimmers,
+                  { ...moved!, completed: false, lapStrokeCounts: {} },
+                ],
+              }
+            : g
+        ),
       }
     }
     case 'REORDER_SWIMMERS':
@@ -328,7 +291,7 @@ export type TimerAction =
 export interface LiveSessionContextValue {
   state: LiveSessionState
   dispatch: Dispatch<LiveSessionAction | TimerAction>
-  store: TimestampStore
+  store: LiveTimingStore
   sessionElapsed: number
   sessionRunning: boolean
   groups: TimedGroup[]
@@ -338,7 +301,7 @@ export interface LiveSessionContextValue {
 export const LiveSessionContext = createContext<LiveSessionContextValue>({
   state: initialState,
   dispatch: () => null,
-  store: { version: 0, get: () => undefined, set: () => {}, batchStop: () => {}, clearDrill: () => {}, clearSwimmer: () => {}, clearGroup: () => {} },
+  store: createLiveTimingStore(),
   sessionElapsed: 0,
   sessionRunning: false,
   groups: [],

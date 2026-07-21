@@ -8,7 +8,7 @@ import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteD
 import type { Session } from '../api/sessions'
 import type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../api/drills'
 import { strokeColors } from '../constants/drill'
-import { getDrillTotalDistance, findSimilarDrills, type SimilarDrill } from '../utils/drillHelpers'
+import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, type SimilarDrill } from '../utils/drillHelpers'
 
 export const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -342,7 +342,7 @@ export const SessionDetail: React.FC = () => {
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">{session.name}</h1>
                 {focusAreas.length > 0 && focusAreas.map(f => (
-                  <span key={f} className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                  <span key={f} className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">
                     {f}
                   </span>
                 ))}
@@ -473,7 +473,7 @@ export const SessionDetail: React.FC = () => {
           <span className="font-label-caps text-on-surface-variant">Stroke Breakdown</span>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {strokeBreakdown.length > 0 ? strokeBreakdown.map(b => (
-              <span key={b.stroke} className={`${strokeColors[b.stroke] || 'bg-surface-variant text-on-surface-variant'} text-[10px] font-bold px-2 py-0.5 rounded-full`}>
+              <span key={b.stroke} className={`${strokeColors[b.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>
                 {b.stroke} {b.meters}m
               </span>
             )) : <span className="text-label-sm text-on-surface-variant">No drills</span>}
@@ -531,17 +531,17 @@ export const SessionDetail: React.FC = () => {
                     <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                           <span className="font-bold text-on-surface truncate">{d.name}</span>
-                          <span className="text-[10px] bg-primary text-on-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(d)}m</span>
-                          {d.repeatCount > 1 && <span className="text-[10px] bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded font-bold">{d.repeatCount}x</span>}
+                          <span className="text-label-sm bg-primary text-on-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(d)}m</span>
+                          {d.repeatCount > 1 && <span className="text-label-sm bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded font-bold">{d.repeatCount}x</span>}
                         </div>
                         {d.description && (
-                          <p className="text-[11px] text-on-surface-variant mt-1 line-clamp-1 italic">{d.description}</p>
+                          <p className="text-label-sm text-on-surface-variant mt-1 line-clamp-1 italic">{d.description}</p>
                         )}
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
 
                         {d.items && d.items.length > 0 ? (
                           d.items.map((item, idx) => (
-                            <span key={item.id} className="text-[11px] text-on-surface-variant flex items-center gap-1">
+                            <span key={item.id} className="text-label-sm text-on-surface-variant flex items-center gap-1">
                               {idx > 0 && <span className="text-outline-variant mr-1">•</span>}
                               <span className="font-bold text-primary">{item.repeatCount}x{item.distance}m</span>
                               <span className="capitalize">{item.stroke}</span>
@@ -552,7 +552,7 @@ export const SessionDetail: React.FC = () => {
                                    {item.equipment.map(e => (
                                      <div key={e} className="flex items-center gap-0.5">
                                        <EquipmentIcons type={e as EquipmentType} className="w-3 h-3 text-secondary" />
-                                       <span className="text-[9px] font-bold text-secondary uppercase leading-none">{e}</span>
+                                       <span className="text-caption-caps font-bold text-secondary uppercase leading-none">{e}</span>
                                      </div>
                                    ))}
                                  </span>
@@ -561,7 +561,7 @@ export const SessionDetail: React.FC = () => {
                           ))
                         ) : (
                           <>
-                            <span className={`${strokeColors[d.stroke] || 'bg-surface-variant text-on-surface-variant'} text-[10px] font-bold px-2 py-0.5 rounded-full`}>
+                            <span className={`${strokeColors[d.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>
                               {d.stroke}
                             </span>
                             <span className="text-label-sm text-on-surface-variant">{d.distance}m</span>
@@ -570,9 +570,9 @@ export const SessionDetail: React.FC = () => {
                       </div>
                       {(d.focus !== 'none' || (d.labels && d.labels.length > 0)) && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
-                          {d.focus !== 'none' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">{d.focus}</span>}
+                          {d.focus !== 'none' && <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{d.focus}</span>}
                           {d.labels?.map(l => (
-                            <span key={l} className="text-[9px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase font-bold tracking-wider">{l}</span>
+                            <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
                           ))}
                         </div>
                       )}
@@ -635,7 +635,7 @@ export const SessionDetail: React.FC = () => {
                   <button
                     key={f}
                     onClick={() => setActiveFocusFilter(f)}
-                    className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-all cursor-pointer capitalize ${activeFocusFilter === f ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    className={`flex-1 py-1.5 text-label-sm font-bold rounded-md transition-all cursor-pointer capitalize ${activeFocusFilter === f ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
                   >
                     {f}
                   </button>
@@ -651,7 +651,7 @@ export const SessionDetail: React.FC = () => {
                       <button
                         key={tag}
                         onClick={() => toggleTagFilter(tag)}
-                        className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
+                        className={`px-2 py-0.5 rounded-full text-caption-caps font-bold uppercase tracking-wider transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
                       >
                         {tag}
                       </button>
@@ -685,10 +685,10 @@ export const SessionDetail: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 mb-1">
                           <h4 className="font-bold text-sm text-on-surface truncate m-0">{libDrill.name}</h4>
-                          <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">{getDrillTotalDistance(libDrill)}m</span>
+                          <span className="text-caption-caps bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase">{getDrillTotalDistance(libDrill)}m</span>
                         </div>
                         {libDrill.description && (
-                          <p className="text-[10px] text-on-surface-variant italic line-clamp-2 leading-relaxed mb-2">{libDrill.description}</p>
+                          <p className="text-label-sm text-on-surface-variant italic line-clamp-2 leading-relaxed mb-2">{libDrill.description}</p>
                         )}
                       </div>
                       <div className="flex gap-1 shrink-0">
@@ -711,20 +711,20 @@ export const SessionDetail: React.FC = () => {
 
                     <div className="flex flex-wrap gap-1 items-center">
                       {libDrill.focus && libDrill.focus !== 'none' && (
-                        <span className="text-[8px] bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">{libDrill.focus}</span>
+                        <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase">{libDrill.focus}</span>
                       )}
                       {(libDrill.labels || []).map(l => (
-                        <span key={l} className="text-[8px] bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">{l}</span>
+                        <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded uppercase">{l}</span>
                       ))}
                       {!libDrill.items?.length && (
-                        <span className={`${strokeColors[libDrill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-[8px] font-bold px-1.5 py-0.5 rounded uppercase`}>{libDrill.stroke}</span>
+                        <span className={`${strokeColors[libDrill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-caption-caps font-bold px-1.5 py-0.5 rounded uppercase`}>{libDrill.stroke}</span>
                       )}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <p className="text-[10px] text-on-surface-variant mt-3 text-center">{libraryDrills.length} drills in bank</p>
+            <p className="text-label-sm text-on-surface-variant mt-3 text-center">{libraryDrills.length} drills in bank</p>
           </div>
         </div>
       </div>
@@ -741,66 +741,4 @@ export const SessionDetail: React.FC = () => {
       />
     </div>
   )
-}
-
-function aggregateByStroke(drills: Drill[]): { stroke: string; meters: number }[] {
-  const map = new Map<string, number>()
-  for (const d of drills) {
-    if (d.items && d.items.length > 0) {
-      for (const item of d.items) {
-        const dist = item.distance * item.repeatCount * d.repeatCount
-        map.set(item.stroke, (map.get(item.stroke) || 0) + dist)
-      }
-    } else {
-      map.set(d.stroke, (map.get(d.stroke) || 0) + d.distance)
-    }
-  }
-  return Array.from(map.entries()).map(([stroke, meters]) => ({ stroke, meters }))
-}
-
-function detectFocus(drills: Drill[]): string[] {
-  const focus: string[] = []
-
-  // Prioritize explicit labels
-  for (const d of drills) {
-    if (d.focus && d.focus !== 'none') {
-      const f = d.focus.charAt(0).toUpperCase() + d.focus.slice(1)
-      if (!focus.includes(f)) focus.push(f)
-    }
-    for (const l of d.labels || []) {
-      const formatted = l.charAt(0).toUpperCase() + l.slice(1)
-      if (!focus.includes(formatted)) focus.push(formatted)
-    }
-  }
-
-  if (focus.length > 0) return Array.from(new Set(focus)).slice(0, 3)
-
-  const totalDistance = drills.reduce((sum, d) => {
-    if (d.items && d.items.length > 0) {
-      return sum + (d.items.reduce((iSum, item) => iSum + (item.distance * item.repeatCount), 0) * d.repeatCount)
-    }
-    return sum + (d.distance || 0)
-  }, 0)
-  if (totalDistance === 0) return focus
-
-  const strokeMeters = new Map<string, number>()
-  for (const d of drills) {
-    strokeMeters.set(d.stroke, (strokeMeters.get(d.stroke) || 0) + d.distance)
-  }
-
-  const maxStroke = [...strokeMeters.entries()].sort((a, b) => b[1] - a[1])[0]
-  if (maxStroke) {
-    const pct = maxStroke[1] / totalDistance
-    if (pct > 0.6) focus.push(`${maxStroke[0]} Focus`)
-  }
-
-  if (totalDistance >= 2000) focus.push('Endurance')
-  else if (totalDistance >= 1000) focus.push('Aerobic')
-  else if (totalDistance <= 400) focus.push('Sprint')
-
-  const avgDistance = totalDistance / drills.length
-  if (avgDistance >= 400) focus.push('Distance Sets')
-  else if (avgDistance <= 50) focus.push('Sprint/Technique')
-
-  return focus
 }

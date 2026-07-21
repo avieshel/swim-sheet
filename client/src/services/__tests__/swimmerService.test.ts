@@ -7,6 +7,8 @@ const mockDao = vi.hoisted(() => ({
   addSwimmer: vi.fn(),
   updateSwimmer: vi.fn(),
   deleteSwimmer: vi.fn(),
+  deleteSwimmerWithData: vi.fn(),
+  exportSwimmerData: vi.fn(),
 }))
 
 vi.mock('../../db/dao', () => mockDao)
@@ -61,6 +63,22 @@ describe('swimmerService', () => {
     mockDao.deleteSwimmer.mockResolvedValue(undefined)
     await swimmerService.delete('1')
     expect(mockDao.deleteSwimmer).toHaveBeenCalledExactlyOnceWith('1')
+  })
+
+  it('deleteWithData calls deleteSwimmerWithData with id', async () => {
+    const blob = new Blob(['data'])
+    mockDao.deleteSwimmerWithData.mockResolvedValue(blob)
+    const result = await swimmerService.deleteWithData('1')
+    expect(mockDao.deleteSwimmerWithData).toHaveBeenCalledExactlyOnceWith('1')
+    expect(result).toBe(blob)
+  })
+
+  it('exportData calls exportSwimmerData with id', async () => {
+    const blob = new Blob(['data'])
+    mockDao.exportSwimmerData.mockResolvedValue(blob)
+    const result = await swimmerService.exportData('1')
+    expect(mockDao.exportSwimmerData).toHaveBeenCalledExactlyOnceWith('1')
+    expect(result).toBe(blob)
   })
 
   it('propagates errors from DAO', async () => {

@@ -33,7 +33,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, options, onCh
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
-      {label && <label className="block text-[10px] font-bold text-on-surface-variant uppercase mb-1">{label}</label>}
+      {label && <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">{label}</label>}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}

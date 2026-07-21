@@ -3,11 +3,11 @@ import { test, expect } from '@playwright/test';
 test.describe('Drill Persistence', () => {
   test('auto-saves drill data to LaneDrillResult when all swimmers complete a drill', async ({ page }) => {
     await page.goto('/');
+    await page.waitForFunction(() => (window as any).db?.isOpen?.(), null, { timeout: 5000 });
 
     // Seed the database with a session, swimmer, active run, and run drill
     const ids = await page.evaluate(async () => {
       const db = (window as any).db;
-      await new Promise(r => setTimeout(r, 200));
 
       const now = new Date().toISOString();
       const sessionId = crypto.randomUUID();

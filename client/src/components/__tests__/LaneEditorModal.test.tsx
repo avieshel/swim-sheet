@@ -29,12 +29,11 @@ const makeGroup = (id: string, lane: number, name: string, swimmers: TimedGroup[
   name,
   swimmers,
   currentRunDrillId: null,
-  drillOverride: null,
 })
 
 const defaultGroups: TimedGroup[] = [
   makeGroup('g1', 1, 'Lane 1', [
-    { id: 1, dbId: '1', name: 'Alice', completed: false, strokeCount: null, lapStrokeCounts: {} },
+    { id: 1, dbId: '1', name: 'Alice', completed: false, lapStrokeCounts: {} },
   ]),
   makeGroup('g2', 2, 'Lane 2', []),
 ]

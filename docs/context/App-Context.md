@@ -117,13 +117,14 @@ SwimSheet/
 
 | Path | Page | Description |
 |------|------|-------------|
-| `/` | CoachDashboard | Home with hero, hub tiles, stats |
+| `/` | LiveDeck | Quick-time auto-start — active session runner (default entry) |
+| `/live` | LiveDeck | Alias for `/` (legacy compatibility) |
+| `/dashboard` | CoachDashboard | Home with hero, hub tiles, stats |
 | `/swimmers` | SwimmersList | Roster grid with search |
 | `/swimmers/:id` | SwimmerDetail | Individual swimmer profile |
 | `/sessions` | SessionsList | Template list |
 | `/sessions/:id` | SessionDetail | Template editor with drills |
 | `/drills` | DrillBank | Global drill library |
-| `/live` | LiveDeck | Active session runner |
 | `/settings` | Settings | App preferences |
 
 ## Deployment

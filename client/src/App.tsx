@@ -17,7 +17,8 @@ function App() {
     <Router>
       <Layout>
         <Routes>
-          <Route path="/" element={<CoachDashboard />} />
+          <Route path="/" element={<LiveDeck />} />
+          <Route path="/dashboard" element={<CoachDashboard />} />
           <Route path="/swimmers" element={<SwimmersList />} />
           <Route path="/swimmers/:id" element={<SwimmerDetail />} />
           <Route path="/sessions" element={<SessionsList />} />

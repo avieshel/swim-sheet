@@ -3,9 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Responsive Layout — lane card fits controls at every breakpoint', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    await page.waitForFunction(() => (window as any).db?.isOpen?.(), null, { timeout: 5000 });
     await page.evaluate(async () => {
       const db = (window as any).db;
-      await new Promise(r => setTimeout(r, 200));
 
       const now = new Date().toISOString();
       const runId = crypto.randomUUID();

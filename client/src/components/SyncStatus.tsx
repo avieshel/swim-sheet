@@ -36,7 +36,7 @@ export const SyncStatus: React.FC = () => {
       <button
         onClick={handleSync}
         disabled={syncing}
-        className="ml-1 px-2 py-0.5 bg-primary text-on-primary rounded-full text-[10px] font-bold hover:brightness-110 transition-all"
+        className="ml-1 px-2 py-0.5 bg-primary text-on-primary rounded-full text-label-sm font-bold hover:brightness-110 transition-all"
       >
         {syncing ? '...' : 'Sync'}
       </button>

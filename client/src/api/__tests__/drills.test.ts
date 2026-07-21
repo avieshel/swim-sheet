@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../services/drillService', () => ({
   drillService: {
-    getForSession: vi.fn(),
+    getDrills: vi.fn(),
     get: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
@@ -23,11 +23,11 @@ import { drillService } from '../../services/drillService'
 describe('drills API', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('getSessionDrills delegates to drillService.getForSession', async () => {
+  it('getSessionDrills delegates to drillService.getDrills', async () => {
     const expected = [{ id: 'd1', sessionId: 's1' }]
-    vi.mocked(drillService.getForSession).mockResolvedValue(expected)
+    vi.mocked(drillService.getDrills).mockResolvedValue(expected)
     const result = await getSessionDrills('s1')
-    expect(drillService.getForSession).toHaveBeenCalledWith('s1')
+    expect(drillService.getDrills).toHaveBeenCalledWith('s1')
     expect(result).toBe(expected)
   })
 

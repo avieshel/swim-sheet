@@ -2,7 +2,9 @@ import { getAllSessions, getSession, addSession, updateSession, deleteSession, g
 import type { SafeSession } from '../db/schema'
 
 export const sessionService = {
-  list: () => getAllSessions(),
+  list: async () => {
+    return await getAllSessions()
+  },
   get: (id: string) => getSession(id),
   create: (data: SafeSession) => addSession(data),
   update: (id: string, data: Partial<SafeSession>) => updateSession(id, data),

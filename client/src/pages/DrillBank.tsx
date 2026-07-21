@@ -283,20 +283,20 @@ export const DrillBank: React.FC = () => {
             <div className="mt-auto pt-3 border-t border-outline-variant/30">
               <div className="flex flex-wrap gap-1.5 items-center mb-3">
                 {d.items && d.items.length > 0 ? d.items.map((item, idx) => (
-                  <div key={item.id} className="flex items-center gap-1 text-[11px] text-on-surface-variant">
+                  <div key={item.id} className="flex items-center gap-1 text-label-sm text-on-surface-variant">
                     {idx > 0 && <span className="text-outline-variant">•</span>}
                     <span className="font-bold text-primary">{item.repeatCount}x{item.distance}m</span>
                     <span className="capitalize">{item.stroke}</span>
                   </div>
                 )) : (
-                  <span className={`${strokeColors[d.stroke] || 'bg-surface-variant text-on-surface-variant'} text-[10px] font-bold px-2 py-0.5 rounded-full`}>{d.stroke} {d.distance}m</span>
+                  <span className={`${strokeColors[d.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>{d.stroke} {d.distance}m</span>
                 )}
               </div>
               
               <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
-                {d.focus && d.focus !== 'none' && <span className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">{d.focus}</span>}
+                {d.focus && d.focus !== 'none' && <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{d.focus}</span>}
                 {d.labels?.map(l => (
-                  <span key={l} className="text-[9px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase font-bold tracking-wider">{l}</span>
+                  <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
                 ))}
               </div>
             </div>
@@ -423,7 +423,7 @@ export const DrillBank: React.FC = () => {
                   )) : (
                     <span className={`${strokeColors[detailDrill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-xs font-bold px-2 py-0.5 rounded-full`}>{detailDrill.stroke} {detailDrill.distance}m</span>
                   )}
-                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(detailDrill)}m total</span>
+                  <span className="text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(detailDrill)}m total</span>
                 </div>
               </div>
 
@@ -441,10 +441,10 @@ export const DrillBank: React.FC = () => {
                   <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1.5">Tags</span>
                   <div className="flex flex-wrap gap-1">
                     {detailDrill.focus && detailDrill.focus !== 'none' && (
-                      <span className="text-[9px] bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase font-bold tracking-wider">{detailDrill.focus}</span>
+                      <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{detailDrill.focus}</span>
                     )}
                     {(detailDrill.labels || []).map(l => (
-                      <span key={l} className="text-[9px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase font-bold tracking-wider">{l}</span>
+                      <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
                     ))}
                   </div>
                 </div>
