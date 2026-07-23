@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { getActiveRun, addSwimmerToRun, createQuickStartRun, updateRun, getRunDrills, getLaneResults, removeSwimmerFromRun, setLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, completeRunWithLaps, buildLaneResult, getRunSwimmers, getRunSwimmerLinks } from '../api/runs'
@@ -7,7 +8,7 @@ import { getSession } from '../api/sessions'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import type { SessionRun, RunDrill, LaneDrillResult, Swimmer as DbSwimmer } from '../api/runs'
 import { timestampSplits } from '../utils/lapEditing'
-import { formatTime, formatWallTime } from '../utils/formatTime'
+import { formatTime, formatSessionTime, formatWallTime } from '../utils/formatTime'
 import { LaneEditorModal } from '../components/LaneEditorModal'
 import { ActiveSwimmerRow, SavedSwimmerRow } from '../components/SwimmerRows'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
@@ -23,7 +24,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
   onCompleteDrill: (groupId: string) => void;
   onResetDrill: (groupId: string) => void;
   onClearSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
-  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number; name?: string; dbId?: string }) => void;
+  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number | null; completedAt?: number | null; name?: string; dbId?: string }) => void;
   loading?: boolean;
   rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>;
   onSwimmerSaved?: () => void;
@@ -31,6 +32,12 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
   const isFastLane = (lane: number) => lane === 1
   const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const liveGroup = groups.find(g => g.id === group.id) ?? group
+
+  const ensureSessionRunning = () => {
+    if (!sessionRunning) {
+      dispatch({ type: 'START_SESSION_TIMER' })
+    }
+  }
 
   const findExistingAllocation = (dbId: string): { groupId: string; groupName: string } | null => {
     const match = groups.find(g => g.id !== liveGroup.id && g.swimmers.some(s => s.dbId === dbId))
@@ -129,6 +136,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
+    ensureSessionRunning()
     store.markSwimmerStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
   }
 
@@ -176,6 +184,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
     if (isDrillRunning) {
       handleBatchLaneStop()
     } else {
+      ensureSessionRunning()
       for (const swimmer of liveGroup.swimmers) {
         if (swimmer.dbId) {
           store.markGroupStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
@@ -287,17 +296,17 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
             <hr className="border-outline-variant/20 mx-3" />
             <div className="px-3 py-2 flex gap-1.5 justify-center">
               {showCompleted ? (
-                <button disabled className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+                <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
                   <span className="material-symbols-outlined text-label-sm">check_circle</span>
                   Completed
                 </button>
               ) : (
                 <button
                   onClick={handleStartFinish}
-                  className={`flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer shrink-0 ${
+                  className={`flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
                     isDrillRunning
-                      ? 'bg-red-600 text-white hover:brightness-110 active:scale-95'
-                      : 'bg-emerald-600 text-white hover:brightness-110 active:scale-95'
+                      ? 'bg-red-600 text-white hover:brightness-110'
+                      : 'bg-emerald-600 text-white hover:brightness-110'
                   }`}
                 >
                   <span className="material-symbols-outlined text-label-sm">{isDrillRunning ? 'stop' : 'play_arrow'}</span>
@@ -308,7 +317,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
               {showCompleted ? (
                 <button
                   onClick={handleLapReset}
-                  className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 shrink-0"
+                  className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant"
                 >
                   <span className="material-symbols-outlined text-label-sm">restart_alt</span>
                   Reset
@@ -317,10 +326,10 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                 <button
                   onClick={handleLapReset}
                   disabled={!drillStarted}
-                  className={`flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer shrink-0 ${
+                  className={`flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
                     !drillStarted
                       ? 'bg-disabled text-on-disabled cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:brightness-110 active:scale-95'
+                      : 'bg-blue-600 text-white hover:brightness-110'
                   }`}
                 >
                   <span className="material-symbols-outlined text-label-sm">flag</span>
@@ -386,6 +395,9 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                   lapEditMode={lapEditMode}
                   toggleLapEdit={toggleLapEdit}
                   onEditSavedSwimmer={onEditSavedSwimmer}
+                  onClearSavedSwimmer={(dbId) => {
+                    if (liveGroup.currentRunDrillId) onEditSavedSwimmer(liveGroup.id, liveGroup.currentRunDrillId, dbId, { laps: [], startedAt: null, completedAt: null })
+                  }}
                   rosterSwimmers={rosterSwimmers}
                   onSwimmerSaved={onSwimmerSaved}
                   currentGroupId={liveGroup.id}
@@ -488,6 +500,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
 }
 
 function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () => void }) {
+  const navigate = useNavigate()
   const { dispatch, store, sessionElapsed, sessionRunning, groups, tick } = useContext(LiveSessionContext)
   const [runDrills, setRunDrills] = useState<RunDrill[]>([])
   const [laneDrillResults, setLaneDrillResults] = useState<LaneDrillResult[]>([])
@@ -497,14 +510,11 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
   const [showLaneEditor, setShowLaneEditor] = useState(false)
   const [editorScrollToLane, setEditorScrollToLane] = useState<number | null>(null)
   const [rosterSwimmers, setRosterSwimmers] = useState<DbSwimmer[]>([])
+  const [editPoolLength, setEditPoolLength] = useState<string | null>(null)
 
   const initializedRef = useRef(false)
   const [sessionStartedAt] = useState(() => Date.now())
   const [drillsLoaded, setDrillsLoaded] = useState(false)
-
-  useEffect(() => {
-    dispatch({ type: 'START_SESSION_TIMER' })
-  }, [dispatch])
 
   useEffect(() => {
     getRunDrills(run.id).then(drills => {
@@ -614,6 +624,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
   }
 
   const handleResetSession = async () => {
+    dispatch({ type: 'RESET_SESSION_TIMER' })
     await deleteLaneResultsForRun(run.id)
     const refreshed = await getLaneResults(run.id)
     setLaneDrillResults(refreshed)
@@ -634,7 +645,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
     setLaneDrillResults(refreshed)
   }
 
-  const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number; name?: string; dbId?: string }) => {
+  const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number | null; completedAt?: number | null; name?: string; dbId?: string }) => {
     await updateLaneResultSwimmer(run.id, groupId, runDrillId, swimmerDbId, updates)
     const refreshed = await getLaneResults(run.id)
     setLaneDrillResults(refreshed)
@@ -650,41 +661,93 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             <h2 className="font-headline-md text-on-surface truncate">{templateName}</h2>
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-label-caps">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live
+            {sessionRunning ? (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-label-caps">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant text-label-caps">
+                <span className="w-1.5 h-1.5 rounded-full bg-on-surface-variant" />
+                Not started
+              </span>
+            )}
+            <span className={`font-display-timer text-lg tabular-nums leading-none ${sessionRunning ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
+              {formatSessionTime(sessionElapsed)}
             </span>
           </div>
-          <p className="text-label-sm text-on-surface-variant truncate">{run.date} &middot; {run.poolName} &middot; {run.poolLength}m &middot; {runDrills.length} drills</p>
-          <p className="text-label-sm text-on-surface-variant/70 mt-0.5">Started {formatWallTime(sessionStartedAt)}</p>
+          <p className="text-label-sm text-on-surface-variant truncate">{run.date} &middot; {run.poolName} &middot; {editPoolLength != null ? (
+            <span className="relative inline-flex items-center">
+              <input
+                type="number"
+                step="0.1"
+                min="1"
+                max="100"
+                value={editPoolLength}
+                onChange={e => setEditPoolLength(e.target.value)}
+                onBlur={async () => {
+                  const v = parseFloat(editPoolLength!)
+                  if (!isNaN(v) && v > 0) {
+                    await updateRun(run.id, { poolLength: v })
+                    setEditPoolLength(null)
+                  } else {
+                    setEditPoolLength(null)
+                  }
+                }}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                  if (e.key === 'Escape') setEditPoolLength(null)
+                }}
+                className="w-14 px-1 py-0.5 rounded border border-outline text-on-surface bg-surface text-xs tabular-nums text-center outline-none"
+                autoFocus
+              />
+              <span className="ml-0.5">m</span>
+            </span>
+          ) : (
+            <button onClick={() => setEditPoolLength(String(run.poolLength))}
+              className="inline-flex items-center gap-0.5 hover:text-primary hover:underline transition-all cursor-pointer">
+              {run.poolLength}m
+              <span className="material-symbols-outlined text-[10px]">edit</span>
+            </button>
+          )} &middot; {runDrills.length} drills</p>
+          <p className="text-label-sm text-on-surface-variant/70 mt-0.5">{sessionElapsed > 0 ? 'Started' : 'Created'} {formatWallTime(sessionStartedAt)}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })}
-            className={`h-8 px-2 rounded-lg font-medium flex items-center gap-1 transition-all cursor-pointer text-xs ${
-              sessionRunning
-                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">{sessionRunning ? 'pause' : 'play_arrow'}</span>
-            <span className="hidden sm:inline">{sessionRunning ? 'Pause' : 'Resume'}</span>
-          </button>
-          <button onClick={() => { setEditorScrollToLane(null); setShowLaneEditor(true) }}
-            className="h-8 px-2 rounded-lg text-on-surface-variant font-medium flex items-center gap-1 hover:bg-surface-variant transition-all cursor-pointer text-xs">
-            <span className="material-symbols-outlined text-sm">group</span>
-            <span className="hidden sm:inline">Lane Swimmers</span>
-          </button>
-          <button onClick={() => setShowResetSessionConfirm(true)}
-            className="h-8 px-2 rounded-lg border-2 border-error text-error font-medium flex items-center gap-1 hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer text-xs">
-            <span className="material-symbols-outlined text-sm">refresh</span>
-            Clear
-          </button>
-          <button onClick={handleComplete}
-            className="h-8 px-2 rounded-lg bg-primary-container text-on-primary-container font-medium flex items-center gap-1 hover:brightness-95 transition-all cursor-pointer text-xs">
-            <span className="material-symbols-outlined text-sm">stop</span>
-            Complete
-          </button>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })}
+                className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
+                  sessionRunning
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                    : 'bg-emerald-600 text-white hover:brightness-110'
+                }`}
+              >
+                <span className="material-symbols-outlined text-label-sm">{sessionRunning ? 'pause' : 'play_arrow'}</span>
+                {sessionRunning ? 'Pause' : sessionElapsed > 0 ? 'Resume' : 'Start'}
+              </button>
+              <button onClick={handleComplete}
+                className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 bg-primary-container text-on-primary-container hover:brightness-95">
+                <span className="material-symbols-outlined text-label-sm">stop</span>
+                Complete
+              </button>
+              <button onClick={() => setShowResetSessionConfirm(true)}
+                className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
+                <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+                Reset
+              </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => { setEditorScrollToLane(null); setShowLaneEditor(true) }}
+              className="h-7 px-1.5 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-0.5 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-[11px]">
+              <span className="material-symbols-outlined text-xs">group</span>
+              Lane Swimmers
+            </button>
+            <button onClick={() => navigate(`/sessions/${run.session_id}`)}
+              className="h-7 px-1.5 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-0.5 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-[11px]">
+              <span className="material-symbols-outlined text-xs">edit_square</span>
+              Edit Session
+            </button>
+          </div>
         </div>
       </div>
 
@@ -752,9 +815,9 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
 
       <ConfirmDialog
         open={showResetSessionConfirm}
-        title="Clear Session?"
-        message="Clear all timing data and return all groups to the first drill? Swimmers will remain assigned. This cannot be undone."
-        confirmLabel="Clear"
+        title="Reset Session?"
+        message="Reset all timing data and return all groups to the first drill? Swimmers will remain assigned. This cannot be undone."
+        confirmLabel="Reset"
         cancelLabel="Cancel"
         destructive={true}
         onConfirm={handleResetSession}

@@ -174,11 +174,17 @@ Settings page has no E2E coverage.
 
 ---
 
-## A-012: History/review feature
+## A-012: Runs history — Past session management
 
 **Source**: `USER-FLOWS.md` (flow 5)
 
-Browse completed SessionRuns, view per-swimmer lap data for historical runs. No implementation yet (route needed, UI needed).
+Browse completed SessionRuns on a dedicated `/runs` page with full session management:
+
+- **List view**: Show all completed/saved runs with date, session name, pool, drill count, total swimmers
+- **Detail view**: Per-run review with per-group, per-drill, per-swimmer lap data — loaded from `LaneDrillResult` JSON and `Lap` table
+- **Actions**: Delete old runs, re-open a completed run for review (read-only), export run data
+- **Live view split**: Live view (`/`) only has Reset and Complete — no delete, no browsing. All historical management lives on the Runs screen.
+- **Navigation**: Accessible from sidebar nav (desktop) and bottom nav (mobile)
 
 **Priority**: Low
 **Status**: Open

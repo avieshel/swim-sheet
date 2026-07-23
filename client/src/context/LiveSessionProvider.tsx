@@ -19,6 +19,11 @@ export const LiveSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
       setSessionRunning(false)
       return
     }
+    if (action.type === 'RESET_SESSION_TIMER') {
+      setSessionElapsed(0)
+      setSessionRunning(false)
+      return
+    }
     switch (action.type) {
       case 'CLEAR':
         setSessionElapsed(0)

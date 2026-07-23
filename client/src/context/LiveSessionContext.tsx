@@ -287,6 +287,7 @@ case 'REMOVE_SWIMMER':
 export type TimerAction =
   | { type: 'START_SESSION_TIMER' }
   | { type: 'PAUSE_SESSION_TIMER' }
+  | { type: 'RESET_SESSION_TIMER' }
 
 export interface LiveSessionContextValue {
   state: LiveSessionState

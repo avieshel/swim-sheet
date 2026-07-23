@@ -163,7 +163,7 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 - After completing a session, `autoStartedRef` is reset — next visit to `/` auto-starts a fresh quick-time session (no intermediate landing screen)
 
 **Active Run View** (run in progress):
-- **Session header box**: session name, "Live" indicator with pulsing dot, wall-time start (e.g. "Started 14:30"), date/pool/drill count, Play/Pause toggle, Lane Editor (pencil icon), Clear, Complete buttons
+- **Session header box**: session name, "Live" indicator with pulsing dot, wall-time start (e.g. "Started 14:30"), date/pool/drill count, Play/Pause toggle, Lane Editor (pencil icon), Reset, Complete buttons
 - Group cards in responsive grid (1–4 columns)
 - Each group has: name (pencil icon opens LaneEditorModal for name editing, swimmer management, lane reset), lane number, drill timer display, drill selector — no inline editing on the card
 - **No per-lane timers** — a single global session clock ticks once per 10ms via `tick()` exposed from context
@@ -183,6 +183,10 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 5. Coach uses lane-level Lap/Reset to record laps or clear data
 6. Coach uses swimmer-level buttons for individual swimmer control
 7. "Complete" button ends the session, saves all data, returns to setup
+
+**Session management split:**
+- **Live view (`/`)** — limited controls: **Reset** (clears all timing data for the current run, returns groups to drill 1) and **Complete** (finalizes and persists the session). These are the only session-level actions available during a live session.
+- **Runs history screen** (future, `/runs`) — full session lifecycle management: browse completed sessions, view per-swimmer lap data, delete old runs, re-open a completed run for review. This is where the coach goes for post-session analysis and administration.
 
 **Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
 - **Start** (emerald) — `store.markSwimmerStart(...)` if not already started; disabled after started.

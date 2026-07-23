@@ -44,14 +44,15 @@ interface SavedSwimmerRowProps {
   sessionElapsed: number
   lapEditMode: Record<string, boolean>
   toggleLapEdit: (key: string) => void
-  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number; completedAt?: number; name?: string; dbId?: string }) => void
+  onEditSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number | null; completedAt?: number | null; name?: string; dbId?: string }) => void
+  onClearSavedSwimmer?: (savedDbId: string) => void
   rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>
   onSwimmerSaved?: () => void
   currentGroupId: string
   findExistingAllocation: (dbId: string) => { groupId: string; groupName: string } | null
 }
 
-export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: SavedSwimmerRowProps) {
+export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, onClearSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: SavedSwimmerRowProps) {
   const { dispatch } = useContext(LiveSessionContext)
   const lapEntries = saved.laps ?? []
 
@@ -189,6 +190,28 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
           })}
         </div>
       )}
+
+      {/* Control bar — disabled; maintains layout stability vs ActiveSwimmerRow */}
+      <hr className="border-outline-variant/20 mx-3" />
+      <div className="px-3 py-2 flex gap-1.5 justify-center">
+        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+          <span className="material-symbols-outlined text-label-sm">play_arrow</span>
+          <span>Start</span>
+        </button>
+        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+          <span className="material-symbols-outlined text-label-sm">flag</span>
+          <span>Lap</span>
+        </button>
+        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+          <span className="material-symbols-outlined text-label-sm">check</span>
+          <span>Finish</span>
+        </button>
+        <button onClick={() => onClearSavedSwimmer?.(saved.dbId)}
+          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
+          <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+          <span>Clear</span>
+        </button>
+      </div>
 
       {modal}
     </div>
@@ -401,21 +424,23 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         <button
           onClick={() => onStart(swimmer.id)}
           disabled={hasIndividualStart || swimmer.completed}
-          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-emerald-600 text-white hover:brightness-110 active:scale-95 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-emerald-600 text-white hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <span className="material-symbols-outlined text-label-sm">play_arrow</span>
           <span>Start</span>
         </button>
         <button
           onClick={() => onLap(swimmer.id)}
-          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-blue-600 text-white hover:brightness-110 active:scale-95 shrink-0"
+          disabled={swimmer.completed}
+          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-blue-600 text-white hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <span className="material-symbols-outlined text-label-sm">flag</span>
           <span>Lap</span>
         </button>
         <button
           onClick={() => onComplete(swimmer.id)}
-          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 shrink-0"
+          disabled={swimmer.completed}
+          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <span className="material-symbols-outlined text-label-sm">check</span>
           <span>Finish</span>
@@ -423,7 +448,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         <button
           onClick={() => onClear(swimmer.id, swimmer.dbId)}
           disabled={startedAt == null && !swimmer.completed}
-          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-label-sm">restart_alt</span>
           <span>Clear</span>
