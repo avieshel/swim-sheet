@@ -54,15 +54,11 @@ interface SavedSwimmerRowProps {
 export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: SavedSwimmerRowProps) {
   const { dispatch } = useContext(LiveSessionContext)
   const lapEntries = saved.laps ?? []
-  const effectiveSplitStart = saved.startedAt ?? savedData.drillStart ?? 0
-  const lapTimes = lapEntries.map(e => e.time)
-  const splits = lapTimes.length > 0 ? timestampSplits(lapTimes, effectiveSplitStart) : []
 
   const displayTime = (() => {
-    const start = saved.startedAt ?? savedData.drillStart
-    if (saved.completedAt != null && start != null) return formatTime(saved.completedAt - start)
-    if (start != null) return formatTime((savedData.drillEnd ?? sessionElapsed) - start)
-    return '--:--.--'
+    if (saved.startedAt == null) return '--:--.--'
+    if (saved.completedAt != null) return formatTime(saved.completedAt - saved.startedAt)
+    return formatTime((savedData.drillEnd ?? sessionElapsed) - saved.startedAt)
   })()
 
   const goOffset = saved.startedAt != null && savedData.drillStart != null
@@ -83,8 +79,15 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
     currentGroupId,
     findExistingAllocation,
     onApply: (targetDbId, data) => {
-      if (runDrillId) onEditSavedSwimmer(group.id, runDrillId, saved.dbId, { name: data.name, dbId: targetDbId })
+      if (targetDbId === saved.dbId && runDrillId) {
+        // Pure edit (no re-link): update the saved result so the UI reflects
+        // the new name immediately.  This is a fast, local lane-result patch.
+        onEditSavedSwimmer(group.id, runDrillId, saved.dbId, { name: data.name })
+      }
       if (targetDbId !== saved.dbId) {
+        // Promotion / re-link: update the live context only so the UI feels
+        // instant.  All DB persistence (lane-result JSON blobs, lap records,
+        // run-swimmer links) is handled by promoteAndLinkSwimmer in finalizeSave.
         const liveSwimmer = group.swimmers.find(s => s.dbId === saved.dbId)
         if (liveSwimmer) dispatch({ type: 'UPDATE_SWIMMER_DBID', payload: { groupId: group.id, swimmerId: liveSwimmer.id, dbId: targetDbId } })
       }
@@ -136,9 +139,8 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
       {lapEntries.length > 0 && (
         <div className="px-3 py-1 space-y-0.5">
           {lapEntries.map((entry, i) => {
-            const split = splits[i]
-            const prevSplit = i > 0 ? splits[i - 1] : null
-            const diff = prevSplit !== null ? split - prevSplit : null
+            const prev = i > 0 ? lapEntries[i - 1].time : null
+            const diff = prev !== null ? entry.time - prev : null
             const sc = entry.strokeCount
             return (
               <div key={i} className="flex items-center gap-1.5 text-xs font-mono tabular-nums">
@@ -149,14 +151,14 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                         const newLaps = removeLapEntry(lapEntries, i)
                         onEditSavedSwimmer(group.id, runDrillId!, saved.dbId, { laps: newLaps })
                       }}
-                      className="w-3.5 h-3.5 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
+                      className="w-3.5 h-3.5 rounded-full bg-red-500/70 text-white text-[6px] flex items-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
                   ) : (
                     <span className="w-3.5 shrink-0 inline-block" />
                   )}
                   <span className="text-on-surface-variant shrink-0">lap #{i + 1}</span>
                   <span className="text-outline-variant/40 shrink-0">|</span>
                   <span className="flex items-center gap-1">
-                    <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(split)}</span>
+                    <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(entry.time)}</span>
                     {diff !== null && (
                       <span className={`shrink-0 text-xs ${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
                         {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s

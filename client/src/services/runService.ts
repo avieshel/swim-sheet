@@ -274,6 +274,7 @@ export const runService = {
       if (!swimmerEntry) continue
 
       swimmerEntry.dbId = realDbId
+      swimmerEntry.name = name
       await upsertLaneDrillResult({ ...result, data: JSON.stringify(data) })
 
       if (swimmerEntry.laps.length > 0) {

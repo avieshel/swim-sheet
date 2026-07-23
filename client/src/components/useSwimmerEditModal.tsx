@@ -67,15 +67,16 @@ export function useSwimmerEditModal(opts: UseSwimmerEditModalOptions) {
   const finalizeSave = async (ctx: { data: SwimmerFormData; realDbId: string; selectedId?: string; currentDbId: string; editSwimmerId: string | null }) => {
     setSaving(true)
     try {
-      // Re-point the live allocation first so the UI reflects the change immediately
+      // Update the in-memory context first so the UI reflects the change immediately
       // and independently of any persistence failure.
       await opts.onApply(ctx.realDbId, ctx.data)
       if (opts.runId) {
         try {
+          // promoteAndLinkSwimmer is the sole DB-write path for promotion. It handles
+          // ALL persistence: updates laneDrillResult JSON blobs, copies laps, manages
+          // runSwimmer links, and cleans up virtual-swimmer bookkeeping in run notes.
           await promoteAndLinkSwimmer(opts.runId, ctx.currentDbId, ctx.data.name, ctx.realDbId, ctx.data.group)
-          // Ensure a run link exists at the current lane (replaces any prior allocation).
           await addSwimmerToRun(opts.runId, ctx.realDbId, opts.lane)
-          // Re-pointing an existing roster swimmer to a *different* existing one: swap the run link
           if (ctx.editSwimmerId && ctx.selectedId && ctx.selectedId !== ctx.editSwimmerId) {
             await removeSwimmerFromRun(opts.runId, ctx.editSwimmerId)
           }

@@ -273,7 +273,9 @@ describe('SavedSwimmerRow swimmer modal flows', () => {
     await waitFor(() => expect(createSwimmer).toHaveBeenCalledOnce())
     expect(createSwimmer).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
     expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', 'quick-saved', 'Bubbles II', 'new-1', '')
-    expect(savedProps.onEditSavedSwimmer).toHaveBeenCalledWith('g1', 'd1', 'quick-saved', { name: 'Bubbles II', dbId: 'new-1' })
+    // Promotion does NOT call onEditSavedSwimmer: promoteAndLinkSwimmer handles
+    // all DB persistence (lane-result JSON blobs, lap records, run-swimmer links).
+    expect(savedProps.onEditSavedSwimmer).not.toHaveBeenCalled()
   })
 
   it('edits an existing roster saved swimmer and updates their details', async () => {
@@ -300,7 +302,7 @@ describe('SavedSwimmerRow swimmer modal flows', () => {
       notes: 'updated notes',
       status: 'active',
     })
-    expect(savedProps.onEditSavedSwimmer).toHaveBeenCalledWith('g1', 'd1', 'real-1', { name: 'Alice', dbId: 'real-1' })
+    expect(savedProps.onEditSavedSwimmer).toHaveBeenCalledWith('g1', 'd1', 'real-1', { name: 'Alice' })
   })
 
   it('fires onSwimmerSaved after creating a roster swimmer from a quick saved swimmer', async () => {

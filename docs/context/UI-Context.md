@@ -172,7 +172,7 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 - Session timer auto-starts on mount via `START_SESSION_TIMER`
 
 **Lane-level controls** (in the group controls area):
-- **Start/Finish** (toggle) — Green "Start" when drill not started: `store.markGroupStart(...)` for every swimmer in the group. Red "Finish" when running: `store.batchStopSwimmers(...)` for all unfinished swimmers (writes `group-done` for each), marks them completed. Auto-save effect then persists drill data and advances to next drill.
+- **Start/Finish** (toggle) — Green "Start" when drill not started: `store.markGroupStart(...)` for every swimmer in the group. Red "Finish" when running: `store.batchStopSwimmers(...)` for all unfinished STARTED swimmers only (skips unstarted swimmers), marks them completed. Auto-save effect then persists drill data and advances to next drill.
 - **Lap/Reset** (toggle) — Blue "Lap" when drill is running (disabled when drill not started): `store.markGroupLap(...)` records a `lap::<n>` timestamp for ALL active swimmers. Outlined "Reset" when drill has been started: opens confirmation dialog, then `store.clearDrill()` resets swimmer data. When drill is completed, shows a disabled "Completed" badge.
 
 **Session lifecycle:**
@@ -187,7 +187,7 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 **Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
 - **Start** (emerald) — `store.markSwimmerStart(...)` if not already started; disabled after started.
 - **Lap** (blue) — `store.markSwimmerLap(...)` appends `lap::<n>` if swimmer has a start and no done; no-op otherwise.
-- **Finish** (primary-container tonal) — `store.markSwimmerDone(...)` if not already set; no-op otherwise. If last active swimmer in the group, also `store.batchStopSwimmers(...)` for all swimmers.
+- **Finish** (primary-container tonal) — `store.markSwimmerDone(...)` if not already set; no-op otherwise. If last active swimmer in the group, also `store.batchStopSwimmers(...)` for all swimmers (skips unstarted ones via natural guard — they count as "active" so batch stop is suppressed unless truly last).
 
 **Stroke count** is no longer a separate button. Each lap row in the swimmer card has an inline `StrokeCountStepper` with `[–]` / preset display / `[+]` controls. SC starts as `--` (unset) for every new lap. Tapping the preset button sets it to the preset value; tapping again when the value matches the preset clears it back to `--`. Stroke counts are per-lap and editable both during live timing and after saving.
 

@@ -175,7 +175,7 @@ export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
       name: sw.name,
       startedAt: lt.startedAt,
       completedAt: lt.completedAt,
-      laps: splits.map((time, i) => ({ time, strokeCount: sw.lapStrokeCounts[i + 1] ?? 0 })),
+      laps: splits.map((time, i) => ({ time, strokeCount: sw.lapStrokeCounts[i + 1] })),
       completed: sw.completed,
     }
   })

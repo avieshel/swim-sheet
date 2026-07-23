@@ -151,12 +151,18 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
 
   const handleBatchLaneStop = () => {
     if (!runId || !liveGroup.currentRunDrillId) return
+    const currentDrillId = liveGroup.currentRunDrillId
+    const started = new Set(
+      liveGroup.swimmers
+        .filter(s => s.dbId && store.getSwimmerTiming(runId, liveGroup.id, currentDrillId, s.dbId).startedAt != null)
+        .map(s => s.dbId!)
+    )
     const active = liveGroup.swimmers
-      .filter(s => s.dbId && !s.completed)
+      .filter(s => s.dbId && started.has(s.dbId) && !s.completed)
       .map(s => s.dbId!)
-    store.batchStopSwimmers(runId, liveGroup.id, liveGroup.currentRunDrillId, active, sessionElapsed)
+    store.batchStopSwimmers(runId, liveGroup.id, currentDrillId, active, sessionElapsed)
     for (const swimmer of liveGroup.swimmers) {
-      if (!swimmer.completed) {
+      if (swimmer.dbId && started.has(swimmer.dbId) && !swimmer.completed) {
         dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId: swimmer.id } })
       }
     }
@@ -716,7 +722,11 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
                 onEditSavedSwimmer={handleEditSavedSwimmer}
                 loading={!drillsLoaded}
                 rosterSwimmers={rosterSwimmers}
-                onSwimmerSaved={refreshRoster}
+                onSwimmerSaved={async () => {
+                  await refreshRoster()
+                  const refreshed = await getLaneResults(run.id)
+                  setLaneDrillResults(refreshed)
+                }}
               />
             ))}
           </div>

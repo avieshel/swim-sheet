@@ -479,5 +479,29 @@ describe('runService', () => {
         expect.objectContaining({ swimmer_id: 'real1', time: 32 })
       )
     })
+
+    it('updates swimmer name in lane drill result data', async () => {
+      mockDao.searchSwimmers.mockResolvedValue([])
+      mockDao.addSwimmer.mockResolvedValue('real2')
+      mockDao.getLaneDrillResults.mockResolvedValue([
+        {
+          id: 'lr1', run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, completed: true,
+          data: JSON.stringify({ swimmers: [{ dbId: 'synth1', name: 'Old Name', laps: [], startedAt: 1000, completedAt: 5000, completed: true }] }),
+        },
+      ])
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+      mockDao.getSessionRun.mockResolvedValue({ id: 'r1', notes: '{}' })
+      mockDao.addSwimmerToRun.mockResolvedValue(undefined)
+      mockDao.updateSessionRun.mockResolvedValue(undefined)
+
+      const result = await runService.promoteAndLinkSwimmer('r1', 'synth1', 'New Name')
+
+      expect(result).toBe('real2')
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      const saved = JSON.parse(mockUpdate.mock.calls[0][1].data)
+      expect(saved.swimmers[0].dbId).toBe('real2')
+      expect(saved.swimmers[0].name).toBe('New Name')
+    })
   })
 })
