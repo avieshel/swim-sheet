@@ -204,6 +204,7 @@ interface ActiveSwimmerRowProps {
   onStart: (swimmerId: number) => void
   onLap: (swimmerId: number) => void
   onComplete: (swimmerId: number) => void
+  onClear: (swimmerId: number, dbId: string | undefined) => void
   handleMoveSwimmer: (swimmerId: number, direction: 'up' | 'down') => void
   rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>
   onSwimmerSaved?: () => void
@@ -211,7 +212,7 @@ interface ActiveSwimmerRowProps {
   findExistingAllocation: (dbId: string) => { groupId: string; groupName: string } | null
 }
 
-export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: ActiveSwimmerRowProps) {
+export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, onClear, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: ActiveSwimmerRowProps) {
   const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
   const storeVersion = store.version
 
@@ -418,6 +419,14 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         >
           <span className="material-symbols-outlined text-label-sm">check</span>
           <span>Finish</span>
+        </button>
+        <button
+          onClick={() => onClear(swimmer.id, swimmer.dbId)}
+          disabled={startedAt == null && !swimmer.completed}
+          className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+          <span>Clear</span>
         </button>
       </div>
       {modal}

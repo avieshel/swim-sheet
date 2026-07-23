@@ -44,6 +44,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
   const [confirmClearSwimmer, setConfirmClearSwimmer] = useState<{ swimmerId: number; dbId?: string } | null>(null)
   const [lapEditMode, setLapEditMode] = useState<Record<string, boolean>>({})
   const [showAddModal, setShowAddModal] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
 
   const toggleLapEdit = (key: string) => setLapEditMode(prev => ({ ...prev, [key]: !prev[key] }))
 
@@ -73,6 +74,8 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
     return liveGroup.swimmers.some(s => s.dbId && store.getSwimmerTiming(runId, liveGroup.id, liveGroup.currentRunDrillId!, s.dbId).startedAt != null)
   })()
   const isDrillRunning = drillStarted && !isCompletedDrill
+  const allSwimmersCompleted = liveGroup.swimmers.length > 0 && liveGroup.swimmers.every(s => s.completed)
+  const showCompleted = isCompletedDrill || allSwimmersCompleted
 
   const nextDrill = currentDrillIndex >= 0 && currentDrillIndex < runDrills.length - 1
     ? runDrills[currentDrillIndex + 1]
@@ -162,7 +165,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
       .map(s => s.dbId!)
     store.batchStopSwimmers(runId, liveGroup.id, currentDrillId, active, sessionElapsed)
     for (const swimmer of liveGroup.swimmers) {
-      if (swimmer.dbId && started.has(swimmer.dbId) && !swimmer.completed) {
+      if (!swimmer.completed) {
         dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId: swimmer.id } })
       }
     }
@@ -183,17 +186,18 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
 
   const handleLapReset = () => {
     if (!runId || !liveGroup.currentRunDrillId) return
-    if (isCompletedDrill) {
+    if (showCompleted) {
       setShowResetDrillConfirm(true)
     } else if (drillStarted) {
       handleDrillLap()
     }
   }
 
-  const handleResetDrillConfirm = () => {
+  const handleResetDrillConfirm = async () => {
     if (!runId || !liveGroup.currentRunDrillId) return
     store.clearDrill(runId, liveGroup.id, liveGroup.currentRunDrillId)
     dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: liveGroup.id } })
+    await deleteLaneResultsForGroup(runId, liveGroup.id)
     onResetDrill(liveGroup.id)
     setShowResetDrillConfirm(false)
   }
@@ -220,239 +224,227 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
             <span className="material-symbols-outlined text-xs">edit</span>
           </button>
         </div>
+        <button onClick={() => setCollapsed(!collapsed)}
+          className="h-6 w-6 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer"
+          title={collapsed ? 'Show swimmers' : 'Hide swimmers'}>
+          <span className="material-symbols-outlined text-xs">{collapsed ? 'expand_more' : 'expand_less'}</span>
+        </button>
       </div>
 
-      {/* Group-Level Controls + Timer */}
-      <div className="mb-4 p-4 rounded-xl bg-surface-container">
-        <div className="group-controls-row flex">
-          <div className="font-display-timer text-[clamp(1.5rem,6vw,2.6rem)] text-on-surface tabular-nums tracking-tight">
-            {isCompletedDrill ? formatTime(savedData?.drillEnd != null && savedData?.drillStart != null ? savedData.drillEnd - savedData.drillStart : 0) : formatTime(drillDuration)}
-          </div>
-          <div className="group-buttons-row flex gap-1.5">
-            {isCompletedDrill ? (
-              <button disabled className="flex items-center gap-1 h-10 md:h-11 px-4 md:px-5 rounded-full text-sm font-bold bg-disabled text-on-disabled cursor-not-allowed">
-                <span className="material-symbols-outlined text-base">check_circle</span>
-                Completed
-              </button>
-            ) : (
-              <button
-                onClick={handleStartFinish}
-                className={`flex items-center gap-1 h-10 md:h-11 px-4 md:px-5 rounded-full text-sm font-bold transition-all cursor-pointer shadow-md ${
-                  isDrillRunning
-                    ? 'bg-red-600 text-white hover:brightness-110 active:scale-95'
-                    : 'bg-emerald-600 text-white hover:brightness-110 active:scale-95'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {isDrillRunning ? 'stop' : 'play_arrow'}
-                </span>
-                {isDrillRunning ? 'Finish' : 'Start'}
-              </button>
-            )}
-
-            {isCompletedDrill ? (
-              <button
-                onClick={handleLapReset}
-                className="flex items-center gap-1 h-10 md:h-11 px-4 md:px-5 rounded-full text-sm font-bold transition-all cursor-pointer border-2 border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 shadow-md"
-              >
-                <span className="material-symbols-outlined text-base">restart_alt</span>
-                Reset
-              </button>
-            ) : (
-              <button
-                onClick={handleLapReset}
-                disabled={!drillStarted}
-                className={`flex items-center gap-1 h-10 md:h-11 px-4 md:px-5 rounded-full text-sm font-bold transition-all cursor-pointer shadow-md ${
-                  !drillStarted
-                    ? 'bg-disabled text-on-disabled cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:brightness-110 active:scale-95'
-                }`}
-              >
-                <span className="material-symbols-outlined text-base">flag</span>
-                Lap
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Current Drill */}
-      {loading ? (
-        <div className="mb-3 p-4 rounded-xl border border-outline-variant/20 bg-surface-container-low">
-          <div className="space-y-2">
+      {/* Drill Card */}
+      <div className={`mb-3 rounded-xl border overflow-hidden ${showCompleted ? 'border-emerald-500/30 bg-emerald-50/30' : 'border-outline-variant/20 bg-surface-container-low'}`}>
+        {loading ? (
+          <div className="p-4 space-y-3">
             <div className="h-4 w-1/3 bg-surface-variant rounded animate-pulse" />
             <div className="h-5 w-2/3 bg-surface-variant rounded animate-pulse" />
+            <div className="h-10 w-full bg-surface-variant rounded-lg animate-pulse" />
+            <div className="h-32 w-full bg-surface-variant rounded-lg animate-pulse" />
           </div>
-        </div>
-      ) : currentDrillIndex >= 0 ? (
-        <div className={`mb-3 p-4 rounded-xl border ${isCompletedDrill ? 'bg-emerald-50 border-emerald-200' : 'bg-surface-container-low border-outline-variant/20'}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="text-label-caps text-on-surface-variant mb-0.5">
-                Drill {currentDrillIndex + 1} of {runDrills.length}
+        ) : currentDrillIndex >= 0 ? (
+          <>
+            {/* Header: drill info + timer */}
+            <div className="flex items-start justify-between gap-3 p-4 pb-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-label-caps text-on-surface-variant mb-0.5">
+                  Drill {currentDrillIndex + 1} of {runDrills.length}
+                </div>
+                <div className="font-bold text-on-surface text-sm md:text-base truncate flex items-center gap-2">
+                  {baseDrill?.name}
+                  {showCompleted && (
+                    <span className="text-emerald-600 flex items-center gap-0.5 text-label-sm">
+                      <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      Complete
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="font-bold text-on-surface text-sm md:text-base truncate flex items-center gap-2">{baseDrill?.name}
-                <span className={`text-emerald-600 font-bold flex items-center gap-0.5 text-label-sm ${isCompletedDrill ? '' : 'invisible'}`}><span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span> Complete</span>
+              <div className="font-display-timer text-xl md:text-2xl tabular-nums tracking-tight text-on-surface leading-none shrink-0">
+                {isCompletedDrill ? formatTime(savedData?.drillEnd != null && savedData?.drillStart != null ? savedData.drillEnd - savedData.drillStart : 0) : formatTime(drillDuration)}
               </div>
             </div>
-            <div className="flex gap-1 shrink-0 items-start">
+
+            {/* Next Drill Preview */}
+            {nextDrill && (
+              <>
+                <hr className="border-outline-variant/20 mx-3" />
+                <div className="px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-label-caps text-on-surface-variant mb-0.5">Next</div>
+                      <div className="font-medium text-sm text-on-surface truncate">{nextDrill.name}</div>
+                      <div className="text-xs text-on-surface-variant">{nextDrill.distance}m {nextDrill.stroke}</div>
+                    </div>
+                    <button onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: nextDrill.id } })}
+                      className="h-7 px-3 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ml-2">
+                      Go to drill
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Controls */}
+            <hr className="border-outline-variant/20 mx-3" />
+            <div className="px-3 py-2 flex gap-1.5 justify-center">
+              {showCompleted ? (
+                <button disabled className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+                  <span className="material-symbols-outlined text-label-sm">check_circle</span>
+                  Completed
+                </button>
+              ) : (
+                <button
+                  onClick={handleStartFinish}
+                  className={`flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer shrink-0 ${
+                    isDrillRunning
+                      ? 'bg-red-600 text-white hover:brightness-110 active:scale-95'
+                      : 'bg-emerald-600 text-white hover:brightness-110 active:scale-95'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-label-sm">{isDrillRunning ? 'stop' : 'play_arrow'}</span>
+                  {isDrillRunning ? 'Finish Drill' : 'Start Drill'}
+                </button>
+              )}
+
+              {showCompleted ? (
+                <button
+                  onClick={handleLapReset}
+                  className="flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 shrink-0"
+                >
+                  <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+                  Reset
+                </button>
+              ) : (
+                <button
+                  onClick={handleLapReset}
+                  disabled={!drillStarted}
+                  className={`flex items-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer shrink-0 ${
+                    !drillStarted
+                      ? 'bg-disabled text-on-disabled cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:brightness-110 active:scale-95'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-label-sm">flag</span>
+                  Lap
+                </button>
+              )}
+            </div>
+          </>
+        ) : runDrills.length > 0 ? (
+          <div className="p-4">
+            <div className="text-label-caps text-on-surface-variant mb-2">Select a drill</div>
+            <div className="space-y-1">
+              {runDrills.map((d, idx) => (
+                <button key={d.id} onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: d.id } })}
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm bg-surface-container-lowest hover:bg-primary-container/30 transition-colors cursor-pointer border border-outline-variant/20">
+                  <span className="tabular-nums font-semibold text-on-surface-variant mr-1.5">{idx + 1}.</span>
+                  <span className="text-on-surface">{d.name}</span>
+                  <span className="ml-1.5 text-on-surface-variant">({d.distance}m {d.stroke})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 text-center">
+            <p className="text-sm text-on-surface-variant">No drills in this session.</p>
+          </div>
+        )}
+      </div>
+
+      {!collapsed && (
+        <>
+          {/* Drill Navigation */}
+          {currentDrillIndex >= 0 && (
+            <div className="flex items-center justify-center gap-3 mb-3">
               <button onClick={() => { const prev = runDrills[currentDrillIndex - 1]; if (prev) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: prev.id } }) }}
                 disabled={currentDrillIndex <= 0}
                 className="h-8 w-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/40 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
                 <span className="material-symbols-outlined text-base">chevron_left</span>
               </button>
-              <button onClick={() => { const next = runDrills[currentDrillIndex + 1]; if (next) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: next.id } }) }}
+              <span className="text-label-sm text-on-surface-variant tabular-nums">
+                Drill {currentDrillIndex + 1} / {runDrills.length}
+              </span>
+              <button onClick={() => { const nxt = runDrills[currentDrillIndex + 1]; if (nxt) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: nxt.id } }) }}
                 disabled={currentDrillIndex < 0 || currentDrillIndex >= runDrills.length - 1}
                 className="h-8 w-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
                 <span className="material-symbols-outlined text-base">chevron_right</span>
               </button>
             </div>
-          </div>
-        </div>
-      ) : runDrills.length > 0 ? (
-        <div className="mb-3 p-4 rounded-xl border border-dashed border-primary/30 bg-surface-container-low">
-          <div className="text-label-caps text-on-surface-variant mb-2">Select a drill</div>
-          <div className="space-y-1">
-            {runDrills.map((d, idx) => (
-              <button key={d.id} onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: d.id } })}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm bg-surface-container-lowest hover:bg-primary-container/30 transition-colors cursor-pointer border border-outline-variant/20">
-                <span className="tabular-nums font-semibold text-on-surface-variant mr-1.5">{idx + 1}.</span>
-                <span className="text-on-surface">{d.name}</span>
-                <span className="ml-1.5 text-on-surface-variant">({d.distance}m {d.stroke})</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-3 p-4 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/20 text-center">
-          <p className="text-sm text-on-surface-variant">No drills in this session.</p>
-        </div>
-      )}
+          )}
 
-      {/* Next Drill Preview */}
-      {loading ? (
-        <div className="mb-3 p-3 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/40">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 space-y-1.5">
-              <div className="h-3 w-12 bg-surface-variant rounded animate-pulse" />
-              <div className="h-4 w-2/3 bg-surface-variant rounded animate-pulse" />
-            </div>
-            <div className="h-7 w-20 bg-surface-variant rounded-full animate-pulse shrink-0 ml-2" />
+          {/* Swimmers */}
+          <div className="space-y-2 mb-3">
+            {isCompletedDrill && savedData ? (
+              savedData.swimmers?.map((saved: SavedSwimmerData, idx: number) => (
+                <SavedSwimmerRow
+                  key={idx}
+                  saved={saved}
+                  savedData={savedData}
+                  group={liveGroup}
+                  runId={runId}
+                  runDrillId={liveGroup.currentRunDrillId}
+                  sessionElapsed={sessionElapsed}
+                  lapEditMode={lapEditMode}
+                  toggleLapEdit={toggleLapEdit}
+                  onEditSavedSwimmer={onEditSavedSwimmer}
+                  rosterSwimmers={rosterSwimmers}
+                  onSwimmerSaved={onSwimmerSaved}
+                  currentGroupId={liveGroup.id}
+                  findExistingAllocation={findExistingAllocation}
+                />
+              ))
+            ) : (
+              liveGroup.swimmers.map((swimmer, idx) => (
+                <ActiveSwimmerRow
+                  key={swimmer.id}
+                  swimmer={swimmer}
+                  group={liveGroup}
+                  idx={idx}
+                  runId={runId}
+                  drillId={liveGroup.currentRunDrillId}
+                  onStart={handleSwimmerStart}
+                  onLap={handleSwimmerLap}
+                  onComplete={handleSwimmerComplete}
+                  onClear={(swimmerId, dbId) => setConfirmClearSwimmer({ swimmerId, dbId })}
+                  handleMoveSwimmer={handleMoveSwimmer}
+                  rosterSwimmers={rosterSwimmers}
+                  onSwimmerSaved={onSwimmerSaved}
+                  currentGroupId={liveGroup.id}
+                  findExistingAllocation={findExistingAllocation}
+                />
+              ))
+            )}
           </div>
-        </div>
-      ) : currentDrillIndex >= 0 && nextDrill ? (
-        <div className="mb-3 p-3 rounded-xl bg-surface-container-low border border-dashed border-outline-variant/40">
-          <div className="text-label-caps text-on-surface-variant mb-0.5">Next</div>
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="font-medium text-sm text-on-surface truncate">{nextDrill.name}</div>
-              <div className="text-xs text-on-surface-variant">{nextDrill.distance}m {nextDrill.stroke}</div>
-            </div>
-            <button onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: nextDrill.id } })}
-              className="h-7 px-3 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ml-2">
-              Go to drill
+
+          {/* Add swimmer */}
+          <div className="mb-3 flex gap-2">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex-1 py-2.5 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">add</span>
+              Add Swimmer
+            </button>
+            <button
+              onClick={() => {
+                const randomName = listTempSwimmerNames()[Math.floor(Math.random() * listTempSwimmerNames().length)]
+                const quickDbId = `quick-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+                dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: randomName, dbId: quickDbId } })
+              }}
+              title="Add a temporary (unregistered) swimmer"
+              className="py-2.5 px-3 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-base">casino</span>
+              Temp Swimmer
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {/* Swimmers */}
-      <div className="space-y-2 mb-3">
-        {loading ? (
-          Array.from({ length: Math.max(1, liveGroup.swimmers.length || 1) }).map((_, i) => (
-            <div key={i} className="bg-surface-container rounded-xl border border-outline-variant/20 h-[188px] animate-pulse">
-              <div className="p-3 h-full flex flex-col gap-1">
-                <div className="flex gap-3 flex-1">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-surface-variant shrink-0" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-4 w-24 bg-surface-variant rounded" />
-                      <div className="h-5 w-16 bg-surface-variant rounded" />
-                    </div>
-                  </div>
-                  <div className="w-1/2 flex flex-col gap-1">
-                    <div className="h-3 w-12 bg-surface-variant rounded ml-auto" />
-                    <div className="h-4 w-20 bg-surface-variant rounded ml-auto" />
-                  </div>
-                </div>
-                <div className="h-px bg-outline-variant/20" />
-                <div className="flex gap-1 justify-center">
-                  {Array.from({ length: 4 }).map((_, bi) => (
-                    <div key={bi} className="h-7 w-14 bg-surface-variant rounded-full" />
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))
-        ) : isCompletedDrill && savedData ? (
-          savedData.swimmers?.map((saved: SavedSwimmerData, idx: number) => (
-            <SavedSwimmerRow
-              key={idx}
-              saved={saved}
-              savedData={savedData}
-              group={liveGroup}
-              runId={runId}
-              runDrillId={liveGroup.currentRunDrillId}
-              sessionElapsed={sessionElapsed}
-              lapEditMode={lapEditMode}
-              toggleLapEdit={toggleLapEdit}
-              onEditSavedSwimmer={onEditSavedSwimmer}
-              rosterSwimmers={rosterSwimmers}
-              onSwimmerSaved={onSwimmerSaved}
-              currentGroupId={liveGroup.id}
-              findExistingAllocation={findExistingAllocation}
-            />
-          ))
-        ) : (
-          liveGroup.swimmers.map((swimmer, idx) => (
-            <ActiveSwimmerRow
-              key={swimmer.id}
-              swimmer={swimmer}
-              group={liveGroup}
-              idx={idx}
-              runId={runId}
-              drillId={liveGroup.currentRunDrillId}
-              onStart={handleSwimmerStart}
-              onLap={handleSwimmerLap}
-              onComplete={handleSwimmerComplete}
-              handleMoveSwimmer={handleMoveSwimmer}
-              rosterSwimmers={rosterSwimmers}
-              onSwimmerSaved={onSwimmerSaved}
-              currentGroupId={liveGroup.id}
-              findExistingAllocation={findExistingAllocation}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Add swimmer */}
-      <div className="mb-3 flex gap-2">
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex-1 py-2.5 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-base">add</span>
-          Add Swimmer
-        </button>
-        <button
-          onClick={() => {
-            const randomName = listTempSwimmerNames()[Math.floor(Math.random() * listTempSwimmerNames().length)]
-            const quickDbId = `quick-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-            dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: randomName, dbId: quickDbId } })
-          }}
-          title="Add a temporary (unregistered) swimmer"
-          className="py-2.5 px-3 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-base">casino</span>
-          Temp Swimmer
-        </button>
-      </div>
+        </>
+      )}
 
       <ConfirmDialog
         open={confirmClearSwimmer !== null}
-        title="Reset swimmer timing?"
+        title="Clear swimmer?"
         message="Clear this swimmer's offsets, laps, and timing data for the current drill?"
-        confirmLabel="Reset"
+        confirmLabel="Clear"
         cancelLabel="Cancel"
         destructive={true}
         onConfirm={() => {
@@ -475,7 +467,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
       <ConfirmDialog
         open={showResetDrillConfirm}
         title="Reset drill?"
-        message={`Clear all timing data for this drill? Swimmers will return to the not-started state.`}
+        message={`Reset all timing data for this drill? Swimmers will return to the not-started state.`}
         confirmLabel="Reset"
         cancelLabel="Cancel"
         destructive={true}
