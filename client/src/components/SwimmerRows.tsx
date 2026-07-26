@@ -23,10 +23,10 @@ function StrokeCountStepper({ value, onChange }: {
         {preset}
       </button>
       <span className="w-px h-4 bg-outline-variant/30 mx-0.5" />
-      <button onClick={() => setPreset(p => Math.max(0, p - 1))}
-        className="w-5 h-5 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none">–</button>
-      <button onClick={() => setPreset(p => p + 1)}
-        className="w-5 h-5 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none">+</button>
+<button onClick={() => setPreset(p => Math.max(0, p - 1))}
+         className="h-9 w-9 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none">–</button>
+       <button onClick={() => setPreset(p => p + 1)}
+         className="h-9 w-9 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none">+</button>
     </span>
   )
 }
@@ -107,11 +107,11 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
           >
             {saved.name}
           </button>
-          <span className="shrink-0 text-label-caps text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">Saved</span>
+          <span className="shrink-0 text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Saved</span>
         </div>
         <div className="flex items-start gap-1.5 shrink-0">
           <div className="flex flex-col items-start">
-            <div className="font-display-timer text-xl md:text-2xl tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
+            <div className="font-display-timer text-display-timer tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
             {goOffset != null && goOffset > 0 && (
               <span className="font-mono text-label-sm tabular-nums text-on-surface-variant flex items-center gap-0.5 mt-0.5">
                 (+{(goOffset / 1000).toFixed(2)}s)
@@ -125,7 +125,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                         onEditSavedSwimmer(group.id, runDrillId!, entry.dbId, { laps: adjustedLaps, startedAt: undefined })
                       }
                     }}
-                    className="w-3 h-3 rounded-full bg-red-500/70 text-white text-[6px] flex items-center justify-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
+                    className="h-9 w-9 rounded-full bg-error/70 text-on-error text-[6px] flex items-center justify-center leading-none hover:bg-error transition-colors shrink-0">✕</button>
                 )}
               </span>
             )}
@@ -152,7 +152,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                         const newLaps = removeLapEntry(lapEntries, i)
                         onEditSavedSwimmer(group.id, runDrillId!, saved.dbId, { laps: newLaps })
                       }}
-                      className="w-3.5 h-3.5 rounded-full bg-red-500/70 text-white text-[6px] flex items-center leading-none hover:bg-red-500 transition-colors shrink-0">✕</button>
+                      className="h-9 w-9 rounded-full bg-error/70 text-on-error text-[6px] flex items-center leading-none hover:bg-error transition-colors shrink-0">✕</button>
                   ) : (
                     <span className="w-3.5 shrink-0 inline-block" />
                   )}
@@ -161,7 +161,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                   <span className="flex items-center gap-1">
                     <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(entry.time)}</span>
                     {diff !== null && (
-                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
+                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
                         {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
                       </span>
                     )}
@@ -194,20 +194,20 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
       {/* Control bar — disabled; maintains layout stability vs ActiveSwimmerRow */}
       <hr className="border-outline-variant/20 mx-3" />
       <div className="px-3 py-2 flex gap-1.5 justify-center">
-        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
           <span className="material-symbols-outlined text-label-sm">play_arrow</span>
           <span>Start</span>
         </button>
-        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
           <span className="material-symbols-outlined text-label-sm">flag</span>
           <span>Lap</span>
         </button>
-        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
           <span className="material-symbols-outlined text-label-sm">check</span>
           <span>Finish</span>
         </button>
         <button onClick={() => onClearSavedSwimmer?.(saved.dbId)}
-          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
+          className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
           <span className="material-symbols-outlined text-label-sm">restart_alt</span>
           <span>Clear</span>
         </button>
@@ -325,14 +325,14 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
       <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-1.5">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <div className="flex flex-col gap-px shrink-0">
-            <button onClick={() => handleMoveSwimmer(swimmer.id, 'up')} disabled={idx === 0}
-              className="h-3.5 w-3.5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
-              <span className="material-symbols-outlined text-caption">keyboard_arrow_up</span>
-            </button>
-            <button onClick={() => handleMoveSwimmer(swimmer.id, 'down')} disabled={idx >= group.swimmers.length - 1}
-              className="h-3.5 w-3.5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
-              <span className="material-symbols-outlined text-caption">keyboard_arrow_down</span>
-            </button>
+<button onClick={() => handleMoveSwimmer(swimmer.id, 'up')} disabled={idx === 0}
+                className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
+                <span className="material-symbols-outlined text-base">keyboard_arrow_up</span>
+              </button>
+              <button onClick={() => handleMoveSwimmer(swimmer.id, 'down')} disabled={idx >= group.swimmers.length - 1}
+                className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
+                <span className="material-symbols-outlined text-base">keyboard_arrow_down</span>
+              </button>
           </div>
           <div className="flex items-center gap-1 min-w-0">
             <button
@@ -348,25 +348,25 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
               </span>
             )}
           </div>
-          {swimmer.completed && !isVirtual && (
-            <span className="shrink-0 text-label-caps text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full">Done</span>
-          )}
+{swimmer.completed && !isVirtual && (
+             <span className="shrink-0 text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Done</span>
+           )}
         </div>
         <div className="flex items-start gap-1.5 shrink-0">
           <div className="flex flex-col items-start">
-            <div className="font-display-timer text-xl md:text-2xl tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
+            <div className="font-display-timer text-display-timer tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
             {goOffset != null && goOffset > 0 && (
               <span className="font-mono text-label-sm tabular-nums text-on-surface-variant mt-0.5">(+{(goOffset / 1000).toFixed(2)}s)</span>
             )}
           </div>
           {canRemove && (
-            <button
-              onClick={() => dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: group.id, swimmerId: swimmer.id } })}
-              className="h-6 w-6 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all cursor-pointer -mr-1"
-              title="Remove swimmer"
-            >
-              <span className="material-symbols-outlined text-sm">close</span>
-            </button>
+<button
+                onClick={() => dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: group.id, swimmerId: swimmer.id } })}
+                className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all cursor-pointer -mr-1"
+                title="Remove swimmer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
           )}
         </div>
       </div>
@@ -388,7 +388,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
                   <span className="flex items-center gap-1">
                     <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(split)}</span>
                     {diff !== null && (
-                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-red-500' : diff < -10 ? 'text-emerald-500' : 'text-on-surface-variant'}`}>
+                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
                         {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
                       </span>
                     )}
@@ -424,7 +424,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         <button
           onClick={() => onStart(swimmer.id)}
           disabled={hasIndividualStart || swimmer.completed}
-          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-emerald-600 text-white hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+          className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary text-on-primary hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <span className="material-symbols-outlined text-label-sm">play_arrow</span>
           <span>Start</span>
@@ -432,7 +432,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         <button
           onClick={() => onLap(swimmer.id)}
           disabled={swimmer.completed}
-          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-blue-600 text-white hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+          className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary text-on-primary hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <span className="material-symbols-outlined text-label-sm">flag</span>
           <span>Lap</span>
@@ -440,7 +440,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         <button
           onClick={() => onComplete(swimmer.id)}
           disabled={swimmer.completed}
-          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+          className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <span className="material-symbols-outlined text-label-sm">check</span>
           <span>Finish</span>
@@ -448,7 +448,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         <button
           onClick={() => onClear(swimmer.id, swimmer.dbId)}
           disabled={startedAt == null && !swimmer.completed}
-          className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <span className="material-symbols-outlined text-label-sm">restart_alt</span>
           <span>Clear</span>

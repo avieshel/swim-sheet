@@ -220,7 +220,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
   }
 
   return (
-    <div className={`rounded-2xl p-3 sm:p-4 lg:p-5 transition-all bg-surface-container-lowest border shadow-sm container-type-inline ${isCompletedDrill ? 'border-emerald-500/30' : sessionRunning ? 'border-primary shadow-lg shadow-primary/10' : 'border-outline-variant'}`}>
+    <div className={`rounded-2xl p-3 sm:p-4 lg:p-5 transition-all bg-surface-container-lowest border shadow-sm container-type-inline ${isCompletedDrill ? 'border-primary/40' : sessionRunning ? 'border-primary shadow-lg shadow-primary/10' : 'border-outline-variant'}`}>
       {/* Group Header */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
@@ -229,19 +229,19 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
             L{liveGroup.lane}
           </span>
           <button onClick={() => onAddSwimmer(liveGroup.id)}
-            className="h-6 w-6 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer ml-1">
-            <span className="material-symbols-outlined text-xs">edit</span>
+            className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer ml-1">
+            <span className="material-symbols-outlined text-sm">edit</span>
           </button>
         </div>
-        <button onClick={() => setCollapsed(!collapsed)}
-          className="h-6 w-6 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer"
-          title={collapsed ? 'Show swimmers' : 'Hide swimmers'}>
-          <span className="material-symbols-outlined text-xs">{collapsed ? 'expand_more' : 'expand_less'}</span>
-        </button>
+<button onClick={() => setCollapsed(!collapsed)}
+            className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer"
+            title={collapsed ? 'Show swimmers' : 'Hide swimmers'}>
+            <span className="material-symbols-outlined text-sm">{collapsed ? 'expand_more' : 'expand_less'}</span>
+          </button>
       </div>
 
       {/* Drill Card */}
-      <div className={`mb-3 rounded-xl border overflow-hidden ${showCompleted ? 'border-emerald-500/30 bg-emerald-50/30' : 'border-outline-variant/20 bg-surface-container-low'}`}>
+      <div className={`mb-3 rounded-xl border overflow-hidden ${showCompleted ? 'border-primary/40 bg-primary-container/15' : 'border-outline-variant/20 bg-surface-container-low'}`}>
         {loading ? (
           <div className="p-4 space-y-3">
             <div className="h-4 w-1/3 bg-surface-variant rounded animate-pulse" />
@@ -260,14 +260,14 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                 <div className="font-bold text-on-surface text-sm md:text-base truncate flex items-center gap-2">
                   {baseDrill?.name}
                   {showCompleted && (
-                    <span className="text-emerald-600 flex items-center gap-0.5 text-label-sm">
+                    <span className="text-primary flex items-center gap-0.5 text-label-sm">
                       <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
                       Complete
                     </span>
                   )}
                 </div>
               </div>
-              <div className="font-display-timer text-xl md:text-2xl tabular-nums tracking-tight text-on-surface leading-none shrink-0">
+              <div className="font-display-timer text-display-timer tabular-nums tracking-tight text-on-surface leading-none shrink-0">
                 {isCompletedDrill ? formatTime(savedData?.drillEnd != null && savedData?.drillStart != null ? savedData.drillEnd - savedData.drillStart : 0) : formatTime(drillDuration)}
               </div>
             </div>
@@ -284,7 +284,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                       <div className="text-xs text-on-surface-variant">{nextDrill.distance}m {nextDrill.stroke}</div>
                     </div>
                     <button onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: nextDrill.id } })}
-                      className="h-7 px-3 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ml-2">
+                      className="<h-11 px-4 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ml-2">
                       Go to drill
                     </button>
                   </div>
@@ -296,18 +296,18 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
             <hr className="border-outline-variant/20 mx-3" />
             <div className="px-3 py-2 flex gap-1.5 justify-center">
               {showCompleted ? (
-                <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold bg-disabled text-on-disabled cursor-not-allowed">
+                <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
                   <span className="material-symbols-outlined text-label-sm">check_circle</span>
                   Completed
                 </button>
               ) : (
                 <button
                   onClick={handleStartFinish}
-                  className={`flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
-                    isDrillRunning
-                      ? 'bg-red-600 text-white hover:brightness-110'
-                      : 'bg-emerald-600 text-white hover:brightness-110'
-                  }`}
+className={`flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
+                     isDrillRunning
+                       ? 'bg-error text-on-error hover:brightness-110'
+                       : 'bg-primary text-on-primary hover:brightness-110'
+                   }`}
                 >
                   <span className="material-symbols-outlined text-label-sm">{isDrillRunning ? 'stop' : 'play_arrow'}</span>
                   {isDrillRunning ? 'Finish Drill' : 'Start Drill'}
@@ -317,7 +317,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
               {showCompleted ? (
                 <button
                   onClick={handleLapReset}
-                  className="flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant"
+                  className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant"
                 >
                   <span className="material-symbols-outlined text-label-sm">restart_alt</span>
                   Reset
@@ -326,11 +326,11 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                 <button
                   onClick={handleLapReset}
                   disabled={!drillStarted}
-                  className={`flex-1 flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
-                    !drillStarted
-                      ? 'bg-disabled text-on-disabled cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:brightness-110'
-                  }`}
+className={`flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
+                     !drillStarted
+                       ? 'bg-disabled text-on-disabled cursor-not-allowed'
+                       : 'bg-primary text-on-primary hover:brightness-110'
+                   }`}
                 >
                   <span className="material-symbols-outlined text-label-sm">flag</span>
                   Lap
@@ -366,16 +366,16 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
             <div className="flex items-center justify-center gap-3 mb-3">
               <button onClick={() => { const prev = runDrills[currentDrillIndex - 1]; if (prev) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: prev.id } }) }}
                 disabled={currentDrillIndex <= 0}
-                className="h-8 w-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/40 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-base">chevron_left</span>
+                className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/40 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
+                <span className="material-symbols-outlined text-lg">chevron_left</span>
               </button>
               <span className="text-label-sm text-on-surface-variant tabular-nums">
                 Drill {currentDrillIndex + 1} / {runDrills.length}
               </span>
               <button onClick={() => { const nxt = runDrills[currentDrillIndex + 1]; if (nxt) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: nxt.id } }) }}
                 disabled={currentDrillIndex < 0 || currentDrillIndex >= runDrills.length - 1}
-                className="h-8 w-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-base">chevron_right</span>
+                className="h-11 w-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
+                <span className="material-symbols-outlined text-lg">chevron_right</span>
               </button>
             </div>
           )}
@@ -662,8 +662,8 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
           <div className="flex items-center gap-2 mb-1">
             <h2 className="font-headline-md text-on-surface truncate">{templateName}</h2>
             {sessionRunning ? (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-label-caps">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-container/40 text-primary text-label-caps">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                 Live
               </span>
             ) : (
@@ -672,7 +672,7 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
                 Not started
               </span>
             )}
-            <span className={`font-display-timer text-lg tabular-nums leading-none ${sessionRunning ? 'text-on-surface' : 'text-on-surface-variant/50'}`}>
+            <span className={`font-display-timer text-display-timer tabular-nums leading-none ${sessionRunning ? 'text-on-surface' : 'text-on-surface-variant/60'}`}>
               {formatSessionTime(sessionElapsed)}
             </span>
           </div>
@@ -716,36 +716,36 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
           <div className="flex items-center gap-1.5">
               <button
                 onClick={() => dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })}
-                className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
+className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
                   sessionRunning
-                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    : 'bg-emerald-600 text-white hover:brightness-110'
+                    ? 'bg-primary-container text-on-primary-container hover:brightness-95'
+                    : 'bg-primary text-on-primary hover:brightness-110'
                 }`}
               >
                 <span className="material-symbols-outlined text-label-sm">{sessionRunning ? 'pause' : 'play_arrow'}</span>
                 {sessionRunning ? 'Pause' : sessionElapsed > 0 ? 'Resume' : 'Start'}
               </button>
               <button onClick={handleComplete}
-                className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 bg-primary-container text-on-primary-container hover:brightness-95">
+                className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 bg-primary-container text-on-primary-container hover:brightness-95">
                 <span className="material-symbols-outlined text-label-sm">stop</span>
                 Complete
               </button>
               <button onClick={() => setShowResetSessionConfirm(true)}
-                className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-7 md:h-8 px-2 md:px-3 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
+                className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
                 <span className="material-symbols-outlined text-label-sm">restart_alt</span>
                 Reset
               </button>
           </div>
           <div className="flex items-center gap-1.5">
             <button onClick={() => { setEditorScrollToLane(null); setShowLaneEditor(true) }}
-              className="h-7 px-1.5 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-0.5 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-[11px]">
-              <span className="material-symbols-outlined text-xs">group</span>
-              Lane Swimmers
-            </button>
-            <button onClick={() => navigate(`/sessions/${run.session_id}`)}
-              className="h-7 px-1.5 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-0.5 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-[11px]">
-              <span className="material-symbols-outlined text-xs">edit_square</span>
-              Edit Session
+                className="h-11 px-3 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-1 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-label-sm">
+                <span className="material-symbols-outlined text-sm">group</span>
+                Lane Swimmers
+              </button>
+              <button onClick={() => navigate(`/sessions/${run.session_id}`)}
+                className="h-11 px-3 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-1 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-label-sm">
+                <span className="material-symbols-outlined text-sm">edit_square</span>
+                Edit Session
             </button>
           </div>
         </div>
