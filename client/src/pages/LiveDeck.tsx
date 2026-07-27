@@ -257,7 +257,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                 <div className="text-label-caps text-on-surface-variant mb-0.5">
                   Drill {currentDrillIndex + 1} of {runDrills.length}
                 </div>
-                <div className="font-bold text-on-surface text-sm md:text-base truncate flex items-center gap-2">
+                <div className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate flex items-center gap-2">
                   {baseDrill?.name}
                   {showCompleted && (
                     <span className="text-primary flex items-center gap-0.5 text-label-sm">
@@ -267,7 +267,7 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                   )}
                 </div>
               </div>
-              <div className="font-display-timer text-display-timer tabular-nums tracking-tight text-on-surface leading-none shrink-0">
+              <div className="font-display-timer text-headline-lg tabular-nums tracking-tight text-on-surface leading-none shrink-0">
                 {isCompletedDrill ? formatTime(savedData?.drillEnd != null && savedData?.drillStart != null ? savedData.drillEnd - savedData.drillStart : 0) : formatTime(drillDuration)}
               </div>
             </div>
@@ -279,9 +279,9 @@ function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onComplet
                 <div className="px-4 py-3">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
-                      <div className="text-label-caps text-on-surface-variant mb-0.5">Next</div>
-                      <div className="font-medium text-sm text-on-surface truncate">{nextDrill.name}</div>
-                      <div className="text-xs text-on-surface-variant">{nextDrill.distance}m {nextDrill.stroke}</div>
+                    <div className="text-label-caps text-on-surface-variant mb-0.5">Next</div>
+                    <div className="font-medium text-base text-on-surface truncate">{nextDrill.name}</div>
+                    <div className="text-label-sm text-on-surface-variant">{nextDrill.distance}m {nextDrill.stroke}</div>
                     </div>
                     <button onClick={() => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId: nextDrill.id } })}
                       className="<h-11 px-4 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ml-2">

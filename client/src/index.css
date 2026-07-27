@@ -274,6 +274,13 @@ body {
   letter-spacing: var(--text-display-timer--letter-spacing, normal);
 }
 
+.text-display-timer {
+  font-size: var(--text-display-timer);
+  line-height: var(--text-display-timer--line-height);
+  font-weight: var(--text-display-timer--font-weight);
+  letter-spacing: var(--text-display-timer--letter-spacing, normal);
+}
+
 @container (min-width: 400px) {
   .group-controls-row {
     flex-direction: row;

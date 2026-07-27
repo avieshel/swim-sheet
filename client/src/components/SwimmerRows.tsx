@@ -1,6 +1,7 @@
 import React, { useContext, useMemo, useState } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
 import { timestampSplits, removeLapEntry, updateStrokeCount } from '../utils/lapEditing'
+import { K } from '../timing/timestampStore'
 import { formatTime } from '../utils/formatTime'
 import { useSwimmerEditModal } from './useSwimmerEditModal'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
@@ -14,7 +15,7 @@ function StrokeCountStepper({ value, onChange }: {
   return (
     <span className="inline-flex items-center gap-0.5 select-none">
       <button onClick={() => onChange(value === preset ? undefined : preset)}
-        className={`h-5 px-1.5 rounded text-xs font-mono font-bold transition-all cursor-pointer leading-none ${
+        className={`h-10 px-3 rounded text-sm font-mono font-bold transition-all cursor-pointer leading-none ${
           value === preset
             ? 'bg-primary text-on-primary shadow-xs'
             : 'bg-surface-variant text-on-surface-variant hover:bg-primary-container/60'
@@ -22,11 +23,11 @@ function StrokeCountStepper({ value, onChange }: {
       >
         {preset}
       </button>
-      <span className="w-px h-4 bg-outline-variant/30 mx-0.5" />
-<button onClick={() => setPreset(p => Math.max(0, p - 1))}
-         className="h-9 w-9 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none">–</button>
-       <button onClick={() => setPreset(p => p + 1)}
-         className="h-9 w-9 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-xs font-bold leading-none">+</button>
+      <span className="w-px h-5 bg-outline-variant/30 mx-0.5" />
+      <button onClick={() => setPreset(p => Math.max(0, p - 1))}
+        className="h-10 w-10 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-sm font-bold leading-none">–</button>
+      <button onClick={() => setPreset(p => p + 1)}
+        className="h-10 w-10 rounded flex items-center justify-center bg-surface-variant text-on-surface-variant hover:bg-primary-container/60 transition-all cursor-pointer text-sm font-bold leading-none">+</button>
     </span>
   )
 }
@@ -98,20 +99,25 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
   return (
     <div className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
+        <div className="min-w-0 flex-1 flex flex-col">
           <button
             onClick={handleNameClick}
-            className="font-bold text-on-surface text-base md:text-lg truncate leading-tight text-left cursor-pointer hover:text-primary transition-colors"
+            className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-left cursor-pointer hover:text-primary transition-colors"
             title={isVirtual ? 'Save to roster' : 'Edit swimmer'}
           >
             {saved.name}
           </button>
-          <span className="shrink-0 text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Saved</span>
+          <div className="flex flex-wrap gap-1.5 mt-0.5">
+            {isVirtual && (
+              <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">wanna be</span>
+            )}
+            <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Saved</span>
+          </div>
         </div>
         <div className="flex items-start gap-1.5 shrink-0">
           <div className="flex flex-col items-start">
-            <div className="font-display-timer text-display-timer tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
+            <div className="font-display-timer text-headline-lg tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
             {goOffset != null && goOffset > 0 && (
               <span className="font-mono text-label-sm tabular-nums text-on-surface-variant flex items-center gap-0.5 mt-0.5">
                 (+{(goOffset / 1000).toFixed(2)}s)
@@ -144,38 +150,30 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
             const diff = prev !== null ? entry.time - prev : null
             const sc = entry.strokeCount
             return (
-              <div key={i} className="flex items-center gap-1.5 text-xs font-mono tabular-nums">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  {isEditing ? (
-                    <button
-                      onClick={() => {
-                        const newLaps = removeLapEntry(lapEntries, i)
-                        onEditSavedSwimmer(group.id, runDrillId!, saved.dbId, { laps: newLaps })
-                      }}
-                      className="h-9 w-9 rounded-full bg-error/70 text-on-error text-[6px] flex items-center leading-none hover:bg-error transition-colors shrink-0">✕</button>
+              <div key={i} className="flex items-center gap-2 font-mono tabular-nums">
+                {isEditing ? (
+                  <button
+                    onClick={() => {
+                      const newLaps = removeLapEntry(lapEntries, i)
+                      onEditSavedSwimmer(group.id, runDrillId!, saved.dbId, { laps: newLaps })
+                    }}
+                    className="h-7 w-7 rounded-full bg-error/70 text-on-error text-[6px] flex items-center justify-center leading-none hover:bg-error transition-colors shrink-0">✕</button>
+                ) : null}
+                <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-right">#{i + 1}</span>
+                <span className="text-body-lg text-on-surface font-bold shrink-0">{formatTime(entry.time)}</span>
+                {diff !== null && (
+                  <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
+                    {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
+                  </span>
+                )}
+                <span className="text-label-sm text-on-surface-variant shrink-0">
+                  SC:{' '}
+                  {sc != null ? (
+                    <span className="text-on-surface font-semibold">{sc}</span>
                   ) : (
-                    <span className="w-3.5 shrink-0 inline-block" />
+                    <span className="text-on-surface-variant/60">--</span>
                   )}
-                  <span className="text-on-surface-variant shrink-0">lap #{i + 1}</span>
-                  <span className="text-outline-variant/40 shrink-0">|</span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(entry.time)}</span>
-                    {diff !== null && (
-                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
-                        {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-outline-variant/40 shrink-0">|</span>
-                  <span className="text-on-surface-variant shrink-0">
-                    SC:{' '}
-                    {sc != null ? (
-                      <span className="text-on-surface font-bold">{sc}</span>
-                    ) : (
-                      <span className="text-on-surface-variant/60">--</span>
-                    )}
-                  </span>
-                </div>
+                </span>
                 <div className="ml-auto shrink-0">
                   <StrokeCountStepper
                     value={sc}
@@ -291,22 +289,12 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
     return timestampSplits(lapTimes, startedAt ?? 0)
   }, [lapTimes, startedAt])
 
-  const groupEarliest = useMemo(() => {
-    if (!runId || !drillId) return null
-    let earliest: number | undefined
-    for (const s of group.swimmers) {
-      if (!s.dbId) continue
-      const start = store.getSwimmerTiming(runId, group.id, drillId, s.dbId).startedAt
-      if (start != null && (earliest == null || start < earliest)) earliest = start
-    }
-    return earliest ?? null
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runId, group.id, drillId, storeVersion])
-
   const goOffset = useMemo(() => {
-    if (startedAt == null || groupEarliest == null) return null
-    return startedAt - groupEarliest
-  }, [startedAt, groupEarliest])
+    if (startedAt == null || !runId || !drillId || !swimmer.dbId) return null
+    const groupStart = store.get(K.swimmerGroupStart(runId, group.id, drillId, swimmer.dbId))
+    if (groupStart == null) return null
+    return startedAt - groupStart
+  }, [startedAt, runId, group.id, drillId, swimmer.dbId, store])
 
   const hasIndividualStart = useMemo(() =>
     (runId && drillId && swimmer.dbId)
@@ -322,8 +310,8 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
   return (
     <div className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 px-3 pt-3 pb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+      <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
+        <div className="flex gap-1.5 min-w-0 flex-1">
           <div className="flex flex-col gap-px shrink-0">
 <button onClick={() => handleMoveSwimmer(swimmer.id, 'up')} disabled={idx === 0}
                 className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
@@ -334,27 +322,29 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
                 <span className="material-symbols-outlined text-base">keyboard_arrow_down</span>
               </button>
           </div>
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="min-w-0 flex-1 flex flex-col">
             <button
               onClick={handleNameClick}
-              className="font-bold text-on-surface text-base md:text-lg truncate leading-tight text-left cursor-pointer hover:text-primary transition-colors"
+              className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-left cursor-pointer hover:text-primary transition-colors"
               title={isVirtual ? 'Save to roster' : 'Edit swimmer'}
             >
               {swimmer.name}
             </button>
-            {isVirtual && (
-              <span className="shrink-0 text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
-                {saving ? 'Saving...' : 'wanna be'}
-              </span>
-            )}
+            <div className="flex flex-wrap gap-1.5 mt-0.5">
+              {isVirtual && (
+                <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
+                  {saving ? 'Saving...' : 'wanna be'}
+                </span>
+              )}
+              {swimmer.completed && (
+                <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Done</span>
+              )}
+            </div>
           </div>
-{swimmer.completed && !isVirtual && (
-             <span className="shrink-0 text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Done</span>
-           )}
         </div>
         <div className="flex items-start gap-1.5 shrink-0">
           <div className="flex flex-col items-start">
-            <div className="font-display-timer text-display-timer tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
+            <div className="font-display-timer text-headline-lg tabular-nums tracking-tight text-primary leading-none">{displayTime}</div>
             {goOffset != null && goOffset > 0 && (
               <span className="font-mono text-label-sm tabular-nums text-on-surface-variant mt-0.5">(+{(goOffset / 1000).toFixed(2)}s)</span>
             )}
@@ -380,29 +370,22 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
             const diff = prevSplit !== null ? split - prevSplit : null
             const sc = swimmer.lapStrokeCounts[i + 1]
             return (
-              <div key={i} className="flex items-center gap-1.5 text-xs font-mono tabular-nums">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="w-3.5 shrink-0 inline-block" />
-                  <span className="text-on-surface-variant shrink-0">lap #{i + 1}</span>
-                  <span className="text-outline-variant/40 shrink-0">|</span>
-                  <span className="flex items-center gap-1">
-                    <span className="text-on-surface font-bold text-sm shrink-0">{formatTime(split)}</span>
-                    {diff !== null && (
-                      <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
-                        {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
-                      </span>
-                    )}
+              <div key={i} className="flex items-center gap-2 font-mono tabular-nums">
+                <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-right">#{i + 1}</span>
+                <span className="text-body-lg text-on-surface font-bold shrink-0">{formatTime(split)}</span>
+                {diff !== null && (
+                  <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
+                    {diff > 0 ? '+' : ''}{(diff / 1000).toFixed(1)}s
                   </span>
-                  <span className="text-outline-variant/40 shrink-0">|</span>
-                  <span className="text-on-surface-variant shrink-0">
-                    SC:{' '}
-                    {sc != null ? (
-                      <span className="text-on-surface font-bold">{sc}</span>
-                    ) : (
-                      <span className="text-on-surface-variant/60">--</span>
-                    )}
-                  </span>
-                </div>
+                )}
+                <span className="text-label-sm text-on-surface-variant shrink-0">
+                  SC:{' '}
+                  {sc != null ? (
+                    <span className="text-on-surface font-semibold">{sc}</span>
+                  ) : (
+                    <span className="text-on-surface-variant/60">--</span>
+                  )}
+                </span>
                 <div className="ml-auto shrink-0">
                   <StrokeCountStepper
                     value={sc}
