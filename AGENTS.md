@@ -18,6 +18,7 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Remaining UI-level work | `docs/context/UI-Tasks-Context.md` |
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
+| Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
 
 Archived plans and audits: `docs/archive/`
 

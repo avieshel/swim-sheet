@@ -291,6 +291,325 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 ---
 
+## A-020: Session-building flow — Support progressive intervals & recovery interleaves
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (reference endurance session)
+
+**Problem**: A real endurance session ("4×200m send-off 4:00→3:45 with 50m easy @ 1:00 between each") cannot be built as written. `DrillItem.interval` is a single string; `createFromTemplate` gives every rep the same interval. Recovery swims between reps must be separate drills.
+
+**Solution**:
+1. `interval` accepts a progression (`4:00, 3:55, 3:50, 3:45` or `4:00 → 3:45`) — resolve per-rep at snapshot time in `createFromTemplate`.
+2. Optional `recovery` sub-component on a drill item ("between each rep: 50m easy @ 1:00") — flatten as alternating reps (200, 50, 200, 50, …), tag recovery reps easy.
+3. Per-rep send-off / recovery labels surface in the live deck.
+
+**Files**: `client/src/db/schema.ts`, `client/src/components/DrillEditorModal.tsx`, `client/src/services/runService.ts`
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-021: Set segments — named components linkable to the drill bank
+
+**Source**: `docs/context/Sessions-Drills-Context.md`
+
+**Problem**: Drill items collapse "50m fingertip drag / 50m fist / 50m breathing every 5" into anonymous "4x50 freestyle". `DrillSegment` has a `name` but isn't editable in the modal.
+
+**Solution**: Add optional `name` (and `note`) to `DrillItem`, with a picker linking segments to existing bank drills (Fingertip Drag, Fist Drill already seeded). Render segment names on session cards and in the live deck.
+
+**Files**: `client/src/db/schema.ts`, `client/src/components/DrillEditorModal.tsx`, `client/src/pages/SessionDetail.tsx`, `client/src/services/runService.ts`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-022: Kickboard equipment option missing from picker (data inconsistency)
+
+**Source**: `docs/context/Sessions-Drills-Context.md`
+
+**Problem**: `EQUIPMENT_OPTIONS` (`client/src/constants/drill.ts:28`) omits `kickboard` even though `DEFAULT_EQUIPMENT` and seed data use it (`client/src/db/dao.ts:287,789,819`). Coaches can't select a kickboard in the modal.
+
+**Note**: This is *not* about the warm-up's "kick" segment — that is a kicking-focus freestyle with **no accessory** (expressed via segment name/note, see A-021). No "kick" stroke type should be added.
+
+**Solution**: Add `kickboard` to `EQUIPMENT_OPTIONS`; recheck the 4-col equipment grid layout with 5 items.
+
+**Files**: `client/src/constants/drill.ts`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-023: Session detail — duplicate drill action & similar-warning refinement
+
+**Source**: `docs/context/Sessions-Drills-Context.md`
+
+**Problem**: Building progression sets requires ~9 modal round-trips; no copy/duplicate on the drill row. The similar-drill warning fires for intentionally-distinct sets (same name + equipment, different interval).
+
+**Solution**: Add a duplicate button on session drill rows (duplicates into the session, opens editor pre-filled). Suppress the similar-drill warning when drills differ only by interval.
+
+**Files**: `client/src/pages/SessionDetail.tsx`, `client/src/utils/drillHelpers.ts`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-024: Reusable session sections (blocks) — the "save the warm-up" feature
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (F-8, Coach's Mental Model)
+
+**Problem**: The unit a coach reuses — a phased section like "standard warm-up" — doesn't exist. Sessions are flat drill lists; the only reuse units are atomic drills (too granular to save a warm-up) and whole sessions (too coarse to remix). Coaches repeat their settings every session.
+
+**Solution**: Introduce a **section/block** entity — a named, phased (warmup/main-set/cooldown), ordered group of drills:
+1. Composes into sessions (a session = ordered list of sections).
+2. Saved to a section library (save once, pull into any session).
+3. Mineable: "save section from this session/run" creates a library section from an existing template's drills or a completed run's run drills.
+4. Sections carry their phase, so pulled drills don't need re-tagging.
+5. **Copy-on-pull** (product-owner decision, three-persona review): pulling a library section copies it into the session — the library stays canonical; tweaks to a pulled section never mutate the library.
+6. **Section phase wins** (product-owner decision): when a section carries a phase, it overrides individual drill tags for A-025 timing defaults.
+
+**Files**: `client/src/db/schema.ts` (new table), `client/src/db/dao.ts`, `client/src/services/` (new sectionService), `client/src/pages/SessionDetail.tsx`, `client/src/pages/SessionsList.tsx`
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-025: Runtime timing — phase-based defaults + per-lane/per-swimmer opt-in
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (F-9)
+
+**Problem**: Warm-ups/cool-downs aren't timed, and the main set *might* be timed (not every rep, not every swimmer). Today `timingMode` is a saved binary on the drill, every live drill shows Start/Lap/Finish, and the phase `labels` (which could carry a default) only drive the Progress-Mode banner.
+
+**Solution**: Separate the three questions:
+1. Phase (warmup/main-set/cooldown) supplies the *default* timing intent — warm-up/cool-down → untimed, main-set → timed — as a soft preference, not a binary.
+2. At run time the coach can mark a drill timed/untimed per lane, or start/stop timing individual swimmers.
+3. A swimmer's per-lap record is created only when actually timed (feeds future progress tracking).
+4. Untimed drills render as instruction cards (no clock); timed drills render with the clock.
+
+**Files**: `client/src/context/LiveSessionContext.tsx`, `client/src/pages/LiveDeck.tsx`, `client/src/components/SwimmerRows.tsx`, `client/src/services/runService.ts`
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-026: Two-mode UX — "Quick Time" and "Planned Session" over one drill substrate
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Debate Outcome)
+
+**Problem**: The app serves two coaches with opposite needs — P1 (Deck Timer): ≤2 taps to an always-timed stopwatch, no session concepts; P2 (Set Architect): rich, reusable, phase-aware session plans where timing is opt-in. Today both are jammed into one flow (deck-first + heavy template editor).
+
+**Solution**: One drill substrate where "100 Free" is the degenerate case of the full drill grammar; two start doors sharing the same timing engine, lane components, and lap data:
+1. **Quick Time** (deck-first, default): plain-swim picker = filtered view of the drill bank; everything timed; "untimed" structurally impossible in this mode; one-touch swimmer chips; tap-to-reset, no modals. **The quick run accumulates drills** — "add drill" appends another plain pick to the active run (same swimmers, identity chain intact), each a labeled row in the deck, add/remove anytime. **First pick creates row #1; every later pick appends a new row — never replaces** (product-owner decision, three-persona review). **Quick rows are rep-agnostic**: lap-anytime, no `repeatCount` auto-advance, no rep-count control on the deck — quick mode is a UI mode over the one drill model, not an API flag.
+2. **Planned Session** (editor-first): section-based builder, rich set grammar, phase-default timing, section library (save/mine).
+3. Timing defaults key off how the run started (quick = timed everything; planned = phase-based). When a planned run is active the deck renders its structure (segments, send-off ladder, recovery tags).
+
+**Files**: `client/src/pages/LiveDeck.tsx`, `client/src/context/LiveSessionContext.tsx`, `client/src/pages/SessionDetail.tsx`, `client/src/db/schema.ts`, `client/src/services/runService.ts`
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-027: Plain-swim picker on the deck (P1)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Debate Outcome, P1 friction #1)
+
+**Problem**: Quick-start locks the coach to "100m Freestyle"; there's no way to pick "200m Breast" from the deck without abandoning timing and editing the template. There's also no way to add a second drill to an active quick run (the coach wants "8×100 free, then a 200 warm-down", same swimmers).
+
+**Solution**: Tap the swim label on a lane card → flat, alphabetized list of common swims (100 Free, 200 Breast, 50 Kick, …) as a filtered view of `libraryDrills`; one tap selects. A "…" opens the rich editor as a back door. Never opens the rich editor for a plain pick. **The same picker serves the initial pick and appending more drills** to the active quick run ("add drill" → pick → appended as a labeled deck row, same run/swimmers/identity chain; first pick creates, later picks append — product-owner decision). Quick rows stay rep-agnostic and label-only (no description text, no stroke-count prompts — P1).
+
+**Files**: `client/src/pages/LiveDeck.tsx`, `client/src/components/DrillEditorModal.tsx` (as needed)
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-028: Fix phase-label mismatch (F-10)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (F-10)
+
+**Problem**: Modal offers `'main set'`/`'cool down'` (`constants/drill.ts:27`) but the deck detects `'main-set'`/`'cooldown'` (`LiveDeck.tsx:933-937`, `ProgressGroupCard.tsx:25-30`). Freshly-tagged drills never phase-group at run time.
+
+**Solution**: Unify the vocabulary — pick one canonical set and make `PHASE_LABELS` and the deck detectors agree.
+
+**Files**: `client/src/constants/drill.ts`, `client/src/pages/LiveDeck.tsx`, `client/src/components/ProgressGroupCard.tsx`
+
+**Priority**: Low
+**Status**: Open
+
+---
+
+## A-029: No modals between reps — tap-to-reset (P1)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Debate Outcome, P1 friction)
+
+**Problem**: Reset between reps is gated by a confirmation dialog every time (`LiveDeck.tsx:481-490`); for an 8×100 set that's 8 dialogs. Confirmation also blocks resetting a swimmer (`LiveDeck.tsx:457-479`).
+
+**Solution**: Tap-to-reset by default with a short hold-to-confirm affordance; remove the modal from the rep-to-rep loop. Same for clearing a swimmer's data.
+
+**Files**: `client/src/pages/LiveDeck.tsx`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-030: Swimmer identity chain — no orphan lap data (P2 red line)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Debate Outcome, guardrail 4)
+
+**Problem**: A timed but never-registered temp chip can leave orphan/ownerless lap rows or data locked inside synthetic `quick-…` ids — which breaks future per-swimmer progress tracking.
+
+**Solution**: Every chip carries a synthetic id; lap rows materialize only for owner-linked swimmers (promoted to roster via `promoteAndLinkSwimmer` or completed with an owner). Untimed reps produce zero lap rows. Keep the one-motion add, enforce the identity chain.
+
+**Product-owner decision (three-persona review)**: laps recorded under never-promoted `quick-…` ids are **retained but excluded from progress tracking until the chip is promoted** to a roster swimmer — data is never lost, but it never counts toward per-swimmer progress as orphan data.
+
+**Files**: `client/src/context/LiveSessionContext.tsx`, `client/src/services/runService.ts`, `client/src/pages/LiveDeck.tsx`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-031: Drill bank scannability + interval validation (F-11/F-14)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (F-11, F-14)
+
+**Problem**: Bank cards render only `reps×dist stroke` — no interval/equipment/intensity — so a coach can't tell 4×100 @1:45 from @1:55. And the interval input is unvalidated free text (`DrillEditorModal.tsx:295-308`); `3:5` flows into the snapshot.
+
+**Solution**: Show interval/equipment/intensity on bank and session drill cards. Validate interval format (and the A-020 progression syntax) on entry.
+
+**Files**: `client/src/pages/DrillBank.tsx`, `client/src/pages/SessionDetail.tsx`, `client/src/components/DrillEditorModal.tsx`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-032: Drill identity — named instruction + parameterized length (no stored variants)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Drill Identity: Named Instruction + Parameters)
+
+**Problem**: The drill bank fills with length-duplicates (100/200/400 free, 100/200/400 back…). The proposed "product/variant" (T-shirt/size) fix was evaluated by both personas and **rejected in its stored-variant form** (a size rack rebuilds the same explosion), but accepted as *parameterization*: product = the named instruction, length = a parameter.
+
+**Solution**:
+1. Product identity = named instruction (never stroke — "Fingertip Drag" ≠ "Fist Drill" even though both freestyle). Stroke/distance/equipment are properties.
+2. **Each bank block carries a default distance** (product-owner decision) so a block is a complete grab-and-go unit for quick drill timing. One entry per instruction — the distance is a mutable default, **not a stored variant** and not the block's identity.
+3. The default is remembered at pick time — **block default wins, then last-used per instruction** (not global; product-owner decision, three-persona review) — so "tap Freestyle, time 100m" stays one tap.
+4. Top-level `distance` is treated as a display total / default; `items[].distance` remains the real per-rep length in session sentences (already true in `schema.ts:22-31`).
+5. Complex sets (progressions, interleaves, sections) are products with no length axis — keep the rich grammar.
+6. Snapshot contract (`RunDrill`) is untouched — refactor touches `LibraryDrill` only.
+
+**Files**: `client/src/db/schema.ts`, `client/src/db/dao.ts` (library keying), `client/src/pages/DrillBank.tsx`, `client/src/pages/LiveDeck.tsx` (length picker), `client/src/utils/drillHelpers.ts`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-033: Per-round variation & effort grammar — descend/build/pyramid patterns (F-5)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (F-5, Worked Example: The Pyramid Drill)
+
+**Problem**: Per-rep variation is unrepresentable. `repeatCount` is just a count: "descend" (each rep faster), "on the 2nd iteration breathe every 7", and effort progressions like a pyramid (`100m strong / 200m medium / 300m easy / 300m strong / 200m medium / 100m easy`) have no field. The effort scale exists (`v1`–`v4`, `DrillEditorModal.tsx:281-287`) but is **unlabeled** — bare values with no legend (v1 easy → v4 hard) and no defined top end for `sprint`/`all-out` on short swims.
+
+**Solution**:
+1. **Keep the `v1`–`v4` effort scale and add `v5`** (product-owner decisions: v1 = easy → v4 = hard; **`v5` = sprint/all-out**, with the short-distance rule — typically 50m–100m). Add a visible legend in the editor and deck — today the picker shows bare `v1`–`v4` values (`DrillEditorModal.tsx:281-287`).
+2. Per-rep length + effort sequence as first-class grammar: a drill's `items` are the explicit steps (each `{distance, effort, interval?}`), the stored/snapshot truth. Handles the pyramid and any irregular progression exactly.
+3. Pattern shorthand as an **authoring convenience only** that expands deterministically into explicit steps (e.g. `pyramid 100/200/300/200/100`); stored form is always the explicit sequence so deck/timing/history behave identically.
+4. Descend/build patterns surface as effort steps in the deck ("rep 1 → max"), not just in the drill name.
+5. Per-rep labels must survive the snapshot (ties to F-2/F-16/A-021) — the two 300m pyramid reps render as distinct "300m easy"/"300m strong" rows.
+
+**Note**: per-rep structure + runtime timing (A-025) makes a pyramid's reps independently timeable — "time just the 300m strong" is flattening + the per-rep timed/untimed flag, no new timing machinery. This largely removes the need for the saved `timingMode: 'individual' | 'continuous'` binary (`schema.ts:46`).
+
+**Files**: `client/src/db/schema.ts`, `client/src/components/DrillEditorModal.tsx`, `client/src/services/runService.ts`, `client/src/constants/drill.ts`
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-035: Drill API / data model for the set grammar (Phase 1)
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Drill API / Data Model for the Set Grammar)
+
+**Problem**: The drill model can't express the set grammar (progression, descend, pyramid, recovery interleave, per-round notes, named segments) and pacing is free-text `interval`. Phase 1 = make the data model + API support all variations without bloat; Phase 2 = the drill-builder UI.
+
+**Solution**: Adopt the **base time + relative ladder** pacing model (see doc): `base?: number` (seconds, the preset/anchor) + `ladder?: number[]` (per-rep offsets; negative descends, positive builds; absent = all reps on base). Replace free-text `interval` with structured numbers — no string DSL. New `DrillItem` fields: `name`, `note` (A-021), `base`, `ladder` (pacing), `strokeLadder` (per-rep stroke-count offsets for test drills; per-swimmer `strokeBase` at run time), `rest` (fixed rest after each rep — alternative to base+ladder, mutually exclusive), `recovery?: { distance, stroke?, base?, rest?, note? }` (F-4/A-020; the recovery carries its own pacing). New **drill-level** `rounds` (per-iteration modifiers: `{ name?, note?, intensity?, equipment?, baseOffset? }`, length = `repeatCount`) — **`roundNotes` merged into `rounds[].note`**; per-round pacing is the single scalar `baseOffset` (no per-round distance — write explicit items); effective rep send-off = `lane base + ladder[rep] + round.baseOffset`. New **drill-level** `rest`. Effort scale `v1`–`v5` (A-033). **Snapshot stores RELATIVE grammar** — `createFromTemplate` persists `base` + `ladder` + the run-level lane→base map and does NOT bake in absolute send-offs; absolutes are derived by an exported `effectiveSendOff()` in `services/drillService.ts`, called by both the deck and any agent. **Structural validation lives in `services/drillService.ts`, not `dao.ts`** (DAO stays pure CRUD — A-004): numbers, ladder/rounds length = rep count, sign ranges, base+ladder vs rest exclusivity.
+
+**Deferred (design only)**: rest countdown in the deck timers — rest-paced units run a rest countdown after the swim, send-off-paced units count down the send-off. Same timer mechanism, different "when does the next start" source.
+
+**Phase 1 scope (API only)**: `schema.ts` DrillItem fields; `services/drillService.ts` create/update + validation + `effectiveSendOff()`; `runService.ts` relative snapshot; sections field envelope (name, phase, ordered drill refs, inter-drill `rest`) sketched in the schema. NOT included: drill-builder UI (Phase 2), per-lane run base overrides (A-034, separate), sections entity (A-024).
+
+**Files**: `client/src/db/schema.ts`, `client/src/db/dao.ts`, `client/src/services/runService.ts`
+
+**Priority**: High
+**Status**: Open
+
+---
+
+## A-036: Drill dimensions — bank taxonomy for finding similar drills
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Drill Dimensions — the bank taxonomy)
+
+**Problem**: The bank is a flat, unscannable list (F-11/A-031) with no way to find similar drills or navigate by facet. Stroke/distance/equipment/focus/phase exist as ad-hoc fields; "type" (simple/pyramid/test/progression) isn't a facet at all.
+
+**Solution**: A **dimensions** model — the facets coaches filter, search, and compare on: Instruction (identity/name, A-032), Stroke, Type (derived), Distance (default), Equipment, Effort (v1–v5), Focus, Phase.
+1. **Type is derived, not stored** — from the grammar present (`ladder` → progression/descend, `strokeLadder` → test, `recovery` → interleave, `rounds` → round-progression, `segments` → broken). No new field, no label/structure drift.
+2. **`focus` enum expands** from technique/fitness/none → + endurance / sprint / test / recovery (small enum change; the only new vocabulary). `test`, not `diagnostic` — one classifier wins (three-persona review).
+3. **Bank navigation**: filter chips over dimensions + search by instruction; cards show the dimensions (extends A-031).
+4. **Similar drills** = shared dimension set (same instruction = exact identity; same stroke + type + equipment = "similar") — the relationship behind the A-023 warning and bank suggestions.
+5. Quick picker (A-027) and the P2 bank are the same filtered list with different default dimensions.
+
+**Files**: `client/src/db/schema.ts` (focus enum), `client/src/utils/drillHelpers.ts` (type derivation), `client/src/pages/DrillBank.tsx`, `client/src/pages/LiveDeck.tsx` (quick picker)
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-037: Coach-facing description on the live deck
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Coach-facing description)
+
+**Problem**: The drill description/notes exist end-to-end (template → snapshot → bank → session detail) but the live deck never renders them — the current-drill card shows only name + distance/stroke (`LiveDeck.tsx:262-287`), and `RunDrill.notes` (`schema.ts:78`) is never displayed. The coach at the wall — the whole point of the notes — can't read them.
+
+**Solution (product-owner decision)**: Render `RunDrill.notes` (and rep `instructions`) as the instruction text on the deck drill card for **planned runs** — all rows (timed + untimed) share the same "instruction card" surface A-025/F-9 defines. **Quick-time rows stay label-only** — P1's deck never gains metadata clutter.
+
+**Files**: `client/src/pages/LiveDeck.tsx` (GroupCard), `client/src/components/ProgressGroupCard.tsx`
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
+## A-034: Per-lane pacing overrides — one drill, different send-offs per lane
+
+**Source**: `docs/context/Sessions-Drills-Context.md` (Worked Example: The Pyramid Drill — "Two lanes, one drill")
+
+**Problem**: Two lanes doing the same drill at different send-offs — lane 1 (stronger) swims a 3×100m pyramid at `1:45 / 1:40 / 1:35`, lane 2 at `2:00 / 1:55 / 1:50`. Coaches group lanes by ability and scale the send-off, not the structure. But the drill carries one interval string (`RunDrill.interval`, `schema.ts:80`; `DrillItem.interval`), so the deck can't show a per-lane ladder.
+
+**Solution**:
+1. **Structure is shared; pacing is per-lane and anchored to a base.** One `RunDrill` per drill — never per-lane drill snapshots. Lanes are already a runtime concept (`RunSwimmer.lane`, `LaneDrillResult.lane`, `schema.ts:87-105`); the send-off ladder is execution context, not drill identity.
+2. **Base pace per lane** (threshold / CSS / T-pace-style anchor, set once): lane 1 → 1:45, lane 2 → 2:00. Squad-standard, validated against swim practice.
+3. **The drill carries a relative ladder**, not absolute times — `descend 0 / −5 / −10s`, `+15s rest`, or an effort mapping (F-1 progression syntax applies to offsets). **Effective send-off per rep = lane base + ladder[rep]**, so the coach never re-enters the ladder per lane; per-lane absolute overrides remain possible when a set genuinely differs.
+4. **Base can anchor both** send-off (deck pacing) and target pace (informational); send-off is what matters at the wall.
+5. Entered in run setup, editable mid-run like the timed/untimed flag (A-025). The deck renders each rep row with every lane's effective send-off (lane 1: 1:45 / lane 2: 2:00).
+6. **Pacing doesn't touch recorded times** — send-off is a pacing/display parameter; laps are whatever they were.
+7. **Run-level execution context** (three-persona review): the lane→base map is stored at run level in the **relative** snapshot (never baked to absolutes — A-035); per-swimmer `strokeBase` for stroke-count tests (A-035) lives in the same run-level lane data.
+
+**Files**: `client/src/db/schema.ts` (lane settings), `client/src/db/dao.ts`, `client/src/services/runService.ts`, `client/src/pages/LiveDeck.tsx`, run setup UI
+
+**Priority**: Medium
+**Status**: Open
+
+---
+
 ## A-019: Session import/export for cross-coach sharing
 
 **Source**: Design review — coach onboarding and sharing
