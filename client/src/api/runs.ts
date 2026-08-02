@@ -148,7 +148,7 @@ export function deleteSwimmerFromLaneResult(runId: string, groupId: string, runD
 // SavedDrillData blob persisted in LaneDrillResult.data. Keeps split-time
 // computation out of the view.
 
-export interface LaneResultSwimmerInput {
+interface LaneResultSwimmerInput {
   dbId: string
   name: string
   completed: boolean

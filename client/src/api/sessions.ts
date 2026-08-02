@@ -25,4 +25,8 @@ export function listCompletedRuns(): Promise<SessionRun[]> {
   return sessionService.getCompletedRuns()
 }
 
+export function seedDefaultSessions(): Promise<void> {
+  return sessionService.seedDefaults()
+}
+
 export type { Session, SessionRun } from '../db/schema'

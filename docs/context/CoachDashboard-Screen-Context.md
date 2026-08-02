@@ -12,11 +12,7 @@ The central navigation hub for SwimSheet coaches. Serves as the entry point for 
   - Recent sessions preview
   - Navigation to different management screens
 
-- **SessionSetup** (`client/src/pages/SessionSetup.tsx`)
-  - Full session creation wizard
-  - Template selection and customization
-  - Roster assignment and lane configuration
-  - Quick-start options
+> Note: A standalone `SessionSetup` component was removed as dead code (never routed). Session creation is handled via `SessionsList`/`SessionDetail`.
 
 ### User Flow
 1. Navigate to CoachDashboard from Home or QuickStart

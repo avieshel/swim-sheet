@@ -36,6 +36,7 @@ Offline-first PWA for swim coaches to track lap times, stroke counts, and athlet
 | Sync | Custom sync engine | Last-write-wins with timestamps |
 | Install | PWA manifest + SW | Add to home screen, full offline |
 | Tests | Vitest (unit), Playwright (e2e) | Testing stack |
+| Static analysis | ESLint + tsc + knip | Lint, typecheck, dead-code detection (`npm run check`) |
 
 ### Server
 

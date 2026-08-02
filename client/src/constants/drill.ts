@@ -31,11 +31,3 @@ export const EQUIPMENT_OPTIONS = [
   { id: 'pullbuoy', label: 'Pull Buoy' },
   { id: 'snorkel', label: 'Snorkel' },
 ]
-
-export const EQUIPMENT_DATA: Record<string, { label: string; icon: string }> = {
-  fins: { label: 'Fins', icon: 'fins' },
-  zoomers: { label: 'Zoomers', icon: 'zoomers' },
-  paddles: { label: 'Paddles', icon: 'paddles' },
-  pullbuoy: { label: 'Pull Buoy', icon: 'pullbuoy' },
-  snorkel: { label: 'Snorkel', icon: 'snorkel' },
-}

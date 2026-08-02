@@ -12,8 +12,10 @@ import { formatTime, formatSessionTime, formatWallTime } from '../utils/formatTi
 import { LaneEditorModal } from '../components/LaneEditorModal'
 import { ActiveSwimmerRow, SavedSwimmerRow } from '../components/SwimmerRows'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
+import { ProgressGroupCard } from '../components/ProgressGroupCard'
 import { listSwimmers, createSwimmer } from '../api/swimmers'
 import { listTempSwimmerNames } from '../api/constants'
+import { getSessionDrills } from '../api/drills'
 
 function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId, loading, rosterSwimmers, onSwimmerSaved }: {
   group: TimedGroup;
@@ -511,6 +513,21 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
   const [editorScrollToLane, setEditorScrollToLane] = useState<number | null>(null)
   const [rosterSwimmers, setRosterSwimmers] = useState<DbSwimmer[]>([])
   const [editPoolLength, setEditPoolLength] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'timing' | 'progress'>(() => {
+    try {
+      const notes = run.notes ? JSON.parse(run.notes) : {}
+      return (notes.viewMode === 'progress') ? 'progress' : 'timing'
+    } catch { return 'timing' }
+  })
+  const [drillLabelMap, setDrillLabelMap] = useState<Map<string, string[]>>(new Map())
+
+  const handleViewModeToggle = async () => {
+    const newMode = viewMode === 'progress' ? 'timing' : 'progress'
+    setViewMode(newMode)
+    const notes = JSON.parse(run.notes || '{}')
+    notes.viewMode = newMode
+    await updateRun(run.id, { notes: JSON.stringify(notes) }).catch(() => {})
+  }
 
   const initializedRef = useRef(false)
   const [sessionStartedAt] = useState(() => Date.now())
@@ -529,7 +546,17 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
     getLaneResults(run.id).then(results => setLaneDrillResults(results))
     getSession(run.session_id).then(s => setTemplateName(s?.name || 'Unknown'))
     listSwimmers().then(setRosterSwimmers)
-  }, [run.id, dispatch])
+  }, [run.id, run.session_id, dispatch])
+
+  useEffect(() => {
+    getSessionDrills(run.session_id).then(drills => {
+      const map = new Map<string, string[]>()
+      for (const d of drills) {
+        map.set(d.id, d.labels)
+      }
+      setDrillLabelMap(map)
+    })
+  }, [run.session_id])
 
   const refreshRoster = () => {
     listSwimmers().then(setRosterSwimmers)
@@ -651,10 +678,6 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
     setLaneDrillResults(refreshed)
   }
 
-  const handleResetDrill = (groupId: string) => {
-    setLaneDrillResults(prev => prev.filter(r => r.group_id !== groupId))
-  }
-
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 bg-surface-container-lowest rounded-xl p-3 md:p-4 border border-outline-variant">
@@ -737,6 +760,11 @@ className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 
               </button>
           </div>
           <div className="flex items-center gap-1.5">
+            <button onClick={handleViewModeToggle}
+                className="h-11 px-3 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-1 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-label-sm">
+                <span className="material-symbols-outlined text-sm">{viewMode === 'progress' ? 'timer' : 'overview'}</span>
+                {viewMode === 'progress' ? 'Timing' : 'Progress'}
+              </button>
             <button onClick={() => { setEditorScrollToLane(null); setShowLaneEditor(true) }}
                 className="h-11 px-3 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-1 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-label-sm">
                 <span className="material-symbols-outlined text-sm">group</span>
@@ -751,6 +779,15 @@ className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 
         </div>
       </div>
 
+      {viewMode === 'progress' && activeGroups.length > 0 && runDrills.length > 0 && (
+        <PhaseOverviewBanner
+          groups={groups}
+          runDrills={runDrills}
+          laneDrillResults={laneDrillResults}
+          drillLabelMap={drillLabelMap}
+        />
+      )}
+
       {activeGroups.length === 0 ? (
         <div className="text-center py-16">
           <span className="material-symbols-outlined text-5xl text-on-surface-variant mb-3">pool</span>
@@ -759,7 +796,31 @@ className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 
       ) : (
         <section className="mb-8">
           <div className="r-grid" style={{ '--grid-min': 'min(100%, 360px)' } as React.CSSProperties}>
-            {activeGroups.map(group => (
+            {activeGroups.map(group => viewMode === 'progress' ? (
+              <ProgressGroupCard
+                key={group.id}
+                group={group}
+                runDrills={runDrills}
+                laneDrillResults={laneDrillResults}
+                runId={run.id}
+                onAddSwimmer={(groupId) => {
+                  const g = groups.find(gr => gr.id === groupId)
+                  setEditorScrollToLane(g?.lane ?? null)
+                  setShowLaneEditor(true)
+                }}
+                onCompleteDrill={handleCompleteDrill}
+                onResetDrill={handleResetGroup}
+                loading={!drillsLoaded}
+                rosterSwimmers={rosterSwimmers}
+                onSwimmerSaved={async () => {
+                  await refreshRoster()
+                  const refreshed = await getLaneResults(run.id)
+                  setLaneDrillResults(refreshed)
+                }}
+                drillLabelMap={drillLabelMap}
+                onSwitchToTiming={handleViewModeToggle}
+              />
+            ) : (
               <GroupCard
                 key={group.id}
                 group={group}
@@ -772,7 +833,7 @@ className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 
                   setShowLaneEditor(true)
                 }}
                 onCompleteDrill={handleCompleteDrill}
-                onResetDrill={handleResetDrill}
+                onResetDrill={handleResetGroup}
                 onClearSwimmer={handleClearSwimmer}
                 onEditSavedSwimmer={handleEditSavedSwimmer}
                 loading={!drillsLoaded}
@@ -856,6 +917,77 @@ className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 
         onResetGroup={handleResetGroup}
         onClose={() => setShowLaneEditor(false)}
       />}
+    </div>
+  )
+}
+
+function PhaseOverviewBanner({ groups, runDrills, laneDrillResults, drillLabelMap }: {
+  groups: import('../context/LiveSessionContext').TimedGroup[]
+  runDrills: RunDrill[]
+  laneDrillResults: LaneDrillResult[]
+  drillLabelMap: Map<string, string[]>
+}) {
+  const getDrillLabels = (rd: RunDrill): string[] =>
+    rd.parent_drill_id ? drillLabelMap.get(rd.parent_drill_id) ?? [] : []
+
+  const phases = [
+    { key: 'warmup', label: 'Warmup', color: 'bg-tertiary-container text-on-tertiary-container' },
+    { key: 'main-set', label: 'Main Set', color: 'bg-primary-container text-on-primary-container' },
+    { key: 'cooldown', label: 'Cooldown', color: 'bg-secondary-container text-on-secondary-container' },
+  ]
+
+  const phaseDrills = phases.map(p => ({
+    ...p,
+    drills: runDrills.filter(rd => getDrillLabels(rd).includes(p.key)),
+  })).filter(p => p.drills.length > 0)
+
+  if (phaseDrills.length === 0) return null
+
+  const getLanePhaseStatus = (group: import('../context/LiveSessionContext').TimedGroup, phaseDrillIds: Set<string>): 'done' | 'current' | 'ahead' => {
+    const allDone = [...phaseDrillIds].every(did =>
+      laneDrillResults.some(r => r.group_id === group.id && r.run_drill_id === did && r.completed)
+    )
+    if (allDone) return 'done'
+    if (group.currentRunDrillId && phaseDrillIds.has(group.currentRunDrillId)) return 'current'
+    return 'ahead'
+  }
+
+  const activeGroups = groups.filter(g => g.swimmers.length > 0)
+
+  return (
+    <div className="mb-4 overflow-x-auto">
+      <div className="flex gap-2 min-w-max">
+        {phaseDrills.map(phase => {
+          const drillIds = new Set(phase.drills.map(d => d.id))
+          return (
+            <div key={phase.key} className="flex items-center gap-1.5 bg-surface-container-low rounded-xl px-3 py-2 border border-outline-variant/20">
+              <span className={`text-label-sm font-bold px-2 py-0.5 rounded-full ${phase.color}`}>{phase.label}</span>
+              <span className="text-label-sm text-on-surface-variant mx-1">{phase.drills.length}</span>
+              {activeGroups.map(group => {
+                const status = getLanePhaseStatus(group, drillIds)
+                return (
+                  <span key={group.id}
+                    className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      status === 'done' ? 'bg-primary text-on-primary' :
+                      status === 'current' ? 'bg-tertiary-container text-on-tertiary-container ring-2 ring-tertiary animate-pulse' :
+                      'bg-surface-variant text-on-surface-variant/50'
+                    }`}
+                    title={`L${group.lane}: ${status === 'done' ? 'Done' : status === 'current' ? 'In Progress' : 'Not started'}`}
+                  >
+                    {status === 'done' ? (
+                      <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>check</span>
+                    ) : status === 'current' ? (
+                      <span className="material-symbols-outlined text-xs">chevron_right</span>
+                    ) : (
+                      <span className="material-symbols-outlined text-xs">more_horiz</span>
+                    )}
+                  </span>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

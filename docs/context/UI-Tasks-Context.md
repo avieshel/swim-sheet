@@ -1,6 +1,106 @@
 # UI Tasks
 
-All UI work items completed. No remaining open tasks.
+---
+
+## Open Tasks
+
+### T-021: Progress Mode — LiveDeck view mode toggle
+
+**Source**: Design review — need minimalist flow for coaches who want lane-level tracking without per-swimmer timing
+
+**Problem**: LiveDeck only has one view mode (Timing Mode) with full swimmer cards showing Start/Lap/Finish, stroke counts, lap tables. Coaches who just want to track lane progression see noise.
+
+**Solution**: Add `viewMode` state (`'progress' | 'timing'`) to `ActiveRunView` in LiveDeck. Persist in `SessionRun.notes` JSON.
+
+**Implementation**:
+- Add view mode toggle button in session header (`overview` ↔ `timer` icon)
+- Conditionally render `ProgressGroupCard` vs `GroupCard` based on mode
+- Store view mode in `SessionRun.notes` JSON: `{ ...notes, viewMode: 'progress' }`
+- Restore on page refresh: read `viewMode` from notes during `INIT_FROM_RUN` recovery
+
+**Files**:
+- `client/src/pages/LiveDeck.tsx` — `viewMode` state, toggle UI, conditional card rendering
+
+**Priority**: High
+**Status**: Done
+
+### T-022: ProgressGroupCard component
+
+**Source**: T-021
+
+**Problem**: No simplified card exists for Progress Mode.
+
+**Solution**: Create `ProgressGroupCard` — a lane-level card for Progress Mode.
+
+**Spec**: See `docs/context/UI-Context.md` — ProgressGroupCard layout:
+- Lane name, lane number badge, swimmer count
+- Current drill name with phase tag badge (warmup/main-set/cooldown)
+- Drill status indicator: "Not Started" (grey) / "In Progress" (blue, pulsing) / "Completed" (green)
+- Lane elapsed timer (formatted `MM:SS`)
+- Three lane-level actions: Previous Drill, Mark Complete, Next Drill
+- "Switch to Timing" button per card
+- Add Swimmer / Temp Swimmer buttons (same as GroupCard)
+- No per-swimmer rows, no lap tables, no stroke counts
+
+**Implementation details**:
+- Same props as `GroupCard` but simpler rendering
+- Reuses `SET_GROUP_DRILL`, `SWIMMER_COMPLETE` reducer actions
+- Reuses `store.markGroupStart()` / `store.batchStopSwimmers()` for group-level timing
+- Swimmer count shown as a label, not interactive rows
+- Collapse/expand button for minimal view
+
+**Files**:
+- New: `client/src/components/ProgressGroupCard.tsx`
+
+**Priority**: High
+**Status**: Done
+
+### T-023: Session-level phase overview banner
+
+**Source**: T-021
+
+**Problem**: In Progress Mode, coach has no glanceable view of overall session phase across all lanes.
+
+**Solution**: Add a compact phase banner below the session header in Progress Mode.
+
+**Spec**:
+```
+Warmup ── [L1✓] [L2→] [L3→]
+Main Set ── [L1→] [L2→]
+Cooldown ── [───]
+```
+- Each row = a drill phase (derived from drill `labels` containing phase tags)
+- Each cell = a lane's status in that phase
+- `✓` = all drills in this phase completed for this lane
+- `→` = currently on a drill in this phase
+- `─` = not yet reached this phase
+- Tapping a phase name navigates all lanes to the first drill in that phase
+
+**Implementation**:
+- Helper: `getPhaseForDrill(drill: RunDrill): string` extracts phase from `drill.notes` or template drill lookup
+- Helper: `getLanePhaseStatus(lane, phase, runDrills, laneDrillResults)`
+- Rendered as a horizontal scrolling row of phase columns
+
+**Files**:
+- `client/src/pages/LiveDeck.tsx` — phase banner component
+- `client/src/utils/drillHelpers.ts` — phase helper functions
+
+**Priority**: Medium
+**Status**: Done
+
+### T-024: Progress Mode — Complete flow for swimmerless lanes (simplified save)
+
+**Source**: T-021
+
+**Problem**: When completing a session in Progress Mode, the `handleComplete` flow iterates swimmers and collects lap data via `store.getDrillTiming`. This works but is more complex than needed for Progress Mode where lap data is minimal.
+
+**Solution**: The existing `completeRunWithLaps` already handles this correctly — it only creates Lap records for swimmers with timing data. Progress Mode's group-level timing (`markGroupStart`/`batchStopSwimmers`) records timestamps that are picked up by the same projection code. No special path needed. Just ensure `handleComplete` doesn't throw when swimmer lap arrays are empty.
+
+**Files**:
+- `client/src/pages/LiveDeck.tsx` — verify `handleComplete` handles empty-timing case
+
+**Priority**: Medium
+**Status**: Open
 
 ---
 

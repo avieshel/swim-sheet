@@ -44,7 +44,7 @@ async function pushCollection<T extends { id: string | number }>(
   }
 }
 
-export async function pushChanges(baseUrl: string): Promise<void> {
+async function pushChanges(baseUrl: string): Promise<void> {
   const swimmers = await db.swimmers.toArray()
   const sessions = await db.sessions.toArray()
   const laps = await db.laps.toArray()
@@ -68,7 +68,7 @@ async function fetchAndMerge<T>(
   }
 }
 
-export async function pullChanges(baseUrl: string): Promise<void> {
+async function pullChanges(baseUrl: string): Promise<void> {
   await fetchAndMerge(baseUrl, 'swimmers', db.swimmers)
   await fetchAndMerge(baseUrl, 'sessions', db.sessions)
   await fetchAndMerge(baseUrl, 'laps', db.laps)

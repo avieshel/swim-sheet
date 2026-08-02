@@ -3,9 +3,9 @@ import { SwimmerFormModal, type SwimmerFormData } from './SwimmerFormModal'
 import { getSwimmer, createSwimmer, updateSwimmer, searchSwimmers } from '../api/swimmers'
 import { promoteAndLinkSwimmer, addSwimmerToRun, removeSwimmerFromRun } from '../api/runs'
 
-export type RosterSwimmer = { id: string; name: string; group: string; notes: string; status: string }
+type RosterSwimmer = { id: string; name: string; group: string; notes: string; status: string }
 
-export interface SwimmerAllocation {
+interface SwimmerAllocation {
   groupId: string
   groupName: string
 }

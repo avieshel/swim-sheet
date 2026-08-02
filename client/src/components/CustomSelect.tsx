@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-export interface SelectOption {
+interface SelectOption {
   value: string | number
   label: string
   badge?: ReactNode

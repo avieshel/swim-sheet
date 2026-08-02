@@ -18,10 +18,7 @@ Primary template management interface for swim session templates. Allows coaches
   - Session metadata editor (name, pool, notes)
   - Save, delete, and run actions
 
-- **SessionSetup** (`client/src/components/SessionSetup.tsx`)
-  - Helper for new session creation from dashboard
-  - Quick template selection and drill configuration
-  - One-click session launch
+> Note: A standalone `SessionSetup` component was removed as dead code (never routed). Session creation is handled via `SessionsList`/`SessionDetail`.
 
 - **DrillEditorModal** (`client/src/components/DrillEditorModal.tsx`)
   - Drill selection and modification for session

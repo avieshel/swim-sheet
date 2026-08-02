@@ -12,7 +12,7 @@ import {
 // straight projection, not an ad-hoc reconstruction of timestamps in the view.
 // All timestamps are sessionElapsed-relative offsets.
 
-export interface LiveSwimmerTiming {
+interface LiveSwimmerTiming {
   dbId: string
   startedAt: number | null
   completedAt: number | null

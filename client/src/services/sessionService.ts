@@ -1,4 +1,4 @@
-import { getAllSessions, getSession, addSession, updateSession, deleteSession, getDrillsForSession, getCompletedRuns, getActiveRun } from '../db/dao'
+import { getAllSessions, getSession, addSession, updateSession, deleteSession, getDrillsForSession, getCompletedRuns, getActiveRun, seedDefaultSessions } from '../db/dao'
 import type { SafeSession } from '../db/schema'
 
 export const sessionService = {
@@ -12,4 +12,5 @@ export const sessionService = {
   getDrills: (sessionId: string) => getDrillsForSession(sessionId),
   getCompletedRuns: () => getCompletedRuns(),
   getActiveRun: () => getActiveRun(),
+  seedDefaults: () => seedDefaultSessions(),
 }

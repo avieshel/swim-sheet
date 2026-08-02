@@ -5,7 +5,7 @@ import { createLiveTimingStore } from '../timing/liveTiming'
 
 // ── Data model ──────────────────────────────────────────────
 
-export interface Swimmer {
+interface Swimmer {
   id: number
   dbId?: string
   name: string

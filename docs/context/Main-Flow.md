@@ -310,6 +310,62 @@ All user journeys the application supports, organized by flow.
 
 ---
 
+## 12. Minimalist Session Progress (Progress Mode)
+
+**Entry**: Active run view → toggle to Progress Mode via header button
+
+**Persona**: Coach who prepares sessions in advance and just wants to track "where is each lane" without per-swimmer timing interaction.
+
+### Flow: Run a session in Progress Mode
+
+1. Coach starts a session from a template (or via quick-start)
+2. Swimmers are assigned to lanes (same as Timing Mode — no swimmerless lanes)
+3. Coach toggles view mode from "Timing" to "Progress" (icon toggle: `overview` ↔ `timer` in session header)
+4. Each lane shows a `ProgressGroupCard`:
+   - Lane name, lane number badge, swimmer count
+   - Current drill name with phase tag (warmup / main-set / cooldown)
+   - Drill status: "Not Started" (grey), "In Progress" (blue, pulsing), "Completed" (green)
+   - Lane elapsed timer (formatted `MM:SS`)
+5. Three lane-level actions:
+   - **Previous Drill** — navigates to the preceding drill (chevron left)
+   - **Mark Complete / Next Drill** — marks current drill done, advances to next (chevron right)
+   - Lane-level Start/Finish acts as "Mark In Progress / Mark Complete" (same backend: `store.markGroupStart()` / `store.batchStopSwimmers()`)
+6. Coach can add swimmers to lanes (Add Swimmer / Temp Swimmer buttons) — same roster-building flow as Timing Mode
+7. Session-level controls unchanged: Play/Pause, Complete, Reset
+8. At any point, coach can switch to Timing Mode to get per-swimmer detail on a specific drill. The mode switch affects only the display — all timing data accumulated via group-level actions is visible in the per-swimmer rows.
+9. "Complete" button saves all data identically to Timing Mode
+
+### Flow: Session-level phase overview
+
+When in Progress Mode, a compact phase banner appears below the session header:
+
+```
+Warmup ── [L1✓] [L2→] [L3→]
+Main Set ── [L1→] [L2→]
+Cooldown ── [───]
+```
+
+Derived from each lane's `currentRunDrillId` → drill's `labels` containing phase tags. Shows which phase each lane is currently on. Tapping a phase name navigates all lanes to the first drill in that phase.
+
+### Flow: Mid-session mode switch
+
+1. Coach is in Progress Mode on Drill 3 of 8
+2. A swimmer finishes an exceptional 200m — coach wants to record splits
+3. Coach taps "Switch to Timing" on that lane's card (or the global toggle)
+4. The card re-renders as the full `GroupCard` with per-swimmer rows
+5. All group-level timing data already accumulated is visible: `sessionElapsed`, drill elapsed time
+6. Coach marks individual swimmer Start/Lap/Finish for remaining swimmers
+7. Coach can switch back to Progress Mode — swimmer data persists in `LaneDrillResult`
+
+### Design invariants
+
+- **No swimmerless lanes** — both modes require swimmers assigned to lanes. Progress Mode just hides per-swimmer controls.
+- **Same data model** — both modes write to the same `LaneDrillResult` and `Lap` tables. Mode is purely a UI concern.
+- **View mode persists per session** — stored in `SessionRun.notes` JSON for page-refresh recovery.
+- **Swimmer roster-building is unchanged** — Add Swimmer / Temp Swimmer buttons present in both modes.
+
+---
+
 ## Error Flows
 
 | Scenario | Behavior |
@@ -321,3 +377,4 @@ All user journeys the application supports, organized by flow.
 | Complete session with virtual swimmers | LaneDrillResult saved, Lap records skipped for `quick-*` dbIds |
 | Browser offline | All CRUD works via Dexie; sync deferred |
 | Page refresh during active run | Recovery from `SessionRun.notes` JSON |
+| Page refresh in Progress Mode | View mode restored from `SessionRun.notes` JSON |

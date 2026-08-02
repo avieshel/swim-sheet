@@ -136,17 +136,9 @@ export async function getSessionRun(id: string): Promise<SessionRun | undefined>
   return db.sessionRuns.get(id)
 }
 
-export async function getAllSessionRuns(): Promise<SessionRun[]> {
-  return db.sessionRuns.orderBy('date').reverse().toArray()
-}
-
 export async function getCompletedRuns(): Promise<SessionRun[]> {
   const runs = await db.sessionRuns.where('status').equals('completed').toArray()
   return runs.sort((a, b) => b.date.localeCompare(a.date))
-}
-
-export async function getRunsForSession(sessionId: string): Promise<SessionRun[]> {
-  return db.sessionRuns.where('session_id').equals(sessionId).toArray()
 }
 
 export async function addSessionRun(data: SafeSessionRun): Promise<string> {
@@ -223,89 +215,6 @@ export async function deleteLaneDrillResultsForRun(runId: string): Promise<void>
   await db.laneDrillResults.where('run_id').equals(runId).delete()
 }
 
-/**
- * Creates a SessionRun from a template, snapshotting all drills into RunDrills.
- * Complex drills are either unrolled (timingMode: 'individual') or grouped (timingMode: 'continuous').
- */
-export async function createRunFromTemplate(sessionId: string, runData: { date: string; poolName: string; poolLength: number; notes?: string }): Promise<string> {
-  const session = await getSession(sessionId)
-  if (!session) throw new Error('Session template not found')
-
-  const drills = await getDrillsForSession(sessionId)
-  drills.sort((a, b) => a.order - b.order)
-
-  const runId = await addSessionRun({
-    session_id: sessionId,
-    date: runData.date,
-    poolName: runData.poolName,
-    poolLength: runData.poolLength,
-    notes: runData.notes || '',
-    status: 'active',
-    session_started_at: Date.now(),
-    session_paused_at: null,
-    session_pause_duration: 0,
-  })
-
-  let runDrillOrder = 0
-  for (const drill of drills) {
-    const items = drill.items || []
-    if (items.length === 0) continue
-
-    if (drill.timingMode === 'continuous') {
-      // Create one RunDrill for the whole drill block
-      const totalDistance = items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * drill.repeatCount
-      
-      const instructionLines: string[] = []
-      const equipmentSet = new Set<string>()
-      
-      if (drill.repeatCount > 1) instructionLines.push(`${drill.repeatCount}x:`)
-      for (const item of items) {
-        const intervalText = item.interval ? ` @ ${item.interval}` : ''
-        const equipText = item.equipment?.length ? ` [${item.equipment.join(', ')}]` : ''
-        instructionLines.push(`${item.repeatCount}x ${item.distance}m ${item.stroke} ${item.intensity || ''}${intervalText}${equipText}`)
-        item.equipment?.forEach(e => equipmentSet.add(e))
-      }
-      
-      await addRunDrill({
-        run_id: runId,
-        name: drill.name,
-        stroke: items[0].stroke || 'mixed',
-        distance: totalDistance,
-        order: runDrillOrder++,
-        instructions: instructionLines.join('\n'),
-        equipment: Array.from(equipmentSet),
-        parent_drill_id: drill.id,
-        notes: drill.description || '',
-      })
-    } else {
-      // Unroll items: each repeat of each item gets its own RunDrill record
-      for (let r = 0; r < drill.repeatCount; r++) {
-        for (const item of items) {
-          for (let ir = 0; ir < item.repeatCount; ir++) {
-            const setLabel = drill.repeatCount > 1 ? `(${r + 1}/${drill.repeatCount}) ` : ''
-            const repLabel = item.repeatCount > 1 ? `[${ir + 1}/${item.repeatCount}]` : ''
-            
-            await addRunDrill({
-              run_id: runId,
-              name: `${setLabel}${drill.name}`,
-              stroke: item.stroke,
-              distance: item.distance,
-              order: runDrillOrder++,
-              instructions: repLabel || item.intensity || '',
-              interval: item.interval,
-              equipment: item.equipment,
-              parent_drill_id: drill.id,
-              notes: drill.description || '',
-            })
-          }
-        }
-      }
-    }
-  }
-
-  return runId
-}
-
 // ── Run ↔ Swimmer ──────────────────────────────────────────
 
 export async function getRunSwimmersForRun(runId: string): Promise<RunSwimmer[]> {
@@ -367,14 +276,6 @@ export async function addLap(data: SafeLap): Promise<string> {
   const id = crypto.randomUUID()
   await db.laps.add({ ...data, id, createdAt: now, updatedAt: now })
   return id
-}
-
-export async function updateLap(id: string, data: Partial<SafeLap>): Promise<void> {
-  await db.laps.update(id, { ...data, updatedAt: new Date().toISOString() })
-}
-
-export async function deleteLap(id: string): Promise<void> {
-  await db.laps.delete(id)
 }
 
   // ── Library Drills ─────────────────────────────────────────
@@ -864,6 +765,79 @@ export async function seedLibraryDrills(): Promise<void> {
 
   for (const d of drills) {
     await addLibraryDrill({ ...d, source: 'builtin' })
+  }
+}
+
+export async function seedDefaultSessions(): Promise<void> {
+  const existing = await db.sessions.where('name').equals('Distance Progression').first()
+  if (existing) return
+
+  const sessionId = await addSession({
+    name: 'Distance Progression',
+    poolLength: 25,
+    notes: 'Progressive distance session — build intensity as distance decreases. Warm up easy, find your rhythm in the main set, cool down well.',
+  })
+
+  const drills: SafeDrill[] = [
+    {
+      session_id: sessionId, name: 'Easy Free', order: 0, stroke: 'freestyle', distance: 100,
+      items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      repeatCount: 1, timingMode: 'individual', focus: 'none', labels: ['warmup'], description: 'Easy pace, focus on breathing and body position.',
+    },
+    {
+      session_id: sessionId, name: 'Kickboard', order: 1, stroke: 'freestyle', distance: 100,
+      items: [{ id: crypto.randomUUID(), distance: 25, stroke: 'freestyle', repeatCount: 4, equipment: ['kickboard'] }],
+      repeatCount: 1, timingMode: 'continuous', focus: 'technique', labels: ['warmup', 'kick'], description: '25m kick, 25m swim. Keep hips high, steady rhythm.',
+    },
+    {
+      session_id: sessionId, name: 'Pull Buoy', order: 2, stroke: 'freestyle', distance: 100,
+      items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1, equipment: ['pullbuoy'] }],
+      repeatCount: 1, timingMode: 'individual', focus: 'technique', labels: ['warmup', 'body position'], description: 'Long strokes, focus on rotation and reach.',
+    },
+    {
+      session_id: sessionId, name: 'Catch-Up Drill', order: 3, stroke: 'freestyle', distance: 100,
+      items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      repeatCount: 1, timingMode: 'individual', focus: 'technique', labels: ['warmup', 'rhythm', 'streamline'], description: 'Full extension before each stroke. Fingertip drag recovery.',
+    },
+    {
+      session_id: sessionId, name: 'Build', order: 4, stroke: 'freestyle', distance: 100,
+      items: [{ id: crypto.randomUUID(), distance: 25, stroke: 'freestyle', repeatCount: 4 }],
+      repeatCount: 1, timingMode: 'continuous', focus: 'technique', labels: ['warmup', 'pacing'], description: 'Build from easy to moderate each 25m. Feel the pace change.',
+    },
+    {
+      session_id: sessionId, name: '500m Free', order: 5, stroke: 'freestyle', distance: 500,
+      items: [{ id: crypto.randomUUID(), distance: 500, stroke: 'freestyle', repeatCount: 1 }],
+      repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: ['main-set', 'endurance', 'aerobic'], description: 'Steady aerobic pace. Hold consistent stroke count.',
+    },
+    {
+      session_id: sessionId, name: '400m Pull', order: 6, stroke: 'freestyle', distance: 400,
+      items: [{ id: crypto.randomUUID(), distance: 400, stroke: 'freestyle', repeatCount: 1, equipment: ['pullbuoy'] }],
+      repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: ['main-set', 'strength', 'endurance'], description: 'Buoy only. Focus on early vertical forearm and catch.',
+    },
+    {
+      session_id: sessionId, name: '300m Kick', order: 7, stroke: 'freestyle', distance: 300,
+      items: [{ id: crypto.randomUUID(), distance: 300, stroke: 'freestyle', repeatCount: 1, equipment: ['kickboard'] }],
+      repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: ['main-set', 'kick', 'endurance'], description: 'Non-stop kick with board. Fast, narrow, steady.',
+    },
+    {
+      session_id: sessionId, name: '3×200 Free', order: 8, stroke: 'freestyle', distance: 600,
+      items: [{ id: crypto.randomUUID(), distance: 200, stroke: 'freestyle', repeatCount: 3, intensity: 'v3', interval: '3:00' }],
+      repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: ['main-set', 'pacing', 'speed'], description: 'On 3:00. Descend 1-3. Build pace through each 200.',
+    },
+    {
+      session_id: sessionId, name: '4×100 Free', order: 9, stroke: 'freestyle', distance: 400,
+      items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 4, intensity: 'v4', interval: '1:45' }],
+      repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: ['main-set', 'speed', 'sprint'], description: 'On 1:45. Fast, hold pace across all four. Strong finish.',
+    },
+    {
+      session_id: sessionId, name: 'Easy Cool Down', order: 10, stroke: 'freestyle', distance: 100,
+      items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      repeatCount: 1, timingMode: 'individual', focus: 'none', labels: ['cooldown'], description: 'Shake it out. Easy, relaxed, deep breathing.',
+    },
+  ]
+
+  for (const drill of drills) {
+    await addDrill(drill)
   }
 }
 

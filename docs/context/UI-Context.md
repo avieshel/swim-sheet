@@ -188,6 +188,36 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 - **Live view (`/`)** — limited controls: **Reset** (clears all timing data for the current run, returns groups to drill 1) and **Complete** (finalizes and persists the session). These are the only session-level actions available during a live session.
 - **Runs history screen** (future, `/runs`) — full session lifecycle management: browse completed sessions, view per-swimmer lap data, delete old runs, re-open a completed run for review. This is where the coach goes for post-session analysis and administration.
 
+**View Modes:**
+
+The LiveDeck supports two view modes to accommodate different coaching styles:
+
+- **Timing Mode** (full detail, existing): Renders the complete `GroupCard` (defined inside `client/src/pages/LiveDeck.tsx`) with per-swimmer Start/Lap/Finish buttons, inline stroke count steppers, lap split tables, and timing detail. Swimmers are always present in state and persisted — this is the default mode.
+
+- **Progress Mode** (minimalist, new): Renders a simplified `ProgressGroupCard` per lane. Same data requirements as Timing Mode (`TimedGroup` with swimmers, `currentRunDrillId`, `LaneDrillResult`) — swimmers are always assigned to lanes. The difference is entirely in presentation:
+  - No per-swimmer rows (no Start/Lap/Finish buttons, no lap tables, no stroke counts)
+  - Lane card shows: lane name, swimmer count, current drill name/phase tag (warmup/main-set/cooldown), drill status indicator
+  - Three lane-level actions: Previous Drill, Mark Complete / Next Drill
+  - Lane elapsed timer display
+  - Add Swimmer / Temp Swimmer buttons still present for roster-building
+  - "Switch to Timing" button per card for mid-session mode switch
+
+The coach can toggle between modes at any time during a live session. Switching from Progress to Timing mode mid-drill shows the full per-swimmer timing data that has been accumulated (via group-level Start/Finish). Both modes write into the same `LaneDrillResult` and `Lap` tables — no data model bifurcation.
+
+**ProgressGroupCard layout:**
+```
+┌─────────────────────────────────────────┐
+│ Lane 1 — L1   3 swimmers           [≡] │ ← lane header with swimmer count
+├─────────────────────────────────────────┤
+│ Drill 3 of 8                            │
+│ 200m IM — Main Set                      │
+│ ◉ In Progress                           │
+│  [+ Prev]  [✔ Mark Complete]  [Next +]  │ ← lane-level only
+├─────────────────────────────────────────┤
+│ ⏱ 14:32 elapsed                        │
+└─────────────────────────────────────────┘
+```
+
 **Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
 - **Start** (emerald) — `store.markSwimmerStart(...)` if not already started; disabled after started.
 - **Lap** (blue) — `store.markSwimmerLap(...)` appends `lap::<n>` if swimmer has a start and no done; no-op otherwise.
@@ -271,7 +301,7 @@ App preferences.
 ## Key Components
 
 ### StrokeCountStepper
-Inline stroke count control for each lap row in the swimmer card. Replaces the old `prompt()`-based SC button.
+Inline stroke count control for each lap row in the swimmer card (defined inside `client/src/components/SwimmerRows.tsx`; the standalone `components/StrokeCountStepper.tsx` was removed as dead code). Replaces the old `prompt()`-based SC button.
 
 - `[−]` decrements the preset, `[+]` increments it; tap the preset number to apply it to the lap
 - Initially SC shows `--` (unset) for every new lap

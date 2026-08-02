@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { listSessions, getSession, createSession, deleteSession, listCompletedRuns } from '../api/sessions'
+import { listSessions, getSession, createSession, deleteSession, listCompletedRuns, seedDefaultSessions } from '../api/sessions'
 import { getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/drillHelpers'
@@ -60,8 +60,13 @@ export const SessionsList: React.FC = () => {
   }
 
   useEffect(() => {
-    listSessions().then(all => {
-      Promise.all(
+    let cancelled = false
+    seedDefaultSessions().then(() => {
+      if (cancelled) return
+      return listSessions()
+    }).then(all => {
+      if (cancelled || !all) return
+      return Promise.all(
         all.map(async (s) => {
           const drills = await getSessionDrills(s.id)
           const breakdown = aggregateByStroke(drills)
@@ -73,11 +78,15 @@ export const SessionsList: React.FC = () => {
             focusAreas: detectFocus(drills),
           } as SessionWithTotals
         })
-      ).then(withTotals => {
-        setSessions(withTotals)
-        setLoading(false)
-      })
-    }).catch(() => setLoading(false))
+      )
+    }).then(withTotals => {
+      if (!cancelled && withTotals) setSessions(withTotals)
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
   }, [])
 
   const handleCreate = async () => {

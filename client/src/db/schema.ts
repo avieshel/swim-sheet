@@ -19,7 +19,7 @@ export interface Session {
   updatedAt: string
 }
 
-export interface DrillItem {
+interface DrillItem {
   id: string
   distance: number
   stroke: string
@@ -30,7 +30,7 @@ export interface DrillItem {
   segments?: DrillSegment[]
 }
 
-export interface DrillSegment {
+interface DrillSegment {
   distance: number
   stroke: string
   name: string
@@ -127,7 +127,7 @@ export interface SavedDrillData {
   swimmers: SavedSwimmerData[]
 }
 
-export interface DbMeta {
+interface DbMeta {
   key: string
   value: string
 }

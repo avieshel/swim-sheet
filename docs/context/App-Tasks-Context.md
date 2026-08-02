@@ -90,7 +90,7 @@ When two or more groups share the same physical lane number, visually cluster th
 - `setLaneDrillResult` upsert logic → `runService.ts`
 
 **Priority**: Medium
-**Status**: In Progress — `setLaneDrillResult` and `deleteSwimmerFromLaneDrillResult` moved to `runService.ts`. Remaining items (seed data functions) deferred due to large hardcoded seed data (~400 lines).
+**Status**: In Progress — `setLaneDrillResult` and `deleteSwimmerFromLaneDrillResult` moved to `runService.ts`. The dead DAO `createRunFromTemplate` was removed (the live implementation lives in `runService.ts`). Remaining items (seed data functions) deferred due to large hardcoded seed data (~400 lines).
 
 ---
 
@@ -288,3 +288,33 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Priority**: Medium
 **Status**: Done
+
+---
+
+## A-019: Session import/export for cross-coach sharing
+
+**Source**: Design review — coach onboarding and sharing
+
+**Problem**: No way to share session templates between coaches. Current alternatives (iPhone notes, verbal instruction) are fragile. The app needs a way for existing coaches to share sessions with new coaches (onboarding vector) and for coaches to trade sessions with peers.
+
+**Solution**: File-based export/import with import namespacing.
+
+**Export**: A session template + its drills serialized to a JSON file. Downloaded via browser.
+
+**Import**: Parse JSON, create session + drills through existing DAO methods. Drills are tagged `source: 'imported'` with a `creatorFingerprint` (stable UUID of the exporting coach). Imports are displayed separately in the drill bank under an "Imports" tab.
+
+**Design doc**: `docs/context/Import-Export-Context.md`
+
+**Implementation stages**:
+1. Phase 1 (onboarding): Export/download from SessionsList, import/file-pick into SessionsList. Imports tagged as `source: 'imported'`.
+2. Phase 2 (peer sharing): Import namespace grouping, re-import updates from same creator, "Make Native" drill-by-drill matching UI.
+3. Phase 3 (curated defaults): Maintain a collection of seed session JSON files. New coaches receive these on sign-up interest (email/AirDrop).
+
+**Files**:
+- New: `client/src/api/importExport.ts` — `exportSession()`, `importSession()` functions
+- `client/src/pages/SessionsList.tsx` — Export button per card, Import button in header
+- `client/src/db/schema.ts` — optional `creatorFingerprint`, `importBatchId`, `source: 'imported'` on LibraryDrill/Session
+- `client/src/pages/DrillBank.tsx` — "My Drills" / "Imports" tab
+
+**Priority**: High
+**Status**: In Progress — Export/download from SessionsList and import/file-pick UI not yet implemented

@@ -4,7 +4,7 @@ import { CustomSelect } from './CustomSelect'
 import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, strokeOptions } from '../constants/drill'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 
-export interface DrillItem {
+interface DrillItem {
   id: string
   distance: number
   stroke: string
