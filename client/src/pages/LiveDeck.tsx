@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
-import { getActiveRun, addSwimmerToRun, createQuickStartRun, updateRun, getRunDrills, getLaneResults, removeSwimmerFromRun, setLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, completeRunWithLaps, buildLaneResult, getRunSwimmers, getRunSwimmerLinks } from '../api/runs'
+import { getActiveRun, addSwimmerToRun, createQuickStartRun, updateRun, getRunDrills, getLaneResults, removeSwimmerFromRun, setLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, completeRunWithLaps, buildLaneResult, getRunSwimmers, getRunSwimmerLinks, promoteAndLinkSwimmer } from '../api/runs'
 import type { CompleteRunLap } from '../api/runs'
 import { getSession } from '../api/sessions'
 import { ConfirmDialog } from '../components/ConfirmDialog'
@@ -578,7 +578,15 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
   const activeGroups = groups.filter(g => g.swimmers.length > 0)
 
 
+  const [showPromotionModal, setShowPromotionModal] = useState<Array<{ name: string; dbId: string }>>([])
+  const [sessionLaps, setSessionLaps] = useState<CompleteRunLap[]>([])
+
   const handleComplete = async () => {
+    const unlinkedSwimmers = groups
+      .flatMap(g => g.swimmers)
+      .filter(s => s.dbId && s.dbId.startsWith('quick-'))
+      .map(s => ({ name: s.name, dbId: s.dbId! }))
+
     const laps: CompleteRunLap[] = []
     for (const group of groups) {
       const drillId = group.currentRunDrillId
@@ -599,7 +607,30 @@ function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () =>
         }
       }
     }
-    await completeRunWithLaps(run.id, laps)
+
+    if (unlinkedSwimmers.length > 0) {
+      setSessionLaps(laps)
+      setShowPromotionModal(unlinkedSwimmers)
+    } else {
+      await completeRunWithLaps(run.id, laps)
+      dispatch({ type: 'CLEAR' })
+      onComplete()
+    }
+  }
+
+  const handleSkipPromotion = async () => {
+    await completeRunWithLaps(run.id, sessionLaps)
+    dispatch({ type: 'CLEAR' })
+    onComplete()
+  }
+
+  const handleConfirmPromotion = async (promotions: Array<{ name: string; dbId: string }>) => {
+    for (const p of promotions) {
+      await promoteAndLinkSwimmer(run.id, p.dbId, p.name)
+    }
+    // Need to re-build laps including newly promoted swimmers?
+    // For now, keep it simple and just promote then complete
+    await completeRunWithLaps(run.id, sessionLaps)
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
@@ -848,6 +879,18 @@ className={`shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 
           </div>
         </section>
       )}
+
+      {/* Promotion Modal */}
+      <ConfirmDialog
+        open={showPromotionModal.length > 0}
+        title="Promote Swimmers?"
+        message="Some swimmers were added as temporary swimmers. Would you like to add them to your permanent roster?"
+        confirmLabel="Promote & Complete"
+        cancelLabel="Skip & Complete"
+        destructive={false}
+        onConfirm={() => handleConfirmPromotion(showPromotionModal)}
+        onCancel={handleSkipPromotion}
+      />
 
       <ConfirmDialog
         open={confirmMove !== null}
