@@ -19,6 +19,9 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
 | Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
+| Template creation + promote-to-live flow (Initiative 1) | `docs/context/Session-Creation-To-Live-Context.md` |
+| Past sessions table + swimmer-filtered history (Initiative 2) | `docs/context/Past-Sessions-Data-Context.md` |
+| Implementation plan for both initiatives (sequenced tasks) | `docs/context/Session-Initiatives-PLAN.md` |
 
 Archived plans and audits: `docs/archive/`
 

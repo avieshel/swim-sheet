@@ -247,6 +247,12 @@ Browse completed SessionRuns on a dedicated `/runs` page with full session manag
 - **Live view split**: Live view (`/`) only has Reset and Complete — no delete, no browsing. All historical management lives on the Runs screen.
 - **Navigation**: Accessible from sidebar nav (desktop) and bottom nav (mobile)
 
+> **Design exists**: `docs/context/Past-Sessions-Data-Context.md` (Initiative 2) is the
+> authoritative design for this — a shared `RunHistoryTable` + `runHistoryService`
+> read model serving `/sessions`, `/runs` (with swimmer filter), and `/swimmers/:id`.
+> It supersedes the list/detail split described here (browse + delete + export in scope;
+> re-open-as-read-only deferred).
+
 **Priority**: Low
 **Status**: Open
 

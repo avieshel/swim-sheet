@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { listSessions, getSession, createSession, deleteSession, listCompletedRuns, seedDefaultSessions } from '../api/sessions'
+import { listSessions, createSession, deleteSession, seedDefaultSessions } from '../api/sessions'
 import { getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/drillHelpers'
 import { strokeColorsSolid } from '../constants/drill'
-import type { SessionRun } from '../api/runs'
+import { RunHistoryTable } from '../components/Table'
 
 interface SessionWithTotals extends Session {
   drillCount: number
@@ -302,7 +302,22 @@ export const SessionsList: React.FC = () => {
       )}
 
       {/* Completed runs section */}
-      <CompletedRunsSection />
+      <div className="mt-8 md:mt-12">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-headline-md text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary">history</span>
+            Completed Sessions
+          </h3>
+          <Link
+            to="/runs"
+            className="text-label-sm text-primary font-bold flex items-center gap-1 hover:gap-2 transition-all no-underline"
+          >
+            View all
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          </Link>
+        </div>
+        <RunHistoryTable showDelete />
+      </div>
 
       {/* Confirmation Dialog */}
       <ConfirmDialog
@@ -315,45 +330,3 @@ export const SessionsList: React.FC = () => {
     </div>
   )
 }
-
-function CompletedRunsSection() {
-  const [runs, setRuns] = useState<(SessionRun & { templateName: string })[]>([])
-
-  useEffect(() => {
-    (async () => {
-      const r = await listCompletedRuns()
-      const withNames = await Promise.all(
-        r.map(async (run) => {
-          const session = await getSession(run.session_id)
-          return { ...run, templateName: session?.name || 'Unknown' }
-        })
-      )
-      setRuns(withNames)
-    })()
-  }, [])
-
-  if (runs.length === 0) return null
-
-  return (
-    <div className="mt-8 md:mt-12">
-      <h3 className="font-headline-md text-on-surface mb-4 flex items-center gap-2">
-        <span className="material-symbols-outlined text-primary">history</span>
-        Completed Sessions
-      </h3>
-      <div className="space-y-2">
-        {runs.map(r => (
-          <div key={r.id} className="bg-surface-container-lowest rounded-xl p-3 md:p-4 border border-outline-variant flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-            <div className="min-w-0">
-              <span className="font-bold text-on-surface block sm:inline">{r.templateName}</span>
-              <span className="text-label-sm text-on-surface-variant sm:ml-3 block sm:inline">{r.date}</span>
-              <span className="text-label-sm text-on-surface-variant sm:ml-3 block sm:inline">{r.poolName} &middot; {r.poolLength}m</span>
-            </div>
-            <span className="text-label-sm text-primary font-bold shrink-0">Completed</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-

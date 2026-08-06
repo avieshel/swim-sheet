@@ -166,6 +166,20 @@ export async function completeSessionRun(id: string): Promise<void> {
   await db.sessionRuns.update(id, { status: 'completed', updatedAt: new Date().toISOString() })
 }
 
+export async function deleteSessionRunCascade(runId: string): Promise<void> {
+  const runDrills = await db.runDrills.where('run_id').equals(runId).toArray()
+  const runDrillIds = runDrills.map(d => d.id)
+  await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.laneDrillResults, db.sessionRuns], async () => {
+    if (runDrillIds.length > 0) {
+      await db.laps.where('run_drill_id').anyOf(runDrillIds).delete()
+    }
+    await db.runDrills.where('run_id').equals(runId).delete()
+    await db.runSwimmers.where('run_id').equals(runId).delete()
+    await db.laneDrillResults.where('run_id').equals(runId).delete()
+    await db.sessionRuns.delete(runId)
+  })
+}
+
 // ── Run Drills (snapshots) ────────────────────────────────
 
 export async function getRunDrillsForRun(runId: string): Promise<RunDrill[]> {
@@ -270,6 +284,13 @@ export async function getLapsForSwimmerInRun(runId: string, swimmerId: string): 
   const drillIds = runDrills.map(d => d.id)
   if (drillIds.length === 0) return []
   return db.laps.where('run_drill_id').anyOf(drillIds).and(l => l.swimmer_id === swimmerId).toArray()
+}
+
+export async function getLapsForRun(runId: string): Promise<Lap[]> {
+  const runDrills = await db.runDrills.where('run_id').equals(runId).toArray()
+  const drillIds = runDrills.map(d => d.id)
+  if (drillIds.length === 0) return []
+  return db.laps.where('run_drill_id').anyOf(drillIds).toArray()
 }
 
 export async function addLap(data: SafeLap): Promise<string> {

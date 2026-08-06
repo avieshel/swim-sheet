@@ -1,5 +1,7 @@
 import { runService } from '../services/runService'
 import type { CompleteRunLap } from '../services/runService'
+import { getRunHistory as getRunHistoryFromService, getRunById as getRunByIdFromService, deleteRun as deleteRunFromService, exportRun as exportRunFromService } from '../services/runHistoryService'
+import type { RunHistoryData, RunSummary } from '../services/runHistoryService'
 import type { SafeSessionRun, SessionRun, SafeRunDrill, RunDrill, SafeLaneDrillResult, LaneDrillResult, Swimmer, RunSwimmer, SafeLap, Lap, SavedDrillData } from '../db/schema'
 import type { LiveDrillTiming } from '../timing/liveTiming'
 import { timestampSplits } from '../utils/lapEditing'
@@ -209,5 +211,22 @@ export function getAllLaps(): Promise<Lap[]> {
   return runService.getAllLaps()
 }
 
+export function getRunHistory(swimmerId?: string): Promise<RunHistoryData> {
+  return getRunHistoryFromService(swimmerId)
+}
+
+export function getRunById(runId: string): Promise<RunSummary | null> {
+  return getRunByIdFromService(runId)
+}
+
+export function deleteRun(runId: string): Promise<void> {
+  return deleteRunFromService(runId)
+}
+
+export function exportRun(runId: string): Promise<Blob> {
+  return exportRunFromService(runId)
+}
+
 export type { SessionRun, RunDrill, LaneDrillResult, Swimmer, RunSwimmer, Lap, SavedDrillData } from '../db/schema'
 export type { CompleteRunLap } from '../services/runService'
+export type { RunSummary, RunSwimmerSummary, RunHistoryData } from '../services/runHistoryService'

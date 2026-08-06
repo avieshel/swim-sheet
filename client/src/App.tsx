@@ -11,6 +11,8 @@ import { DrillDetail } from './pages/DrillDetail'
 import { CoachDashboard } from './pages/CoachDashboard'
 import { LiveDeck } from './pages/LiveDeck'
 import { Settings } from './pages/Settings'
+import { RunsHistory } from './pages/RunsHistory'
+import { RunDetail } from './pages/RunDetail'
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
           <Route path="/drills/:id" element={<DrillDetail />} />
           <Route path="/live" element={<LiveDeck />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/runs" element={<RunsHistory />} />
+          <Route path="/runs/:id" element={<RunDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <SyncStatus />

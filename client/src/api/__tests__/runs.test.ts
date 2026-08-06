@@ -34,11 +34,19 @@ vi.mock('../../services/runService', () => ({
   },
 }))
 
-import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult } from '../runs'
+vi.mock('../../services/runHistoryService', () => ({
+  getRunHistory: vi.fn(),
+  getRunById: vi.fn(),
+  deleteRun: vi.fn(),
+  exportRun: vi.fn(),
+}))
+
+import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult, getRunHistory, getRunById, deleteRun, exportRun } from '../runs'
 import { runService } from '../../services/runService'
 import type { SafeSessionRun, SafeLaneDrillResult, SafeLap } from '../../db/schema'
 import type { LiveDrillTiming } from '../../timing/liveTiming'
 import type { CompleteRunLap } from '../../services/runService'
+import type { RunSummary, RunSwimmerSummary, RunHistoryData } from '../runs'
 
 describe('runs API', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -317,4 +325,60 @@ describe('runs API', () => {
     expect(result.swimmers[0].laps).toEqual([])
     expect(result.swimmers[0].completed).toBe(false)
   })
+
+  // ── Run History ──
+
+  it('getRunHistory delegates to the run history service without a filter', async () => {
+    const serviceGetRunHistory = vi.mocked((await import('../../services/runHistoryService')).getRunHistory)
+    const expected: RunHistoryData = { runs: [], totalRuns: 0 }
+    serviceGetRunHistory.mockResolvedValue(expected)
+    const result = await getRunHistory()
+    expect(serviceGetRunHistory).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(result).toBe(expected)
+  })
+
+  it('getRunHistory passes a swimmer filter', async () => {
+    const serviceGetRunHistory = vi.mocked((await import('../../services/runHistoryService')).getRunHistory)
+    serviceGetRunHistory.mockResolvedValue({ runs: [], totalRuns: 0 })
+    await getRunHistory('sw1')
+    expect(serviceGetRunHistory).toHaveBeenCalledExactlyOnceWith('sw1')
+  })
+
+  it('getRunById delegates to the run history service', async () => {
+    const serviceGetRunById = vi.mocked((await import('../../services/runHistoryService')).getRunById)
+    serviceGetRunById.mockResolvedValue(null)
+    const result = await getRunById('r1')
+    expect(serviceGetRunById).toHaveBeenCalledExactlyOnceWith('r1')
+    expect(result).toBeNull()
+  })
+
+  it('deleteRun delegates to the run history service', async () => {
+    const serviceDeleteRun = vi.mocked((await import('../../services/runHistoryService')).deleteRun)
+    serviceDeleteRun.mockResolvedValue(undefined)
+    await deleteRun('r1')
+    expect(serviceDeleteRun).toHaveBeenCalledExactlyOnceWith('r1')
+  })
+
+  it('exportRun delegates to the run history service', async () => {
+    const serviceExportRun = vi.mocked((await import('../../services/runHistoryService')).exportRun)
+    serviceExportRun.mockResolvedValue(new Blob(['{}'], { type: 'application/json' }))
+    const result = await exportRun('r1')
+    expect(serviceExportRun).toHaveBeenCalledExactlyOnceWith('r1')
+    expect(result).toBeInstanceOf(Blob)
+  })
+
+  it('exposes the run history read-model types', () => {
+    swimmerSummaryFixture()
+  })
 })
+
+function swimmerSummaryFixture(): void {
+  const swimmer: RunSwimmerSummary = { swimmerId: null, name: 'Mia', isVirtual: true, totalTimeMs: null, timeEntries: [] }
+  const run: RunSummary = {
+    runId: 'r1', sessionId: 's1', templateName: 'T', date: '2024-01-01', poolName: null,
+    poolLength: 25, status: 'completed', swimmers: [swimmer], totalSwimmers: 1,
+    recordedTimesCount: 0, completedLaps: 0,
+  }
+  const data: RunHistoryData = { runs: [run], totalRuns: 1 }
+  expect(data.runs[0].swimmers[0].isVirtual).toBe(true)
+}

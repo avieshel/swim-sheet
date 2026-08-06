@@ -1,12 +1,35 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listSwimmers, createSwimmer, updateSwimmer, deleteSwimmer } from '../api/swimmers'
+import { getRunHistory } from '../api/runs'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
-import type { Swimmer } from '../api/runs'
+import type { Swimmer, RunSummary } from '../api/runs'
+
+interface SwimmerStats {
+  lastRun: { runId: string; date: string; templateName: string } | null
+  sessions30d: number
+}
+
+function computeSwimmerStats(runs: RunSummary[], swimmer: Swimmer): SwimmerStats {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const swimmerLower = swimmer.name.toLowerCase()
+  let sessions30d = 0
+  let lastRun: SwimmerStats['lastRun'] = null
+  for (const run of runs) {
+    const participates = run.swimmers.some(
+      s => s.swimmerId === swimmer.id || s.name.toLowerCase() === swimmerLower
+    )
+    if (!participates) continue
+    if (lastRun == null) lastRun = { runId: run.runId, date: run.date, templateName: run.templateName }
+    if (run.date >= cutoff) sessions30d += 1
+  }
+  return { lastRun, sessions30d }
+}
 
 export const SwimmersList: React.FC = () => {
   const [swimmers, setSwimmers] = useState<Swimmer[]>([])
+  const [historyRuns, setHistoryRuns] = useState<RunSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -34,6 +57,20 @@ export const SwimmersList: React.FC = () => {
   }
 
   useEffect(() => { listSwimmers().then(data => { setSwimmers(data); setLoading(false) }) }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    getRunHistory()
+      .then(data => { if (!cancelled) setHistoryRuns(data.runs) })
+      .catch(() => { if (!cancelled) setHistoryRuns([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  const statsBySwimmer = useMemo(() => {
+    const map = new Map<string, SwimmerStats>()
+    for (const s of swimmers) map.set(s.id, computeSwimmerStats(historyRuns, s))
+    return map
+  }, [swimmers, historyRuns])
 
   const openAddModal = () => {
     setEditingId(null)
@@ -196,32 +233,51 @@ export const SwimmersList: React.FC = () => {
                         {s.group}
                       </span>
                     )}
+                    <span className={`px-2 py-0.5 rounded text-label-caps font-bold ${
+                      s.status === 'inactive'
+                        ? 'bg-surface-variant text-on-surface-variant'
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {s.status === 'inactive' ? 'Inactive' : 'Active'}
+                    </span>
                     {s.notes && (
                       <span className="text-on-surface-variant font-label-sm text-label-sm truncate max-w-[200px]">{s.notes}</span>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-surface-container-low p-3 rounded-lg">
-                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">GROUP</span>
-                  <span className="font-display-timer text-headline-lg text-primary">{s.group || '—'}</span>
-                </div>
-                <div className="bg-surface-container-low p-3 rounded-lg">
-                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">STATUS</span>
-                  <span className={`flex items-center gap-1.5 font-bold text-sm ${s.status === 'inactive' ? 'text-on-surface-variant' : 'text-green-600'}`}>
-                    <span className={`w-2 h-2 rounded-full ${s.status === 'inactive' ? 'bg-outline' : 'bg-green-500'}`}></span>
-                    {s.status === 'inactive' ? 'Inactive' : 'Active'}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const stats = statsBySwimmer.get(s.id) ?? { lastRun: null, sessions30d: 0 }
+                return (
+                  <div className="flex flex-col gap-3 mb-6">
+                    <div className="bg-surface-container-low p-3 rounded-lg min-w-0">
+                      <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">LAST SESSION</span>
+                      {stats.lastRun ? (
+                        <Link
+                          to={`/runs/${stats.lastRun.runId}`}
+                          className="block text-primary font-bold text-sm leading-tight hover:underline no-underline"
+                        >
+                          <span className="block truncate">{stats.lastRun.templateName}</span>
+                          <span className="block font-label-sm text-label-sm text-on-surface-variant font-normal">{stats.lastRun.date}</span>
+                        </Link>
+                      ) : (
+                        <span className="font-body-md text-on-surface-variant">No sessions yet</span>
+                      )}
+                    </div>
+                    <div className="bg-surface-container-low p-3 rounded-lg">
+                      <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">SESSIONS · 30D</span>
+                      <span className="font-display-timer text-headline-lg text-primary">{stats.sessions30d}</span>
+                    </div>
+                  </div>
+                )
+              })()}
               <div className="flex gap-2">
                 <Link
                   to={`/swimmers/${s.id}`}
                   className="flex-1 h-touch-target-min bg-primary text-on-primary rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all no-underline"
                 >
                   <span className="material-symbols-outlined text-xl">analytics</span>
-                  View Stats
+                  Stats
                 </Link>
                 <button
                   onClick={() => openEditModal(s)}

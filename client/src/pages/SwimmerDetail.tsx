@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSwimmer, updateSwimmer, deleteSwimmer, deleteSwimmerWithData, exportSwimmerData } from '../api/swimmers'
-import { getSession } from '../api/sessions'
-import { getRunsForSwimmer } from '../api/runs'
-import type { Swimmer, SessionRun } from '../api/runs'
+import type { Swimmer } from '../api/runs'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
+import { RunHistoryTable } from '../components/Table'
 
 export const SwimmerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [swimmer, setSwimmer] = useState<Swimmer | null>(null)
-  const [runs, setRuns] = useState<(SessionRun & { templateName: string })[]>([])
   const [loading, setLoading] = useState(true)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editName, setEditName] = useState('')
@@ -46,14 +44,6 @@ export const SwimmerDetail: React.FC = () => {
       setEditGroup(s.group || '')
       setEditNotes(s.notes || '')
       setEditStatus(s.status || 'active')
-      const runList = await getRunsForSwimmer(id)
-      const withTemplates = await Promise.all(
-        runList.map(async (r: SessionRun) => {
-          const session = await getSession(r.session_id)
-          return { ...r, templateName: session?.name || 'Unknown' }
-        })
-      )
-      setRuns(withTemplates)
       setLoading(false)
     }
     load()
@@ -179,26 +169,7 @@ export const SwimmerDetail: React.FC = () => {
           <span className="material-symbols-outlined text-primary">event_note</span>
           Session History
         </h3>
-        {runs.length === 0 ? (
-          <p className="text-on-surface-variant font-body-md">No completed sessions yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {runs.map(r => (
-              <div
-                key={r.id}
-                className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl"
-              >
-                <div>
-                  <span className="font-body-md text-body-md text-on-surface">{r.templateName}</span>
-                  <span className="text-label-sm text-on-surface-variant ml-2">{r.date}</span>
-                </div>
-                <span className={`text-label-sm font-bold ${r.status === 'completed' ? 'text-primary' : 'text-warning'}`}>
-                  {r.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        <RunHistoryTable swimmerId={id} borderless focusName={swimmer.name} lastAttended />
       </div>
 
       <SwimmerFormModal
