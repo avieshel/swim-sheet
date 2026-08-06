@@ -618,6 +618,7 @@ the identity model (A-032) made navigable:
 | Equipment | none / fins / paddles / pullbuoy / snorkel / kickboard | item `equipment` |
 | Effort | v1–v5 | item `intensity` |
 | Focus / purpose | technique / fitness / endurance / sprint / test / recovery | `focus` (enum expands) |
+| Labels (facets) | catch, rotation, breathing, body position, kick, streamline, rhythm, strength, endurance, speed, pacing, sprint, aerobic, anaerobic, pullout, recovery, feel, balance, power, efficiency | `labels` (free-form, multi-value) |
 | Phase | warmup / main-set / cooldown | `labels` |
 
 - **Similar drills** = drills sharing a dimension set: same instruction (exact identity),

@@ -319,6 +319,7 @@ export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
     focus: data.focus || 'none',
     labels: data.labels || [],
     description: data.description || '',
+    popularity: data.popularity ?? (data.source === 'builtin' ? 0 : 1),
     createdAt: now,
     updatedAt: now,
   }
@@ -330,12 +331,26 @@ export async function deleteLibraryDrill(id: string): Promise<void> {
   await db.libraryDrills.delete(id)
 }
 
+export async function bumpDrillPopularity(id: string): Promise<void> {
+  const drill = await db.libraryDrills.get(id)
+  if (drill) {
+    await db.libraryDrills.update(id, {
+      popularity: (drill.popularity ?? 0) + 1,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+}
+
+export async function getPopularDrills(limit?: number): Promise<LibraryDrill[]> {
+  return db.libraryDrills.orderBy('popularity').reverse().limit(limit ?? 20).toArray()
+}
+
 export async function patchLibraryDrills(): Promise<void> {
   const defaults = [
     { 
       name: 'Fingertip Drag', 
       focus: 'technique', 
-      labels: ['catch', 'rotation'], 
+      labels: ['catch', 'pull', 'rotation'], 
       description: 'Focus on high elbow recovery by dragging fingertips along the water surface. Improves arm recovery and shoulder rotation.' 
     },
     { 
@@ -359,7 +374,7 @@ export async function patchLibraryDrills(): Promise<void> {
     { 
       name: 'Single Arm', 
       focus: 'technique', 
-      labels: ['catch', 'rotation'], 
+      labels: ['catch', 'pull', 'rotation'], 
       description: 'Swim with one arm only, keeping the other arm extended forward or at your side. Focus on the pull phase and rotation.' 
     },
     { 
@@ -371,7 +386,7 @@ export async function patchLibraryDrills(): Promise<void> {
     { 
       name: 'Tarzan Drill', 
       focus: 'technique', 
-      labels: ['catch', 'strength'], 
+      labels: ['catch', 'pull', 'strength'], 
       description: 'Swim with head out of the water, looking forward. Improves catch, high elbow, and stroke power.' 
     },
     { 
@@ -379,6 +394,24 @@ export async function patchLibraryDrills(): Promise<void> {
       focus: 'technique', 
       labels: ['catch'], 
       description: 'Use small figure-8 hand motions to feel the water pressure. Focus on maintaining a strong "feel" for the water throughout the path.' 
+    },
+    { 
+      name: 'Body Rotation drill', 
+      focus: 'technique', 
+      labels: ['rotation'], 
+      description: 'Focus on rotating the whole body as a single unit from the hips. Improves efficiency and power.' 
+    },
+    { 
+      name: 'Head-lead Breathing', 
+      focus: 'technique', 
+      labels: ['breathing', 'streamline'], 
+      description: 'Swim on your front with arms at your side. Focus on rotating only the head to breathe while keeping the body flat.' 
+    },
+    { 
+      name: 'Catch-up with Paddle', 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'strength'], 
+      description: 'Catch-up drill using hand paddles to exaggerate the pull phase and resistance.' 
     },
     { 
       name: 'Kickboard Set', 
@@ -395,7 +428,7 @@ export async function patchLibraryDrills(): Promise<void> {
     { 
       name: 'Paddle Work', 
       focus: 'fitness', 
-      labels: ['strength', 'catch'], 
+      labels: ['strength', 'catch', 'pull'], 
       description: 'Swim with hand paddles to increase resistance. Highlights early vertical forearm and high elbow during the pull.' 
     },
     { 
@@ -488,6 +521,126 @@ export async function patchLibraryDrills(): Promise<void> {
       labels: ['aerobic', 'endurance'], 
       description: 'Sustained intensity swimming to build a strong aerobic foundation. Maintain consistent stroke count.' 
     },
+    { 
+      name: 'Zipper Drill', 
+      focus: 'technique', 
+      labels: ['rotation', 'recovery'], 
+      description: 'Run thumb up your side during recovery to promote body rotation and keep recovery hand close to body. Improves stroke compactness and rotation.' 
+    },
+    { 
+      name: '6-Kick Switch', 
+      focus: 'technique', 
+      labels: ['rotation', 'kick', 'balance'], 
+      description: '6 kicks on side, 1 stroke, switch sides. Builds continuous rotation from side to side and develops balance on the stroke axis.' 
+    },
+    { 
+      name: 'Superman Glide', 
+      focus: 'technique', 
+      labels: ['streamline', 'body position'], 
+      description: 'Push off in streamlined position, hold 3-5 seconds. Develops core stability and horizontal alignment to minimize drag.' 
+    },
+    { 
+      name: 'Popov Drill', 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'rotation'], 
+      description: 'Swim with fists, then open hands mid-stroke. Develops feel for water and high-elbow catch through rotation.' 
+    },
+    { 
+      name: 'Armpit Pause', 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'rotation'], 
+      description: 'Pause at the end of each stroke with hand at armpit. Focus on high elbow and early vertical forearm during the pull.' 
+    },
+    { 
+      name: 'Front Scull', 
+      focus: 'technique', 
+      labels: ['catch', 'feel'], 
+      description: 'Small figure-8 hand motions in front of body. Develops feel for water pressure on the catch and early vertical forearm.' 
+    },
+    { 
+      name: 'Mid Scull', 
+      focus: 'technique', 
+      labels: ['catch', 'pull'], 
+      description: 'Sculling motion at mid-body, focusing on forearm pressure. Builds pull-phase strength and water feel.' 
+    },
+    { 
+      name: 'Shark Fin', 
+      focus: 'technique', 
+      labels: ['catch', 'recovery'], 
+      description: 'Recovery arm forms a shark fin shape with elbow high. Promotes high-elbow recovery and proper hand entry angle.' 
+    },
+    { 
+      name: 'Double-arm Pulls', 
+      focus: 'technique', 
+      labels: ['catch', 'pull'], 
+      description: 'Both arms pull simultaneously. Focus on symmetrical catch and pull, feeling the water pressure evenly.' 
+    },
+    { 
+      name: 'Long Dog', 
+      focus: 'technique', 
+      labels: ['body position', 'kick'], 
+      description: 'Swim on front with arms extended, kicking gently. Focus on long, streamlined body position and hip-driven kick.' 
+    },
+    { 
+      name: 'Roll Kick', 
+      focus: 'technique', 
+      labels: ['rotation', 'kick'], 
+      description: 'Kick on side with body rolled, rotating from side to side. Links kick to body rotation for more powerful flutter kick.' 
+    },
+    { 
+      name: 'Pull Buoy Between Ankles', 
+      focus: 'technique', 
+      labels: ['body position', 'catch', 'rotation'], 
+      description: 'Pull buoy between ankles, arms at sides. Focus on body rotation and catch mechanics without kick propulsion.' 
+    },
+    { 
+      name: 'Closed-Fist Freestyle', 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'feel'], 
+      description: 'Swim freestyle with closed fists. Increases awareness of forearm pressure and pull mechanics throughout the stroke.' 
+    },
+    { 
+      name: 'Straight-Arm Breath-Every-Stroke', 
+      focus: 'technique', 
+      labels: ['rotation', 'breathing'], 
+      description: 'Swim with straight-arm recovery, breathing every stroke. Exaggerates body rotation and links breathing to rotation timing.' 
+    },
+    { 
+      name: 'One-Arm Breathing Focus', 
+      focus: 'technique', 
+      labels: ['breathing', 'rotation'], 
+      description: 'Single-arm freestyle, focusing on rotating head to breathe. Coordinates breathing timing with body rotation.' 
+    },
+    { 
+      name: '5 Strokes & Stop', 
+      focus: 'technique', 
+      labels: ['pacing', 'rhythm'], 
+      description: 'Swim 5 strokes at moderate effort, stop and reset. Builds awareness of stroke count, rhythm, and consistent pacing.' 
+    },
+    { 
+      name: 'Freestyle with Dolphin Kicks', 
+      focus: 'technique', 
+      labels: ['rhythm', 'catch'], 
+      description: 'Freestyle arms with dolphin kick instead of flutter kick. Develops stroke rhythm and high-elbow catch timing.' 
+    },
+    { 
+      name: 'Torpedo Drill', 
+      focus: 'technique', 
+      labels: ['streamline', 'body position'], 
+      description: 'Push off wall in tight streamline, hold position as long as possible. Teaches thin body position to minimize drag.' 
+    },
+    { 
+      name: 'Side-kick with Breathing', 
+      focus: 'technique', 
+      labels: ['breathing', 'rotation', 'kick'], 
+      description: 'Side-kick position, rotate head to breathe. Links breathing technique directly to body rotation and side balance.' 
+    },
+    { 
+      name: 'Fingertip Drag with Rotation', 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'rotation'], 
+      description: 'Fingertip drag with exaggerated body rotation. Combines pull work with rotation focus for a complete stroke feel.' 
+    },
   ]
 
   for (const d of defaults) {
@@ -558,7 +711,7 @@ export async function seedLibraryDrills(): Promise<void> {
       stroke: 'freestyle', 
       distance: 100, 
       focus: 'technique', 
-      labels: ['catch', 'rotation'], 
+      labels: ['catch', 'pull', 'rotation'], 
       description: 'Focus on high elbow recovery by dragging fingertips along the water surface. Improves arm recovery and shoulder rotation.' 
     },
     { 
@@ -590,7 +743,7 @@ export async function seedLibraryDrills(): Promise<void> {
       stroke: 'freestyle', 
       distance: 100, 
       focus: 'technique', 
-      labels: ['catch', 'rotation'], 
+      labels: ['catch', 'pull', 'rotation'], 
       description: 'Swim with one arm only, keeping the other arm extended forward or at your side. Focus on the pull phase and rotation.' 
     },
     { 
@@ -606,7 +759,7 @@ export async function seedLibraryDrills(): Promise<void> {
       stroke: 'freestyle', 
       distance: 50, 
       focus: 'technique', 
-      labels: ['catch', 'strength'], 
+      labels: ['catch', 'pull', 'strength'], 
       description: 'Swim with head out of the water, looking forward. Improves catch, high elbow, and stroke power.' 
     },
     { 
@@ -616,6 +769,30 @@ export async function seedLibraryDrills(): Promise<void> {
       focus: 'technique', 
       labels: ['catch'], 
       description: 'Use small figure-8 hand motions to feel the water pressure. Focus on maintaining a strong "feel" for the water throughout the path.' 
+    },
+    { 
+      name: 'Body Rotation drill', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['rotation'], 
+      description: 'Focus on rotating the whole body as a single unit from the hips. Improves efficiency and power.' 
+    },
+    { 
+      name: 'Head-lead Breathing', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['breathing', 'streamline'], 
+      description: 'Swim on your front with arms at your side. Focus on rotating only the head to breathe while keeping the body flat.' 
+    },
+    { 
+      name: 'Catch-up with Paddle', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'strength'], 
+      description: 'Catch-up drill using hand paddles to exaggerate the pull phase and resistance.' 
     },
     { 
       name: 'Kickboard Set', 
@@ -638,7 +815,7 @@ export async function seedLibraryDrills(): Promise<void> {
       stroke: 'freestyle', 
       distance: 200, 
       focus: 'fitness', 
-      labels: ['strength', 'catch'], 
+      labels: ['strength', 'catch', 'pull'], 
       description: 'Swim with hand paddles to increase resistance. Highlights early vertical forearm and high elbow during the pull.' 
     },
     { 
@@ -760,6 +937,166 @@ export async function seedLibraryDrills(): Promise<void> {
       focus: 'fitness', 
       labels: ['aerobic', 'endurance'], 
       description: 'Sustained intensity swimming to build a strong aerobic foundation. Maintain consistent stroke count.' 
+    },
+    { 
+      name: 'Zipper Drill', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['rotation', 'recovery'], 
+      description: 'Run thumb up your side during recovery to promote body rotation and keep recovery hand close to body. Improves stroke compactness and rotation.' 
+    },
+    { 
+      name: '6-Kick Switch', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['rotation', 'kick', 'balance'], 
+      description: '6 kicks on side, 1 stroke, switch sides. Builds continuous rotation from side to side and develops balance on the stroke axis.' 
+    },
+    { 
+      name: 'Superman Glide', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['streamline', 'body position'], 
+      description: 'Push off in streamlined position, hold 3-5 seconds. Develops core stability and horizontal alignment to minimize drag.' 
+    },
+    { 
+      name: 'Popov Drill', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'rotation'], 
+      description: 'Swim with fists, then open hands mid-stroke. Develops feel for water and high-elbow catch through rotation.' 
+    },
+    { 
+      name: 'Armpit Pause', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'rotation'], 
+      description: 'Pause at the end of each stroke with hand at armpit. Focus on high elbow and early vertical forearm during the pull.' 
+    },
+    { 
+      name: 'Front Scull', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['catch', 'feel'], 
+      description: 'Small figure-8 hand motions in front of body. Develops feel for water pressure on the catch and early vertical forearm.' 
+    },
+    { 
+      name: 'Mid Scull', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['catch', 'pull'], 
+      description: 'Sculling motion at mid-body, focusing on forearm pressure. Builds pull-phase strength and water feel.' 
+    },
+    { 
+      name: 'Shark Fin', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['catch', 'recovery'], 
+      description: 'Recovery arm forms a shark fin shape with elbow high. Promotes high-elbow recovery and proper hand entry angle.' 
+    },
+    { 
+      name: 'Double-arm Pulls', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['catch', 'pull'], 
+      description: 'Both arms pull simultaneously. Focus on symmetrical catch and pull, feeling the water pressure evenly.' 
+    },
+    { 
+      name: 'Long Dog', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['body position', 'kick'], 
+      description: 'Swim on front with arms extended, kicking gently. Focus on long, streamlined body position and hip-driven kick.' 
+    },
+    { 
+      name: 'Roll Kick', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['rotation', 'kick'], 
+      description: 'Kick on side with body rolled, rotating from side to side. Links kick to body rotation for more powerful flutter kick.' 
+    },
+    { 
+      name: 'Pull Buoy Between Ankles', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['body position', 'catch', 'rotation'], 
+      description: 'Pull buoy between ankles, arms at sides. Focus on body rotation and catch mechanics without kick propulsion.' 
+    },
+    { 
+      name: 'Closed-Fist Freestyle', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'feel'], 
+      description: 'Swim freestyle with closed fists. Increases awareness of forearm pressure and pull mechanics throughout the stroke.' 
+    },
+    { 
+      name: 'Straight-Arm Breath-Every-Stroke', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['rotation', 'breathing'], 
+      description: 'Swim with straight-arm recovery, breathing every stroke. Exaggerates body rotation and links breathing to rotation timing.' 
+    },
+    { 
+      name: 'One-Arm Breathing Focus', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['breathing', 'rotation'], 
+      description: 'Single-arm freestyle, focusing on rotating head to breathe. Coordinates breathing timing with body rotation.' 
+    },
+    { 
+      name: '5 Strokes & Stop', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['pacing', 'rhythm'], 
+      description: 'Swim 5 strokes at moderate effort, stop and reset. Builds awareness of stroke count, rhythm, and consistent pacing.' 
+    },
+    { 
+      name: 'Freestyle with Dolphin Kicks', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['rhythm', 'catch'], 
+      description: 'Freestyle arms with dolphin kick instead of flutter kick. Develops stroke rhythm and high-elbow catch timing.' 
+    },
+    { 
+      name: 'Torpedo Drill', 
+      stroke: 'freestyle', 
+      distance: 50, 
+      focus: 'technique', 
+      labels: ['streamline', 'body position'], 
+      description: 'Push off wall in tight streamline, hold position as long as possible. Teaches thin body position to minimize drag.' 
+    },
+    { 
+      name: 'Side-kick with Breathing', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['breathing', 'rotation', 'kick'], 
+      description: 'Side-kick position, rotate head to breathe. Links breathing technique directly to body rotation and side balance.' 
+    },
+    { 
+      name: 'Fingertip Drag with Rotation', 
+      stroke: 'freestyle', 
+      distance: 100, 
+      focus: 'technique', 
+      labels: ['catch', 'pull', 'rotation'], 
+      description: 'Fingertip drag with exaggerated body rotation. Combines pull work with rotation focus for a complete stroke feel.' 
     },
   ]
 

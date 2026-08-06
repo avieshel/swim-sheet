@@ -144,6 +144,7 @@ export interface LibraryDrill {
   labels?: string[]
   description?: string
   source?: 'builtin' | 'personal' | 'customized'
+  popularity?: number
   createdAt: string
   updatedAt: string
 }
@@ -193,11 +194,11 @@ class SwimSheetDB extends Dexie {
       runSwimmers: 'id, run_id, swimmer_id',
       laps: 'id, run_drill_id, swimmer_id, createdAt',
       laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
-      libraryDrills: 'id, name, stroke, focus, updatedAt',
-      _meta: 'key',
-    })
+       libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+       _meta: 'key',
+     })
 
-    this.version(2).stores({
+     this.version(2).stores({
       swimmers: 'id, name, status, updatedAt',
       sessions: 'id, createdAt, updatedAt',
       drills: 'id, session_id, focus, updatedAt',
@@ -206,15 +207,15 @@ class SwimSheetDB extends Dexie {
       runSwimmers: 'id, run_id, swimmer_id',
       laps: 'id, run_drill_id, swimmer_id, createdAt',
       laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
-      libraryDrills: 'id, name, stroke, focus, updatedAt',
-      _meta: 'key',
-    }).upgrade(async tx => {
-      await tx.table('swimmers').toCollection().modify(s => {
-        s.status = 'active'
-      })
-    })
+       libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+       _meta: 'key',
+     }).upgrade(async tx => {
+       await tx.table('swimmers').toCollection().modify(s => {
+         s.status = 'active'
+       })
+     })
 
-    this.version(3).stores({
+     this.version(3).stores({
       swimmers: 'id, name, status, updatedAt',
       sessions: 'id, createdAt, updatedAt',
       drills: 'id, session_id, focus, updatedAt',
@@ -223,10 +224,10 @@ class SwimSheetDB extends Dexie {
       runSwimmers: 'id, run_id, swimmer_id',
       laps: 'id, run_drill_id, swimmer_id, createdAt',
       laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
-      libraryDrills: 'id, name, stroke, focus, updatedAt',
-      _meta: 'key',
-    }).upgrade(async tx => {
-      await tx.table('sessionRuns').toCollection().modify(r => {
+       libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+       _meta: 'key',
+     }).upgrade(async tx => {
+       await tx.table('sessionRuns').toCollection().modify(r => {
         r.session_started_at = r.session_started_at ?? null
         r.session_paused_at = r.session_paused_at ?? null
         r.session_pause_duration = r.session_pause_duration ?? 0

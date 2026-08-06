@@ -2,6 +2,7 @@ import {
   getDrillsForSession, getDrill, addDrill, updateDrill, deleteDrill,
   getAllLibraryDrills, addLibraryDrill, updateLibraryDrill, deleteLibraryDrill,
   seedLibraryDrills, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills,
+  bumpDrillPopularity, getPopularDrills,
 } from '../db/dao'
 import type { SafeDrill, SafeLibraryDrill } from '../db/schema'
 
@@ -21,4 +22,7 @@ export const drillService = {
   resetLibraryToDefaults: () => resetLibraryToDefaults(),
   seedLibrary: () => seedLibraryDrills(),
   deduplicateLibrary: () => deduplicateLibraryDrills(),
+
+  bumpPopularity: (id: string) => bumpDrillPopularity(id),
+  getPopular: (limit?: number) => getPopularDrills(limit),
 }

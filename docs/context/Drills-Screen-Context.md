@@ -91,6 +91,31 @@ Key functions:
 - `deduplicateLibrary()`: Remove duplicate templates
 - `getDrills(sessionId)`: Get drills for specific session
 
+### Popularity Ranking Algorithm
+
+Drills in the library carry a `popularity` counter that tracks how often coaches use them. The ranking is a simple usage-based metric:
+
+| Source | Default Popularity | Rationale |
+|---|---|---|
+| `builtin` (pre-seeded) | 0 | Fresh out of the box, no usage yet |
+| `personal` (coach-created) | 1 | Coaches who create custom drills are actively using the library |
+| `customized` (edited builtin) | 1 | Modified drills indicate active engagement |
+
+**How popularity is incremented:**
+- +1 each time a coach adds a library drill to a session (via DrillBank → Add to Session)
+- +1 each time a coach edits/creates a custom drill (via DrillEditorModal save)
+
+**How ranking is used:**
+- The "Popular" toggle chip in DrillBank sorts drills by `popularity` descending
+- A `trending_up` badge appears on drill cards with `popularity > 0`
+- The badge shows the raw count, giving coaches a quick signal of community usage
+
+**Known limitations (see also: issue to enhance ranking):**
+- The current algorithm is a simple counter — it does not decay old usage, weight by swimmer count, or distinguish between "added to session" vs "actually timed"
+- There is no recency factor — a drill used 50 times 2 years ago ranks the same as one used 50 times today
+- There is no personalization — all coaches see the same ranking regardless of their own usage patterns
+- The `popularity` field is stored on the library drill record, not computed from session/run data
+
 ### Data Structure
 **File**: `client/src/db/schema.ts`
 

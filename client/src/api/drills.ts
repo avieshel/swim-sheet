@@ -57,4 +57,8 @@ export function deduplicateLibraryDrills(): Promise<number> {
   return drillService.deduplicateLibrary()
 }
 
+export function bumpDrillPopularity(id: string): Promise<void> {
+  return drillService.bumpPopularity(id)
+}
+
 export type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../db/schema'

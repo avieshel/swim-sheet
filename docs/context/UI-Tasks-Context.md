@@ -165,3 +165,18 @@ Cooldown ── [───]
 
 ### T-020: Playwright UI/UX validation tests for LiveDeck
 **Status**: Done — Added `tests/livedeck-ui-validation.spec.ts` and extended `tests/live-deck.spec.ts` with assertions for touch target sizes, overflow checks, timer sizing, dark/light mode contrast, and completed drill visual distinction.
+
+### T-025: Localization — Support custom language overrides for drill content
+
+**Source**: Architecture refinement
+
+**Problem**: Current drill content is English-only. Coaches need content in their local language without requiring a full UI localization system.
+
+**Solution**: Implement "Override-by-Default" pattern for drill content.
+- Add `nameOverride` and `descriptionOverride` fields to `Drill` schema in Dexie.
+- Detect browser language on first load and prompt user to set "Content Language" preference.
+- In UI, use a `useContent` hook to display `*Override` field if "Use Custom Content" is enabled in settings, otherwise default to base fields.
+- Include a small set of "baked-in" common translations for default drills to provide immediate value.
+
+**Priority**: Medium
+**Status**: Open

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
-import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, createDrill, getSessionDrills, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills } from '../api/drills'
+import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, createDrill, getSessionDrills, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills, bumpDrillPopularity } from '../api/drills'
 import { listSessions } from '../api/sessions'
 import type { LibraryDrill, SafeLibraryDrill } from '../api/drills'
 import type { Session } from '../api/sessions'
@@ -15,6 +15,7 @@ export const DrillBank: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [activeLabel, setActiveLabel] = useState<string | null>(null)
+  const [sortByPopularity, setSortByPopularity] = useState(false)
 
   const quickLabels = ['Technique', 'Kick', 'Speed', 'Endurance', 'Rotation']
 
@@ -86,6 +87,7 @@ export const DrillBank: React.FC = () => {
       stroke: detailDrill.stroke,
       distance: detailDrill.distance,
     })
+    await bumpDrillPopularity(detailDrill.id!)
     setAddingToSession(false)
     setDetailDrill(null)
     navigate(`/sessions/${session.id}`)
@@ -152,6 +154,11 @@ export const DrillBank: React.FC = () => {
       if (!drillLabels.includes(activeLabel.toLowerCase())) return false
     }
     return true
+  }).sort((a, b) => {
+    if (sortByPopularity) {
+      return (b.popularity ?? 0) - (a.popularity ?? 0)
+    }
+    return a.name.localeCompare(b.name)
   })
 
   if (loading) return (
@@ -240,31 +247,42 @@ export const DrillBank: React.FC = () => {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        <button
-          onClick={() => setActiveLabel(null)}
-          className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
-            activeLabel === null
-              ? 'bg-primary text-on-primary'
-              : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
-          }`}
-        >
-          All ({drills.length})
-        </button>
-        {quickLabels.map(label => (
-          <button
-            key={label}
-            onClick={() => setActiveLabel(activeLabel === label ? null : label)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
-              activeLabel === label
-                ? 'bg-primary text-on-primary'
-                : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
-            }`}
-          >
-            {label} ({drills.filter(d => (d.labels || []).map(l => l.toLowerCase()).includes(label.toLowerCase())).length})
-          </button>
-        ))}
-      </div>
+       <div className="flex flex-wrap gap-1.5 mb-4">
+         <button
+           onClick={() => setActiveLabel(null)}
+           className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
+             activeLabel === null
+               ? 'bg-primary text-on-primary'
+               : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
+           }`}
+         >
+           All ({drills.length})
+         </button>
+         {quickLabels.map(label => (
+           <button
+             key={label}
+             onClick={() => setActiveLabel(activeLabel === label ? null : label)}
+             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
+               activeLabel === label
+                 ? 'bg-primary text-on-primary'
+                 : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
+             }`}
+           >
+             {label} ({drills.filter(d => (d.labels || []).map(l => l.toLowerCase()).includes(label.toLowerCase())).length})
+           </button>
+         ))}
+         <button
+           onClick={() => setSortByPopularity(!sortByPopularity)}
+           className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none flex items-center gap-1 ${
+             sortByPopularity
+               ? 'bg-primary text-on-primary'
+               : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
+           }`}
+         >
+           <span className="material-symbols-outlined text-sm">trending_up</span>
+           Popular
+         </button>
+       </div>
 
       <div className="r-grid r-grid--fill" style={{ '--grid-min': '360px' } as React.CSSProperties}>
         {filteredDrills.map(d => (
@@ -293,12 +311,18 @@ export const DrillBank: React.FC = () => {
                 )}
               </div>
               
-              <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
-                {d.focus && d.focus !== 'none' && <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{d.focus}</span>}
-                {d.labels?.map(l => (
-                  <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
-                ))}
-              </div>
+               <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
+                 {d.focus && d.focus !== 'none' && <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{d.focus}</span>}
+                 {d.labels?.map(l => (
+                   <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
+                 ))}
+                 {(d.popularity ?? 0) > 0 && (
+                   <span className="text-caption-caps bg-primary-container text-on-primary-container px-2 py-0.5 rounded uppercase flex items-center gap-0.5">
+                     <span className="material-symbols-outlined text-xs">trending_up</span>
+                     {d.popularity}
+                   </span>
+                 )}
+               </div>
             </div>
           </div>
         ))}
