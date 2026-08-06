@@ -1,0 +1,651 @@
+[
+  {
+    "name": "Fingertip Drag",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "rotation"
+    ],
+    "description": "Focus on high elbow recovery by dragging fingertips along the water surface. Improves arm recovery and shoulder rotation."
+  },
+  {
+    "name": "Catch-Up Drill",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rhythm",
+      "streamline"
+    ],
+    "description": "Wait for the recovering arm to almost touch the leading hand before starting the next stroke. Improves glide and stroke timing."
+  },
+  {
+    "name": "6-1-6 Breathing",
+    "stroke": "freestyle",
+    "distance": 200,
+    "focus": "technique",
+    "labels": [
+      "body position",
+      "rotation",
+      "breathing"
+    ],
+    "description": "6 kicks on the side, 1 full stroke, 6 kicks on the other side. Focus on rotation, body alignment, and breath timing."
+  },
+  {
+    "name": "Side Kicking",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "body position",
+      "kick"
+    ],
+    "description": "Kick on your side with one arm extended and the other at your side. Focus on a narrow, fast kick and stable body position."
+  },
+  {
+    "name": "Single Arm",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "rotation"
+    ],
+    "description": "Swim with one arm only, keeping the other arm extended forward or at your side. Focus on the pull phase and rotation."
+  },
+  {
+    "name": "Fist Drill",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch"
+    ],
+    "description": "Swim with closed fists to increase awareness of forearm pressure on the water. Teaches you to use your whole arm for the pull."
+  },
+  {
+    "name": "Tarzan Drill",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "strength"
+    ],
+    "description": "Swim with head out of the water, looking forward. Improves catch, high elbow, and stroke power."
+  },
+  {
+    "name": "Sculling",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch"
+    ],
+    "description": "Use small figure-8 hand motions to feel the water pressure. Focus on maintaining a strong \"feel\" for the water throughout the path."
+  },
+  {
+    "name": "Body Rotation drill",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rotation"
+    ],
+    "description": "Focus on rotating the whole body as a single unit from the hips. Improves efficiency and power."
+  },
+  {
+    "name": "Head-lead Breathing",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "breathing",
+      "streamline"
+    ],
+    "description": "Swim on your front with arms at your side. Focus on rotating only the head to breathe while keeping the body flat."
+  },
+  {
+    "name": "Catch-up with Paddle",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "strength"
+    ],
+    "description": "Catch-up drill using hand paddles to exaggerate the pull phase and resistance."
+  },
+  {
+    "name": "Kickboard Set",
+    "stroke": "freestyle",
+    "distance": 200,
+    "focus": "fitness",
+    "labels": [
+      "kick",
+      "endurance"
+    ],
+    "description": "Focused kick work using a board. Focus on high hips and a steady, rhythmic kick from the core."
+  },
+  {
+    "name": "Pull Buoy Set",
+    "stroke": "freestyle",
+    "distance": 200,
+    "focus": "fitness",
+    "labels": [
+      "strength",
+      "endurance",
+      "body position"
+    ],
+    "description": "Swim using a pull buoy. Isolates the upper body to improve stroke power and maintain horizontal alignment."
+  },
+  {
+    "name": "Paddle Work",
+    "stroke": "freestyle",
+    "distance": 200,
+    "focus": "fitness",
+    "labels": [
+      "strength",
+      "catch",
+      "pull"
+    ],
+    "description": "Swim with hand paddles to increase resistance. Highlights early vertical forearm and high elbow during the pull."
+  },
+  {
+    "name": "Underwater Dolphin Kick",
+    "stroke": "butterfly",
+    "distance": 25,
+    "focus": "technique",
+    "labels": [
+      "kick",
+      "streamline",
+      "pullout"
+    ],
+    "description": "Focus on core-driven movement and staying streamlined. Essential for turns and starts."
+  },
+  {
+    "name": "Streamline Drill",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "streamline",
+      "body position"
+    ],
+    "description": "Push off in a tight streamline and hold as long as possible. Teaches \"thin\" body position to minimize drag."
+  },
+  {
+    "name": "IM Order Practice",
+    "stroke": "im",
+    "distance": 200,
+    "focus": "fitness",
+    "labels": [
+      "anaerobic",
+      "aerobic",
+      "rhythm"
+    ],
+    "description": "50m of each stroke in IM order (Fly, Back, Breast, Free). Focus on stroke transitions."
+  },
+  {
+    "name": "Descending Set",
+    "stroke": "freestyle",
+    "distance": 400,
+    "focus": "fitness",
+    "labels": [
+      "pacing",
+      "speed"
+    ],
+    "description": "Each subsequent 100m or 50m repeat should be faster than the previous one. Build effort throughout."
+  },
+  {
+    "name": "Broken 100s",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "fitness",
+    "labels": [
+      "speed",
+      "anaerobic",
+      "pacing"
+    ],
+    "description": "Swim 100m broken into smaller segments with short rest to maintain high speed and focus on finish."
+  },
+  {
+    "name": "Kicking on Side",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "kick",
+      "body position"
+    ],
+    "description": "Kick on your side with one arm extended and the other at your side. Focus on a narrow, fast kick and stable body position."
+  },
+  {
+    "name": "Pullout",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "pullout",
+      "streamline"
+    ],
+    "description": "Drill the underwater sequence: 1 massive pull, 1 dolphin kick, 1 breaststroke kick. Focus on minimizing drag."
+  },
+  {
+    "name": "Body Motion",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "rhythm",
+      "body position"
+    ],
+    "description": "Dolphin kick with arms at sides. Focus on the chest-driven wave motion through the hips."
+  },
+  {
+    "name": "Dolphin Kick",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "kick",
+      "body position"
+    ],
+    "description": "Dolphin kick on your side. Focus on the upward phase of the kick and core engagement."
+  },
+  {
+    "name": "Kick Only",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "kick"
+    ],
+    "description": "Kick only with arms extended. Focus on outsweep-insweep motion and keeping feet flexed."
+  },
+  {
+    "name": "IM Transition Drill",
+    "stroke": "im",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rhythm",
+      "rotation"
+    ],
+    "description": "Focus on the specific turns and transitions between strokes (e.g., Fly to Back)."
+  },
+  {
+    "name": "Sprint Set",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "fitness",
+    "labels": [
+      "sprint",
+      "speed"
+    ],
+    "description": "100% effort swimming with maximum recovery. Focus on explosive power and stroke rate."
+  },
+  {
+    "name": "Pace Work 100s",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "fitness",
+    "labels": [
+      "pacing",
+      "aerobic"
+    ],
+    "description": "Swim at a specific race-representative pace with controlled rest periods."
+  },
+  {
+    "name": "Aerobic Set",
+    "stroke": "freestyle",
+    "distance": 400,
+    "focus": "fitness",
+    "labels": [
+      "aerobic",
+      "endurance"
+    ],
+    "description": "Sustained intensity swimming to build a strong aerobic foundation. Maintain consistent stroke count."
+  },
+  {
+    "name": "Speed Ladder",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "fitness",
+    "labels": [
+      "speed",
+      "pacing",
+      "anaerobic"
+    ],
+    "description": "Progressive speed set: 25m fast / 25m easy, 50m fast / 50m easy, 75m fast / 75m easy, then reverse. Builds speed control and pacing."
+  },
+  {
+    "name": "Sprint Intervals 25s",
+    "stroke": "freestyle",
+    "distance": 25,
+    "focus": "fitness",
+    "labels": [
+      "sprint",
+      "speed",
+      "anaerobic"
+    ],
+    "description": "10-16 x 25m all-out with 30-60s rest. Maximum velocity, full recovery. Develops raw speed and power."
+  },
+  {
+    "name": "Race Pace 50s",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "fitness",
+    "labels": [
+      "pacing",
+      "speed",
+      "anaerobic"
+    ],
+    "description": "8-12 x 50m at goal race pace with 15-20s rest. Practice exact race speed and rhythm under fatigue."
+  },
+  {
+    "name": "Power Tower Sprints",
+    "stroke": "freestyle",
+    "distance": 25,
+    "focus": "fitness",
+    "labels": [
+      "sprint",
+      "strength",
+      "speed"
+    ],
+    "description": "6-8 x 25m against power tower/parachute resistance, then 2-3 unresisted. Builds explosive power and stroke force."
+  },
+  {
+    "name": "Threshold 100s",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "fitness",
+    "labels": [
+      "endurance",
+      "pacing",
+      "aerobic"
+    ],
+    "description": "10-20 x 100m at threshold pace (CSS/T-pace) with 10-15s rest. Lactate tolerance and aerobic power."
+  },
+  {
+    "name": "Over-Under 200s",
+    "stroke": "freestyle",
+    "distance": 200,
+    "focus": "fitness",
+    "labels": [
+      "endurance",
+      "pacing",
+      "aerobic",
+      "anaerobic"
+    ],
+    "description": "4-6 x 200m alternating 100m over threshold / 100m under threshold. Combines speed endurance with aerobic base."
+  },
+  {
+    "name": "Long Continuous",
+    "stroke": "freestyle",
+    "distance": 800,
+    "focus": "fitness",
+    "labels": [
+      "endurance",
+      "aerobic"
+    ],
+    "description": "800-1500m continuous at steady aerobic pace. Pure endurance, stroke efficiency, and mental toughness."
+  },
+  {
+    "name": "Distance Build Set",
+    "stroke": "freestyle",
+    "distance": 400,
+    "focus": "fitness",
+    "labels": [
+      "endurance",
+      "pacing",
+      "aerobic"
+    ],
+    "description": "400m easy, 300m moderate, 200m threshold, 100m fast. Progressive effort across decreasing distance."
+  },
+  {
+    "name": "Endurance Pull",
+    "stroke": "freestyle",
+    "distance": 200,
+    "focus": "fitness",
+    "labels": [
+      "endurance",
+      "strength",
+      "aerobic"
+    ],
+    "description": "6-10 x 200m pull buoy at steady aerobic pace. Upper-body endurance and stroke consistency without kick."
+  },
+  {
+    "name": "Zipper Drill",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rotation",
+      "recovery"
+    ],
+    "description": "Run thumb up your side during recovery to promote body rotation and keep recovery hand close to body. Improves stroke compactness and rotation."
+  },
+  {
+    "name": "6-Kick Switch",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rotation",
+      "kick",
+      "balance"
+    ],
+    "description": "6 kicks on side, 1 stroke, switch sides. Builds continuous rotation from side to side and develops balance on the stroke axis."
+  },
+  {
+    "name": "Superman Glide",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "streamline",
+      "body position"
+    ],
+    "description": "Push off in streamlined position, hold 3-5 seconds. Develops core stability and horizontal alignment to minimize drag."
+  },
+  {
+    "name": "Popov Drill",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "rotation"
+    ],
+    "description": "Swim with fists, then open hands mid-stroke. Develops feel for water and high-elbow catch through rotation."
+  },
+  {
+    "name": "Armpit Pause",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "rotation"
+    ],
+    "description": "Pause at the end of each stroke with hand at armpit. Focus on high elbow and early vertical forearm during the pull."
+  },
+  {
+    "name": "Front Scull",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "feel"
+    ],
+    "description": "Small figure-8 hand motions in front of body. Develops feel for water pressure on the catch and early vertical forearm."
+  },
+  {
+    "name": "Mid Scull",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull"
+    ],
+    "description": "Sculling motion at mid-body, focusing on forearm pressure. Builds pull-phase strength and water feel."
+  },
+  {
+    "name": "Shark Fin",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "recovery"
+    ],
+    "description": "Recovery arm forms a shark fin shape with elbow high. Promotes high-elbow recovery and proper hand entry angle."
+  },
+  {
+    "name": "Double-arm Pulls",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull"
+    ],
+    "description": "Both arms pull simultaneously. Focus on symmetrical catch and pull, feeling the water pressure evenly."
+  },
+  {
+    "name": "Long Dog",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "body position",
+      "kick"
+    ],
+    "description": "Swim on front with arms extended, kicking gently. Focus on long, streamlined body position and hip-driven kick."
+  },
+  {
+    "name": "Roll Kick",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "rotation",
+      "kick"
+    ],
+    "description": "Kick on side with body rolled, rotating from side to side. Links kick to body rotation for more powerful flutter kick."
+  },
+  {
+    "name": "Pull Buoy Between Ankles",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "body position",
+      "catch",
+      "rotation"
+    ],
+    "description": "Pull buoy between ankles, arms at sides. Focus on body rotation and catch mechanics without kick propulsion."
+  },
+  {
+    "name": "Closed-Fist Freestyle",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "feel"
+    ],
+    "description": "Swim freestyle with closed fists. Increases awareness of forearm pressure and pull mechanics throughout the stroke."
+  },
+  {
+    "name": "Straight-Arm Breath-Every-Stroke",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rotation",
+      "breathing"
+    ],
+    "description": "Swim with straight-arm recovery, breathing every stroke. Exaggerates body rotation and links breathing to rotation timing."
+  },
+  {
+    "name": "One-Arm Breathing Focus",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "breathing",
+      "rotation"
+    ],
+    "description": "Single-arm freestyle, focusing on rotating head to breathe. Coordinates breathing timing with body rotation."
+  },
+  {
+    "name": "5 Strokes & Stop",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "pacing",
+      "rhythm"
+    ],
+    "description": "Swim 5 strokes at moderate effort, stop and reset. Builds awareness of stroke count, rhythm, and consistent pacing."
+  },
+  {
+    "name": "Freestyle with Dolphin Kicks",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "rhythm",
+      "catch"
+    ],
+    "description": "Freestyle arms with dolphin kick instead of flutter kick. Develops stroke rhythm and high-elbow catch timing."
+  },
+  {
+    "name": "Torpedo Drill",
+    "stroke": "freestyle",
+    "distance": 50,
+    "focus": "technique",
+    "labels": [
+      "streamline",
+      "body position"
+    ],
+    "description": "Push off wall in tight streamline, hold position as long as possible. Teaches thin body position to minimize drag."
+  },
+  {
+    "name": "Side-kick with Breathing",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "breathing",
+      "rotation",
+      "kick"
+    ],
+    "description": "Side-kick position, rotate head to breathe. Links breathing technique directly to body rotation and side balance."
+  },
+  {
+    "name": "Fingertip Drag with Rotation",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "catch",
+      "pull",
+      "rotation"
+    ],
+    "description": "Fingertip drag with exaggerated body rotation. Combines pull work with rotation focus for a complete stroke feel."
+  }
+]

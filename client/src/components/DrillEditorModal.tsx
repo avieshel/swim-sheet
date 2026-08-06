@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ConfirmDialog } from './ConfirmDialog'
 import { EquipmentIcons, type EquipmentType } from './EquipmentIcons'
 import { CustomSelect } from './CustomSelect'
 import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, strokeOptions } from '../constants/drill'
@@ -33,7 +34,7 @@ interface DrillEditorModalProps {
   open: boolean
   title: string
   initialData?: Partial<DrillFormData>
-  onSave: (data: DrillFormData) => void
+  onSave: (data: DrillFormData, asVariant?: boolean) => void
   onDelete?: () => void
   onClose: () => void
 }
@@ -68,6 +69,8 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
 
 export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose }) => {
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
+  const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
+  const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -75,6 +78,34 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
     }
     return () => { document.body.style.overflow = '' }
   }, [open])
+
+  const hasStrokeChanged = (): boolean => {
+    if (!initialData?.stroke) return false
+    const originalStroke = initialData.stroke
+    return (form.items || []).some(item => item.stroke !== originalStroke)
+  }
+
+  const handleSave = () => {
+    if (hasStrokeChanged()) {
+      setPendingSave(form)
+      setShowStrokeConfirm(true)
+    } else {
+      onSave(form)
+    }
+  }
+
+  const handleStrokeConfirm = () => {
+    setShowStrokeConfirm(false)
+    if (pendingSave) {
+      onSave(pendingSave, true)
+      setPendingSave(null)
+    }
+  }
+
+  const handleStrokeSkip = () => {
+    setShowStrokeConfirm(false)
+    setPendingSave(null)
+  }
 
   if (!open) return null
 
@@ -351,19 +382,31 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-outline-variant">
-              <button
-                onClick={() => onSave(form)}
-                className="flex-1 h-14 bg-primary text-on-primary rounded-xl font-bold text-lg hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 cursor-pointer"
-              >
-                {form.id ? 'Save Changes' : 'Create Drill'}
-              </button>
-              <button
-                onClick={onClose}
-                className="px-6 h-14 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-variant transition-all cursor-pointer"
-              >
-                Cancel
-              </button>
-            </div>
+               <button
+                 onClick={handleSave}
+                 className="flex-1 h-14 bg-primary text-on-primary rounded-xl font-bold text-lg hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 cursor-pointer"
+               >
+                 {form.id ? 'Save Changes' : 'Create Drill'}
+               </button>
+               <button
+                 onClick={onClose}
+                 className="px-6 h-14 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-variant transition-all cursor-pointer"
+               >
+                 Cancel
+               </button>
+             </div>
+
+             {/* Stroke-Change Confirmation */}
+<ConfirmDialog
+                 open={showStrokeConfirm}
+                 title="Stroke Changed"
+                 message="This drill has a different stroke than the original. Save as a new variant to bump its popularity ranking, or discard to undo your changes?"
+                 onConfirm={handleStrokeConfirm}
+                 onCancel={handleStrokeSkip}
+                 confirmLabel="Save as New Variant"
+                 cancelLabel="Discard"
+                 destructive={false}
+               />
 
             {onDelete && (
               <div className="pt-2 flex justify-center">

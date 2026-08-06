@@ -258,6 +258,14 @@ Constraints: `startedAt ≤ laps[i].time ≤ completedAt`, `drillStart ≤ all s
 ### LibraryDrill (Client Only)
 Global drill library with builtin defaults and user customizations.
 
+**Builtin data source**: The builtin drill catalog (57 drills) and default sessions (Distance Progression + 11 drills) live in external JSON files under `client/src/data/` (`drills.json`, `sessions.json`), loaded through `client/src/data/catalog.ts`. This is the single source of truth for both `patchLibraryDrills` (upsert-by-name) and `seedLibraryDrills`/`seedDefaultSessions` (first-run seeding). The old hardcoded arrays in `dao.ts` were removed — editing builtin content means editing the JSON, not code. **All built-in data is external to business logic/DAO.**
+
+### Builtin vs. user data separation
+- `client/src/data/*.json` are **immutable builtin defaults**, bundled at build time, read-only at runtime.
+- User edits/creates (`createLibraryDrill`, `updateLibraryDrill`, session drills) write to the **Dexie tables**, never back to JSON.
+- `patchLibraryDrills()` runs on DrillBank load and heals *blank* builtin drills (`!description || labels empty || focus === 'none' || !source`) back to catalog values. This is deliberate: it is an anti-corruption/anti-accident heal **and** the propagation vector for catalog improvements (new labels/descriptions/renames reach existing users). It never touches a drill's content fields (name/stroke/distance/items) while the drill retains any description/labels/focus.
+- **Known narrow edge**: a coach who *deliberately* keeps a builtin but strips it to a blank state (empty description + no labels + `focus: none`) cannot persist that — it gets healed on reload. Not a bug (see above); if it ever matters, the fix is an explicit `keep`/`customize` flag on the drill (set only when a field is intentionally blanked), which preserves propagation in all other cases.
+
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string PK | UUID |

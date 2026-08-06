@@ -258,19 +258,26 @@ export const DrillBank: React.FC = () => {
          >
            All ({drills.length})
          </button>
-         {quickLabels.map(label => (
-           <button
-             key={label}
-             onClick={() => setActiveLabel(activeLabel === label ? null : label)}
-             className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
-               activeLabel === label
-                 ? 'bg-primary text-on-primary'
-                 : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
-             }`}
-           >
-             {label} ({drills.filter(d => (d.labels || []).map(l => l.toLowerCase()).includes(label.toLowerCase())).length})
-           </button>
-         ))}
+         {quickLabels.map(label => {
+           const count = drills.filter(d => {
+             const drillLabels = (d.labels || []).map(l => l.toLowerCase())
+             const drillFocus = (d.focus || '').toLowerCase()
+             return drillLabels.includes(label.toLowerCase()) || drillFocus === label.toLowerCase()
+           }).length
+           return (
+             <button
+               key={label}
+               onClick={() => setActiveLabel(activeLabel === label ? null : label)}
+               className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
+                 activeLabel === label
+                   ? 'bg-primary text-on-primary'
+                   : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
+               }`}
+             >
+               {label} ({count})
+             </button>
+           )
+         })}
          <button
            onClick={() => setSortByPopularity(!sortByPopularity)}
            className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none flex items-center gap-1 ${
@@ -380,26 +387,27 @@ export const DrillBank: React.FC = () => {
         open={showEditor}
         title={editingDrill.id ? 'Edit Bank Drill' : 'New Bank Drill'}
         initialData={showEditor ? editingDrill as DrillFormData : undefined}
-        onSave={async (data) => {
-          const save = async () => {
-            if (editingDrill.id) {
-              await updateLibraryDrill(editingDrill.id, data as unknown as Partial<SafeLibraryDrill>)
-            } else {
-              await createLibraryDrill(data as unknown as SafeLibraryDrill)
-            }
-            setShowEditor(false)
-            loadDrills()
-          }
-          const similars = findSimilarDrills(
-            { name: data.name, stroke: data.stroke, distance: data.distance, focus: data.focus, labels: data.labels },
-            drills.filter(d => d.id !== (editingDrill.id || undefined)).map(d => ({ id: d.id, name: d.name, stroke: d.stroke, distance: d.distance, focus: d.focus, labels: d.labels }))
-          )
-          if (similars.length > 0) {
-            setSimilarWarning({ similars, data, proceedSave: save })
-          } else {
-            await save()
-          }
-        }}
+         onSave={async (data, asVariant) => {
+           const save = async () => {
+             if (editingDrill.id) {
+               await updateLibraryDrill(editingDrill.id, data as unknown as Partial<SafeLibraryDrill>)
+               if (asVariant) await bumpDrillPopularity(editingDrill.id!)
+             } else {
+               await createLibraryDrill(data as unknown as SafeLibraryDrill)
+             }
+             setShowEditor(false)
+             loadDrills()
+           }
+           const similars = findSimilarDrills(
+             { name: data.name, stroke: data.stroke, distance: data.distance, focus: data.focus, labels: data.labels },
+             drills.filter(d => d.id !== (editingDrill.id || undefined)).map(d => ({ id: d.id, name: d.name, stroke: d.stroke, distance: d.distance, focus: d.focus, labels: d.labels }))
+           )
+           if (similars.length > 0) {
+             setSimilarWarning({ similars, data, proceedSave: save })
+           } else {
+             await save()
+           }
+         }}
         onDelete={editingDrill.id ? (() => {
           setConfirmState({
             open: true,

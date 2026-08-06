@@ -103,7 +103,7 @@ Drills in the library carry a `popularity` counter that tracks how often coaches
 
 **How popularity is incremented:**
 - +1 each time a coach adds a library drill to a session (via DrillBank → Add to Session)
-- +1 each time a coach edits/creates a custom drill (via DrillEditorModal save)
+- +1 only when a coach changes a drill's stroke and confirms "Save as New Variant" (via DrillEditorModal stroke-change confirm). A plain edit that keeps the stroke does **not** bump popularity.
 
 **How ranking is used:**
 - The "Popular" toggle chip in DrillBank sorts drills by `popularity` descending
@@ -116,8 +116,19 @@ Drills in the library carry a `popularity` counter that tracks how often coaches
 - There is no personalization — all coaches see the same ranking regardless of their own usage patterns
 - The `popularity` field is stored on the library drill record, not computed from session/run data
 
-### Data Structure
-**File**: `client/src/db/schema.ts`
+### Naming Convention
+
+All drills default to **freestyle** stroke with a generic, technique-focused name. Stroke-specific variants are created by the coach editing the drill and changing the stroke — which triggers a "Save as New Variant" prompt that bumps the drill's popularity ranking. Choosing "Discard" instead closes the dialog and undoes the unsaved changes without bumping.
+
+Examples of the naming pattern:
+- `Single Arm` (freestyle default, was "One-Arm Backstroke")
+- `Kicking on Side` (freestyle default, was "Kicking on Back")
+- `Dolphin Kick` (freestyle default, was "Dolphin Kick on Back")
+- `Pullout` (freestyle default, was "Breaststroke Pullout")
+- `Body Motion` (freestyle default, was "Butterfly Body Motion")
+- `Kick Only` (freestyle default, was "Breaststroke Kick Only")
+
+This ensures the drill bank is scannable and stroke-agnostic by default.
 
 Types:
 - `Drill`: Drill template record

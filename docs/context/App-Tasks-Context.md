@@ -4,6 +4,67 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ---
 
+## A-044: Extract builtin drill/session data into external JSON catalog ✅
+
+**Source**: User request — "export the drill / session data (initial data) out of the core application, it aligns with our future goals" (import/export + all data types follow same pattern)
+
+Extracted the hardcoded builtin seed data out of `client/src/db/dao.ts` into an external JSON catalog:
+
+- `client/src/data/drills.json` — 57 builtin drill categories (name, stroke, distance, focus, labels, description). Single source of truth.
+- `client/src/data/sessions.json` — default sessions (currently "Distance Progression": pool length, notes, 11 drills with `items[]`).
+- `client/src/data/catalog.ts` — typed loader: `drillCatalog` / `sessionsCatalog` with `CatalogDrill`/`CatalogSession` interfaces.
+
+**DAO refactor** (`dao.ts` shrank ~1439 → ~591 lines):
+- `patchLibraryDrills` — iterates `drillCatalog`, upserts missing/incomplete by name.
+- `seedLibraryDrills` — iterates `drillCatalog`, adds all on first run.
+- `seedDefaultSessions` — iterates `sessionsCatalog`, creates each session + hydrates drill/item ids via `crypto.randomUUID()`.
+
+Editing builtin drills/sessions now means editing JSON, not code. Aligns seed/catalog data with the future import/export pipeline (A-019). **All built-in data is now external to business logic/DAO** (DAO contains zero hardcoded drill/session records — only `DEFAULT_EQUIPMENT` remains, an app-level constant). Added `resolveJsonModule: true` to `tsconfig.app.json`.
+
+The `patchLibraryDrills` heal-on-reload behavior is a **feature** (not a bug): it heals blank builtin drills from accidental/corrupt edits **and** propagates catalog improvements to existing users. Documented its one narrow edge (cannot persist a deliberately blanked builtin) in `docs/context/DB-Context.md` under "Builtin vs. user data separation".
+
+**Files modified**:
+- `client/src/data/drills.json` (new), `client/src/data/sessions.json` (new), `client/src/data/catalog.ts` (new)
+- `client/src/db/dao.ts` — refactored the three seed/patch functions to read from catalog
+- `client/tsconfig.app.json` — `resolveJsonModule: true`
+- `docs/context/DB-Context.md` — documented builtin data source
+
+**Priority**: Medium
+**Status**: Done
+
+---
+
+## A-040: Speed & endurance drill library expansion ✅
+
+**Source**: User request — "add more speed drills & endurance drills"
+
+Added 9 new builtin drills to both `patchLibraryDrills` and `seedLibraryDrills` in `client/src/db/dao.ts`:
+
+**Speed drills** (focus: 'fitness'):
+- `Speed Ladder` — progressive 25/50/75m fast-easy pacing set
+- `Sprint Intervals 25s` — 10-16 x 25m all-out with full recovery
+- `Race Pace 50s` — 8-12 x 50m at goal race pace
+- `Power Tower Sprints` — 6-8 x 25m resisted sprints vs parachute
+
+**Endurance drills** (focus: 'fitness'):
+- `Threshold 100s` — 10-20 x 100m at CSS/T-pace
+- `Over-Under 200s` — alternating over/under-threshold 200s
+- `Long Continuous` — 800-1500m steady aerobic continuous swim
+- `Distance Build Set` — decreasing-distance progressive effort
+- `Endurance Pull` — 6-10 x 200m pull buoy aerobic set
+
+All default to `stroke: 'freestyle'` with `distance` set in the seed array. Names follow the generic freestyle-default convention.
+
+> **Later refactor (A-044)**: these builtin drills now live in `client/src/data/drills.json` (single source), not in `dao.ts`.
+
+**Files modified**:
+- `client/src/db/dao.ts` — 9 new drills in both `patchLibraryDrills` and `seedLibraryDrills`; **`patchLibraryDrills` now also inserts missing drills** (previously it only updated existing ones, so new builtin drills never appeared for existing users without a manual "Reset to Defaults"). Missing drills are added via `addLibraryDrill` with `stroke: 'freestyle'`, `distance: 0` defaults, `source: 'builtin'`.
+
+**Priority**: Medium
+**Status**: Done
+
+---
+
 ## A-018: Quick Time Lap — Path to value for new users
 
 **Source**: User feedback — coach wants to time swimmers right now without onboarding
