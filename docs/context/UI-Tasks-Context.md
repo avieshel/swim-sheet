@@ -265,7 +265,6 @@
 - **Duplicate Prevention**:
   - Service-layer check in `createSwimmerIfNotExists()` function
   - Database unique constraint (Dexie schema version 4 with `&name` index)
-  - Server-side validation (409 error on duplicate)
   - Client-side duplicate check via `rosterSwimmers` prop on `SwimmerFormModal`
 
 **Files**:
@@ -279,7 +278,6 @@
 - `client/src/services/swimmerService.ts`: Added `createIfNotExists` function with duplicate check
 - `client/src/api/swimmers.ts`: Added `createSwimmerIfNotExists` export
 - `client/src/db/schema.ts`: Added version 4 with unique index on swimmer name
-- `server/src/routes/swimmers.ts`: Added server-side duplicate validation
 - `client/src/components/__tests__/SwimmerRows.test.tsx`: Updated mocks for `createSwimmerIfNotExists`
 
 **Priority**: High

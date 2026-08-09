@@ -84,8 +84,7 @@ A student/athlete registered by the coach.
 
 **Uniqueness constraint:** Swimmer names are unique (case-insensitive). Enforced by:
 - Client: Dexie schema version 4 with `&name` unique index
-- Server: SQLite unique index `idx_swimmers_name` on `LOWER(name)`
-- API: `createSwimmerIfNotExists()` service function checks for duplicates before creation
+- Client API: `createSwimmerIfNotExists()` service function checks for duplicates before creation
 - UI: `SwimmerFormModal` validates against existing roster swimmers
 
 ### Session (Template)

@@ -46,13 +46,6 @@ export function createSwimmersRouter(db: Database): Router {
       if (!name || typeof name !== 'string' || name.trim() === '') {
         return res.status(400).json({ error: 'Validation failed', details: { name: 'required' } })
       }
-      
-      // Check for duplicate swimmer name
-      const existing = db.prepare('SELECT id FROM swimmers WHERE LOWER(name) = LOWER(?)').get(name.trim())
-      if (existing) {
-        return res.status(409).json({ error: `A swimmer named "${name.trim()}" already exists. Please use a different name.` })
-      }
-      
       const id = randomUUID()
       const now = new Date().toISOString()
       db.prepare('INSERT INTO swimmers (id, name, group_name, notes, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
