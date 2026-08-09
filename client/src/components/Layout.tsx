@@ -1,5 +1,6 @@
 import React, { useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useActiveRun } from '../hooks/useActiveRun';
 
 const navItems = [
   { path: '/swimmers', label: 'Swimmers', icon: 'groups' },
@@ -11,6 +12,7 @@ const navItems = [
 
 export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const location = useLocation();
+  const activeRun = useActiveRun();
 
   const isActive = (path: string) => location.pathname.startsWith(path);
 
@@ -42,13 +44,16 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`font-label-sm transition-colors px-3 py-1.5 rounded-full h-10 flex items-center ${
+                  className={`relative font-label-sm transition-colors px-3 py-1.5 rounded-full h-10 flex items-center ${
                     isActive(item.path)
                       ? 'text-primary font-bold bg-primary-container/10'
                       : 'text-on-surface-variant hover:bg-surface-container-high'
                   }`}
                 >
                   {item.label}
+                  {item.path === '/live' && activeRun && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
+                  )}
                 </Link>
               ))}
             </nav>
@@ -67,17 +72,22 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
           <Link
             key={item.path}
             to={item.path}
-            className={`flex flex-col items-center justify-center min-h-[44px] min-w-[44px] px-3 py-1 rounded-xl transition-all duration-200 active:scale-90 tap-highlight-none ${
+            className={`relative flex flex-col items-center justify-center min-h-[44px] min-w-[44px] px-3 py-1 rounded-xl transition-all duration-200 active:scale-90 tap-highlight-none ${
               isActive(item.path)
                 ? 'bg-secondary-container text-on-secondary-container'
                 : 'text-on-surface-variant hover:bg-surface-variant'
             }`}
           >
-            <span
-              className="material-symbols-outlined"
-              style={isActive(item.path) ? { fontVariationSettings: "'FILL' 1" } : undefined}
-            >
-              {item.icon}
+            <span className="relative">
+              <span
+                className="material-symbols-outlined"
+                style={isActive(item.path) ? { fontVariationSettings: "'FILL' 1" } : undefined}
+              >
+                {item.icon}
+              </span>
+              {item.path === '/live' && activeRun && (
+                <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
+              )}
             </span>
             <span className="font-label-sm leading-none mt-0.5">{item.label}</span>
           </Link>

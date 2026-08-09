@@ -102,7 +102,7 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 ### CoachDashboard (`/`)
 Landing hub showing today's focus, quick stats, and navigation.
 
-- **Hero Section**: Pool-gradient banner (`#00677f → #00d1ff`) with today's workout focus, "Quick Start Live" button, time schedule.
+- **Hero Section**: Pool-gradient banner (`#00677f → #00d1ff`) with today's workout focus and a single "Quick Time Lap" CTA to `/live` (the duplicate "Quick Start Live" outline button was removed — it was identical to the primary CTA and the Active Deck tile; both always navigate to the same LiveDeck).
 - **Hub Tiles** (3-column grid):
   1. Team Management — swimmer count
   2. Session Planner — template count
@@ -192,31 +192,53 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 
 The LiveDeck supports two view modes to accommodate different coaching styles:
 
-- **Timing Mode** (full detail, existing): Renders the complete `GroupCard` (defined inside `client/src/pages/LiveDeck.tsx`) with per-swimmer Start/Lap/Finish buttons, inline stroke count steppers, lap split tables, and timing detail. Swimmers are always present in state and persisted — this is the default mode.
+- **Overview** (default): A session-level, high-level view rendered by `client/src/components/OverviewView.tsx`. It is deliberately minimal — no per-swimmer timers or lap tables. It is split into two panels (about 50/50 of the screen on tablet):
+  - **Drills panel (top, expandable)** — the **Session Structure table**: a drills × lanes grid with a column per lane (header shows `L{n}` + swimmer count) and a row per drill. Cells are **status markers**: `check` = done, `play_arrow` = current (pulsing ring), `–` = not started; a legend below the table explains each. **Markers are toggles** — a click marks a not-done (lane, drill) complete via `completeLaneResult` (no timing, no advance); clicking a done marker again **undos** it via `uncompleteLaneResult`. Every drill row also has a **"Time"** button that opens **Timing for all lanes on that specific drill**. A fullscreen toggle expands the drills panel to the whole view (hiding the lanes panel) for focused reading — about 5–6 drills fit on tablet.
+  - **Repeated drills collapse to a single record.** A template drill with `repeatCount > 1` (individual-mode) becomes several `RunDrill` rows sharing `parent_drill_id`; the structure table groups consecutive same-parent rows into one row (**`Nx <name>`**, total distance, per-lane progress `done/total`) instead of N rows. The per-lane progress chip **toggles the whole set in one click** (complete all reps when incomplete; undo all when fully complete). An **expand** toggle (small `>` chevron) reveals each repetition (stored name `(r/N)` + mark `done/current/todo` markers + per-rep **Time** button).
+  - **Lanes panel (bottom, collapsible)** — a **collapsible container** for lane cards. The collapsed header is a **summary strip** ("Lanes · N lanes · N swimmers" + chevron); expanding shows a **responsive grid** (`r-grid` with a 360px minimum) so two lanes sit **side by side on wide screens** and **stack one under the other on mobile**.
+  - **Lane cards are slim and assignment-focused** (`client/src/components/LaneCard.tsx`) — one per lane (**including empty lanes**): a big `L{n}` badge, lane name, **swimmer count** ("N swimmers assigned"), swimmer chips, a `casino` **quick-add temp swimmer** button, and a **Manage Swimmers** button (opens the lane editor scoped to that lane). Empty lanes show a dashed "Add Temp Swimmer" / "Manage Swimmers" card. **No note field, no in-card drill card, no Mark Done / Time buttons** — timing happens from drill-row "Time" buttons or the timing-mode `GroupCard`.
+  - **Lane layout** — sessions start with **2 default lanes** (the app supports **up to 8 lanes**, but new sessions never instantiate 8).
+  - Temp (hint) swimmers are pre-populated **only for the default quick session**: while the real roster is ≤ `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD` (15), Lane 1 starts with 2 temp swimmers and Lane 2 with 1; above the threshold and for **every custom template session**, lanes start **empty** so the coach assigns their own swimmers.
+  - No per-swimmer rows and no timers in the overview. The primary action is "Time" (per drill row) to enter timing for a drill.
 
-- **Progress Mode** (minimalist, new): Renders a simplified `ProgressGroupCard` per lane. Same data requirements as Timing Mode (`TimedGroup` with swimmers, `currentRunDrillId`, `LaneDrillResult`) — swimmers are always assigned to lanes. The difference is entirely in presentation:
-  - No per-swimmer rows (no Start/Lap/Finish buttons, no lap tables, no stroke counts)
-  - Lane card shows: lane name, swimmer count, current drill name/phase tag (warmup/main-set/cooldown), drill status indicator
-  - Three lane-level actions: Previous Drill, Mark Complete / Next Drill
-  - Lane elapsed timer display
-  - Add Swimmer / Temp Swimmer buttons still present for roster-building
-  - "Switch to Timing" button per card for mid-session mode switch
+**Session-level progress and lane summary live in the session header** (owned by `ActiveRunView.tsx`, not OverviewView): a full-width **progress bar** with `done / total` and %, plus **per-lane chips** (`L{n}` + swimmer count + edit icon) that each call `openLaneEditor(lane)` to open the lane editor focused on that lane. Logical-drill counting (each repetition-group counts once per lane) is computed in `client/src/utils/sessionProgress.ts` (`computeSessionProgress`, `groupDrillRows`, `stripRepPrefix`), which also drives the structure table's repetition grouping.
 
-The coach can toggle between modes at any time during a live session. Switching from Progress to Timing mode mid-drill shows the full per-swimmer timing data that has been accumulated (via group-level Start/Finish). Both modes write into the same `LaneDrillResult` and `Lap` tables — no data model bifurcation.
+**Overview is the everyday runner.** It can drive a whole practice using markers alone (`completeLaneResult` per lane writes `LaneDrillResult.completed` with `data: null`); timing is only pulled in via "Time" for the drills the coach wants lap/split detail. Progress is tracked per lane over the session flow and persists for the run.
 
-**ProgressGroupCard layout:**
+- **Timing** (full detail, drill-scoped): Entered from a drill row's **"Time"** button (the lane cards are assignment-only — no in-card timing). Entering calls `SET_ALL_DRILLS` to that drill and sets `timingDrillId`, so **all lanes open the same drill in timing mode**. A banner at the top ("Timing all lanes · Drill X of Y · <name>") with a **"Overview"** back button exits timing. The drill-scoped timing view renders the complete `GroupCard` (its own component at `client/src/components/GroupCard.tsx`) per lane with per-swimmer Start/Lap/Finish buttons, inline stroke count steppers, lap split tables, and timing detail. Both modes write into the same `LaneDrillResult` and `Lap` tables — no data model bifurcation.
+
+The live session UI is split across a few files instead of one monolith: `pages/LiveDeck.tsx` (bootstrap — quick-start + template chooser + run hydration), `pages/live/ActiveRunView.tsx` (the active-session runner: header, `timingDrillId` drill-scoped timing state, overview/timing orchestration, lane editor, promotion), `components/OverviewView.tsx` (session structure), `components/LaneCard.tsx` (overview lane card), and `components/GroupCard.tsx` (the per-lane timing card).
+
+There is **no global overview/timing segmented control anymore** — timing is entered per drill (all lanes), matching the coach flow "mark 5 drills done in the overview, then time drill 6". The old `viewMode` persisted in `SessionRun.notes` JSON was removed in favor of the ephemeral `timingDrillId` state.
+
+**OverviewView layout (expandable Drills panel + collapsible Lanes panel) — progress bar & lane chips live in the session header:**
 ```
-┌─────────────────────────────────────────┐
-│ Lane 1 — L1   3 swimmers           [≡] │ ← lane header with swimmer count
-├─────────────────────────────────────────┤
-│ Drill 3 of 8                            │
-│ 200m IM — Main Set                      │
-│ ◉ In Progress                           │
-│  [+ Prev]  [✔ Mark Complete]  [Next +]  │ ← lane-level only
-├─────────────────────────────────────────┤
-│ ⏱ 14:32 elapsed                        │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│ Session Header  (ActiveRunView)             │
+│  ▶ Live · 14:32        [⏱] [✔ Complete]    │
+│  ┌────┐ ┌────┐ ┌────┐                      │
+│  │L1 4 ││L2 3 ││L3 5 │  ← lane chips (open │
+│  └────┘ └────┘ └────┘     lane editor)     │
+│  [██████████░░░░░░░░░░┡]  2 / 8 · 25%      │  ← full-width progress bar
+├─────────────────────────────────────────────┤
+│ Drills                       [⛶ Expand]    │  ← fullscreen toggle (hides lanes)
+│ #  Drill       L1 (4)   L2 (3)   L3 (5)     │
+│ 1  100 Free    [✓]      [✓]      [✓]   [⏱] │  ← markers + Time
+│ 2  5x 50 Fly    2/4      1/4      0/4   [+] │  ← repeated drill (single record, 4 reps)
+│ 3  100 IM      [·]      [·]      [·]   [⏱] │     expand [-] → per-rep marker rows
+│  ✓ Done  ▶ In progress  · Not started      │
+├─────────────────────────────────────────────┤
+│ Lanes · 2 lanes · 3 swimmers         [∨]   │  ← collapsible summary strip
+│ ┌─────────────┐ ┌─────────────┐            │  ← slim lane cards (2-up wide)
+│ │⭕ L1 Lane 1                 │ ││ ⭕ L2 Lane 2  │            │
+│ │2 swimmers assigned         │ ││ 1 swimmer... │            │
+│ │[Phelps] [Ledecky] [🎲] [👥]│ ││ [Dressel] [🎲]│            │
+│ └─────────────┘ └─────────────┘            │
+└─────────────────────────────────────────────┘
 ```
+*Lane markers: `✓` = drill done for that lane, `▶` = current drill (pulsing ring), `·` = not started; row **⏱ Time** opens Timing for all lanes on that drill. Lane cards are assignment-only (quick-add + Manage Swimmers); no note field, no drill info, no timing controls.*
+
+*Note: the diagram above shows three lanes for illustration; new sessions always start with 2.*
 
 **Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
 - **Start** (emerald) — `store.markSwimmerStart(...)` if not already started; disabled after started.
@@ -285,7 +307,7 @@ The saved-state variant replaces active buttons with a "Saved" badge but keeps s
 - Lane-level Start/Finish is always active (emerald when idle, red when running)
 - Lane-level Reset appears only when drill is running
 
-**Saved/reviewed swimmer cards** show elapsed time and lap splits instead of the old LapTimeline.
+**Saved/reviewed swimmer cards** show elapsed time and lap splits instead of the old LapTimeline. The control bar is a single **Clear** action — the in-session Start/Lap/Finish grid was removed as dead weight (a saved card isn't being timed).
 
 ### Settings (`/settings`)
 App preferences.
@@ -312,7 +334,7 @@ Inline stroke count control for each lap row in the swimmer card (defined inside
 - **Touch support**: Pointer Events, 5px drag threshold, `touch-none` CSS, 12px hit targets
 
 ### ConfirmDialog
-Reusable confirmation modal for destructive actions (delete, reset).
+Reusable confirmation modal for destructive or neutral actions (delete, reset). Props: `open`, `title`, `message`, `confirmLabel` (default "Delete"), `cancelLabel`, `destructive` (default true — error button/icon), `confirmDisabled` (disables both buttons while an async action is in flight), `onConfirm`, `onCancel`. Both buttons render `type="button"` so it is safe to render inside a `<form>`. Used by RunDetail, ActiveRunView, SessionsList, SwimmersList, DrillBank, SessionDetail, GroupCard, LaneEditorModal, Table, and Settings (replaced two hand-rolled overlay dialogs). SwimmerDetail's multi-action delete dialog remains custom (it needs 3+ actions that this 2-button modal cannot express).
 
 ### CustomSelect
 Styled select dropdown used in drill editor and session setup.

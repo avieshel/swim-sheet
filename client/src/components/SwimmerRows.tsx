@@ -5,6 +5,8 @@ import { K } from '../timing/timestampStore'
 import { formatTime } from '../utils/formatTime'
 import { useSwimmerEditModal } from './useSwimmerEditModal'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
+import { removeSwimmerFromRun } from '../api/runs'
+import { ConfirmDialog } from './ConfirmDialog'
 
 function StrokeCountStepper({ value, onChange }: {
   value: number | undefined
@@ -189,25 +191,15 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
         </div>
       )}
 
-      {/* Control bar — disabled; maintains layout stability vs ActiveSwimmerRow */}
+      {/* Control bar — a single Clear action. No dead Start/Lap/Finish buttons:
+          this is a saved swimmer card, so the in-session controls don't apply. */}
       <hr className="border-outline-variant/20 mx-3" />
-      <div className="px-3 py-2 flex gap-1.5 justify-center">
-        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
-          <span className="material-symbols-outlined text-label-sm">play_arrow</span>
-          <span>Start</span>
-        </button>
-        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
-          <span className="material-symbols-outlined text-label-sm">flag</span>
-          <span>Lap</span>
-        </button>
-        <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
-          <span className="material-symbols-outlined text-label-sm">check</span>
-          <span>Finish</span>
-        </button>
-        <button onClick={() => onClearSavedSwimmer?.(saved.dbId)}
-          className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
+      <div className="px-3 py-2 flex gap-1.5">
+        <button
+          onClick={() => onClearSavedSwimmer?.(saved.dbId)}
+          className="flex-1 flex items-center justify-center gap-1.5 h-11 md:h-12 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
           <span className="material-symbols-outlined text-label-sm">restart_alt</span>
-          <span>Clear</span>
+          Clear
         </button>
       </div>
 
@@ -236,6 +228,8 @@ interface ActiveSwimmerRowProps {
 export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, onClear, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: ActiveSwimmerRowProps) {
   const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
   const storeVersion = store.version
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
 
   const isVirtual = isVirtualSwimmer(swimmer.dbId)
   const { saving, handleNameClick, modal } = useSwimmerEditModal({
@@ -255,6 +249,19 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
       }
     },
   })
+
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      swimmerId: swimmer.id,
+      fromGroupId: group.id,
+    }))
+    e.dataTransfer.effectAllowed = 'move'
+    setIsDragging(true)
+  }
+
+  const handleDragEnd = () => {
+    setIsDragging(false)
+  }
 
   const startedAt = useMemo(() =>
     (runId && drillId && swimmer.dbId)
@@ -304,11 +311,27 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
     [runId, group.id, drillId, swimmer.dbId, storeVersion]
   )
 
-  // Check if this swimmer is a virtual swimmer (promotable)
-  const canRemove = isVirtual && startedAt == null && !swimmer.completed
+  const handleRemoveSwimmer = async () => {
+    if (isVirtual) {
+      // Virtual swimmers: remove instantly
+      dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: group.id, swimmerId: swimmer.id } })
+    } else {
+      // Real swimmers: remove from run and UI
+      if (runId && swimmer.dbId) {
+        await removeSwimmerFromRun(runId, swimmer.dbId).catch(() => {})
+      }
+      dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: group.id, swimmerId: swimmer.id } })
+    }
+    setShowRemoveConfirm(false)
+  }
 
   return (
-    <div className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden">
+    <div 
+      className={`bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden transition-all ${isDragging ? 'opacity-50 scale-95' : ''}`}
+      draggable="true"
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
         <div className="flex gap-1.5 min-w-0 flex-1">
@@ -332,8 +355,17 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
             </button>
             <div className="flex flex-wrap gap-1.5 mt-0.5">
               {isVirtual && (
-                <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
-                  {saving ? 'Saving...' : 'wanna be'}
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
+                    {saving ? 'Saving...' : 'wanna be'}
+                  </span>
+                  <button
+                    onClick={handleNameClick}
+                    className="h-6 px-2 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer"
+                    title="Save to roster"
+                  >
+                    Save
+                  </button>
                 </span>
               )}
               {swimmer.completed && (
@@ -349,15 +381,13 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
               <span className="font-mono text-label-sm tabular-nums text-on-surface-variant mt-0.5">(+{(goOffset / 1000).toFixed(2)}s)</span>
             )}
           </div>
-          {canRemove && (
-<button
-                onClick={() => dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId: group.id, swimmerId: swimmer.id } })}
-                className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition-all cursor-pointer -mr-1"
-                title="Remove swimmer"
-              >
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
-          )}
+          <button
+            onClick={() => setShowRemoveConfirm(true)}
+            className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
+            title={isVirtual ? 'Remove swimmer' : 'Remove swimmer from this lane'}
+          >
+            <span className="material-symbols-outlined text-sm">close</span>
+          </button>
         </div>
       </div>
 
@@ -438,6 +468,20 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         </button>
       </div>
       {modal}
+      
+      <ConfirmDialog
+        open={showRemoveConfirm}
+        title={isVirtual ? 'Remove swimmer?' : 'Remove swimmer from lane?'}
+        message={isVirtual 
+          ? 'Remove this temporary swimmer? Any timing data will be lost.'
+          : `Remove ${swimmer.name} from this lane? Their data is preserved in history.`
+        }
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        destructive={true}
+        onConfirm={handleRemoveSwimmer}
+        onCancel={() => setShowRemoveConfirm(false)}
+      />
     </div>
   )
 })

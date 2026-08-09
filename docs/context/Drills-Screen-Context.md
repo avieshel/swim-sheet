@@ -1,6 +1,6 @@
 # SwimSheet Drills Screen Context
 
-## Screen: DrillBank & DrillDetail
+## Screen: DrillBank
 
 ### Purpose
 Global drill library and template management. Provides reusable drill templates that can be used across all sessions. Supports drill creation, editing, and library deduplication while maintaining template consistency.
@@ -11,12 +11,7 @@ Global drill library and template management. Provides reusable drill templates 
   - Search bar with real-time filtering
   - Grid of drill cards with drill type, description, and options
   - Bulk actions: deduplicate, reset to defaults, seed library
-
-- **DrillDetail** (`client/src/pages/DrillDetail.tsx`)
-  - Individual drill template view with full options
-  - Edit drill modal trigger
-  - Usage count and related sessions display
-  - Delete confirmation modal
+  - Per-drill **detail modal** (opened from a card) with edit + "Add to Session" — the old dedicated `DrillDetail` route/page (`/drills/:id`, `client/src/pages/DrillDetail.tsx`) was **removed** as dead code: nothing navigated to it, so the drill-rate detail lives in the modal only.
 
 - **DrillEditorModal** (`client/src/components/DrillEditorModal.tsx`)
   - Drill creation/edit form with all configurable options

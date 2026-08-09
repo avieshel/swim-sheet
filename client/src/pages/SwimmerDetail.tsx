@@ -4,6 +4,7 @@ import { getSwimmer, updateSwimmer, deleteSwimmer, deleteSwimmerWithData, export
 import type { Swimmer } from '../api/runs'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import { RunHistoryTable } from '../components/Table'
+import { downloadBlob } from '../utils/downloadBlob'
 
 export const SwimmerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -24,15 +25,6 @@ export const SwimmerDetail: React.FC = () => {
     }
     return () => { document.body.style.overflow = '' }
   }, [showDeleteConfirm, showEditModal])
-
-  const triggerExport = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   useEffect(() => {
     const load = async () => {
@@ -72,7 +64,7 @@ export const SwimmerDetail: React.FC = () => {
     try {
       const blob = await deleteSwimmerWithData(id)
       if (blob) {
-        triggerExport(blob, `swimmer-${id}-data.json`)
+        downloadBlob(blob, `swimmer-${id}-data.json`)
       }
     } catch {
       await deleteSwimmer(id)
@@ -84,7 +76,7 @@ export const SwimmerDetail: React.FC = () => {
   const handleExportOnly = async () => {
     if (!id) return
     const blob = await exportSwimmerData(id)
-    triggerExport(blob, `swimmer-${id}-data.json`)
+    downloadBlob(blob, `swimmer-${id}-data.json`)
   }
 
   if (loading) return (

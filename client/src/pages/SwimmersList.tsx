@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listSwimmers, createSwimmer, updateSwimmer, deleteSwimmer } from '../api/swimmers'
+import { listSwimmers, createSwimmerIfNotExists, updateSwimmer, deleteSwimmer } from '../api/swimmers'
 import { getRunHistory } from '../api/runs'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
@@ -50,13 +50,24 @@ export const SwimmersList: React.FC = () => {
     )
   }, [swimmers, search])
 
-  const loadSwimmers = async () => {
-    const data = await listSwimmers()
+  const loadSwimmerData = async (): Promise<Swimmer[]> => {
+    return listSwimmers()
+  }
+
+  const applySwimmers = (data: Swimmer[]) => {
     setSwimmers(data)
     setLoading(false)
   }
 
-  useEffect(() => { listSwimmers().then(data => { setSwimmers(data); setLoading(false) }) }, [])
+  const loadSwimmers = async () => applySwimmers(await loadSwimmerData())
+
+  useEffect(() => {
+    let cancelled = false
+    loadSwimmerData()
+      .then(data => { if (!cancelled) applySwimmers(data) })
+      .catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -332,7 +343,7 @@ export const SwimmersList: React.FC = () => {
           if (editingId) {
             await updateSwimmer(editingId, data)
           } else {
-            await createSwimmer(data)
+            await createSwimmerIfNotExists(data)
           }
           setShowModal(false)
           loadSwimmers()

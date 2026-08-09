@@ -10,7 +10,7 @@ The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-fir
 - All CRUD operates against local IndexedDB via Dexie
 - The app works fully offline — the server is only needed for sync and first-time load
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
-- Schema versioning: current version is 2
+- Schema versioning: current version is 4
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
 
 ### Session → SessionRun (Template/Instance) Pattern
@@ -75,12 +75,18 @@ A student/athlete registered by the coach.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
-| `name` | `name` | string/TEXT | Required |
+| `name` | `name` | string/TEXT | Required, **unique** (case-insensitive) |
 | `group` | `group_name` | string/TEXT | Optional (e.g. "U17", "Masters") |
 | `notes` | `notes` | string/TEXT | Optional |
 | `status` | `status` | 'active' \| 'inactive'/TEXT | Default 'active' |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
+
+**Uniqueness constraint:** Swimmer names are unique (case-insensitive). Enforced by:
+- Client: Dexie schema version 4 with `&name` unique index
+- Server: SQLite unique index `idx_swimmers_name` on `LOWER(name)`
+- API: `createSwimmerIfNotExists()` service function checks for duplicates before creation
+- UI: `SwimmerFormModal` validates against existing roster swimmers
 
 ### Session (Template)
 Reusable training plan blueprint.
@@ -199,9 +205,11 @@ JSON blob storage for timed group timing data.
 | `group_id` | string | Timed group UUID |
 | `lane` | number | Physical lane number |
 | `run_drill_id` | string | FK → RunDrill |
-| `completed` | boolean | Drill completion status |
-| `data` | string | JSON blob with timing data |
+| `completed` | boolean | Drill completion **marker** — can be set without any timing (progress/overview "done") |
+| `data` | string \| null | JSON blob with timing detail; `null` = completed via marker only, never timed |
 | `updatedAt` | string | ISO 8601 |
+
+**Single-model rule (markers + optional timing):** `completed` is the always-present per-lane progress marker. Timing is an *optional* attachment to the same row: when a drill is timed, `data` carries the `SavedDrillData` blob (start/lap/finish + stroke counts); when a lane is just marked done in the overview, `data` stays `null`. The API surface is one set of lane-result endpoints — the difference is purely how much of the payload is filled. Progress bars/`OverviewView` read `completed`; timing views additionally read `data`.
 
 In-memory `TimestampStore` key hierarchy (flat key-value map, session-relative ms):
 ```

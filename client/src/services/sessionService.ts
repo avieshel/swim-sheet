@@ -3,6 +3,10 @@ import type { SafeSession } from '../db/schema'
 
 export const sessionService = {
   list: async () => {
+    await seedDefaultSessions()
+    return await getAllSessions()
+  },
+  listAll: async () => {
     return await getAllSessions()
   },
   get: (id: string) => getSession(id),
@@ -12,5 +16,5 @@ export const sessionService = {
   getDrills: (sessionId: string) => getDrillsForSession(sessionId),
   getCompletedRuns: () => getCompletedRuns(),
   getActiveRun: () => getActiveRun(),
-  seedDefaults: () => seedDefaultSessions(),
+  // seedDefaults: () => seedDefaultSessions(),
 }

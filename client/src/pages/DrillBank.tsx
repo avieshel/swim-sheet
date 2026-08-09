@@ -7,7 +7,7 @@ import { listSessions } from '../api/sessions'
 import type { LibraryDrill, SafeLibraryDrill } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { strokeColors } from '../constants/drill'
-import { getDrillTotalDistance, findSimilarDrills, type SimilarDrill } from '../utils/drillHelpers'
+import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
@@ -22,15 +22,7 @@ export const DrillBank: React.FC = () => {
   // Editor Modal
   const [showEditor, setShowEditor] = useState(false)
   const [similarWarning, setSimilarWarning] = useState<{ similars: SimilarDrill[]; data: DrillFormData; proceedSave: () => void } | null>(null)
-  const [editingDrill, setEditingDrill] = useState<Partial<LibraryDrill>>({
-    name: '',
-    items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
-    repeatCount: 1,
-    timingMode: 'individual',
-    focus: 'none',
-    labels: [],
-    description: ''
-  })
+  const [editingDrill, setEditingDrill] = useState<Partial<LibraryDrill>>(emptyDrillForm())
 
   // Detail Modal
   const [detailDrill, setDetailDrill] = useState<LibraryDrill | null>(null)
@@ -51,11 +43,25 @@ export const DrillBank: React.FC = () => {
     onConfirm: () => {},
   })
 
+  const loadDrillsData = async (): Promise<LibraryDrill[]> => {
+    await deduplicateLibraryDrills()
+    await patchLibraryDrills()
+    return listLibraryDrills()
+  }
+
+  const applyDrills = (data: LibraryDrill[]) => {
+    setDrills(data)
+    setLoading(false)
+  }
+
+  const loadDrills = async () => applyDrills(await loadDrillsData())
+
   useEffect(() => {
-    deduplicateLibraryDrills().then(() => patchLibraryDrills()).then(() => listLibraryDrills()).then(d => {
-      setDrills(d)
-      setLoading(false)
-    })
+    let cancelled = false
+    loadDrillsData()
+      .then(data => { if (!cancelled) applyDrills(data) })
+      .catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [])
 
   const openDetail = (drill: LibraryDrill) => {
@@ -93,27 +99,11 @@ export const DrillBank: React.FC = () => {
     navigate(`/sessions/${session.id}`)
   }
 
-  const loadDrills = async () => {
-    await deduplicateLibraryDrills()
-    await patchLibraryDrills()
-    const d = await listLibraryDrills()
-    setDrills(d)
-    setLoading(false)
-  }
-
   const openEditor = (drill?: LibraryDrill) => {
     if (drill) {
       setEditingDrill({ ...drill })
     } else {
-      setEditingDrill({
-        name: '',
-        items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
-        repeatCount: 1,
-        timingMode: 'individual',
-        focus: 'none',
-        labels: [],
-        description: ''
-      })
+      setEditingDrill(emptyDrillForm())
     }
     setShowEditor(true)
   }

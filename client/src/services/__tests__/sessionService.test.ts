@@ -9,6 +9,7 @@ const mockDao = vi.hoisted(() => ({
   getDrillsForSession: vi.fn(),
   getCompletedRuns: vi.fn(),
   getActiveRun: vi.fn(),
+  seedDefaultSessions: vi.fn(),
 }))
 
 vi.mock('../../db/dao', () => mockDao)
@@ -23,7 +24,18 @@ describe('sessionService', () => {
   it('list calls getAllSessions', async () => {
     const expected = [{ id: '1', name: 'Session 1' }]
     mockDao.getAllSessions.mockResolvedValue(expected)
+    mockDao.seedDefaultSessions.mockResolvedValue(undefined)
     const result = await sessionService.list()
+    expect(mockDao.seedDefaultSessions).toHaveBeenCalledOnce()
+    expect(mockDao.getAllSessions).toHaveBeenCalledOnce()
+    expect(result).toEqual(expected)
+  })
+
+  it('listAll returns sessions without seeding', async () => {
+    const expected = [{ id: '2', name: 'Session 2' }]
+    mockDao.getAllSessions.mockResolvedValue(expected)
+    const result = await sessionService.listAll()
+    expect(mockDao.seedDefaultSessions).not.toHaveBeenCalled()
     expect(mockDao.getAllSessions).toHaveBeenCalledOnce()
     expect(result).toEqual(expected)
   })

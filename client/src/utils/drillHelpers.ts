@@ -3,6 +3,28 @@ export function getDrillTotalDistance(d: { items?: { distance: number; repeatCou
   return d.items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * (d.repeatCount || 1)
 }
 
+export interface EmptyDrillForm {
+  name: string
+  items: { id: string; distance: number; stroke: string; repeatCount: number }[]
+  repeatCount: number
+  timingMode: 'individual' | 'continuous'
+  focus: 'technique' | 'fitness' | 'none'
+  labels: string[]
+  description: string
+}
+
+export function emptyDrillForm(): EmptyDrillForm {
+  return {
+    name: '',
+    items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+    repeatCount: 1,
+    timingMode: 'individual',
+    focus: 'none',
+    labels: [],
+    description: '',
+  }
+}
+
 export function aggregateByStroke(drills: { stroke?: string; distance?: number; repeatCount?: number; items?: { stroke?: string; distance: number; repeatCount: number }[] }[]): { stroke: string; meters: number }[] {
   const map = new Map<string, number>()
   for (const d of drills) {

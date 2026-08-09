@@ -15,7 +15,7 @@ Currently, a new user hits two cold-start hurdles to reach the live view:
 
 ## Goal
 
-A coach opens the app and is immediately in the live view timing a 100m freestyle with default swimmers (Michael Phelps in Lane 1, Katie Ledecky + Caeleb Dressel in Lane 2). Zero friction. Value in under 5 seconds — no taps required.
+A coach opens the app and is immediately in the live view timing a 100m freestyle with default temp swimmers (Michael Phelps + Katie Ledecky in Lane 1, Caeleb Dressel in Lane 2). Zero friction. Value in under 5 seconds — no taps required.
 
 ## Design Decision: Default Session Template
 
@@ -31,12 +31,13 @@ A coach opens the app and is immediately in the live view timing a 100m freestyl
 ## Design Tenets
 
 - **Existing SessionSetup and full-featured flows are untouched** — returning/advanced users with rosters and templates use the structured path (accessible via `/dashboard` → full session setup)
-- **Quick Time is the default entry point** — app opens to `/` (root route → `LiveDeck`) which auto-starts a quick-time session immediately. No picker, no "Start Timing" button — the live view appears directly.
-- **Auto-start, not auto-select** — the root route does not show a session picker. If no active run exists, one is created automatically via `handleQuickStart()` (guarded by a `useRef` to fire only once). If an active run exists (e.g. page refresh), it is restored.
+- **Quick Time is the default entry point** — app opens to `/` (root route → `LiveDeck`). With **no session templates**, a quick-time session is auto-started immediately (no picker, no taps — the live view appears directly). With **exactly one template** it is auto-selected (the default 100m freestyle quick-start is still used when that single template is the default). With **more than one template**, a session picker is shown so the coach chooses which template to start.
+- **Auto-select, then pick** — the root route auto-starts only when there are 0 or 1 session templates. If multiple templates exist, `LiveDeck` lists them (plus an "or quick-start the default 100m freestyle" option) instead of auto-creating a run. If an active run exists (e.g. page refresh), it is restored.
 - **One schema, two modes** — quick-time and full sessions share the same tables (Session, SessionRun, RunDrill, LaneDrillResult). The only difference is the swimmer data source: virtual (in-memory + notes JSON) vs real (Swimmer + RunSwimmer tables).
 - **Serve both personas** — the app is a sophisticated timer for some and a progression tracker for others. Never force one path.
 - **Famous swimmer defaults** — temp swimmers use famous swimmer names (Michael Phelps, Katie Ledecky, Caeleb Dressel) to signal "temporary, edit anytime"
-- **Multi-swimmer hint** — Lane 2 starts with 2 swimmers to hint that multiple swimmers per lane are supported
+- **New-user hints** — quick-start pre-populates **2 lanes**: Lane 1 with **2 temp swimmers** (hints a lane can hold more than one swimmer) and Lane 2 with **1 temp swimmer** (hints more than one lane exists). This only happens while the coach's real roster is small (< `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD`, default 15) — a coach who has already added 15 swimmers is familiar with the app and gets 2 empty lanes instead.
+- **Default 2 lanes, not 8** — sessions start with 2 lanes (up to 8 are supported); lanes sit side by side on wide screens and stack on mobile.
 - **One-tap scale** — "Add Swimmer" / "Temp Swimmer" buttons grow the session from 3 to N swimmers
 - **Inline editing** — drill name/distance/stroke and swimmer names are editable directly in the group card
 - **Name edit is the promotion signal** — editing a virtual swimmer's name triggers a non-blocking inline prompt to save to roster. The prompt must never interrupt timing (auto-dismiss, no modal, doesn't block Start/Lap/Finish).
@@ -48,23 +49,23 @@ The Quick Time flow adapts based on how many swimmers the coach has defined in t
 
 ### Threshold
 
-Define a configurable threshold `T` (default: 5). The behavior changes at the boundary:
+Define a configurable threshold `T` (default: 15, `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD` in `client/src/constants/index.ts`, exposed via `api/constants.quickSessionTempSwimmerThreshold()`). The behavior changes at the boundary:
 
-| Roster size | Pre-populated swimmers | Add swimmer control | Use case |
-|-------------|----------------------|-------------------|----------|
-| **0** | 3 virtual (Phelps, Ledecky, Dressel) | "Add Swimmer" / "Temp Swimmer" buttons | Fresh app, no data yet |
-| **1 to T-1** | 3 virtual | Dropdown: roster swimmers + "Temp Swimmer" option | Small roster — coach may want to mix real and temp |
-| **≥ T** | 0 (empty lanes) | Dropdown: roster swimmers + "Temp Swimmer" option | Established roster — coach almost always picks real swimmers |
+| Roster size | Pre-populated lanes/swimmers | Add swimmer control | Use case |
+|-------------|------------------------------|-------------------|----------|
+| **0** | 2 lanes — Lane 1: Phelps + Ledecky (2), Lane 2: Dressel (1) | "Add Swimmer" / "Temp Swimmer" buttons | Fresh app, no data yet |
+| **1 to T-1** | Same 2 lanes, 2+1 temp swimmers | Dropdown: roster swimmers + "Temp Swimmer" option | Small roster — coach may want to mix real and temp |
+| **≥ T** | 2 **empty** lanes (no hint swimmers) | Dropdown: roster swimmers + "Temp Swimmer" option | Established roster — coach is familiar with the app and picks real swimmers |
 
 ### Pre-population Logic
 
-**Roster size 0** (current behavior):
-- Lane 1: "Michael Phelps" (1 virtual swimmer)
-- Lane 2: "Katie Ledecky" + "Caeleb Dressel" (2 virtual swimmers — hints at multi-swimmer lanes)
+**Roster size < T** (new/small coach):
+- Lane 1: "Michael Phelps" + "Katie Ledecky" (2 virtual swimmers — hints at multi-swimmer lanes)
+- Lane 2: "Caeleb Dressel" (1 virtual swimmer — hints at multiple lanes)
 - Add button → next famous swimmer name from pool
 
-**Roster size 1 to T-1** (e.g., 1-4 swimmers):
-- Same visual — 2 virtual lanes with 3 swimmers
+**Roster size 1 to T-1** (e.g., 1-14 swimmers):
+- Same visual — 2 lanes with 3 hint temp swimmers (2 in Lane 1, 1 in Lane 2)
 - Add button shows a dropdown menu:
   ```
   [Add Swimmer ▼]
@@ -76,8 +77,8 @@ Define a configurable threshold `T` (default: 5). The behavior changes at the bo
 - Selecting an existing swimmer: creates a new lane with the real swimmer (uses their UUID as `dbId`, no promotion needed — already real)
 - Selecting "Temp Swimmer": creates a virtual swimmer with next famous swimmer name (same behavior as current "Temp Swimmer" button)
 
-**Roster size ≥ T** (e.g., 5+ swimmers):
-- No pre-populated virtual swimmers. The live view starts with a prompt:
+**Roster size ≥ T** (e.g., 15+ swimmers):
+- No pre-populated hint swimmers. Quick-start still creates **2 empty default lanes**; the coach assigns real roster swimmers directly (lane editor / lane quick-add). A swimmer picker like the one below remains a future enhancement:
   ```
   ┌──────────────────────────────────────┐
   │  Select swimmers to time             │
@@ -189,15 +190,16 @@ App opens → / (root route → LiveDeck)
        │          notes: JSON { isQuickStart: true, version: 2, virtualSwimmers: [...] }
        │      → RunDrill snapshot created automatically (100m Freestyle)
        │
-       ├─ 2. Create virtual swimmers and persist to notes:
-       │      - Lane 1: Michael Phelps (1 swimmer — hints at single-swimmer lane)
-       │      - Lane 2: Katie Ledecky + Caeleb Dressel (2 swimmers — hints at multi-swimmer)
+       ├─ 2. Create virtual swimmers and persist to notes (only if roster < `T`):
+       │      - Lane 1: Michael Phelps + Katie Ledecky (2 swimmers — hints at multi-swimmer lanes)
+       │      - Lane 2: Caeleb Dressel (1 swimmer — hints at multiple lanes)
+       │      - Roster ≥ T → no virtual swimmers; still 2 empty lanes
        │      - Virtual swimmers get dbId: "quick-..."
        │      - updateRun(runId, { notes: JSON with virtualSwimmers })
        │
        ├─ 3. Dispatch INIT_FROM_RUN with groups:
-       │      - Lane 1: [Michael Phelps]
-       │      - Lane 2: [Katie Ledecky, Caeleb Dressel]
+       │      - Lane 1: [Michael Phelps, Katie Ledecky]
+       │      - Lane 2: [Caeleb Dressel]
        │      - All groups have currentRunDrillId set to the RunDrill's id
        │
        └─ 4. Renders ActiveRunView:
@@ -227,7 +229,7 @@ Simone Manuel        Lilly King          Adam Peaty
 Sarah Sjostrom       Katinka Hosszu      Florent Manaudou
 ```
 
-On quick-start creation: Lane 1 gets "Michael Phelps" (1 swimmer), Lane 2 gets "Katie Ledecky" + "Caeleb Dressel" (2 swimmers — hints at multi-swimmer lanes). Every tap of "Temp Swimmer" picks the next unused name from the pool.
+On quick-start creation (roster < threshold): Lane 1 gets "Michael Phelps" + "Katie Ledecky" (2 swimmers — hints at multi-swimmer lanes), Lane 2 gets "Caeleb Dressel" (1 swimmer — hints at multiple lanes). Every tap of "Temp Swimmer" picks the next unused name from the pool.
 
 ## Changes Required
 
@@ -459,15 +461,12 @@ useEffect(() => {
 
 // In handleQuickStart:
 const roster = await listSwimmers()
-const threshold = 5 // configurable
+const threshold = quickSessionTempSwimmerThreshold() // default 15 (configurable)
 
-if (roster.length === 0) {
-  // Two virtual swimmers (current default)
-} else if (roster.length < threshold) {
-  // Two virtual swimmers + roster dropdown
+if (roster.length < threshold) {
+  // Two hint lanes: Lane 1 gets 2 temp swimmers, Lane 2 gets 1
 } else {
-  // No virtual swimmers — show swimmer picker
-  // Pre-select based on most recent RunSwimmer links
+  // No hint swimmers — two empty default lanes; coach assigns roster swimmers
 }
 ```
 
@@ -912,8 +911,8 @@ The flow must serve both without compromising either.
 | Step | Action | UX | Streamlined? |
 |------|--------|----|-------------|
 | 1 | Open app → `/` auto-starts | Live view appears immediately — no dashboard, no picker, no taps. Creates session + drill + 3 virtual swimmers. Transition is instant. | ✅ Zero taps to value |
-| 2 | See live view | Two lane cards: Lane 1 has "Michael Phelps", Lane 2 has "Katie Ledecky" + "Caeleb Dressel". 100m Freestyle pre-selected. Timer running. | ✅ Zero-config timing surface |
-| 3 | See live view | Two lane cards: "Michael Phelps" (Lane 1), "Katie Ledecky" + "Caeleb Dressel" (Lane 2). 100m Freestyle pre-selected. Timer running. | ✅ Zero-config timing surface |
+| 2 | See live view | Two lane cards side by side (stacked on mobile): Lane 1 has "Michael Phelps" + "Katie Ledecky", Lane 2 has "Caeleb Dressel". 100m Freestyle pre-selected. Timer running. | ✅ Zero-config timing surface |
+| 3 | See live view | Two lane cards: "Michael Phelps" + "Katie Ledecky" (Lane 1), "Caeleb Dressel" (Lane 2). 100m Freestyle pre-selected. Timer running. | ✅ Zero-config timing surface |
 | 4 | Want more swimmers | Tap "🐙 Add Random Swimmer" → new lane appears with next sea creature name, drill auto-selected | ✅ One tap per swimmer |
 | 5 | All swimmers lined up | Each lane shows Start/Lap/Finish buttons. Lane-level Start starts all swimmers in that lane simultaneously. | ✅ Start timing immediately |
 | 6 | Recording times | Swimmer-level Start / Lap / Finish record timestamps. Timer displays live. | ✅ Core value delivered |
@@ -974,7 +973,7 @@ The flow must serve both without compromising either.
 
 #### Session 5 — Persona B's roster is growing
 
-Now Persona B has 8 real swimmers in the roster. They open the app:
+Now Persona B has 8 real swimmers in the roster (still below the default threshold of 15, so hint temp swimmers are still pre-populated). They open the app:
 
 | Step | Action | UX |
 |------|--------|----|
@@ -986,7 +985,7 @@ Now Persona B has 8 real swimmers in the roster. They open the app:
 
 **Recommendation**: After the first promotion, Quick Time should pre-populate the Lane Editor with recently-used real swimmers as quick-add options. Or show a hybrid: 2 virtual lanes + a "Pick from roster" bar above the Add Random Swimmer button.
 
-For now this is a future enhancement — the current flow works, just with an extra tap (Lane Editor).
+For now this is a future enhancement — the current flow works, just with an extra tap (Lane Editor). **Note**: once the roster reaches `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD` (15), the hint temp swimmers disappear entirely and the coach lands on 2 empty lanes ready for their own roster picks.
 
 #### Session 10 — Persona B graduates to full setup
 
@@ -1037,7 +1036,7 @@ Persona B now has a full roster and session templates. They notice the "Quick St
 ## Verification
 
 1. Fresh app → opens to `/` → auto-starts quick time session (no picker, no taps)
-2. Lands immediately in live view with "Michael Phelps" (Lane 1) and "Katie Ledecky" + "Caeleb Dressel" (Lane 2)
+2. Lands immediately in live view with "Michael Phelps" + "Katie Ledecky" (Lane 1) and "Caeleb Dressel" (Lane 2)
 3. 100m Freestyle pre-selected, Start/Finish is live
 4. Tap Start → time swimmer → Finish → lap recording works
 5. Tap "Add Swimmer" / "Temp Swimmer" → new swimmer added to lane

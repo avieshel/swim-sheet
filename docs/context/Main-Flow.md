@@ -15,10 +15,11 @@ All user journeys the application supports, organized by flow.
 
 ### Flow: First-time user (roster = 0)
 
-1. Open app → `/` root route auto-starts quick-time session immediately (no picker, no taps)
-2. Live view appears with 2 lanes:
-   - Lane 1: "Michael Phelps" (1 swimmer)
-   - Lane 2: "Katie Ledecky" + "Caeleb Dressel" (2 swimmers — hints at multi-swimmer capability)
+1. Open app → `/` root route: with no templates (or only the default 100m freestyle), quick-time auto-starts immediately (no picker, no taps). With multiple templates, a session picker appears so the coach chooses which template to start.
+2. Live view appears with **2 lanes** (the default — the app supports up to 8 lanes but never instantiates that many up front):
+   - Lane 1: "Michael Phelps" + "Katie Ledecky" (2 temp swimmers — hints that a lane can hold more than one swimmer)
+   - Lane 2: "Caeleb Dressel" (1 temp swimmer — hints that more than one lane exists)
+   - On wide screens the two lanes sit side by side; on mobile they stack one under the other.
 3. 100m Freestyle drill pre-selected, session timer running
 4. Lane-level Start/Finish to control drill timing per lane
 5. Lane-level Lap/Reset to record splits or clear data
@@ -29,20 +30,18 @@ All user journeys the application supports, organized by flow.
 10. Name edit → non-blocking promotion chip ("Save to roster?" or "Link to existing?")
 11. "Complete" button → saves all data, returns to fresh auto-start state
 
-### Flow: Small roster (1 to T-1 swimmers)
+### Flow: Small roster (fewer than `T` swimmers, `T` = `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD`, default 15)
 
-1. Same auto-start as above
+1. Same auto-start as above — hint temp swimmers are still pre-populated
 2. "Add Swimmer" shows dropdown menu: roster swimmers + "Temp Swimmer" option
 3. Selecting roster swimmer → creates lane with real swimmer (UUID dbId, no promotion needed)
 4. Selecting "Temp Swimmer" → virtual swimmer with next famous name
 
-### Flow: Established roster (≥ T swimmers)
+### Flow: Established roster (≥ T swimmers — coach is already familiar with the app)
 
-1. Auto-start behavior: shows swimmer picker instead of pre-populated virtual lanes
-2. Pick swimmers to time from roster, assign lanes
-3. "Quick Random" adds virtual swimmer alongside real ones
-4. "Start Timing" transitions to live view
-5. Most recent RunSwimmer links pre-selected as likely candidates
+1. Auto-start still creates **2 empty default lanes** but **no pre-populated temp swimmers** — the coach assigns real roster swimmers via the lane editor instead
+2. "Add Swimmer" / lane quick-add offers roster swimmers + "Temp Swimmer" as needed
+3. Most recent RunSwimmer links can be surfaced as likely candidates (future enhancement)
 
 ### Flow: Page refresh recovery
 
@@ -310,59 +309,45 @@ All user journeys the application supports, organized by flow.
 
 ---
 
-## 12. Minimalist Session Progress (Progress Mode)
+## 12. Session Overview vs Drill-Level Timing
 
-**Entry**: Active run view → toggle to Progress Mode via header button
+**Lanes**: A session can have **up to 8 lanes**, but new sessions start with **2 default lanes** — never 8. Lane cards render in a responsive grid: side by side when the screen is wide enough, stacked one under the other on mobile.
 
-**Persona**: Coach who prepares sessions in advance and just wants to track "where is each lane" without per-swimmer timing interaction.
+The active run has two modes. **Overview** is the default — a session-level view with clear progress markers, per-lane swimmer counts, and the session structure. **Timing** is entered **per drill** (all lanes open the same drill in timing mode) for full per-swimmer timer detail. There is no global overview/timing toggle — timing is a drill-scoping action, so a coach can mark 5 drills "done" in the overview and then time only drill 6.
 
-### Flow: Run a session in Progress Mode
+**Entry**: Active run view. It always opens in Overview. Timing is entered from either a drill row's **"Time"** button in the Session Structure table, or a lane card's **"Time This Drill"** button. Exiting uses the "Overview" back button in the timing banner.
+
+**Personas**:
+- **High-level coach**: wants to track "where is each lane / how far through the session" without per-swimmer timing. Stays in Overview; only times a specific drill occasionally (e.g. one timed drill per session).
+- **Drill-focused coach**: enters Timing on the target drill and runs it with granular per-swimmer start/lap/finish, then returns to Overview.
+
+### Flow: Run a session in Overview
 
 1. Coach starts a session from a template (or via quick-start)
-2. Swimmers are assigned to lanes (same as Timing Mode — no swimmerless lanes)
-3. Coach toggles view mode from "Timing" to "Progress" (icon toggle: `overview` ↔ `timer` in session header)
-4. Each lane shows a `ProgressGroupCard`:
-   - Lane name, lane number badge, swimmer count
-   - Current drill name with phase tag (warmup / main-set / cooldown)
-   - Drill status: "Not Started" (grey), "In Progress" (blue, pulsing), "Completed" (green)
-   - Lane elapsed timer (formatted `MM:SS`)
-5. Three lane-level actions:
-   - **Previous Drill** — navigates to the preceding drill (chevron left)
-   - **Mark Complete / Next Drill** — marks current drill done, advances to next (chevron right)
-   - Lane-level Start/Finish acts as "Mark In Progress / Mark Complete" (same backend: `store.markGroupStart()` / `store.batchStopSwimmers()`)
-6. Coach can add swimmers to lanes (Add Swimmer / Temp Swimmer buttons) — same roster-building flow as Timing Mode
-7. Session-level controls unchanged: Play/Pause, Complete, Reset
-8. At any point, coach can switch to Timing Mode to get per-swimmer detail on a specific drill. The mode switch affects only the display — all timing data accumulated via group-level actions is visible in the per-swimmer rows.
-9. "Complete" button saves all data identically to Timing Mode
+2. Swimmers are assigned to lanes
+3. Overview shows (rendered by `client/src/components/OverviewView.tsx`):
+   - **Session Header (session-level progress + lane summary)** — full-width **progress bar** with `done / total` and % (logical drills; repetition-groups count once), and a **lane-chip strip** (`L{n}` + swimmer count + edit icon) where each chip opens the **lane editor focused on that lane**; live/elapsed state
+   - **Session Structure table** — drills as rows, lanes as columns (header shows `L{n}` + swimmer count); each cell is a status marker (`✓` done / `▶` current with pulsing ring / `–` not started) + a legend; markers **toggle** (click to complete, click again to undo); each drill row has a **"Time"** button. Repeated drills (`repeatCount > 1`) collapse to a **single record** (`Nx <name>`, per-lane `done/total` progress) whose progress chip **completes/undoes the whole set in one click** and that **expands** (small `>` chevron) into each repetition with its own markers and Time button.
+   - **Per-lane current-drill card** (`client/src/components/LaneCard.tsx`) — big `L{n}` badge, lane name, **swimmer count made prominent**, current drill number/name/distance/stroke, Done/Current status
+4. Two primary actions per lane card:
+   - **Mark Done** — marker-only completion of the current drill (no timing), advances to next drill
+   - **Time This Drill** — enters Timing on that drill for all lanes
+5. Tapping a marker in the Session Structure completes (or, on a done marker, undoes) that (lane, drill); the repetition progress chip completes or undoes the whole set in one click; session-level controls unchanged: Play/Pause, Complete, Reset
 
-### Flow: Session-level phase overview
+### Flow: Time a drill
 
-When in Progress Mode, a compact phase banner appears below the session header:
-
-```
-Warmup ── [L1✓] [L2→] [L3→]
-Main Set ── [L1→] [L2→]
-Cooldown ── [───]
-```
-
-Derived from each lane's `currentRunDrillId` → drill's `labels` containing phase tags. Shows which phase each lane is currently on. Tapping a phase name navigates all lanes to the first drill in that phase.
-
-### Flow: Mid-session mode switch
-
-1. Coach is in Progress Mode on Drill 3 of 8
-2. A swimmer finishes an exceptional 200m — coach wants to record splits
-3. Coach taps "Switch to Timing" on that lane's card (or the global toggle)
-4. The card re-renders as the full `GroupCard` with per-swimmer rows
-5. All group-level timing data already accumulated is visible: `sessionElapsed`, drill elapsed time
-6. Coach marks individual swimmer Start/Lap/Finish for remaining swimmers
-7. Coach can switch back to Progress Mode — swimmer data persists in `LaneDrillResult`
+1. Coach is in Overview; taps **"Time"** on a drill row or a lane card's **"Time This Drill"**
+2. `SET_ALL_DRILLS` sets every lane to that drill; `timingDrillId` opens the timing banner + the `GroupCard` grid for all lanes (per-swimmer Start/Lap/Finish, lap tables, stroke counts)
+3. Coach times individual swimmers on that drill
+4. Taps the **"Overview"** back button to return — swimmer data persists in `LaneDrillResult`
 
 ### Design invariants
 
-- **No swimmerless lanes** — both modes require swimmers assigned to lanes. Progress Mode just hides per-swimmer controls.
+- **No swimmerless lanes** — both modes require swimmers assigned to lanes. Overview just hides per-swimmer timing controls.
 - **Same data model** — both modes write to the same `LaneDrillResult` and `Lap` tables. Mode is purely a UI concern.
-- **View mode persists per session** — stored in `SessionRun.notes` JSON for page-refresh recovery.
-- **Swimmer roster-building is unchanged** — Add Swimmer / Temp Swimmer buttons present in both modes.
+- **Timing is drill-scoped, not a page mode** — `timingDrillId` is local ephemeral state in `ActiveRunView`; there is no persisted `viewMode` in `SessionRun.notes` anymore.
+- **Overview is deliberately minimal** — the focused (drill) coach gets full timers in Timing; the session coach sees markers and lanes in Overview.
+- **Swimmer counts are surfaced at session level** — per-lane counts in the session-header lane chips and the structure-table lane headers; tapping a lane chip opens the lane editor on that lane.
 
 ---
 
@@ -377,4 +362,4 @@ Derived from each lane's `currentRunDrillId` → drill's `labels` containing pha
 | Complete session with virtual swimmers | LaneDrillResult saved, Lap records skipped for `quick-*` dbIds |
 | Browser offline | All CRUD works via Dexie; sync deferred |
 | Page refresh during active run | Recovery from `SessionRun.notes` JSON |
-| Page refresh in Progress Mode | View mode restored from `SessionRun.notes` JSON |
+| Page refresh in Overview Mode | View mode restored from `SessionRun.notes` JSON |

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, deleteAllData, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
 import { CustomSelect } from '../components/CustomSelect'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 
 interface SettingsForm {
   team_name: string
@@ -562,62 +563,28 @@ export const Settings: React.FC = () => {
           </div>
         </section>
 
-        {/* Reset All Data Confirmation Dialog */}
-        {showResetAllDataConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-surface-container-lowest rounded-3xl p-8 max-w-md w-full border border-outline-variant shadow-2xl">
-              <h3 className="font-headline-md text-headline-md font-bold text-error mb-4">Reset All Data?</h3>
-              <p className="text-on-surface-variant font-body-md mb-6">
-                This will delete all swimmers, sessions, and timing data. This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowResetAllDataConfirm(false)}
-                  className="flex-1 bg-surface text-on-surface font-bold px-6 py-3 rounded-xl hover:bg-surface-variant transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetAllData}
-                  disabled={resettingAllData}
-                  className="flex-1 bg-error text-on-error font-bold px-6 py-3 rounded-xl hover:bg-error-hover transition-all disabled:opacity-50"
-                >
-                  {resettingAllData ? 'Resetting...' : 'Reset All Data'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          open={showResetAllDataConfirm}
+          title="Reset All Data?"
+          message="This will delete all swimmers, sessions, and timing data. This action cannot be undone."
+          confirmLabel={resettingAllData ? 'Resetting...' : 'Reset All Data'}
+          cancelLabel="Cancel"
+          destructive={true}
+          confirmDisabled={resettingAllData}
+          onConfirm={handleResetAllData}
+          onCancel={() => setShowResetAllDataConfirm(false)}
+        />
 
-        {/* Reset Confirmation Dialog */}
-        {showResetConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-surface-container-lowest rounded-3xl p-8 max-w-md w-full border border-outline-variant shadow-2xl">
-              <h3 className="font-headline-md text-headline-md font-bold text-primary mb-4">Reset Settings?</h3>
-              <p className="text-on-surface-variant font-body-md mb-6">
-                This will restore all settings to their default values. This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(false)}
-                  className="flex-1 bg-surface text-on-surface font-bold px-6 py-3 rounded-xl hover:bg-surface-variant transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="flex-1 bg-error text-error font-bold px-6 py-3 rounded-xl hover:bg-error-hover transition-all"
-                >
-                  Reset
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ConfirmDialog
+          open={showResetConfirm}
+          title="Reset Settings?"
+          message="This will restore all settings to their default values. This action cannot be undone."
+          confirmLabel="Reset"
+          cancelLabel="Cancel"
+          destructive={false}
+          onConfirm={handleReset}
+          onCancel={() => setShowResetConfirm(false)}
+        />
       </form>
 
       {/* Language & Theme */}

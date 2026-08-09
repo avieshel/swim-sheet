@@ -1,3 +1,8 @@
+// Quick-start pre-populates temp swimmers only while the roster is small.
+// Once a coach has this many real swimmers, they're familiar with the app and
+// get two empty default lanes instead of hint swimmers.
+export const QUICK_SESSION_TEMP_SWIMMER_THRESHOLD = 15
+
 export const FAMOUS_SWIMMER_NAMES = [
   'Michael Phelps',
   'Katie Ledecky',

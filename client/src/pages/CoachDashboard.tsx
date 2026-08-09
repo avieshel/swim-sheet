@@ -66,21 +66,23 @@ export const CoachDashboard: React.FC = () => {
               {stats.templateCount} templates ready &middot; {stats.swimmerCount} swimmers in the roster
             </p>
 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
-               <Link
-                 to="/live?quick=1"
-                 className="bg-surface-container-lowest text-primary font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:shadow-xl active:scale-95 transition-all no-underline"
-               >
-                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
-                 ⚡ Quick Time Lap
-               </Link>
-               <Link
-                 to="/live"
-                 className="border border-outline-variant text-on-surface-variant font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:bg-surface-variant transition-all no-underline"
-               >
-                 <span className="material-symbols-outlined">play_arrow</span>
-                 Quick Start Live
-               </Link>
-             </div>
+                <Link
+                  to="/live"
+                  className="bg-surface-container-lowest text-primary font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:shadow-xl active:scale-95 transition-all no-underline"
+                >
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                  Quick Time Lap
+                </Link>
+                {/* Duplicate of the primary /live CTA above (also the "Active Deck" hub tile). Kept commented until removal is confirmed.
+                <Link
+                  to="/live"
+                  className="border border-outline-variant text-on-surface-variant font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:bg-surface-variant transition-all no-underline"
+                >
+                  <span className="material-symbols-outlined">play_arrow</span>
+                  Quick Start Live
+                </Link>
+                */}
+              </div>
           </div>
         </div>
       </section>

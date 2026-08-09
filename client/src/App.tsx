@@ -7,7 +7,7 @@ import { SwimmerDetail } from './pages/SwimmerDetail'
 import { SessionsList } from './pages/SessionsList'
 import { SessionDetail } from './pages/SessionDetail'
 import { DrillBank } from './pages/DrillBank'
-import { DrillDetail } from './pages/DrillDetail'
+// import { DrillDetail } from './pages/DrillDetail'
 import { CoachDashboard } from './pages/CoachDashboard'
 import { LiveDeck } from './pages/LiveDeck'
 import { Settings } from './pages/Settings'
@@ -26,7 +26,7 @@ function App() {
           <Route path="/sessions" element={<SessionsList />} />
           <Route path="/sessions/:id" element={<SessionDetail />} />
           <Route path="/drills" element={<DrillBank />} />
-          <Route path="/drills/:id" element={<DrillDetail />} />
+          {/* <Route path="/drills/:id" element={<DrillDetail />} /> */}
           <Route path="/live" element={<LiveDeck />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/runs" element={<RunsHistory />} />

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   removeSwimmerFromRun: vi.fn(),
   getSwimmer: vi.fn(),
   createSwimmer: vi.fn(),
+  createSwimmerIfNotExists: vi.fn(),
   updateSwimmer: vi.fn(),
   searchSwimmers: vi.fn().mockResolvedValue([]),
   listSwimmers: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../../api/runs', () => ({
 vi.mock('../../api/swimmers', () => ({
   getSwimmer: mocks.getSwimmer,
   createSwimmer: mocks.createSwimmer,
+  createSwimmerIfNotExists: mocks.createSwimmerIfNotExists,
   updateSwimmer: mocks.updateSwimmer,
   searchSwimmers: mocks.searchSwimmers,
   listSwimmers: mocks.listSwimmers,
@@ -41,7 +43,7 @@ vi.mock('../../api/swimmers', () => ({
 import { ActiveSwimmerRow, SavedSwimmerRow } from '../SwimmerRows'
 import { LiveSessionContext } from '../../context/LiveSessionContext'
 import { promoteAndLinkSwimmer } from '../../api/runs'
-import { createSwimmer, updateSwimmer } from '../../api/swimmers'
+import { createSwimmerIfNotExists, updateSwimmer } from '../../api/swimmers'
 
 const baseGroup = {
   id: 'g1',
@@ -82,7 +84,7 @@ afterEach(cleanup)
 describe('ActiveSwimmerRow swimmer modal flows', () => {
   it('promotes a quick swimmer to a newly created roster swimmer', async () => {
     const user = userEvent.setup()
-    mocks.createSwimmer.mockResolvedValue('new-1')
+    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
     mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
 
     renderRow({
@@ -99,8 +101,8 @@ describe('ActiveSwimmerRow swimmer modal flows', () => {
     await user.type(nameInput, 'Bubbles II')
     await user.click(screen.getByText('Add Swimmer'))
 
-    await waitFor(() => expect(createSwimmer).toHaveBeenCalledOnce())
-    expect(createSwimmer).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
+    await waitFor(() => expect(createSwimmerIfNotExists).toHaveBeenCalledOnce())
+    expect(createSwimmerIfNotExists).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
     expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', 'quick-1', 'Bubbles II', 'new-1', '')
     expect(mockDispatch).toHaveBeenCalledWith({
       type: 'UPDATE_SWIMMER_DBID',
@@ -131,7 +133,7 @@ describe('ActiveSwimmerRow swimmer modal flows', () => {
     await user.click(screen.getByText('Add Swimmer'))
 
     await waitFor(() => expect(promoteAndLinkSwimmer).toHaveBeenCalledOnce())
-    expect(createSwimmer).not.toHaveBeenCalled()
+    expect(createSwimmerIfNotExists).not.toHaveBeenCalled()
     expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', 'quick-1', 'Alice', 'existing-1', 'U17')
     expect(mockDispatch).toHaveBeenCalledWith({
       type: 'UPDATE_SWIMMER_DBID',
@@ -203,7 +205,7 @@ describe('ActiveSwimmerRow swimmer modal flows', () => {
   it('fires onSwimmerSaved after creating a roster swimmer from a quick swimmer', async () => {
     const user = userEvent.setup()
     const onSwimmerSaved = vi.fn()
-    mocks.createSwimmer.mockResolvedValue('new-1')
+    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
     mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
 
     renderRow({
@@ -254,7 +256,7 @@ describe('SavedSwimmerRow swimmer modal flows', () => {
 
   it('promotes a quick saved swimmer to a newly created roster swimmer', async () => {
     const user = userEvent.setup()
-    mocks.createSwimmer.mockResolvedValue('new-1')
+    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
     mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
 
     renderSaved({
@@ -270,8 +272,8 @@ describe('SavedSwimmerRow swimmer modal flows', () => {
     await user.type(nameInput, 'Bubbles II')
     await user.click(screen.getByText('Add Swimmer'))
 
-    await waitFor(() => expect(createSwimmer).toHaveBeenCalledOnce())
-    expect(createSwimmer).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
+    await waitFor(() => expect(createSwimmerIfNotExists).toHaveBeenCalledOnce())
+    expect(createSwimmerIfNotExists).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
     expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', 'quick-saved', 'Bubbles II', 'new-1', '')
     // Promotion does NOT call onEditSavedSwimmer: promoteAndLinkSwimmer handles
     // all DB persistence (lane-result JSON blobs, lap records, run-swimmer links).
@@ -308,7 +310,7 @@ describe('SavedSwimmerRow swimmer modal flows', () => {
   it('fires onSwimmerSaved after creating a roster swimmer from a quick saved swimmer', async () => {
     const user = userEvent.setup()
     const onSwimmerSaved = vi.fn()
-    mocks.createSwimmer.mockResolvedValue('new-1')
+    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
     mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
 
     renderSaved({

@@ -4,6 +4,7 @@ import { EquipmentIcons, type EquipmentType } from './EquipmentIcons'
 import { CustomSelect } from './CustomSelect'
 import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, strokeOptions } from '../constants/drill'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
+import { emptyDrillForm } from '../utils/drillHelpers'
 
 interface DrillItem {
   id: string
@@ -57,13 +58,7 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
     }
   }
   return {
-    name: '',
-    items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
-    repeatCount: 1,
-    timingMode: 'individual',
-    focus: 'none',
-    labels: [],
-    description: '',
+    ...emptyDrillForm(),
   }
 }
 

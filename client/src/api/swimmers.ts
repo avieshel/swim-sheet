@@ -17,6 +17,10 @@ export function createSwimmer(data: SafeSwimmer): Promise<string> {
   return swimmerService.create(data)
 }
 
+export function createSwimmerIfNotExists(data: SafeSwimmer): Promise<string> {
+  return swimmerService.createIfNotExists(data)
+}
+
 export function updateSwimmer(id: string, data: Partial<SafeSwimmer>): Promise<void> {
   return swimmerService.update(id, data)
 }

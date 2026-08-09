@@ -8,7 +8,7 @@ import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteD
 import type { Session } from '../api/sessions'
 import type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../api/drills'
 import { strokeColors } from '../constants/drill'
-import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, type SimilarDrill } from '../utils/drillHelpers'
+import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 
 export const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -34,15 +34,7 @@ export const SessionDetail: React.FC = () => {
   // Rich Drill Editor
   const [showRichEditor, setShowRichEditor] = useState(false)
   const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null)
-  const [richDrill, setRichDrill] = useState<Partial<Drill>>({
-    name: '',
-    items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
-    repeatCount: 1,
-    timingMode: 'individual',
-    focus: 'none',
-    labels: [],
-    description: '',
-  })
+  const [richDrill, setRichDrill] = useState<Partial<Drill>>(emptyDrillForm())
 
   const [similarWarning, setSimilarWarning] = useState<{ similars: SimilarDrill[]; data: DrillFormData; proceedSave: () => void } | null>(null)
 
@@ -61,38 +53,57 @@ export const SessionDetail: React.FC = () => {
     onConfirm: () => {},
   })
 
-  const loadData = async () => {
+  const loadData = async (isCancelled?: () => boolean) => {
     if (!id) return
     const s = await getSession(id)
+    if (isCancelled?.()) return
     if (!s) { setLoading(false); return }
     setSession(s)
     setEditName(s.name)
     setEditPoolLength(String(s.poolLength))
     setEditNotes(s.notes || '')
     const d = await getSessionDrills(id)
+    if (isCancelled?.()) return
     setDrills(d.sort((a, b) => a.order - b.order))
     setLoading(false)
   }
 
-  const loadLibrary = async () => {
+  const loadSessionData = async (): Promise<[Session, Drill[]] | null> => {
+    if (!id) return null
+    const s = await getSession(id)
+    if (!s) return null
+    const d = await getSessionDrills(id)
+    return [s, d.sort((a, b) => a.order - b.order)]
+  }
+
+  const applySessionData = (data: [Session, Drill[]]) => {
+    const [s, d] = data
+    setSession(s)
+    setEditName(s.name)
+    setEditPoolLength(String(s.poolLength))
+    setEditNotes(s.notes || '')
+    setDrills(d)
+    setLoading(false)
+  }
+
+  const loadLibrary = async (isCancelled?: () => boolean) => {
     const lib = await listLibraryDrills()
+    if (isCancelled?.()) return
     setLibraryDrills(lib)
   }
 
   useEffect(() => {
-    if (!id) return
-    getSession(id).then(s => {
-      if (!s) { setLoading(false); return }
-      setSession(s)
-      setEditName(s.name)
-      setEditPoolLength(String(s.poolLength))
-      setEditNotes(s.notes || '')
-      getSessionDrills(id).then(d => {
-        setDrills(d.sort((a, b) => a.order - b.order))
-        setLoading(false)
-      })
-    })
-    seedLibraryDrills().then(() => listLibraryDrills().then(setLibraryDrills))
+    let cancelled = false
+    loadSessionData()
+      .then(data => { if (!cancelled && data) applySessionData(data) })
+      .catch(() => { if (!cancelled) setLoading(false) })
+    const seedAndLoad = async () => {
+      await seedLibraryDrills()
+      await loadLibrary(() => cancelled)
+    }
+    void seedAndLoad()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const handleSaveMeta = async () => {
@@ -107,15 +118,7 @@ export const SessionDetail: React.FC = () => {
       setRichDrill({ ...drill })
       setEditingLibraryId(isLibrary ? drill.id : null)
     } else {
-      setRichDrill({
-        name: '',
-        items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
-        repeatCount: 1,
-        timingMode: 'individual',
-        focus: 'none',
-        labels: [],
-        description: '',
-      })
+      setRichDrill(emptyDrillForm())
       setEditingLibraryId(null)
     }
     setShowRichEditor(true)
@@ -156,6 +159,20 @@ export const SessionDetail: React.FC = () => {
       onConfirm: async () => {
         await deleteDrill(drillId)
         loadData()
+        setConfirmState(prev => ({ ...prev, open: false }))
+      }
+    })
+  }
+
+  const handleDeleteLibraryDrill = (drill: LibraryDrill) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Bank Drill',
+      message: `Are you sure you want to permanently remove "${drill.name}" from the drill library?`,
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        await deleteLibraryDrill(drill.id)
+        loadLibrary()
         setConfirmState(prev => ({ ...prev, open: false }))
       }
     })
@@ -362,39 +379,47 @@ export const SessionDetail: React.FC = () => {
         )}
       </div>
 
-      {/* Similar Drill Warning Banner */}
+      {/* Similar Drill Warning Dialog — rendered above the DrillEditorModal overlay */}
       {similarWarning && (
-        <div className="mb-4 p-4 bg-warning-container text-on-warning-container rounded-xl border border-warning shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-warning-container">warning</span>
-            <div className="flex-1">
-              <p className="font-bold text-sm mb-2">Similar drills found:</p>
-              <ul className="list-disc list-inside text-sm space-y-1 mb-3">
-                {similarWarning.similars.map(s => (
-                  <li key={s.drill.id}>
-                    <span className="font-semibold">{s.drill.name}</span>
-                    <span className="ml-1 text-on-warning-container/70">
-                      ({s.score.toFixed(2)} — {s.matches.join(', ')})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    similarWarning.proceedSave()
-                    setSimilarWarning(null)
-                  }}
-                  className="px-4 py-2 bg-warning text-on-warning rounded-lg font-bold text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
-                >
-                  Create Anyway
-                </button>
-                <button
-                  onClick={() => setSimilarWarning(null)}
-                  className="px-4 py-2 border-2 border-outline text-on-surface rounded-lg font-bold text-xs cursor-pointer bg-transparent"
-                >
-                  Cancel
-                </button>
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setSimilarWarning(null) }}
+        >
+          <div
+            className="bg-warning-container text-on-warning-container w-full max-w-md rounded-2xl p-4 md:p-6 shadow-2xl border border-warning"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-warning-container">warning</span>
+              <div className="flex-1">
+                <p className="font-bold text-sm mb-2">Similar drills found:</p>
+                <ul className="list-disc list-inside text-sm space-y-1 mb-3">
+                  {similarWarning.similars.map(s => (
+                    <li key={s.drill.id}>
+                      <span className="font-semibold">{s.drill.name}</span>
+                      <span className="ml-1 text-on-warning-container/70">
+                        ({s.score.toFixed(2)} — {s.matches.join(', ')})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      similarWarning.proceedSave()
+                      setSimilarWarning(null)
+                    }}
+                    className="flex-1 py-2.5 bg-warning text-on-warning rounded-xl font-bold text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
+                  >
+                    Create Anyway
+                  </button>
+                  <button
+                    onClick={() => setSimilarWarning(null)}
+                    className="flex-1 py-2.5 border-2 border-outline text-on-surface rounded-xl font-bold text-xs cursor-pointer bg-transparent"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -428,9 +453,13 @@ export const SessionDetail: React.FC = () => {
             loadLibrary()
           }
           const excludeId = data.id ?? editingLibraryId ?? undefined
+          const mirrorName = data.id && !editingLibraryId ? richDrill.name : undefined
           const similars = findSimilarDrills(
             { name: data.name, stroke: data.stroke, distance: data.distance, focus: data.focus, labels: data.labels },
-            [...drills.filter(d => d.id !== excludeId), ...libraryDrills.filter(d => d.id !== excludeId)].map(d => ({ id: d.id, name: d.name, stroke: d.stroke, distance: d.distance, focus: d.focus, labels: d.labels }))
+            [
+              ...drills.filter(d => d.id !== excludeId),
+              ...libraryDrills.filter(d => d.id !== excludeId && d.name !== mirrorName),
+            ].map(d => ({ id: d.id, name: d.name, stroke: d.stroke, distance: d.distance, focus: d.focus, labels: d.labels }))
           )
           if (similars.length > 0) {
             setSimilarWarning({ similars, data, proceedSave: save })
@@ -705,6 +734,13 @@ export const SessionDetail: React.FC = () => {
                           title="Edit bank drill"
                         >
                           <span className="material-symbols-outlined text-base">edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLibraryDrill(libDrill)}
+                          className="p-1.5 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                          title="Delete bank drill"
+                        >
+                          <span className="material-symbols-outlined text-base">delete</span>
                         </button>
                       </div>
                     </div>

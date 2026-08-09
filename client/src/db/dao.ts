@@ -230,6 +230,20 @@ export async function deleteLaneDrillResultsForRun(runId: string): Promise<void>
   await db.laneDrillResults.where('run_id').equals(runId).delete()
 }
 
+export async function deleteLaneDrillResultsForDrills(runId: string, groupId: string, runDrillIds: string[]): Promise<void> {
+  if (runDrillIds.length === 0) return
+  await db.laneDrillResults
+    .where('run_id')
+    .equals(runId)
+    .and(r => r.group_id === groupId && runDrillIds.includes(r.run_drill_id))
+    .delete()
+}
+
+export async function deleteLapsForDrills(runDrillIds: string[]): Promise<void> {
+  if (runDrillIds.length === 0) return
+  await db.laps.where('run_drill_id').anyOf(runDrillIds).delete()
+}
+
 // ── Run ↔ Swimmer ──────────────────────────────────────────
 
 export async function getRunSwimmersForRun(runId: string): Promise<RunSwimmer[]> {
@@ -439,10 +453,22 @@ export async function seedLibraryDrills(): Promise<void> {
   }
 }
 
+let seedingSessionsPromise: Promise<void> | null = null
+
 export async function seedDefaultSessions(): Promise<void> {
+  if (seedingSessionsPromise) return seedingSessionsPromise
+  seedingSessionsPromise = seedDefaultSessionsOnce()
+  try {
+    await seedingSessionsPromise
+  } finally {
+    seedingSessionsPromise = null
+  }
+}
+
+async function seedDefaultSessionsOnce(): Promise<void> {
+  const existingNames = new Set((await getAllSessions()).map(s => s.name))
   for (const catalog of sessionsCatalog) {
-    const existing = await db.sessions.where('name').equals(catalog.name).first()
-    if (existing) continue
+    if (existingNames.has(catalog.name)) continue
 
     const sessionId = await addSession({
       name: catalog.name,

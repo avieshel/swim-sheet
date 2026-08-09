@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { listSwimmers } from '../api/swimmers'
+import { listSwimmers, createSwimmerIfNotExists } from '../api/swimmers'
 import { type Swimmer } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
+import { SwimmerFormModal, type SwimmerFormData } from './SwimmerFormModal'
 import type { TimedGroup } from '../context/LiveSessionContext'
 
 interface LaneEditorModalProps {
@@ -14,12 +15,16 @@ interface LaneEditorModalProps {
   onMoveSwimmer: (swimmerId: number, fromGroupId: string, toGroupId: string) => void
   onUpdateGroupName: (groupId: string, name: string) => void
   onResetGroup: (groupId: string) => void
+  onRemoveSwimmerFromLane: (swimmerId: number, groupId: string) => void
+  onSaveTempSwimmer?: (swimmerId: number, groupId: string, data: SwimmerFormData) => Promise<void>
+  onReorderSwimmers?: (groupId: string, swimmerIds: number[]) => void
   onClose: () => void
 }
 
 export function LaneEditorModal({
   state, editorScrollToLane, onScrollHandled,
-  onAddSwimmerToLane, onAddGroup, onRemoveGroup, onMoveSwimmer, onUpdateGroupName, onResetGroup, onClose,
+  onAddSwimmerToLane, onAddGroup, onRemoveGroup, onMoveSwimmer, onUpdateGroupName, onResetGroup,
+  onRemoveSwimmerFromLane, onSaveTempSwimmer, onReorderSwimmers, onClose,
 }: LaneEditorModalProps) {
   const [allSwimmers, setAllSwimmers] = useState<Swimmer[]>([])
   const [unassignedSearch, setUnassignedSearch] = useState('')
@@ -27,6 +32,8 @@ export function LaneEditorModal({
   const [editingNameGroupId, setEditingNameGroupId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [resettingGroupId, setResettingGroupId] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [savingSwimmer, setSavingSwimmer] = useState<{ id: number; name: string; groupId: string } | null>(null)
 
   useEffect(() => { listSwimmers().then(setAllSwimmers) }, [])
 
@@ -116,6 +123,15 @@ export function LaneEditorModal({
             {!unassignedSearch && unassignedPool.length === 0 && (
               <p className="text-xs text-on-surface-variant text-center py-3 italic">All swimmers are assigned</p>
             )}
+            <div className="mt-3">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="w-full py-2 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">person_add</span>
+                Create new swimmer
+              </button>
+            </div>
           </div>
 
           {/* Lane Sections */}
@@ -161,39 +177,95 @@ export function LaneEditorModal({
               </div>
               {group.swimmers.length === 0 ? (
                 <p className="text-xs text-on-surface-variant text-center py-3 italic">No swimmers assigned</p>
-              ) : group.swimmers.map(sw => (
-                <div key={sw.id} className="flex items-center gap-3 bg-surface-container-lowest rounded-lg px-3 py-2 mb-1.5 last:mb-0">
-                  <div className="w-7 h-7 rounded-full bg-primary-container/40 text-primary font-bold text-xs flex items-center justify-center shrink-0">
-                    {sw.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <span className="text-sm font-medium text-on-surface flex-1 min-w-0 truncate">{sw.name}</span>
-                  <div className="flex items-center gap-1">
-                    {laneOptions.map(laneNum => (
-                      <button key={laneNum}
-                        onClick={() => {
-                          if (laneNum === group.lane) return
-                          onMoveSwimmer(sw.id, group.id, state.groups.find(g => g.lane === laneNum)?.id ?? '')
-                        }}
-                        className={`px-2 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
-                          laneNum === group.lane
-                            ? 'bg-primary-container text-on-primary-container'
-                            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-higher'
-                        }`}>
-                        {laneNum}
+              ) : group.swimmers.map((sw, idx) => {
+                const isTemp = sw.dbId?.startsWith('quick-')
+                return (
+                  <div key={sw.id} className="flex items-center gap-3 bg-surface-container-lowest rounded-lg px-3 py-2 mb-1.5 last:mb-0">
+                    {onReorderSwimmers && (
+                      <div className="flex flex-col gap-px shrink-0">
+                        <button
+                          onClick={() => {
+                            if (idx === 0) return
+                            const newIds = group.swimmers.map(s => s.id)
+                            ;[newIds[idx - 1], newIds[idx]] = [newIds[idx], newIds[idx - 1]]
+                            onReorderSwimmers(group.id, newIds)
+                          }}
+                          disabled={idx === 0}
+                          className="h-5 w-5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <span className="material-symbols-outlined text-xs">keyboard_arrow_up</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (idx === group.swimmers.length - 1) return
+                            const newIds = group.swimmers.map(s => s.id)
+                            ;[newIds[idx], newIds[idx + 1]] = [newIds[idx + 1], newIds[idx]]
+                            onReorderSwimmers(group.id, newIds)
+                          }}
+                          disabled={idx === group.swimmers.length - 1}
+                          className="h-5 w-5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
+                        >
+                          <span className="material-symbols-outlined text-xs">keyboard_arrow_down</span>
+                        </button>
+                      </div>
+                    )}
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isTemp ? 'bg-tertiary-container/30 text-tertiary' : 'bg-primary-container/40 text-primary'}`}>
+                      {isTemp ? (
+                        <span className="material-symbols-outlined text-xs">bolt</span>
+                      ) : (
+                        <span className="font-bold text-xs">{sw.name.slice(0, 2).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-on-surface truncate block">{sw.name}</span>
+                      {isTemp && (
+                        <span className="text-label-sm text-tertiary">Temp swimmer</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isTemp && onSaveTempSwimmer && (
+                        <button
+                          onClick={() => setSavingSwimmer({ id: sw.id, name: sw.name, groupId: group.id })}
+                          className="h-7 px-2 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer"
+                          title="Save to roster"
+                        >
+                          Save
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onRemoveSwimmerFromLane(sw.id, group.id)}
+                        className="h-7 w-7 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer"
+                        title="Remove from lane"
+                      >
+                        <span className="material-symbols-outlined text-xs">close</span>
                       </button>
-                    ))}
-                    <button onClick={() => {
-                      const max = state.groups.reduce((m, g) => Math.max(m, g.lane), 0)
-                      const newId = crypto.randomUUID()
-                      onAddGroup(max + 1, `Lane ${max + 1}`, newId)
-                      onMoveSwimmer(sw.id, group.id, newId)
-                    }}
-                      className="px-2 py-1 rounded-md text-xs font-bold bg-surface-container text-on-surface-variant hover:bg-surface-container-higher transition-colors cursor-pointer">
-                      +L
-                    </button>
+                      {laneOptions.map(laneNum => (
+                        <button key={laneNum}
+                          onClick={() => {
+                            if (laneNum === group.lane) return
+                            onMoveSwimmer(sw.id, group.id, state.groups.find(g => g.lane === laneNum)?.id ?? '')
+                          }}
+                          className={`px-2 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                            laneNum === group.lane
+                              ? 'bg-primary-container text-on-primary-container'
+                              : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-higher'
+                          }`}>
+                          {laneNum}
+                        </button>
+                      ))}
+                      <button onClick={() => {
+                        const max = state.groups.reduce((m, g) => Math.max(m, g.lane), 0)
+                        const newId = crypto.randomUUID()
+                        onAddGroup(max + 1, `Lane ${max + 1}`, newId)
+                        onMoveSwimmer(sw.id, group.id, newId)
+                      }}
+                        className="px-2 py-1 rounded-md text-xs font-bold bg-surface-container text-on-surface-variant hover:bg-surface-container-higher transition-colors cursor-pointer">
+                        +L
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {group.swimmers.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-outline-variant/30">
                   <button onClick={() => setResettingGroupId(group.id)}
@@ -230,6 +302,33 @@ export function LaneEditorModal({
             onCancel={() => setResettingGroupId(null)}
           />
         )}
+        <SwimmerFormModal
+          key={showCreateModal ? 'create-open' : 'create-closed'}
+          open={showCreateModal}
+          editingId={null}
+          onSave={async (data) => {
+            await createSwimmerIfNotExists({ name: data.name, group: data.group, notes: data.notes, status: data.status as 'active' | 'inactive' })
+            const updated = await listSwimmers()
+            setAllSwimmers(updated)
+            setShowCreateModal(false)
+          }}
+          onClose={() => setShowCreateModal(false)}
+          rosterSwimmers={allSwimmers.map(s => ({ id: s.id, name: s.name, group: s.group, notes: s.notes, status: s.status }))}
+        />
+        <SwimmerFormModal
+          key={savingSwimmer ? `save-${savingSwimmer.id}` : 'save-closed'}
+          open={savingSwimmer !== null}
+          editingId={null}
+          initialData={savingSwimmer ? { name: savingSwimmer.name, group: '', notes: '', status: 'active' } : undefined}
+          onSave={async (data) => {
+            if (savingSwimmer && onSaveTempSwimmer) {
+              await onSaveTempSwimmer(savingSwimmer.id, savingSwimmer.groupId, data)
+              setSavingSwimmer(null)
+            }
+          }}
+          onClose={() => setSavingSwimmer(null)}
+          rosterSwimmers={allSwimmers.map(s => ({ id: s.id, name: s.name, group: s.group, notes: s.notes, status: s.status }))}
+        />
         <div className="flex gap-2 mt-4 shrink-0">
           <button onClick={() => {
             const max = state.groups.reduce((m, g) => Math.max(m, g.lane), 0)

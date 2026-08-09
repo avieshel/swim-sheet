@@ -21,6 +21,8 @@ const mockDao = vi.hoisted(() => ({
   deleteLaneDrillResult: vi.fn(),
   deleteLaneDrillResultsForGroup: vi.fn(),
   deleteLaneDrillResultsForRun: vi.fn(),
+  deleteLaneDrillResultsForDrills: vi.fn(),
+  deleteLapsForDrills: vi.fn(),
   addLap: vi.fn(),
   getLapsForRunDrill: vi.fn(),
   getLapsForSwimmerInRun: vi.fn(),
@@ -174,6 +176,121 @@ describe('runService', () => {
       expect(result).toEqual(expected)
     })
 
+    it('startLaneResult creates a marker row with empty timing when new', async () => {
+      const mockChain = {
+        first: vi.fn().mockResolvedValue(undefined),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockAdd = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.add = mockAdd
+
+      const result = await runService.startLaneResult({
+        run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1,
+      })
+
+      expect(mockDb.laneDrillResults.where).toHaveBeenCalledWith({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1' })
+      expect(result).toMatch(/^[0-9a-f-]{36}$/)
+      expect(mockAdd).toHaveBeenCalledOnce()
+      const added = mockAdd.mock.calls[0][0]
+      expect(added.completed).toBe(false)
+      expect(added.data).toBeNull()
+    })
+
+    it('startLaneResult records a drillStart when a startedAt marker is given', async () => {
+      const mockChain = {
+        first: vi.fn().mockResolvedValue(undefined),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockAdd = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.add = mockAdd
+
+      await runService.startLaneResult({
+        run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, startedAt: 5000,
+      })
+
+      const added = mockAdd.mock.calls[0][0]
+      expect(added.completed).toBe(false)
+      const data = JSON.parse(added.data)
+      expect(data.drillStart).toBe(5000)
+      expect(data.drillEnd).toBeNull()
+    })
+
+    it('startLaneResult preserves an existing timing blob when marked not started', async () => {
+      const mockChain = {
+        first: vi.fn().mockResolvedValue({
+          id: 'lr1',
+          data: JSON.stringify({ drillStart: 1000, swimmers: [{ dbId: 'sw1' }] }),
+        }),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+
+      const result = await runService.startLaneResult({
+        run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1,
+      })
+
+      expect(result).toBe('lr1')
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      expect(mockUpdate.mock.calls[0][1].completed).toBe(false)
+      expect(mockUpdate.mock.calls[0][1].data).toContain('drillStart')
+    })
+
+    it('completeLaneResult creates a marker-only done row when new', async () => {
+      const mockChain = {
+        first: vi.fn().mockResolvedValue(undefined),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockAdd = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.add = mockAdd
+
+      await runService.completeLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+
+      const added = mockAdd.mock.calls[0][0]
+      expect(added.completed).toBe(true)
+      expect(added.data).toBeNull()
+    })
+
+    it('completeLaneResult flips completed true on an existing row', async () => {
+      const mockChain = {
+        first: vi.fn().mockResolvedValue({ id: 'lr1', completed: false, data: null }),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+
+      await runService.completeLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      expect(mockUpdate.mock.calls[0][1].completed).toBe(true)
+    })
+
+    it('uncompleteLaneResult flips completed false on an existing row', async () => {
+      const mockChain = {
+        first: vi.fn().mockResolvedValue({ id: 'lr1', completed: true, data: null }),
+      }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockUpdate = vi.fn().mockResolvedValue(undefined)
+      mockDb.laneDrillResults.update = mockUpdate
+
+      await runService.uncompleteLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+
+      expect(mockUpdate).toHaveBeenCalledOnce()
+      expect(mockUpdate.mock.calls[0][1].completed).toBe(false)
+    })
+
+    it('uncompleteLaneResult is a no-op when no row exists', async () => {
+      const mockChain = { first: vi.fn().mockResolvedValue(undefined) }
+      mockDb.laneDrillResults.where.mockReturnValue(mockChain)
+      const mockUpdate = vi.fn()
+      mockDb.laneDrillResults.update = mockUpdate
+
+      const result = await runService.uncompleteLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+
+      expect(result).toBe('')
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
     it('setLaneResult upserts via db', async () => {
       const data = { run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: false, data: '{}' }
       const mockChain = {
@@ -205,6 +322,20 @@ describe('runService', () => {
       mockDao.deleteLaneDrillResultsForRun.mockResolvedValue(undefined)
       await runService.deleteLaneResultsForRun('r1')
       expect(mockDao.deleteLaneDrillResultsForRun).toHaveBeenCalledExactlyOnceWith('r1')
+    })
+
+    it('deleteLaneResultsForDrills calls deleteLaneDrillResultsForDrills with runId, groupId, runDrillIds', async () => {
+      const ids = ['rd1', 'rd2']
+      mockDao.deleteLaneDrillResultsForDrills.mockResolvedValue(undefined)
+      await runService.deleteLaneResultsForDrills('r1', 'g1', ids)
+      expect(mockDao.deleteLaneDrillResultsForDrills).toHaveBeenCalledExactlyOnceWith('r1', 'g1', ids)
+    })
+
+    it('deleteLapsForDrills calls deleteLapsForDrills with runDrillIds', async () => {
+      const ids = ['rd1', 'rd2']
+      mockDao.deleteLapsForDrills.mockResolvedValue(undefined)
+      await runService.deleteLapsForDrills(ids)
+      expect(mockDao.deleteLapsForDrills).toHaveBeenCalledExactlyOnceWith(ids)
     })
 
     it('deleteSwimmerFromLaneResult removes swimmer from db record', async () => {

@@ -350,8 +350,9 @@ Current model conflates three different questions into one saved binary field
 
 The phase tags (`labels: ['warmup'|'main-set'|'cooldown']` on the *template* drill) could
 carry a sensible *default* ("warm-up → untimed"), but today they only drive the
-Progress-Mode banner (`LiveDeck.tsx:551-559`; `ProgressGroupCard.tsx:25-30`) — they do not
-affect timing at all.
+(superseded) Progress-Mode banner — they do not affect timing at all. The phase banner and
+`ProgressGroupCard` were removed; the `OverviewView`'s Session Drill Flow shows per-lane
+markers at drill granularity instead of phase aggregation.
 
 **Fix direction:** split the three questions. (a) A drill's phase provides the *default*
 timing intent (warm-up/cool-down → untimed; main set → timed), stored as a soft
@@ -366,10 +367,10 @@ the clock.
 Found by the P1 (Deck Timer) and P2 (Set Architect) agents when they walked the app as
 themselves. These supplement F-1…F-9.
 
-- **F-10 — Phase labels don't match runtime detection.** The modal offers `'main set'` /
-  `'cool down'` (`PHASE_LABELS`, `constants/drill.ts:27`) but the deck detects
-  `'main-set'` / `'cooldown'` (`LiveDeck.tsx:933-937`; `ProgressGroupCard.tsx:25-30`).
-  Only `'warmup'` agrees. Any freshly-tagged drill won't phase-group at run time.
+- **F-10 — Phase labels don't match runtime detection.** Superseded: the phase banner and
+  `ProgressGroupCard` were removed in the Overview/Timing split; phase labels no longer
+  drive runtime aggregation. (Historically `'main set'` / `'cool down'` in
+  `constants/drill.ts:27` vs `'main-set'`/`'cooldown'` at runtime.)
 - **F-11 — The drill bank isn't scannable.** Cards render only `reps×dist stroke`
   (`DrillBank.tsx:285-293`) — no interval, equipment, or intensity. A coach can't tell
   4×100 @1:45 from @1:55 without opening each drill.
@@ -382,9 +383,9 @@ themselves. These supplement F-1…F-9.
   No duplicate action (`SessionDetail.tsx:581-596`) — the #1 repeated-work killer.
 - **F-14 — Interval is unvalidated free text.** Bare input with placeholder `2:00`
   (`DrillEditorModal.tsx:295-308`); a typo like `3:5` flows into the run snapshot.
-- **F-15 — Progress Mode still has a clock.** Untimed drills don't exist; the progress card
-  still renders elapsed + Start/Complete (`ProgressGroupCard.tsx:214-285`). Timing is the
-  default, not opt-in.
+- **F-15 — Progress Mode still has a clock.** Superseded: Progress Mode / `ProgressGroupCard`
+  were removed. Overview Mode shows no per-swimmer or per-lane clock — a drill clock only
+  renders in Timing Mode (the focused `GroupCard`). Timing is opt-in per drill via "Time This Drill".
 - **F-16 — The snapshot destroys meaning.** Per-rep flattening renders named warm-up
   segments as anonymous `50m freestyle [1/1]` rows (`runService.ts:179,188`). The plan a
   coach spent an evening making legible arrives at the deck illegible.

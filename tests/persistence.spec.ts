@@ -39,7 +39,7 @@ test.describe('Drill Persistence', () => {
       });
 
       await db.runSwimmers.add({
-        run_id: runId, swimmer_id: swimmerId, lane: 1, createdAt: now, updatedAt: now,
+        id: crypto.randomUUID(), run_id: runId, swimmer_id: swimmerId, lane: 1, createdAt: now, updatedAt: now,
       });
 
       return { runId, runDrillId, swimmerId };

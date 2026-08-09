@@ -1,8 +1,8 @@
 import { runService } from '../services/runService'
-import type { CompleteRunLap } from '../services/runService'
 import { getRunHistory as getRunHistoryFromService, getRunById as getRunByIdFromService, deleteRun as deleteRunFromService, exportRun as exportRunFromService } from '../services/runHistoryService'
 import type { RunHistoryData, RunSummary } from '../services/runHistoryService'
 import type { SafeSessionRun, SessionRun, SafeRunDrill, RunDrill, SafeLaneDrillResult, LaneDrillResult, Swimmer, RunSwimmer, SafeLap, Lap, SavedDrillData } from '../db/schema'
+import type { CompleteRunLap, StartLaneMarker, CompleteLaneMarker } from '../services/runService'
 import type { LiveDrillTiming } from '../timing/liveTiming'
 import { timestampSplits } from '../utils/lapEditing'
 
@@ -24,9 +24,14 @@ import { timestampSplits } from '../utils/lapEditing'
 //   POST   /runs/:id/swimmers/:swimmerId/promote  promoteAndLinkSwimmer
 //   GET    /lane-results?runId=          getLaneResults
 //   GET    /lane-results/:id            getLaneResult
-//   PUT    /lane-results                 setLaneResult
+//   PUT    /lane-results                 setLaneResult (timed drill)
+//   POST   /lane-results/start          startLaneResult (marker start, no timing)
+//   POST   /lane-results/complete       completeLaneResult (marker-only done)
+//   POST   /lane-results/uncomplete     uncompleteLaneResult (undo marker)
 //   DELETE /lane-results/:id            deleteLaneResult
 //   DELETE /lane-results?runId&groupId  deleteLaneResultsForGroup
+//   DELETE /lane-results?runId&groupId&runDrillIds[]  deleteLaneResultsForDrills (reset one/more drills)
+//   DELETE /laps?runDrillIds  deleteLapsForDrills (clear timing laps for one/more drills)
 //   DELETE /lane-results?runId          deleteLaneResultsForRun
 //   DELETE /lane-results?...&swimmerId  deleteSwimmerFromLaneResult
 //   PATCH  /lane-results/:id/swimmers/:dbId  updateLaneResultSwimmer
@@ -129,6 +134,18 @@ export function setLaneResult(data: SafeLaneDrillResult): Promise<string> {
   return runService.setLaneResult(data)
 }
 
+export function startLaneResult(data: StartLaneMarker): Promise<string> {
+  return runService.startLaneResult(data)
+}
+
+export function completeLaneResult(data: CompleteLaneMarker): Promise<string> {
+  return runService.completeLaneResult(data)
+}
+
+export function uncompleteLaneResult(data: CompleteLaneMarker): Promise<string> {
+  return runService.uncompleteLaneResult(data)
+}
+
 export function deleteLaneResult(id: string): Promise<void> {
   return runService.deleteLaneResult(id)
 }
@@ -139,6 +156,14 @@ export function deleteLaneResultsForGroup(runId: string, groupId: string): Promi
 
 export function deleteLaneResultsForRun(runId: string): Promise<void> {
   return runService.deleteLaneResultsForRun(runId)
+}
+
+export function deleteLaneResultsForDrills(runId: string, groupId: string, runDrillIds: string[]): Promise<void> {
+  return runService.deleteLaneResultsForDrills(runId, groupId, runDrillIds)
+}
+
+export function deleteLapsForDrills(runDrillIds: string[]): Promise<void> {
+  return runService.deleteLapsForDrills(runDrillIds)
 }
 
 export function deleteSwimmerFromLaneResult(runId: string, groupId: string, runDrillId: string, swimmerDbId: string): Promise<void> {
@@ -228,5 +253,5 @@ export function exportRun(runId: string): Promise<Blob> {
 }
 
 export type { SessionRun, RunDrill, LaneDrillResult, Swimmer, RunSwimmer, Lap, SavedDrillData } from '../db/schema'
-export type { CompleteRunLap } from '../services/runService'
+export type { CompleteRunLap, StartLaneMarker, CompleteLaneMarker } from '../services/runService'
 export type { RunSummary, RunSwimmerSummary, RunHistoryData } from '../services/runHistoryService'

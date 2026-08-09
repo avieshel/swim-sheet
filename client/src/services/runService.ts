@@ -4,6 +4,7 @@ import {
   getSwimmersForRun, getRunSwimmersForRun, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer,
   getLaneDrillResults, getLaneDrillResult, deleteLaneDrillResult,
   deleteLaneDrillResultsForGroup, deleteLaneDrillResultsForRun,
+  deleteLaneDrillResultsForDrills, deleteLapsForDrills,
   addLap, getLapsForRunDrill, getLapsForSwimmerInRun,
   getSession, getDrillsForSession, getAllSessions, addSession, addDrill, getAllLaps as daoGetAllLaps,
   searchSwimmers,
@@ -11,6 +12,12 @@ import {
 } from '../db/dao'
 import { db } from '../db/schema'
 import type { SafeSessionRun, SafeRunDrill, SafeLaneDrillResult, SafeLap, SavedDrillData } from '../db/schema'
+
+function buildMarkerData(startedAt?: number): string | null {
+  return startedAt != null
+    ? JSON.stringify({ drillStart: startedAt, drillEnd: null, sessionStartedAt: startedAt, swimmers: [] })
+    : null
+}
 
 async function upsertLaneDrillResult(data: SafeLaneDrillResult): Promise<string> {
   const existing = await db.laneDrillResults.where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id }).first()
@@ -40,6 +47,24 @@ export interface CompleteRunLap {
   swimmerId: string
   time: number
   strokeCount: number
+}
+
+// Marker-only lane actions. These never require timing data: the underlying
+// LaneDrillResult.completed is the progress marker, `data` stays null unless a
+// timed drill later attaches SavedDrillData to the same row.
+export interface StartLaneMarker {
+  run_id: string
+  group_id: string
+  run_drill_id: string
+  lane: number
+  startedAt?: number
+}
+
+export interface CompleteLaneMarker {
+  run_id: string
+  group_id: string
+  run_drill_id: string
+  lane: number
 }
 
 export const runService = {
@@ -75,12 +100,71 @@ export const runService = {
       return id
     }
   },
+  startLaneResult: async (data: StartLaneMarker): Promise<string> => {
+    const existing = await db.laneDrillResults
+      .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
+      .first()
+    const now = new Date().toISOString()
+    if (existing) {
+      await db.laneDrillResults.update(existing.id!, {
+        completed: false,
+        data: existing.data ?? buildMarkerData(data.startedAt),
+        updatedAt: now,
+      })
+      return existing.id!
+    }
+    const id = crypto.randomUUID()
+    await db.laneDrillResults.add({
+      run_id: data.run_id,
+      group_id: data.group_id,
+      run_drill_id: data.run_drill_id,
+      lane: data.lane,
+      completed: false,
+      data: buildMarkerData(data.startedAt),
+      id,
+      updatedAt: now,
+    })
+    return id
+  },
+  completeLaneResult: async (data: CompleteLaneMarker): Promise<string> => {
+    const existing = await db.laneDrillResults
+      .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
+      .first()
+    const now = new Date().toISOString()
+    if (existing) {
+      await db.laneDrillResults.update(existing.id!, { completed: true, updatedAt: now })
+      return existing.id!
+    }
+    const id = crypto.randomUUID()
+    await db.laneDrillResults.add({
+      run_id: data.run_id,
+      group_id: data.group_id,
+      run_drill_id: data.run_drill_id,
+      lane: data.lane,
+      completed: true,
+      data: null,
+      id,
+      updatedAt: now,
+    })
+    return id
+  },
+  uncompleteLaneResult: async (data: CompleteLaneMarker): Promise<string> => {
+    const existing = await db.laneDrillResults
+      .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
+      .first()
+    if (!existing) return ''
+    await db.laneDrillResults.update(existing.id!, { completed: false, updatedAt: new Date().toISOString() })
+    return existing.id!
+  },
   deleteLaneResult: (id: string) => deleteLaneDrillResult(id),
   deleteLaneResultsForGroup: (runId: string, groupId: string) => deleteLaneDrillResultsForGroup(runId, groupId),
   deleteLaneResultsForRun: (runId: string) => deleteLaneDrillResultsForRun(runId),
+  deleteLaneResultsForDrills: (runId: string, groupId: string, runDrillIds: string[]) =>
+    deleteLaneDrillResultsForDrills(runId, groupId, runDrillIds),
+  deleteLapsForDrills: (runDrillIds: string[]) => deleteLapsForDrills(runDrillIds),
   deleteSwimmerFromLaneResult: async (runId: string, groupId: string, runDrillId: string, swimmerDbId: string): Promise<void> => {
     const result = await db.laneDrillResults.where({ run_id: runId, group_id: groupId, run_drill_id: runDrillId }).first()
-    if (!result) return
+    if (!result?.data) return
     const data = JSON.parse(result.data)
     data.swimmers = data.swimmers.filter((s: { dbId: string }) => s.dbId !== swimmerDbId)
     await db.laneDrillResults.update(result.id!, {
@@ -106,7 +190,7 @@ export const runService = {
 
   updateLaneResultSwimmer: async (runId: string, groupId: string, runDrillId: string, swimmerDbId: string, updates: LaneResultSwimmerUpdate): Promise<void> => {
     const result = await getLaneDrillResult(runId, groupId, runDrillId)
-    if (!result) return
+    if (!result?.data) return
     const data = JSON.parse(result.data) as SavedDrillData
     const swimmer = data.swimmers.find(s => s.dbId === swimmerDbId)
     if (!swimmer) return
@@ -269,6 +353,7 @@ export const runService = {
 
     const results = await getLaneDrillResults(runId)
     for (const result of results) {
+      if (!result.data) continue
       const data = JSON.parse(result.data) as SavedDrillData
       const swimmerEntry = data.swimmers.find(s => s.dbId === syntheticDbId)
       if (!swimmerEntry) continue

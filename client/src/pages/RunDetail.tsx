@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getRunById, getRun, deleteRun, exportRun } from '../api/runs'
 import type { RunSummary } from '../api/runs'
 import { formatTime } from '../utils/formatTime'
+import { downloadBlob } from '../utils/downloadBlob'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 
 function isQuickStartNotes(notes: string | null | undefined): boolean {
@@ -63,15 +64,6 @@ export function RunDetail() {
     return [...run.swimmers].sort((a, b) => a.name.localeCompare(b.name))
   }, [run])
 
-  const triggerExport = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   const handleDelete = async () => {
     if (!id) return
     setDeleting(true)
@@ -86,7 +78,7 @@ export function RunDetail() {
   const handleExport = async () => {
     if (!id) return
     const blob = await exportRun(id)
-    triggerExport(blob, `run-${id}.json`)
+    downloadBlob(blob, `run-${id}.json`)
   }
 
   if (loading) return (

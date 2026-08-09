@@ -5,6 +5,10 @@ export function listSessions(): Promise<Session[]> {
   return sessionService.list()
 }
 
+export function listAllSessions(): Promise<Session[]> {
+  return sessionService.listAll()
+}
+
 export function getSession(id: string): Promise<Session | undefined> {
   return sessionService.get(id)
 }
@@ -25,8 +29,8 @@ export function listCompletedRuns(): Promise<SessionRun[]> {
   return sessionService.getCompletedRuns()
 }
 
-export function seedDefaultSessions(): Promise<void> {
-  return sessionService.seedDefaults()
-}
+// export function seedDefaultSessions(): Promise<void> {
+//   return sessionService.seedDefaults()
+// }
 
 export type { Session, SessionRun } from '../db/schema'

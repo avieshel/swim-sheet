@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { SwimmerFormModal, type SwimmerFormData } from './SwimmerFormModal'
-import { getSwimmer, createSwimmer, updateSwimmer, searchSwimmers } from '../api/swimmers'
+import { getSwimmer, createSwimmerIfNotExists, updateSwimmer, searchSwimmers } from '../api/swimmers'
 import { promoteAndLinkSwimmer, addSwimmerToRun, removeSwimmerFromRun } from '../api/runs'
 
 type RosterSwimmer = { id: string; name: string; group: string; notes: string; status: string }
@@ -112,7 +112,7 @@ export function useSwimmerEditModal(opts: UseSwimmerEditModalOptions) {
       realDbId = selectedId
     } else {
       const existing = await searchSwimmers(data.name)
-      realDbId = existing.length > 0 ? existing[0].id : await createSwimmer({ name: data.name, group: data.group, notes: data.notes, status: data.status })
+      realDbId = existing.length > 0 ? existing[0].id : await createSwimmerIfNotExists({ name: data.name, group: data.group, notes: data.notes, status: data.status })
     }
 
     // A swimmer can only be allocated to one lane per run. Block pointing this

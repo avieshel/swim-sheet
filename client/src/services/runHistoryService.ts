@@ -140,7 +140,7 @@ async function buildRunSummary(run: SessionRun, targetName: string | null): Prom
   for (const result of laneResults) {
     const saved: SavedDrillData | null = (() => {
       try {
-        return JSON.parse(result.data) as SavedDrillData
+        return JSON.parse(result.data ?? 'null') as SavedDrillData
       } catch {
         return null
       }

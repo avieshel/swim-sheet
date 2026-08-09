@@ -34,7 +34,41 @@ The `patchLibraryDrills` heal-on-reload behavior is a **feature** (not a bug): i
 
 ---
 
-## A-040: Speed & endurance drill library expansion ✅
+## A-045: Session templates never appear in the Sessions view (seeding crash) ✅
+
+**Source**: Bug report — "In the client's sessions view although I expect to see two session templates (100m freestyle default, Technique session) — I don't see any of these".
+
+**Root cause**: `seedDefaultSessions()` in `client/src/db/dao.ts` used `db.sessions.where('name').equals(...)`, but `name` is **not an indexed field** in the Dexie schema (`sessions: 'id, createdAt, updatedAt'`). Dexie throws `SchemaError: KeyPath name on object store sessions is not indexed` on every call. In `SessionsList`, the seeding call preceded `listSessions()` in the same promise chain, so the crash **aborted the whole chain** — `listSessions()` never ran and the page always rendered the empty "No session templates yet." state, hiding even user-created templates.
+
+**Fix**:
+- `seedDefaultSessions` (dao) — replaced the non-indexed `where('name')` query with a lookup over `getAllSessions()` (same pattern as `runService.createQuickStartRun`), and made it concurrency-safe via a module-level in-flight promise (React StrictMode double-invokes effects in dev, which previously seeded duplicates).
+- Seeding now lives in the **API/service layer**: `sessionService.list()` (→ `api.sessions.listSessions`) calls `seedDefaultSessions()` before returning the list — the `/sessions/` endpoint readies the DB and returns templates, per the desired architecture.
+- Added `listAllSessions()` (pure read, no seeding) for `LiveDeck`, so the first-launch quick-start path still sees an empty list and auto-creates the "Quick 100m freestyle (default)" run (preserves documented Quick-Start behavior + `live-swimmer-promotion` e2e flow).
+- `SessionsList` no longer calls `seedDefaultSessions()` itself — `listSessions()` handles readiness.
+
+**Note**: the seeded default template is "Distance Progression" (from `sessions.json`). The "Quick 100m freestyle (default)" template only exists after a quick-time run has been started once (created by `createQuickStartRun`); "Technique session" is a user template that now renders correctly.
+
+**Files modified**: `client/src/db/dao.ts`, `client/src/services/sessionService.ts`, `client/src/api/sessions.ts`, `client/src/pages/LiveDeck.tsx`, `client/src/pages/SessionsList.tsx`, `client/src/services/__tests__/sessionService.test.ts`
+
+**Priority**: High
+**Status**: Done
+
+---
+
+## A-046: e2e specs failed at seed with DataError (runSwimmers missing primary key) ✅
+
+**Root cause**: `tests/live-deck.spec.ts` and `tests/persistence.spec.ts` inserted `runSwimmers` rows via `db.runSwimmers.add({ run_id, swimmer_id, lane, ... })` **without an `id`**. `runSwimmers` uses `id` as its primary keypath (`EntityTable<RunSwimmer, 'id'>`), so every insert threw `DataError: Evaluating the object store's key path did not yield a value` — the failure was masked as a generic `DexieError2` in Playwright. Reproduced on clean HEAD (`c9a454b`), i.e. **pre-existing**, not caused by the WIP live-view refactor.
+
+**Fix**: added `id: crypto.randomUUID()` to all 4 `runSwimmers.add` calls (3 in `tests/live-deck.spec.ts`, 1 in `tests/persistence.spec.ts`).
+
+**Remaining (pre-existing, out of scope)**: after the seed fix, 3 of those specs (`live-deck` "starts lane timer / completed drill", `persistence` auto-save) still fail because their assertions target the **old pre-WIP timing UI** — `.glass-panel.rounded-2xl` cards, per-swimmer `Go` buttons, no pre-start "Start" screen. The WIP `GroupCard`/pre-start flow replaced those, so the specs need a flow rewrite to match (separate effort).
+
+**Files modified**: `tests/live-deck.spec.ts`, `tests/persistence.spec.ts`
+
+**Priority**: Medium
+**Status**: Done
+
+---
 
 **Source**: User request — "add more speed drills & endurance drills"
 
@@ -56,6 +90,8 @@ Added 9 new builtin drills to both `patchLibraryDrills` and `seedLibraryDrills` 
 All default to `stroke: 'freestyle'` with `distance` set in the seed array. Names follow the generic freestyle-default convention.
 
 > **Later refactor (A-044)**: these builtin drills now live in `client/src/data/drills.json` (single source), not in `dao.ts`.
+
+## A-040: Speed & endurance drill library expansion ✅
 
 **Files modified**:
 - `client/src/db/dao.ts` — 9 new drills in both `patchLibraryDrills` and `seedLibraryDrills`; **`patchLibraryDrills` now also inserts missing drills** (previously it only updated existing ones, so new builtin drills never appeared for existing users without a manual "Reset to Defaults"). Missing drills are added via `addLibraryDrill` with `stroke: 'freestyle'`, `distance: 0` defaults, `source: 'builtin'`.
@@ -423,7 +459,43 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 ---
 
-## A-024: Reusable session sections (blocks) — the "save the warm-up" feature
+## A-041: Similar-drill warning blocks drill add/edit in the session builder ✅
+
+**Source**: Bug report — "can't add more than two drills; can't edit an existing drill" in the session template builder.
+
+**Root cause**: `SessionDetail`'s modal `onSave` defers persistence through `findSimilarDrills`. Two compounding bugs made saves silently fail:
+1. `addDrill` (DAO) auto-upserts every session drill into the library (by name), so editing any session drill always matched its own library mirror (different id, not excluded by `excludeId`) — score `0.5` (nameScore of an identical pair) `>=` threshold `0.5`. Every edit was blocked.
+2. The "Similar drills found" banner rendered in normal page flow **below** the full-screen `z-50` modal overlay, so "Create Anyway" was invisible and unreachable — the save just appeared to do nothing. This also blocked adds once a new drill's name/focus/labels resembled an earlier drill or one of the builtins.
+
+**Solution**:
+- Exclude the edited drill's library mirror from the similar check (`mirrorName = data.id && !editingLibraryId ? richDrill.name : undefined`; library candidates filtered by name — mirrors are keyed by name).
+- Rendered the warning as a fixed dialog at `z-[60]` (above the modal, below ConfirmDialog's `z-[70]`), so "Create Anyway" / "Cancel" are actually visible and clickable.
+- Added a delete button on each drill-library card in the SessionDetail bank panel (deletes via `deleteLibraryDrill` with a ConfirmDialog, matching the DrillBank page behavior).
+
+**Files**: `client/src/pages/SessionDetail.tsx`
+
+**Priority**: High
+**Status**: Done — verified `npm run check` green (306 tests)
+
+---
+
+## A-042: Template → live-session start — picker when multiple templates ✅
+
+**Source**: Bug report — "can't start the session I've just created" (live view always auto-started the quick 100m freestyle).
+
+**Root cause**: `LiveDeck` unconditionally auto-fired `handleQuickStart()` whenever no active run existed (`LiveDeck.tsx` root effect), so there was never a way to start any other session template.
+
+**Solution**: `LiveDeck` now loads session templates when no active run exists and branches:
+- 0 templates → auto quick-start (creates the default 100m freestyle run) — path-to-value preserved.
+- 1 template → auto-selected; if it's the default quick-start session (`Quick 100m freestyle (default)`) quick-start runs, otherwise `createRunFromTemplate` starts it.
+- >1 templates → a "Start a Session" picker lists the templates (tap to start via `createRunFromTemplate`, using the template's pool length) plus an "or quick-start the default 100m freestyle" option.
+
+**Files**: `client/src/pages/LiveDeck.tsx`
+
+**Priority**: High
+**Status**: Done — verified `npm run check` green (306 tests)
+
+---
 
 **Source**: `docs/context/Sessions-Drills-Context.md` (F-8, Coach's Mental Model)
 
@@ -500,14 +572,7 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Source**: `docs/context/Sessions-Drills-Context.md` (F-10)
 
-**Problem**: Modal offers `'main set'`/`'cool down'` (`constants/drill.ts:27`) but the deck detects `'main-set'`/`'cooldown'` (`LiveDeck.tsx:933-937`, `ProgressGroupCard.tsx:25-30`). Freshly-tagged drills never phase-group at run time.
-
-**Solution**: Unify the vocabulary — pick one canonical set and make `PHASE_LABELS` and the deck detectors agree.
-
-**Files**: `client/src/constants/drill.ts`, `client/src/pages/LiveDeck.tsx`, `client/src/components/ProgressGroupCard.tsx`
-
-**Priority**: Low
-**Status**: Open
+**Status**: Superseded — phase aggregation was removed in the Overview/Timing split. The `ProgressGroupCard` and phase banner no longer exist; `OverviewView`'s Drill-Flow markers are keyed to drills, not phase labels. No runtime phase matching remains.
 
 ---
 
@@ -648,7 +713,7 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Solution (product-owner decision)**: Render `RunDrill.notes` (and rep `instructions`) as the instruction text on the deck drill card for **planned runs** — all rows (timed + untimed) share the same "instruction card" surface A-025/F-9 defines. **Quick-time rows stay label-only** — P1's deck never gains metadata clutter.
 
-**Files**: `client/src/pages/LiveDeck.tsx` (GroupCard), `client/src/components/ProgressGroupCard.tsx`
+**Files**: `client/src/pages/LiveDeck.tsx` (GroupCard — rendered in Timing Mode)
 
 **Priority**: Medium
 **Status**: Open

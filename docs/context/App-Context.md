@@ -98,6 +98,7 @@ SwimSheet/
 │   │   ├── context/        # React context (LiveSessionContext)
 │   │   ├── db/             # Dexie schema + DAO (pure CRUD)
 │   │   ├── pages/          # Route page components
+│   │   │   └── live/       # ActiveRunView (live session runner) — split from LiveDeck
 │   │   ├── services/       # Business logic services
 │   │   ├── sync/           # Sync engine
 │   │   ├── utils/          # Utility functions

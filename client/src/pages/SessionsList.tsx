@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { listSessions, createSession, deleteSession, seedDefaultSessions } from '../api/sessions'
+import { listSessions, createSession, deleteSession } from '../api/sessions'
 import { getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/drillHelpers'
 import { strokeColorsSolid } from '../constants/drill'
 import { RunHistoryTable } from '../components/Table'
+import { useActiveRun } from '../hooks/useActiveRun'
 
 interface SessionWithTotals extends Session {
   drillCount: number
@@ -17,6 +18,7 @@ interface SessionWithTotals extends Session {
 
 export const SessionsList: React.FC = () => {
   const navigate = useNavigate()
+  const activeRun = useActiveRun()
   const [sessions, setSessions] = useState<SessionWithTotals[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewForm, setShowNewForm] = useState(false)
@@ -36,10 +38,9 @@ export const SessionsList: React.FC = () => {
     onConfirm: () => {},
   })
 
-  const loadSessions = async () => {
-    try {
+  const loadSessionData = async (): Promise<SessionWithTotals[]> => {
       const all = await listSessions()
-      const withTotals: SessionWithTotals[] = await Promise.all(
+      return Promise.all(
         all.map(async (s) => {
           const drills = await getSessionDrills(s.id)
           const breakdown = aggregateByStroke(drills)
@@ -52,42 +53,22 @@ export const SessionsList: React.FC = () => {
           }
         })
       )
-      setSessions(withTotals)
-    } catch {
-      // ignore
     }
-    setLoading(false)
-  }
 
-  useEffect(() => {
-    let cancelled = false
-    seedDefaultSessions().then(() => {
-      if (cancelled) return
-      return listSessions()
-    }).then(all => {
-      if (cancelled || !all) return
-      return Promise.all(
-        all.map(async (s) => {
-          const drills = await getSessionDrills(s.id)
-          const breakdown = aggregateByStroke(drills)
-          return {
-            ...s,
-            drillCount: drills.length,
-            totalDistance: drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0),
-            strokeBreakdown: breakdown,
-            focusAreas: detectFocus(drills),
-          } as SessionWithTotals
-        })
-      )
-    }).then(withTotals => {
-      if (!cancelled && withTotals) setSessions(withTotals)
-    }).catch(() => {
-      if (!cancelled) setLoading(false)
-    }).finally(() => {
-      if (!cancelled) setLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [])
+    const applySessions = (withTotals: SessionWithTotals[]) => {
+      setSessions(withTotals)
+      setLoading(false)
+    }
+
+    const loadSessions = async () => applySessions(await loadSessionData())
+
+    useEffect(() => {
+      let cancelled = false
+      loadSessionData()
+        .then(d => { if (!cancelled) applySessions(d) })
+        .catch(() => { if (!cancelled) setLoading(false) })
+      return () => { cancelled = true }
+    }, [])
 
   const handleCreate = async () => {
     if (!formName.trim()) return
@@ -229,10 +210,16 @@ export const SessionsList: React.FC = () => {
         </div>
       ) : (
         <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
-          {sessions.map(s => (
+          {sessions.map(s => {
+            const isLive = activeRun?.session_id === s.id
+            return (
             <div
               key={s.id}
-              className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant hover:border-primary/40 transition-all cursor-pointer shadow-sm hover:shadow-md group"
+              className={`bg-surface-container-lowest rounded-2xl p-5 border transition-all cursor-pointer shadow-sm hover:shadow-md group ${
+                isLive
+                  ? 'border-green-500/70 ring-2 ring-green-500/20'
+                  : 'border-outline-variant hover:border-primary/40'
+              }`}
               onClick={() => navigate(`/sessions/${s.id}`)}
             >
               <div className="flex items-start gap-3 mb-3">
@@ -241,7 +228,15 @@ export const SessionsList: React.FC = () => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-headline-md text-headline-md text-on-surface font-bold truncate">{s.name}</h3>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <h3 className="font-headline-md text-headline-md text-on-surface font-bold truncate">{s.name}</h3>
+                      {isLive && (
+                        <span className="shrink-0 flex items-center gap-1 text-label-caps text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                          Live
+                        </span>
+                      )}
+                    </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
                       className="p-1.5 text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
@@ -297,7 +292,8 @@ export const SessionsList: React.FC = () => {
                 </span>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

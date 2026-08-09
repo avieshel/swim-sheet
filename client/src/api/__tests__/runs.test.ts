@@ -23,6 +23,9 @@ vi.mock('../../services/runService', () => ({
     getLaneResults: vi.fn(),
     getLaneResult: vi.fn(),
     setLaneResult: vi.fn(),
+    startLaneResult: vi.fn(),
+    completeLaneResult: vi.fn(),
+    uncompleteLaneResult: vi.fn(),
     deleteLaneResult: vi.fn(),
     deleteLaneResultsForGroup: vi.fn(),
     deleteLaneResultsForRun: vi.fn(),
@@ -41,7 +44,7 @@ vi.mock('../../services/runHistoryService', () => ({
   exportRun: vi.fn(),
 }))
 
-import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult, getRunHistory, getRunById, deleteRun, exportRun } from '../runs'
+import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, startLaneResult, completeLaneResult, uncompleteLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult, getRunHistory, getRunById, deleteRun, exportRun } from '../runs'
 import { runService } from '../../services/runService'
 import type { SafeSessionRun, SafeLaneDrillResult, SafeLap } from '../../db/schema'
 import type { LiveDrillTiming } from '../../timing/liveTiming'
@@ -191,6 +194,30 @@ describe('runs API', () => {
     const result = await setLaneResult(data)
     expect(runService.setLaneResult).toHaveBeenCalledWith(data)
     expect(result).toBe('new-id')
+  })
+
+  it('startLaneResult delegates to runService.startLaneResult', async () => {
+    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 }
+    vi.mocked(runService.startLaneResult).mockResolvedValue('new-id')
+    const result = await startLaneResult(data)
+    expect(runService.startLaneResult).toHaveBeenCalledWith(data)
+    expect(result).toBe('new-id')
+  })
+
+  it('completeLaneResult delegates to runService.completeLaneResult', async () => {
+    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 }
+    vi.mocked(runService.completeLaneResult).mockResolvedValue('new-id')
+    const result = await completeLaneResult(data)
+    expect(runService.completeLaneResult).toHaveBeenCalledWith(data)
+    expect(result).toBe('new-id')
+  })
+
+  it('uncompleteLaneResult delegates to runService.uncompleteLaneResult', async () => {
+    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 }
+    vi.mocked(runService.uncompleteLaneResult).mockResolvedValue('lr1')
+    const result = await uncompleteLaneResult(data)
+    expect(runService.uncompleteLaneResult).toHaveBeenCalledWith(data)
+    expect(result).toBe('lr1')
   })
 
   it('deleteLaneResult delegates to runService.deleteLaneResult', async () => {
