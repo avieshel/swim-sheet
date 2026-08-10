@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, type ReactNode } from 'react'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -10,6 +10,7 @@ interface ConfirmDialogProps {
   confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
+  children?: ReactNode
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -22,6 +23,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmDisabled = false,
   onConfirm,
   onCancel,
+  children,
 }) => {
   useEffect(() => {
     if (open) {
@@ -47,7 +49,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </span>
         </div>
         <h3 className="font-headline-md text-on-surface mb-2">{title}</h3>
-        <p className="font-body-md text-on-surface-variant mb-6">{message}</p>
+        <p className="font-body-md text-on-surface-variant mb-4">{message}</p>
+        {children && <div className="mb-4">{children}</div>}
         <div className="flex gap-3">
           <button
             type="button"

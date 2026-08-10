@@ -20,6 +20,7 @@ import { computeSessionProgress } from '../../utils/sessionProgress'
 import { LaneEditorModal } from '../../components/LaneEditorModal'
 import { GroupCard } from '../../components/GroupCard'
 import { listSwimmers, createSwimmerIfNotExists } from '../../api/swimmers'
+import { pickRandomTempSwimmerName } from '../../api/constants'
 import { LiveSessionHeader } from '../../components/live/LiveSessionHeader'
 import { DrillsSection } from '../../components/live/DrillsSection'
 import { LaneSwimmersSection } from '../../components/live/LaneSwimmersSection'
@@ -80,6 +81,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const [templateName, setTemplateName] = useState('')
   const [confirmMove, setConfirmMove] = useState<{ swimmer: DbSwimmer; fromGroupId: string; toGroupId: string } | null>(null)
   const [showResetSessionConfirm, setShowResetSessionConfirm] = useState(false)
+  const [resetClearSwimmers, setResetClearSwimmers] = useState(false)
   const [showLaneEditor, setShowLaneEditor] = useState(false)
   const [editorScrollToLane, setEditorScrollToLane] = useState<number | null>(null)
   const [rosterSwimmers, setRosterSwimmers] = useState<DbSwimmer[]>([])
@@ -253,9 +255,10 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   }
 
   const handleResetSession = async () => {
-    const refreshed = await TimingService.resetSession(run.id, groups, runDrills, store, dispatch)
+    const refreshed = await TimingService.resetSession(run.id, groups, runDrills, store, dispatch, resetClearSwimmers)
     setLaneDrillResults(refreshed)
     setShowResetSessionConfirm(false)
+    setResetClearSwimmers(false)
   }
 
   const handleClearSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string) => {
@@ -401,13 +404,26 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       <ConfirmDialog
         open={showResetSessionConfirm}
         title="Reset Session?"
-        message="Reset all timing data and return all groups to the first drill? Swimmers will remain assigned. This cannot be undone."
+        message="Reset all timing data and return all groups to the first drill. This cannot be undone."
         confirmLabel="Reset"
         cancelLabel="Cancel"
         destructive={true}
         onConfirm={handleResetSession}
-        onCancel={() => setShowResetSessionConfirm(false)}
-      />
+        onCancel={() => { setShowResetSessionConfirm(false); setResetClearSwimmers(false) }}
+      >
+        <label className="flex items-start gap-3 p-3 rounded-xl bg-surface-container cursor-pointer hover:bg-surface-container-higher transition-colors">
+          <input
+            type="checkbox"
+            checked={resetClearSwimmers}
+            onChange={(e) => setResetClearSwimmers(e.target.checked)}
+            className="mt-0.5 h-5 w-5 rounded border-outline text-primary focus:ring-primary cursor-pointer"
+          />
+          <div className="text-left">
+            <span className="text-sm font-medium text-on-surface block">Clear swimmer lane assignments</span>
+            <span className="text-xs text-on-surface-variant">Remove all swimmers from lanes. They'll remain in your roster.</span>
+          </div>
+        </label>
+      </ConfirmDialog>
 
       {showLaneEditor && <LaneEditorModal
         state={{ groups, runId: run.id }}
@@ -446,6 +462,11 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
             await removeSwimmerFromRun(run.id, swimmer.dbId)
           }
           dispatch({ type: 'REMOVE_SWIMMER', payload: { groupId, swimmerId } })
+        }}
+        onAddTempSwimmer={(groupId) => {
+          const randomName = pickRandomTempSwimmerName()
+          const quickDbId = `quick-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+          dispatch({ type: 'ADD_SWIMMER', payload: { groupId, name: randomName, dbId: quickDbId } })
         }}
         onSaveTempSwimmer={async (swimmerId, groupId, data) => {
           const newId = await createSwimmerIfNotExists({ name: data.name, group: data.group, notes: data.notes, status: data.status as 'active' | 'inactive' })

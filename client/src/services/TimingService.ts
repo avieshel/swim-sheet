@@ -115,7 +115,8 @@ export const TimingService = {
     groups: TimedGroup[],
     runDrills: Array<{ id: string }>,
     store: LiveTimingStore,
-    dispatch: Dispatch<LiveSessionAction | TimerAction>
+    dispatch: Dispatch<LiveSessionAction | TimerAction>,
+    clearSwimmers = false
   ): Promise<LaneDrillResult[]> {
     dispatch({ type: 'RESET_SESSION_TIMER' })
     await deleteLaneResultsForRun(runId)
@@ -123,7 +124,11 @@ export const TimingService = {
       if (group.currentRunDrillId) {
         store.clearDrill(runId, group.id, group.currentRunDrillId)
       }
-      dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: group.id } })
+      if (clearSwimmers) {
+        dispatch({ type: 'CLEAR_GROUP_SWIMMERS', payload: { groupId: group.id } })
+      } else {
+        dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: group.id } })
+      }
       const first = runDrills.length > 0 ? runDrills[0] : null
       if (first) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: group.id, runDrillId: first.id } })
     }

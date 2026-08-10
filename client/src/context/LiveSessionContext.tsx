@@ -43,6 +43,7 @@ export type LiveSessionAction =
    | { type: 'ADD_GROUP'; payload: { lane: number; name: string; id?: string } }
    | { type: 'REMOVE_GROUP'; payload: { groupId: string } }
    | { type: 'CLEAR_GROUP_SWIMMER_DATA'; payload: { groupId: string } }
+   | { type: 'CLEAR_GROUP_SWIMMERS'; payload: { groupId: string } }
    | { type: 'SWIMMER_CLEAR'; payload: { groupId: string; swimmerId: number } }
    | { type: 'MOVE_SWIMMER_TO_GROUP'; payload: { swimmerId: number; fromGroupId: string; toGroupId: string } }
    | { type: 'REORDER_SWIMMERS'; payload: { groupId: string; swimmerIds: number[] } }
@@ -219,6 +220,18 @@ case 'REMOVE_SWIMMER':
               completed: false,
               lapStrokeCounts: {},
             })),
+              }
+            : g
+        ),
+      }
+    case 'CLEAR_GROUP_SWIMMERS':
+      return {
+        ...state,
+        groups: state.groups.map(g =>
+          g.id === action.payload.groupId
+            ? {
+                ...g,
+                swimmers: [],
               }
             : g
         ),

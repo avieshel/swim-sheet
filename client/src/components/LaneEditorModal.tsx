@@ -18,13 +18,14 @@ interface LaneEditorModalProps {
   onRemoveSwimmerFromLane: (swimmerId: number, groupId: string) => void
   onSaveTempSwimmer?: (swimmerId: number, groupId: string, data: SwimmerFormData) => Promise<void>
   onReorderSwimmers?: (groupId: string, swimmerIds: number[]) => void
+  onAddTempSwimmer?: (groupId: string) => void
   onClose: () => void
 }
 
 export function LaneEditorModal({
   state, editorScrollToLane, onScrollHandled,
   onAddSwimmerToLane, onAddGroup, onRemoveGroup, onMoveSwimmer, onUpdateGroupName, onResetGroup,
-  onRemoveSwimmerFromLane, onSaveTempSwimmer, onReorderSwimmers, onClose,
+  onRemoveSwimmerFromLane, onSaveTempSwimmer, onReorderSwimmers, onAddTempSwimmer, onClose,
 }: LaneEditorModalProps) {
   const [allSwimmers, setAllSwimmers] = useState<Swimmer[]>([])
   const [unassignedSearch, setUnassignedSearch] = useState('')
@@ -72,6 +73,29 @@ export function LaneEditorModal({
             onScrollHandled()
           }
         }}>
+          {/* Quick Add Temp Swimmer */}
+          {onAddTempSwimmer && sortedGroups.length > 0 && (
+            <div className="bg-tertiary-container/20 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-tertiary text-sm">bolt</span>
+                <span className="text-label-sm font-bold text-on-surface">Quick Add Temp Swimmer</span>
+              </div>
+              <p className="text-xs text-on-surface-variant mb-3">Add a temp swimmer to start timing right away. You can save them to your roster later.</p>
+              <div className="flex flex-wrap gap-2">
+                {sortedGroups.map(group => (
+                  <button
+                    key={group.id}
+                    onClick={() => onAddTempSwimmer(group.id)}
+                    className="h-9 px-3 flex items-center justify-center gap-1.5 rounded-lg bg-tertiary-container text-on-tertiary-container hover:brightness-95 transition-all cursor-pointer text-label-sm font-medium"
+                  >
+                    <span className="material-symbols-outlined text-sm">add</span>
+                    Lane {group.lane}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Unassigned Section */}
           <div className="bg-surface-container-low rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -170,6 +194,16 @@ export function LaneEditorModal({
                   <span className="material-symbols-outlined text-label-sm">edit</span>
                 </button>
                 <span className="text-xs text-on-surface-variant">{group.swimmers.length} swimmer{group.swimmers.length !== 1 ? 's' : ''}</span>
+                {onAddTempSwimmer && (
+                  <button
+                    onClick={() => onAddTempSwimmer(group.id)}
+                    className="h-6 px-2 rounded-full bg-tertiary-container/50 text-tertiary text-label-sm font-medium flex items-center gap-1 hover:bg-tertiary-container transition-all cursor-pointer"
+                    title="Add temp swimmer"
+                  >
+                    <span className="material-symbols-outlined text-xs">add</span>
+                    Temp
+                  </button>
+                )}
                 {group.swimmers.length === 0 && (
                   <button onClick={() => setRemovingGroupId(group.id)}
                     className="ml-auto text-xs text-error font-semibold hover:underline cursor-pointer">Remove</button>

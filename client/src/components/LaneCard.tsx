@@ -1,6 +1,5 @@
 import { useContext } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
-import { pickRandomTempSwimmerName } from '../api/constants'
 
 export interface LaneCardProps {
   group: TimedGroup
@@ -8,14 +7,8 @@ export interface LaneCardProps {
 }
 
 export function LaneCard({ group, onManageSwimmers }: LaneCardProps) {
-  const { dispatch, groups } = useContext(LiveSessionContext)
+  const { groups } = useContext(LiveSessionContext)
   const liveGroup = groups.find(g => g.id === group.id) ?? group
-
-  const addTempSwimmer = () => {
-    const randomName = pickRandomTempSwimmerName()
-    const quickDbId = `quick-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-    dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: randomName, dbId: quickDbId } })
-  }
 
   return (
     <div className="rounded-2xl p-4 sm:p-5 bg-surface-container-lowest border shadow-sm">
@@ -29,56 +22,38 @@ export function LaneCard({ group, onManageSwimmers }: LaneCardProps) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        {onManageSwimmers && (
           <button
-            onClick={addTempSwimmer}
-            className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-xl bg-primary-container text-on-primary-container hover:brightness-110 transition-all cursor-pointer"
-            title="Quick add a temp swimmer"
+            onClick={() => onManageSwimmers(liveGroup.lane)}
+            className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-full bg-primary-container text-on-primary-container hover:brightness-95 transition-all cursor-pointer"
+            title="Manage lane swimmers"
           >
-            <span className="material-symbols-outlined text-base">add</span>
-            <span className="text-label-sm font-medium">Add Swimmer</span>
+            <span className="material-symbols-outlined text-base">group</span>
+            <span className="text-label-sm font-medium">Manage</span>
           </button>
-          {onManageSwimmers && (
-            <button
-              onClick={() => onManageSwimmers(liveGroup.lane)}
-              className="h-11 w-11 flex items-center justify-center rounded-full bg-surface-variant text-on-surface-variant hover:bg-primary-container transition-all cursor-pointer"
-              title="Manage lane swimmers"
-            >
-              <span className="material-symbols-outlined text-base">group</span>
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {liveGroup.swimmers.length > 0 ? (
           liveGroup.swimmers.map(s => (
-            <span key={s.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-on-surface text-label-sm font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            <span key={s.id} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container text-on-surface text-base font-medium">
+              <span className="w-2 h-2 rounded-full bg-primary" />
               {s.name}
             </span>
           ))
         ) : (
-          <div className="w-full rounded-xl bg-surface-container p-3 flex flex-col items-center gap-2">
+          <div className="w-full rounded-xl bg-surface-container p-4 flex flex-col items-center gap-3">
             <p className="text-label-sm text-on-surface-variant text-center">No swimmers in this lane yet.</p>
-            <div className="flex items-center gap-2">
+            {onManageSwimmers && (
               <button
-                onClick={addTempSwimmer}
-                className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-xl bg-primary-container text-on-primary-container hover:brightness-110 transition-all cursor-pointer active:scale-95"
+                onClick={() => onManageSwimmers(liveGroup.lane)}
+                className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-base">add</span>
-                Add Swimmer
+                <span className="material-symbols-outlined text-base">group_add</span>
+                Add Swimmers
               </button>
-              {onManageSwimmers && (
-                <button
-                  onClick={() => onManageSwimmers(liveGroup.lane)}
-                  className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-full border border-outline text-on-surface-variant text-label-sm font-bold hover:bg-surface-variant transition-all cursor-pointer active:scale-95"
-                >
-                  <span className="material-symbols-outlined text-base">group</span>
-                  Manage Swimmers
-                </button>
-              )}
-            </div>
+            )}
           </div>
         )}
       </div>
