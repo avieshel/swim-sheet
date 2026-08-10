@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
-import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, createDrill, getSessionDrills, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills, bumpDrillPopularity } from '../api/drills'
+import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, createDrill, getSessionDrills, patchLibraryDrills, deduplicateLibraryDrills, bumpDrillPopularity } from '../api/drills'
 import { listSessions } from '../api/sessions'
 import type { LibraryDrill, SafeLibraryDrill } from '../api/drills'
 import type { Session } from '../api/sessions'
@@ -108,19 +108,6 @@ export const DrillBank: React.FC = () => {
     setShowEditor(true)
   }
 
-  const handleResetDefaults = () => {
-    setConfirmState({
-      open: true,
-      title: 'Reset Drills',
-      message: 'This will delete ALL custom drills and reset the bank to the rich technical defaults. This cannot be undone.',
-      onConfirm: async () => {
-        await resetLibraryToDefaults()
-        loadDrills()
-        setConfirmState(prev => ({ ...prev, open: false }))
-      }
-    })
-  }
-
   const handleDelete = (id: string) => {
     setConfirmState({
       open: true,
@@ -203,14 +190,6 @@ export const DrillBank: React.FC = () => {
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">Review and manage your shared library of swim sets.</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={handleResetDefaults}
-            className="h-10 md:h-12 px-3 md:px-4 border-2 border-outline text-on-surface rounded-xl font-bold flex items-center gap-2 hover:bg-surface-container transition-all cursor-pointer text-xs md:text-sm"
-            title="Restore default technical drills"
-          >
-            <span className="material-symbols-outlined md:text-lg">restart_alt</span>
-            <span className="hidden sm:inline">Reset Defaults</span>
-          </button>
           <button
             onClick={() => openEditor()}
             className="h-10 md:h-12 px-4 md:px-6 bg-primary text-on-primary rounded-xl font-bold flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-primary/20 text-xs md:text-sm"

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, deleteAllData, DEFAULT_EQUIPMENT } from '../api/settings'
+import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
 import { CustomSelect } from '../components/CustomSelect'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ResetDataDialog } from '../components/ResetDataDialog'
 
 interface SettingsForm {
   team_name: string
@@ -51,7 +52,7 @@ export const Settings: React.FC = () => {
     data_retention_days: '90',
   })
   const [showResetConfirm, setShowResetConfirm] = useState(false)
-  const [showResetAllDataConfirm, setShowResetAllDataConfirm] = useState(false)
+  const [showResetDataDialog, setShowResetDataDialog] = useState(false)
 
   // Team names state
   const [newTeamName, setNewTeamName] = useState('')
@@ -65,7 +66,6 @@ export const Settings: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<{ bytes: number; tables: Record<string, number> } | null>(null)
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null)
   const [cleaningUp, setCleaningUp] = useState(false)
-  const [resettingAllData, setResettingAllData] = useState(false)
 
   useEffect(() => {
     if (showResetConfirm) {
@@ -207,22 +207,6 @@ export const Settings: React.FC = () => {
     })
     setShowResetConfirm(false)
     navigate('/')
-  }
-
-  const handleResetAllData = async () => {
-    setResettingAllData(true)
-    try {
-      await deleteAllData()
-      setShowResetAllDataConfirm(false)
-      setCleanupMsg('All data has been reset')
-      const info = await estimateDbSize()
-      setStorageInfo(info)
-      setTimeout(() => navigate('/'), 1000)
-    } catch (err) {
-      setCleanupMsg('Reset failed: ' + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setResettingAllData(false)
-    }
   }
 
   if (loading) return (
@@ -544,11 +528,10 @@ export const Settings: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => setShowResetAllDataConfirm(true)}
-                  disabled={resettingAllData}
-                  className="flex-1 bg-error-container text-on-error-container font-bold px-6 py-4 rounded-xl hover:bg-error transition-all active:scale-95 cursor-pointer border-none disabled:opacity-50"
+                  onClick={() => setShowResetDataDialog(true)}
+                  className="flex-1 bg-error-container text-on-error-container font-bold px-6 py-4 rounded-xl hover:bg-error transition-all active:scale-95 cursor-pointer border-none"
                 >
-                  {resettingAllData ? 'Resetting...' : 'Reset All Data'}
+                  Reset Data
                 </button>
 
                 <button
@@ -564,18 +547,6 @@ export const Settings: React.FC = () => {
         </section>
 
         <ConfirmDialog
-          open={showResetAllDataConfirm}
-          title="Reset All Data?"
-          message="This will delete all swimmers, sessions, and timing data. This action cannot be undone."
-          confirmLabel={resettingAllData ? 'Resetting...' : 'Reset All Data'}
-          cancelLabel="Cancel"
-          destructive={true}
-          confirmDisabled={resettingAllData}
-          onConfirm={handleResetAllData}
-          onCancel={() => setShowResetAllDataConfirm(false)}
-        />
-
-        <ConfirmDialog
           open={showResetConfirm}
           title="Reset Settings?"
           message="This will restore all settings to their default values. This action cannot be undone."
@@ -584,6 +555,17 @@ export const Settings: React.FC = () => {
           destructive={false}
           onConfirm={handleReset}
           onCancel={() => setShowResetConfirm(false)}
+        />
+
+        <ResetDataDialog
+          open={showResetDataDialog}
+          onConfirm={() => {
+            setShowResetDataDialog(false)
+            setCleanupMsg('Data has been reset')
+            estimateDbSize().then(setStorageInfo)
+            setTimeout(() => navigate('/'), 1000)
+          }}
+          onCancel={() => setShowResetDataDialog(false)}
         />
       </form>
 
