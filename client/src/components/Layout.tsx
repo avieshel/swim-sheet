@@ -62,7 +62,7 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 r-container py-stack-md md:py-stack-lg pb-28 md:pb-12">
+      <main className="flex-1 r-container py-stack-md md:py-stack-lg pb-28 md:pb-12 overflow-x-hidden">
         {children}
       </main>
 

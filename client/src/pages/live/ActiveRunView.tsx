@@ -4,11 +4,10 @@ import { LiveSessionContext } from '../../context/LiveSessionContext'
 import type { LapEntry } from '../../api/types'
 import { 
   getRunDrills, getLaneResults, updateRun, 
-  completeLaneResult, uncompleteLaneResult,
   addSwimmerToRun, removeSwimmerFromRun,
-  deleteLaneResultsForGroup, deleteLaneResultsForRun,
+  deleteLaneResultsForGroup,
   deleteSwimmerFromLaneResult,
-  updateLaneResultSwimmer, completeRunWithLaps
+  completeRunWithLaps
 } from '../../api/runs'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BatchPromotionModal } from '../../components/BatchPromotionModal'
@@ -19,9 +18,11 @@ import { TimingService } from '../../services/TimingService'
 import { timestampSplits } from '../../utils/lapEditing'
 import { computeSessionProgress } from '../../utils/sessionProgress'
 import { LaneEditorModal } from '../../components/LaneEditorModal'
-import { OverviewView } from '../../components/OverviewView'
 import { GroupCard } from '../../components/GroupCard'
 import { listSwimmers, createSwimmerIfNotExists } from '../../api/swimmers'
+import { LiveSessionHeader } from '../../components/live/LiveSessionHeader'
+import { DrillsSection } from '../../components/live/DrillsSection'
+import { LaneSwimmersSection } from '../../components/live/LaneSwimmersSection'
 
 // ── Presentational sub-components (logic lives in ActiveRunView) ─────────────
 
@@ -85,6 +86,8 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const [timingDrillId, setTimingDrillId] = useState<string | null>(null)
   const [showAddSwimmersPrompt, setShowAddSwimmersPrompt] = useState(false)
 
+  const activeGroups = groups.filter(g => g.swimmers.length > 0)
+
   const enterTiming = (drillId: string) => {
     if (activeGroups.length === 0) {
       setShowAddSwimmersPrompt(true)
@@ -107,20 +110,37 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const [sessionStartedAt] = useState(() => Date.now())
   const [drillsLoaded, setDrillsLoaded] = useState(false)
 
+  const isQuickStart = (run: SessionRun): boolean => {
+    try {
+      const notes = JSON.parse(run.notes || '{}')
+      return notes.isQuickStart === true
+    } catch {
+      return false
+    }
+  }
+
   useEffect(() => {
     getRunDrills(run.id).then(drills => {
       const sorted = drills.sort((a, b) => a.order - b.order)
       setRunDrills(sorted)
       if (sorted.length > 0 && !initializedRef.current) {
         initializedRef.current = true
-        dispatch({ type: 'SET_ALL_DRILLS', payload: { runDrillId: sorted[0].id } })
+        // Auto-switch to timing for simple sessions (1 drill + quick start)
+        if (sorted.length === 1 && isQuickStart(run)) {
+          if (activeGroups.length > 0) {
+            dispatch({ type: 'SET_ALL_DRILLS', payload: { runDrillId: sorted[0].id } })
+            setTimingDrillId(sorted[0].id)
+          }
+        } else {
+          dispatch({ type: 'SET_ALL_DRILLS', payload: { runDrillId: sorted[0].id } })
+        }
       }
       setDrillsLoaded(true)
     })
     getLaneResults(run.id).then(results => setLaneDrillResults(results))
     getSession(run.session_id).then(s => setTemplateName(s?.name || 'Unknown'))
     listSwimmers().then(setRosterSwimmers)
-  }, [run.id, run.session_id, dispatch])
+  }, [run.id, run.session_id, dispatch, run, activeGroups.length])
 
   const refreshRoster = () => {
     listSwimmers().then(setRosterSwimmers)
@@ -139,7 +159,6 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [sessionRunning, tick])
 
-  const activeGroups = groups.filter(g => g.swimmers.length > 0)
   const progress = computeSessionProgress(runDrills, laneDrillResults, activeGroups)
 
 
@@ -215,20 +234,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const handleToggleDrillDone = async (groupId: string, runDrillId: string, advanceTo: string | null) => {
     const group = groups.find(g => g.id === groupId)
     if (!group) return
-    const existing = laneDrillResults.find(r => r.group_id === groupId && r.run_drill_id === runDrillId)
-    if (existing?.completed) {
-      await uncompleteLaneResult({ run_id: run.id, group_id: group.id, run_drill_id: runDrillId, lane: group.lane })
-    } else {
-      await completeLaneResult({ run_id: run.id, group_id: group.id, run_drill_id: runDrillId, lane: group.lane })
-      if (group.currentRunDrillId === runDrillId) {
-        store.clearDrill(run.id, group.id, runDrillId)
-        dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId } })
-        if (advanceTo) {
-          dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId, runDrillId: advanceTo } })
-        }
-      }
-    }
-    const refreshed = await getLaneResults(run.id)
+    const refreshed = await TimingService.toggleDrillDone(run.id, group, runDrillId, laneDrillResults, store, advanceTo, dispatch)
     setLaneDrillResults(refreshed)
   }
 
@@ -240,52 +246,57 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   }
 
   const handleResetGroup = async (groupId: string) => {
-    await deleteLaneResultsForGroup(run.id, groupId)
-    const refreshed = await getLaneResults(run.id)
-    setLaneDrillResults(refreshed)
     const group = groups.find(g => g.id === groupId)
-    if (group?.currentRunDrillId) {
-      store.clearDrill(run.id, group.id, group.currentRunDrillId)
-    }
-    dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId } })
-    const first = runDrills.length > 0 ? runDrills[0] : null
-    if (first) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId, runDrillId: first.id } })
+    if (!group) return
+    const refreshed = await TimingService.resetGroup(run.id, group, runDrills, store, dispatch)
+    setLaneDrillResults(refreshed)
   }
 
   const handleResetSession = async () => {
-    dispatch({ type: 'RESET_SESSION_TIMER' })
-    await deleteLaneResultsForRun(run.id)
-    const refreshed = await getLaneResults(run.id)
+    const refreshed = await TimingService.resetSession(run.id, groups, runDrills, store, dispatch)
     setLaneDrillResults(refreshed)
-    for (const group of groups) {
-      if (group.currentRunDrillId) {
-        store.clearDrill(run.id, group.id, group.currentRunDrillId)
-      }
-      dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: group.id } })
-      const first = runDrills.length > 0 ? runDrills[0] : null
-      if (first) dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: group.id, runDrillId: first.id } })
-    }
     setShowResetSessionConfirm(false)
   }
 
   const handleClearSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string) => {
-    await deleteSwimmerFromLaneResult(run.id, groupId, runDrillId, swimmerDbId)
-    const refreshed = await getLaneResults(run.id)
+    const refreshed = await TimingService.clearSwimmer(run.id, groupId, runDrillId, swimmerDbId)
     setLaneDrillResults(refreshed)
   }
 
   const handleEditSavedSwimmer = async (groupId: string, runDrillId: string, swimmerDbId: string, updates: { laps?: LapEntry[]; startedAt?: number | null; completedAt?: number | null; name?: string; dbId?: string }) => {
-    await updateLaneResultSwimmer(run.id, groupId, runDrillId, swimmerDbId, updates)
-    const refreshed = await getLaneResults(run.id)
+    const refreshed = await TimingService.editSavedSwimmer(run.id, groupId, runDrillId, swimmerDbId, updates)
     setLaneDrillResults(refreshed)
   }
 
   return (
-    <div>
-      {groups.length === 0 ? (
-        <EmptyState icon="pool" title="No lanes set up yet." actionLabel="Manage Swimmers" actionIcon="group" onAction={() => openLaneEditor()} />
-      ) : timingDrillId ? (
-        <>
+    <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden">
+      {/* Header */}
+      <LiveSessionHeader
+        templateName={templateName}
+        run={run}
+        drillCount={runDrills.length}
+        progress={progress}
+        sessionRunning={sessionRunning}
+        sessionElapsed={sessionElapsed}
+        sessionStartedAt={sessionStartedAt}
+        onToggleSession={() => {
+          if (!sessionRunning && activeGroups.length === 0) {
+            setShowAddSwimmersPrompt(true)
+            return
+          }
+          dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })
+        }}
+        onComplete={handleComplete}
+        onReset={() => setShowResetSessionConfirm(true)}
+        onOpenLaneEditor={() => openLaneEditor()}
+        onEditSession={() => navigate(`/sessions/${run.session_id}`)}
+        onLaneChipClick={lane => openLaneEditor(lane)}
+        onCommitPoolLength={value => { updateRun(run.id, { poolLength: value }) }}
+      />
+
+      {/* Timing Mode or Drills/Lanes */}
+      {timingDrillId ? (
+        <div className="p-3 md:p-4 border-t border-outline-variant/20">
           <TimingModeHeader runDrills={runDrills} timingDrillId={timingDrillId} onExit={exitTiming} />
           {activeGroups.length > 0 ? (
             <section className="mb-8">
@@ -322,37 +333,23 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
           ) : (
             <EmptyState icon="groups" title="No swimmers in any lane yet." actionLabel="Add Swimmers" actionIcon="casino" compact onAction={() => openLaneEditor()} />
           )}
-        </>
+        </div>
       ) : (
-        <OverviewView
-          runDrills={runDrills}
-          laneDrillResults={laneDrillResults}
-          onToggleDrillDone={handleToggleDrillDone}
-          onEnterTiming={enterTiming}
-          onManageSwimmers={(lane) => openLaneEditor(lane)}
-          templateName={templateName}
-          runDate={run.date}
-          poolName={run.poolName}
-          poolLength={run.poolLength}
-          drillCount={runDrills.length}
-          progress={progress}
-          sessionRunning={sessionRunning}
-          sessionElapsed={sessionElapsed}
-          sessionStartedAt={sessionStartedAt}
-          onToggleSession={() => {
-            if (!sessionRunning && activeGroups.length === 0) {
-              setShowAddSwimmersPrompt(true)
-              return
-            }
-            dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })
-          }}
-          onComplete={handleComplete}
-          onReset={() => setShowResetSessionConfirm(true)}
-          onOpenLaneEditor={() => openLaneEditor()}
-          onEditSession={() => navigate(`/sessions/${run.session_id}`)}
-          onLaneChipClick={lane => openLaneEditor(lane)}
-          onCommitPoolLength={value => { updateRun(run.id, { poolLength: value }) }}
-        />
+        <>
+          {/* Drills Section */}
+          <DrillsSection
+            runDrills={runDrills}
+            laneDrillResults={laneDrillResults}
+            groups={groups}
+            onEnterTiming={enterTiming}
+            onToggleDrillDone={handleToggleDrillDone}
+          />
+
+          {/* Lane Swimmers Section */}
+          <LaneSwimmersSection
+            onManageSwimmers={openLaneEditor}
+          />
+        </>
       )}
 
       {/* Promotion Modal */}
