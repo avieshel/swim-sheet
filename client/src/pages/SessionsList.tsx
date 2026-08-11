@@ -143,13 +143,22 @@ export const SessionsList: React.FC = () => {
           <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Session Templates</h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
         </div>
-        <button
-          onClick={() => setShowNewForm(true)}
-          className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
-        >
-          <Icon name="add" />
-          New Template
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/sessions/catalog"
+            className="flex items-center gap-2 px-4 py-3 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-all no-underline"
+          >
+            <Icon name="storefront" />
+            Browse Catalog
+          </Link>
+          <button
+            onClick={() => setShowNewForm(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
+          >
+            <Icon name="add" />
+            New Template
+          </button>
+        </div>
       </div>
 
       {showNewForm && (

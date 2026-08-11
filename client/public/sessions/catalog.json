@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "sessions": [
+    {
+      "id": "distance-progression",
+      "name": "Distance Progression",
+      "description": "Progressive distance session — build intensity as distance decreases. Warm up easy, find your rhythm in the main set, cool down well.",
+      "category": "endurance",
+      "drillCount": 11,
+      "totalDistance": 3200,
+      "file": "distance-progression.json"
+    }
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "name": "Distance Progression",
+  "notes": "Progressive distance session — build intensity as distance decreases. Warm up easy, find your rhythm in the main set, cool down well.",
+  "drills": [
+    {
+      "name": "Easy Free",
+      "order": 0,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": ["warmup"],
+      "description": "Easy pace, focus on breathing and body position."
+    },
+    {
+      "name": "Kickboard",
+      "order": 1,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 25,
+          "stroke": "freestyle",
+          "repeatCount": 4,
+          "equipment": ["kickboard"]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "continuous",
+      "focus": "technique",
+      "labels": ["warmup", "kick"],
+      "description": "25m kick, 25m swim. Keep hips high, steady rhythm."
+    },
+    {
+      "name": "Pull Buoy",
+      "order": 2,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 1,
+          "equipment": ["pullbuoy"]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "technique",
+      "labels": ["warmup", "body position"],
+      "description": "Long strokes, focus on rotation and reach."
+    },
+    {
+      "name": "Catch-Up Drill",
+      "order": 3,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "technique",
+      "labels": ["warmup", "rhythm", "streamline"],
+      "description": "Full extension before each stroke. Fingertip drag recovery."
+    },
+    {
+      "name": "Build",
+      "order": 4,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 25,
+          "stroke": "freestyle",
+          "repeatCount": 4
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "continuous",
+      "focus": "technique",
+      "labels": ["warmup", "pacing"],
+      "description": "Build from easy to moderate each 25m. Feel the pace change."
+    },
+    {
+      "name": "500m Free",
+      "order": 5,
+      "stroke": "freestyle",
+      "distance": 500,
+      "items": [
+        {
+          "distance": 500,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "fitness",
+      "labels": ["main-set", "endurance", "aerobic"],
+      "description": "Steady aerobic pace. Hold consistent stroke count."
+    },
+    {
+      "name": "400m Pull",
+      "order": 6,
+      "stroke": "freestyle",
+      "distance": 400,
+      "items": [
+        {
+          "distance": 400,
+          "stroke": "freestyle",
+          "repeatCount": 1,
+          "equipment": ["pullbuoy"]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "fitness",
+      "labels": ["main-set", "strength", "endurance"],
+      "description": "Buoy only. Focus on early vertical forearm and catch."
+    },
+    {
+      "name": "300m Kick",
+      "order": 7,
+      "stroke": "freestyle",
+      "distance": 300,
+      "items": [
+        {
+          "distance": 300,
+          "stroke": "freestyle",
+          "repeatCount": 1,
+          "equipment": ["kickboard"]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "fitness",
+      "labels": ["main-set", "kick", "endurance"],
+      "description": "Non-stop kick with board. Fast, narrow, steady."
+    },
+    {
+      "name": "3×200 Free",
+      "order": 8,
+      "stroke": "freestyle",
+      "distance": 600,
+      "items": [
+        {
+          "distance": 200,
+          "stroke": "freestyle",
+          "repeatCount": 3,
+          "intensity": "v3",
+          "interval": "3:00"
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "fitness",
+      "labels": ["main-set", "pacing", "speed"],
+      "description": "On 3:00. Descend 1-3. Build pace through each 200."
+    },
+    {
+      "name": "4×100 Free",
+      "order": 9,
+      "stroke": "freestyle",
+      "distance": 400,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 4,
+          "intensity": "v4",
+          "interval": "1:45"
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "fitness",
+      "labels": ["main-set", "speed", "sprint"],
+      "description": "On 1:45. Fast, hold pace across all four. Strong finish."
+    },
+    {
+      "name": "Easy Cool Down",
+      "order": 10,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": ["cooldown"],
+      "description": "Shake it out. Easy, relaxed, deep breathing."
+    }
+  ]
+}
