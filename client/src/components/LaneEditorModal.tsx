@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listSwimmers, createSwimmerIfNotExists } from '../api/swimmers'
 import { type Swimmer } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
+import { Icon } from './Icon'
 import { SwimmerFormModal, type SwimmerFormData } from './SwimmerFormModal'
 import type { TimedGroup } from '../context/LiveSessionContext'
 
@@ -63,7 +64,7 @@ export function LaneEditorModal({
           <h3 className="font-headline-md text-on-surface">Manage Lane Swimmers</h3>
           <button onClick={onClose}
             className="h-10 w-10 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container transition-colors cursor-pointer">
-            <span className="material-symbols-outlined">close</span>
+            <Icon name="close" />
           </button>
         </div>
         <div className="overflow-y-auto flex-1 space-y-3" ref={el => {
@@ -77,7 +78,7 @@ export function LaneEditorModal({
           {onAddTempSwimmer && sortedGroups.length > 0 && (
             <div className="bg-tertiary-container/20 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="material-symbols-outlined text-tertiary text-sm">bolt</span>
+                <Icon name="bolt" size="sm" color="on-surface-variant" />
                 <span className="text-label-sm font-bold text-on-surface">Quick Add Temp Swimmer</span>
               </div>
               <p className="text-xs text-on-surface-variant mb-3">Add a temp swimmer to start timing right away. You can save them to your roster later.</p>
@@ -88,7 +89,7 @@ export function LaneEditorModal({
                     onClick={() => onAddTempSwimmer(group.id)}
                     className="h-9 px-3 flex items-center justify-center gap-1.5 rounded-lg bg-tertiary-container text-on-tertiary-container hover:brightness-95 transition-all cursor-pointer text-label-sm font-medium"
                   >
-                    <span className="material-symbols-outlined text-sm">add</span>
+                    <Icon name="add" size="sm" />
                     Lane {group.lane}
                   </button>
                 ))}
@@ -152,7 +153,7 @@ export function LaneEditorModal({
                 onClick={() => setShowCreateModal(true)}
                 className="w-full py-2 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-base">person_add</span>
+                <Icon name="person_add" size="md" />
                 Create new swimmer
               </button>
             </div>
@@ -191,7 +192,7 @@ export function LaneEditorModal({
                   }
                 }}
                   className="h-5 w-5 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer shrink-0">
-                  <span className="material-symbols-outlined text-label-sm">edit</span>
+                  <Icon name="edit" size="xs" />
                 </button>
                 <span className="text-xs text-on-surface-variant">{group.swimmers.length} swimmer{group.swimmers.length !== 1 ? 's' : ''}</span>
                 {onAddTempSwimmer && (
@@ -200,7 +201,7 @@ export function LaneEditorModal({
                     className="h-6 px-2 rounded-full bg-tertiary-container/50 text-tertiary text-label-sm font-medium flex items-center gap-1 hover:bg-tertiary-container transition-all cursor-pointer"
                     title="Add temp swimmer"
                   >
-                    <span className="material-symbols-outlined text-xs">add</span>
+                    <Icon name="add" size="xs" />
                     Temp
                   </button>
                 )}
@@ -227,7 +228,7 @@ export function LaneEditorModal({
                           disabled={idx === 0}
                           className="h-5 w-5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-xs">keyboard_arrow_up</span>
+                          <Icon name="keyboard_arrow_up" size="xs" />
                         </button>
                         <button
                           onClick={() => {
@@ -239,13 +240,13 @@ export function LaneEditorModal({
                           disabled={idx === group.swimmers.length - 1}
                           className="h-5 w-5 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
                         >
-                          <span className="material-symbols-outlined text-xs">keyboard_arrow_down</span>
+                          <Icon name="keyboard_arrow_down" size="xs" />
                         </button>
                       </div>
                     )}
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isTemp ? 'bg-tertiary-container/30 text-tertiary' : 'bg-primary-container/40 text-primary'}`}>
                       {isTemp ? (
-                        <span className="material-symbols-outlined text-xs">bolt</span>
+                        <Icon name="bolt" size="xs" />
                       ) : (
                         <span className="font-bold text-xs">{sw.name.slice(0, 2).toUpperCase()}</span>
                       )}
@@ -271,7 +272,7 @@ export function LaneEditorModal({
                         className="h-7 w-7 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer"
                         title="Remove from lane"
                       >
-                        <span className="material-symbols-outlined text-xs">close</span>
+                        <Icon name="close" size="xs" />
                       </button>
                       {laneOptions.map(laneNum => (
                         <button key={laneNum}
@@ -304,7 +305,7 @@ export function LaneEditorModal({
                 <div className="mt-3 pt-3 border-t border-outline-variant/30">
                   <button onClick={() => setResettingGroupId(group.id)}
                     className="text-xs text-error font-semibold flex items-center gap-1 hover:underline cursor-pointer">
-                    <span className="material-symbols-outlined text-xs">refresh</span>
+                    <Icon name="refresh" size="xs" />
                     Reset lane
                   </button>
                 </div>
@@ -369,7 +370,7 @@ export function LaneEditorModal({
             onAddGroup(max + 1, `Lane ${max + 1}`)
           }}
             className="flex-1 min-h-11 py-3 rounded-xl border-2 border-dashed border-outline-variant flex items-center justify-center gap-2 text-sm text-on-surface-variant hover:text-primary hover:border-primary transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-base">add</span>
+            <Icon name="add" size="md" />
             Add Lane
           </button>
           <button onClick={onClose}

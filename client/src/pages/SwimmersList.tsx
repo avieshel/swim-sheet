@@ -5,6 +5,7 @@ import { getRunHistory } from '../api/runs'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
+import { Icon } from '../components/Icon'
 
 interface SwimmerStats {
   lastRun: { runId: string; date: string; templateName: string } | null
@@ -165,7 +166,7 @@ export const SwimmersList: React.FC = () => {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 group">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline">search</span>
+            <Icon name="search" color="on-surface-variant" className="absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               className="w-full h-12 pl-12 pr-10 bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 rounded-t-lg transition-all font-body-md text-body-md outline-none"
               placeholder="Search by name or group..."
@@ -178,7 +179,7 @@ export const SwimmersList: React.FC = () => {
                 onClick={() => setSearch('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors cursor-pointer bg-transparent border-none"
               >
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" />
               </button>
             )}
           </div>
@@ -191,7 +192,7 @@ export const SwimmersList: React.FC = () => {
           {search.trim() ? (
             <>
               <div className="w-16 h-16 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-3xl">search_off</span>
+                <Icon name="search_off" size="2xl" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No results found</h3>
               <p className="font-body-md text-body-md text-on-surface-variant mb-6">
@@ -207,7 +208,7 @@ export const SwimmersList: React.FC = () => {
           ) : (
             <>
               <div className="w-16 h-16 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-3xl">person_add</span>
+                <Icon name="person_add" size="2xl" />
               </div>
               <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No swimmers yet</h3>
               <p className="font-body-md text-body-md text-on-surface-variant mb-6">
@@ -217,7 +218,7 @@ export const SwimmersList: React.FC = () => {
                 onClick={openAddModal}
                 className="bg-primary text-on-primary px-8 py-3 rounded-xl font-label-sm text-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined">add</span>
+                <Icon name="add" />
                 Add Swimmer
               </button>
             </>
@@ -232,7 +233,7 @@ export const SwimmersList: React.FC = () => {
             >
               <div className="flex items-start gap-4 mb-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface-variant flex-shrink-0 bg-surface-container-high flex items-center justify-center">
-                  <span className="material-symbols-outlined text-3xl text-on-surface-variant">person</span>
+                  <Icon name="person" size="2xl" color="on-surface-variant" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <Link to={`/swimmers/${s.id}`} className="no-underline">
@@ -287,20 +288,20 @@ export const SwimmersList: React.FC = () => {
                   to={`/swimmers/${s.id}`}
                   className="flex-1 h-touch-target-min bg-primary text-on-primary rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all no-underline"
                 >
-                  <span className="material-symbols-outlined text-xl">analytics</span>
+                  <Icon name="analytics" size="xl" />
                   Stats
                 </Link>
                 <button
                   onClick={() => openEditModal(s)}
                   className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
-                  <span className="material-symbols-outlined">edit</span>
+                  <Icon name="edit" />
                 </button>
                 <button
                   onClick={() => { setDeleteTarget(s); }}
                   className="p-2 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
-                  <span className="material-symbols-outlined">delete</span>
+                  <Icon name="delete" />
                 </button>
               </div>
             </div>
@@ -311,7 +312,7 @@ export const SwimmersList: React.FC = () => {
             className="bg-surface-container rounded-xl border-2 border-dashed border-outline-variant p-5 flex flex-col items-center justify-center text-center group cursor-pointer hover:bg-surface-container-high transition-all h-full min-h-[200px]"
           >
             <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-              <span className="material-symbols-outlined">person_add</span>
+              <Icon name="person_add" />
             </div>
             <h4 className="font-headline-md text-headline-md text-on-surface">Add New Swimmer</h4>
             <p className="font-body-md text-body-md text-on-surface-variant mt-1">
@@ -327,7 +328,7 @@ export const SwimmersList: React.FC = () => {
         className="fixed right-4 md:right-6 bottom-20 md:bottom-10 w-14 h-14 md:w-16 md:h-16 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50 group"
         aria-label="Add Swimmer"
       >
-        <span className="material-symbols-outlined text-3xl md:text-[32px]">add</span>
+        <Icon name="add" size="2xl" className="md:text-[32px]" />
         <span className="absolute right-full mr-4 bg-inverse-surface text-inverse-on-surface px-3 py-1 rounded-lg font-label-sm text-label-sm whitespace-nowrap pointer-events-none hidden md:block opacity-70">
           Add Swimmer
         </span>

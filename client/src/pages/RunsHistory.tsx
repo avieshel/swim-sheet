@@ -5,6 +5,7 @@ import { getRunHistory } from '../api/runs'
 import type { RunSummary } from '../api/runs'
 import { listSwimmers } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
+import { Icon } from '../components/Icon'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
 
@@ -145,12 +146,12 @@ export const RunsHistory: React.FC = () => {
 
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
-          <span className="material-symbols-outlined animate-spin">progress_activity</span>
+          <Icon name="progress_activity" className="animate-spin" />
           <span className="font-body-md">Loading past sessions...</span>
         </div>
       ) : error ? (
         <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
-          <span className="material-symbols-outlined text-error">error_outline</span>
+          <Icon name="error_outline" color="error" />
           <span className="font-body-md">Couldn't load past sessions. Please try again.</span>
         </div>
       ) : (

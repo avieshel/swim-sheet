@@ -1,6 +1,7 @@
 import { useContext, useState, type CSSProperties } from 'react'
 import { LiveSessionContext } from '../../context/LiveSessionContext'
 import { LaneCard } from '../LaneCard'
+import { Icon } from '../Icon'
 
 interface LaneSwimmersSectionProps {
   onManageSwimmers: (lane: number) => void
@@ -20,13 +21,13 @@ export function LaneSwimmersSection({ onManageSwimmers }: LaneSwimmersSectionPro
         aria-label={collapsed ? 'Expand lanes' : 'Collapse lanes'}
       >
         <span className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-on-surface-variant">lanes</span>
+          <Icon name="lanes" color="on-surface-variant" />
           <span className="text-label-caps text-on-surface-variant">Lanes</span>
           <span className="text-label-sm text-on-surface-variant tabular-nums">
             {groups.length} {groups.length === 1 ? 'lane' : 'lanes'} · {swimmerCount} {swimmerCount === 1 ? 'swimmer' : 'swimmers'} assigned
           </span>
         </span>
-        <span className="material-symbols-outlined text-on-surface-variant">{collapsed ? 'chevron_right' : 'expand_more'}</span>
+        <Icon name={collapsed ? 'chevron_right' : 'expand_more'} color="on-surface-variant" />
       </button>
       {!collapsed && (
         <div className="p-3 md:p-4 pt-3 border-t border-outline-variant/20">

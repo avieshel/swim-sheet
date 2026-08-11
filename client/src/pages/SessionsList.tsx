@@ -8,6 +8,7 @@ import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/
 import { strokeColorsSolid } from '../constants/drill'
 import { RunHistoryTable } from '../components/Table'
 import { useActiveRun } from '../hooks/useActiveRun'
+import { Icon } from '../components/Icon'
 
 interface SessionWithTotals extends Session {
   drillCount: number
@@ -149,7 +150,7 @@ export const SessionsList: React.FC = () => {
           onClick={() => setShowNewForm(true)}
           className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
         >
-          <span className="material-symbols-outlined">add</span>
+          <Icon name="add" />
           New Template
         </button>
       </div>
@@ -198,7 +199,7 @@ export const SessionsList: React.FC = () => {
       {/* Fix the closing div for the r-grid */}
       {sessions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
-          <span className="material-symbols-outlined text-4xl md:text-5xl text-outline-variant mb-4">event_note</span>
+          <Icon name="event_note" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
           <p className="text-on-surface-variant font-body-md mb-2">No session templates yet.</p>
           <p className="text-label-sm text-on-surface-variant mb-6">Create a template to start building your drill library.</p>
           <button
@@ -224,7 +225,7 @@ export const SessionsList: React.FC = () => {
             >
               <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center flex-shrink-0">
-                  <span className="material-symbols-outlined text-xl">description</span>
+                  <Icon name="description" size="xl" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
@@ -241,22 +242,22 @@ export const SessionsList: React.FC = () => {
                       onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
                       className="p-1.5 text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
                     >
-                      <span className="material-symbols-outlined text-lg">delete</span>
+                      <Icon name="delete" size="lg" />
                     </button>
                   </div>
                   <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">straighten</span>
+                      <Icon name="straighten" size="sm" />
                       {s.poolLength}m
                     </span>
                     <span className="text-outline">·</span>
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">fitness_center</span>
+                      <Icon name="fitness_center" size="sm" />
                       {s.drillCount} drills
                     </span>
                     <span className="text-outline">·</span>
                     <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">distance</span>
+                      <Icon name="distance" size="sm" />
                       {s.totalDistance}m
                     </span>
                   </div>
@@ -288,7 +289,7 @@ export const SessionsList: React.FC = () => {
               <div className="pt-3 border-t border-outline-variant/30">
                 <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
                   Open Template
-                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                  <Icon name="arrow_forward" size="sm" />
                 </span>
               </div>
             </div>
@@ -301,7 +302,7 @@ export const SessionsList: React.FC = () => {
       <div className="mt-8 md:mt-12">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-headline-md text-on-surface flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">history</span>
+            <Icon name="history" color="primary" />
             Completed Sessions
           </h3>
           <Link
@@ -309,7 +310,7 @@ export const SessionsList: React.FC = () => {
             className="text-label-sm text-primary font-bold flex items-center gap-1 hover:gap-2 transition-all no-underline"
           >
             View all
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            <Icon name="arrow_forward" size="sm" />
           </Link>
         </div>
         <RunHistoryTable showDelete />

@@ -5,6 +5,7 @@ import type { Swimmer } from '../api/runs'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import { RunHistoryTable } from '../components/Table'
 import { downloadBlob } from '../utils/downloadBlob'
+import { Icon } from '../components/Icon'
 
 export const SwimmerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -96,7 +97,7 @@ export const SwimmerDetail: React.FC = () => {
         onClick={() => navigate('/swimmers')}
         className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors mb-4 font-body-md cursor-pointer bg-transparent border-none"
       >
-        <span className="material-symbols-outlined text-lg">arrow_back</span>
+        <Icon name="arrow_back" size="lg" />
         Back to Swimmers
       </button>
 
@@ -105,7 +106,7 @@ export const SwimmerDetail: React.FC = () => {
         <div className="flex items-start justify-between">
           <div className="flex gap-4">
             <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-surface-variant flex-shrink-0 bg-primary-container flex items-center justify-center">
-              <span className="material-symbols-outlined text-3xl text-on-primary-container">person</span>
+              <Icon name="person" size="2xl" color="on-surface-variant" />
             </div>
             <div>
               <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">{swimmer.name}</h1>
@@ -131,14 +132,14 @@ export const SwimmerDetail: React.FC = () => {
               onClick={openEditModal}
               className="h-touch-target-min px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-lg">edit</span>
+              <Icon name="edit" size="lg" />
               Edit
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="h-touch-target-min px-4 border-2 border-error/30 text-error rounded-lg font-label-sm flex items-center gap-2 hover:bg-error-container transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-lg">delete</span>
+              <Icon name="delete" size="lg" />
             </button>
           </div>
         </div>
@@ -148,7 +149,7 @@ export const SwimmerDetail: React.FC = () => {
       {swimmer.notes && (
         <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant mb-6">
           <h3 className="font-headline-md text-headline-md text-on-surface mb-3 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">info</span>
+            <Icon name="info" color="primary" />
             General Information
           </h3>
           <p className="font-body-md text-body-md text-on-surface-variant whitespace-pre-wrap">{swimmer.notes}</p>
@@ -158,7 +159,7 @@ export const SwimmerDetail: React.FC = () => {
       {/* Sessions */}
       <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant">
         <h3 className="font-headline-md text-headline-md text-on-surface mb-4 flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">event_note</span>
+          <Icon name="event_note" color="primary" />
           Session History
         </h3>
         <RunHistoryTable swimmerId={id} borderless focusName={swimmer.name} lastAttended />

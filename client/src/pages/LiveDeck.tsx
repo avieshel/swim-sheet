@@ -6,6 +6,7 @@ import { buildStartLanes } from '../api/runSetup'
 import type { Session } from '../api/sessions'
 import type { SessionRun } from '../api/runs'
 import { ActiveRunView } from './live/ActiveRunView'
+import { Icon } from '../components/Icon'
 
 export const LiveDeck: React.FC = () => {
   const { dispatch } = useContext(LiveSessionContext)
@@ -193,7 +194,7 @@ export const LiveDeck: React.FC = () => {
               className="w-full flex items-center justify-between gap-3 p-4 md:p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant hover:border-primary/40 transition-all text-left cursor-pointer shadow-sm disabled:opacity-60"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <span className="material-symbols-outlined text-primary">pool</span>
+                <Icon name="pool" color="primary" />
                 <div className="min-w-0">
                   <span className="block font-bold text-on-surface truncate">{s.name}</span>
                   <span className="block text-label-sm text-on-surface-variant">{s.poolLength}m pool</span>
@@ -201,7 +202,7 @@ export const LiveDeck: React.FC = () => {
               </div>
               <span className="flex items-center gap-1 text-primary font-bold text-sm shrink-0">
                 {startingSessionId === s.id ? 'Starting...' : 'Start'}
-                <span className="material-symbols-outlined text-base">arrow_forward</span>
+                <Icon name="arrow_forward" size="md" />
               </span>
             </button>
           ))}

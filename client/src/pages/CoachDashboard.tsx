@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Icon } from '../components/Icon'
 import { listSwimmers } from '../api/swimmers'
 import { listSessions, listCompletedRuns } from '../api/sessions'
 import { getRunDrill, getAllLaps } from '../api/runs'
@@ -55,7 +56,7 @@ export const CoachDashboard: React.FC = () => {
       <section className="mb-stack-lg">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#00677f] to-[#00d1ff] p-6 md:p-8 text-on-primary shadow-lg group">
           <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
-            <span className="material-symbols-outlined text-[120px]">water_drop</span>
+            <Icon name="water_drop" className="text-[120px]" />
           </div>
           <div className="relative z-10">
             <span className="font-label-caps bg-white/20 px-3 py-1 rounded-full backdrop-blur-md mb-4 inline-block">
@@ -70,7 +71,7 @@ export const CoachDashboard: React.FC = () => {
                   to="/live"
                   className="bg-surface-container-lowest text-primary font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:shadow-xl active:scale-95 transition-all no-underline"
                 >
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
+                  <Icon name="bolt" fill />
                   Quick Time Lap
                 </Link>
                 {/* Duplicate of the primary /live CTA above (also the "Active Deck" hub tile). Kept commented until removal is confirmed.
@@ -78,7 +79,7 @@ export const CoachDashboard: React.FC = () => {
                   to="/live"
                   className="border border-outline-variant text-on-surface-variant font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:bg-surface-variant transition-all no-underline"
                 >
-                  <span className="material-symbols-outlined">play_arrow</span>
+                  <Icon name="play_arrow" />
                   Quick Start Live
                 </Link>
                 */}
@@ -95,7 +96,7 @@ export const CoachDashboard: React.FC = () => {
         >
           <div className="mb-6 md:mb-8">
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-secondary-container flex items-center justify-center text-on-secondary-container mb-4 md:mb-6 group-hover:scale-110 transition-transform">
-              <span className="material-symbols-outlined text-2xl md:text-3xl">groups</span>
+              <Icon name="groups" size="xl" className="md:text-3xl" />
             </div>
             <h3 className="font-headline-md text-on-surface mb-1 md:mb-2">Team Management</h3>
             <p className="text-on-surface-variant font-body-md">
@@ -104,7 +105,7 @@ export const CoachDashboard: React.FC = () => {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-primary font-bold">Go to Swimmers</span>
-            <span className="material-symbols-outlined text-primary group-hover:translate-x-2 transition-transform">arrow_forward</span>
+            <Icon name="arrow_forward" color="primary" className="group-hover:translate-x-2 transition-transform" />
           </div>
         </Link>
 
@@ -114,7 +115,7 @@ export const CoachDashboard: React.FC = () => {
         >
           <div className="mb-6 md:mb-8">
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary-container/30 flex items-center justify-center text-primary mb-4 md:mb-6 group-hover:scale-110 transition-transform">
-              <span className="material-symbols-outlined text-2xl md:text-3xl">event_note</span>
+              <Icon name="event_note" size="xl" className="md:text-3xl" />
             </div>
             <h3 className="font-headline-md text-on-surface mb-1 md:mb-2">Session Planner</h3>
             <p className="text-on-surface-variant font-body-md">
@@ -123,7 +124,7 @@ export const CoachDashboard: React.FC = () => {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-primary font-bold">Plan Next Set</span>
-            <span className="material-symbols-outlined text-primary group-hover:translate-x-2 transition-transform">arrow_forward</span>
+            <Icon name="arrow_forward" color="primary" className="group-hover:translate-x-2 transition-transform" />
           </div>
         </Link>
 
@@ -133,7 +134,7 @@ export const CoachDashboard: React.FC = () => {
         >
           <div className="mb-6 md:mb-8">
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary flex items-center justify-center text-white mb-4 md:mb-6 group-hover:scale-110 transition-transform animate-pulse">
-              <span className="material-symbols-outlined text-2xl md:text-3xl">timer</span>
+              <Icon name="timer" size="xl" className="md:text-3xl" />
             </div>
             <h3 className="font-headline-md text-white mb-1 md:mb-2">Active Deck</h3>
             <p className="text-outline-variant font-body-md">
@@ -144,7 +145,7 @@ export const CoachDashboard: React.FC = () => {
             <span className="text-primary-fixed-dim font-bold">Launch Deck</span>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
-              <span className="material-symbols-outlined text-primary-fixed-dim group-hover:translate-x-2 transition-transform">arrow_forward</span>
+              <Icon name="arrow_forward" color="on-surface-variant" className="group-hover:translate-x-2 transition-transform" />
             </div>
           </div>
         </Link>

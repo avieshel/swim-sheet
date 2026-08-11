@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { Icon } from './Icon'
 
 export interface SwimmerFormData {
   name: string
@@ -119,9 +120,9 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
           </h3>
           <button
             onClick={onClose}
-            className="h-11 w-11 flex items-center justify-center material-symbols-outlined text-outline hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+            className="h-11 w-11 flex items-center justify-center text-outline hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
           >
-            close
+            <Icon name="close" color="on-surface-variant" />
           </button>
         </div>
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -145,7 +146,7 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
                     onClick={() => handleSelectSwimmer(s)}
                     className="w-full px-3 py-2 text-left text-sm font-medium text-on-surface hover:bg-primary-container/40 flex items-center gap-2 transition-colors cursor-pointer first:rounded-t-xl last:rounded-b-xl"
                   >
-                    <span className="material-symbols-outlined text-sm text-on-surface-variant">person</span>
+                    <Icon name="person" size="sm" color="on-surface-variant" />
                     <span>{s.name}</span>
                     {s.group && (
                       <span className="ml-auto text-label-sm text-on-surface-variant">{s.group}</span>

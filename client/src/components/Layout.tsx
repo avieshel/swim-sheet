@@ -1,6 +1,7 @@
 import React, { useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useActiveRun } from '../hooks/useActiveRun';
+import { Icon } from './Icon';
 
 const navItems = [
   { path: '/swimmers', label: 'Swimmers', icon: 'groups' },
@@ -35,7 +36,7 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
       <header className="bg-surface border-b-2 border-outline-variant shadow-sm sticky top-0 z-40 w-full">
         <div className="r-container flex items-center justify-between py-3 md:py-4">
           <Link to="/" className="flex items-center gap-2 md:gap-3 min-w-0 no-underline">
-            <span className="material-symbols-outlined text-primary text-2xl shrink-0">pool</span>
+            <Icon name="pool" size="xl" color="primary" className="shrink-0" />
             <h1 className="font-headline-md font-bold text-primary truncate">Swim Sheet</h1>
           </Link>
           <div className="hidden md:flex items-center">
@@ -79,12 +80,10 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
             }`}
           >
             <span className="relative">
-              <span
-                className="material-symbols-outlined"
-                style={isActive(item.path) ? { fontVariationSettings: "'FILL' 1" } : undefined}
-              >
-                {item.icon}
-              </span>
+              <Icon
+                name={item.icon}
+                fill={isActive(item.path)}
+              />
               {item.path === '/live' && activeRun && (
                 <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
               )}

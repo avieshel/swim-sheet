@@ -3,6 +3,7 @@ import { LiveSessionContext } from '../../context/LiveSessionContext'
 import type { SessionRun } from '../../api/runs'
 import { formatSessionTime, formatWallTime } from '../../utils/formatTime'
 import type { SessionProgress } from '../../utils/sessionProgress'
+import { Icon } from '../Icon'
 
 interface LiveSessionHeaderProps {
   templateName: string
@@ -81,7 +82,7 @@ export function LiveSessionHeader({
             <button onClick={() => setEditPoolLength(String(run.poolLength))}
               className="inline-flex items-center gap-0.5 hover:text-primary hover:underline transition-all cursor-pointer">
               {run.poolLength}m
-              <span className="material-symbols-outlined text-[10px]">edit</span>
+              <Icon name="edit" className="text-[10px]" />
             </button>
           )} &middot; {drillCount} drills</p>
           <p className="text-label-sm text-on-surface-variant/70 mt-0.5">
@@ -105,29 +106,29 @@ export function LiveSessionHeader({
                   : 'bg-primary text-on-primary hover:brightness-110'
               }`}
             >
-              <span className="material-symbols-outlined text-label-sm">{sessionRunning ? 'pause' : 'play_arrow'}</span>
+              <Icon name={sessionRunning ? 'pause' : 'play_arrow'} size="xs" />
               {sessionRunning ? 'Pause' : sessionElapsed > 0 ? 'Resume' : 'Start'}
             </button>
             <button onClick={onComplete}
               className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 bg-primary-container text-on-primary-container hover:brightness-95">
-              <span className="material-symbols-outlined text-label-sm">stop</span>
+              <Icon name="stop" size="xs" />
               Complete
             </button>
             <button onClick={onReset}
               className="shrink-0 min-w-[90px] flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
-              <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+              <Icon name="restart_alt" size="xs" />
               Reset
             </button>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button onClick={onOpenLaneEditor}
               className="h-11 px-3 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-1 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-label-sm">
-              <span className="material-symbols-outlined text-sm">group</span>
+              <Icon name="group" size="sm" />
               Lane Swimmers
             </button>
             <button onClick={onEditSession}
               className="h-11 px-3 rounded-md text-on-surface-variant/60 font-medium flex items-center gap-1 hover:bg-surface-variant hover:text-on-surface-variant transition-all cursor-pointer text-label-sm">
-              <span className="material-symbols-outlined text-sm">edit_square</span>
+              <Icon name="edit_square" size="sm" />
               Edit Session
             </button>
           </div>
@@ -149,7 +150,7 @@ export function LiveSessionHeader({
                   {g.swimmers.length}
                   {g.swimmers.length === 1 ? ' swimmer' : ' swimmers'}
                 </span>
-                <span className="material-symbols-outlined text-sm text-on-primary-container/60">edit</span>
+                <Icon name="edit" size="sm" color="on-surface-variant" />
               </button>
             ))}
           </div>
@@ -167,7 +168,7 @@ export function LiveSessionHeader({
       {swimmerCount === 0 && (
         <div className="mt-3 p-4 bg-warning-container text-on-warning-container rounded-xl border border-warning shadow-sm">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-warning">warning</span>
+            <Icon name="warning" color="on-surface-variant" />
             <div className="flex-1">
               <p className="font-bold text-sm">No swimmers assigned</p>
               <p className="text-sm opacity-90">Add swimmers to lanes before starting the session.</p>
@@ -176,7 +177,7 @@ export function LiveSessionHeader({
               onClick={onOpenLaneEditor}
               className="h-9 px-3 flex items-center justify-center gap-1.5 rounded-lg bg-warning text-on-warning text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-base">group_add</span>
+              <Icon name="group_add" size="md" />
               Add Swimmers
             </button>
           </div>

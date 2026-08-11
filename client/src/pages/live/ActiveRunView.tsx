@@ -18,6 +18,7 @@ import { TimingService } from '../../services/TimingService'
 import { timestampSplits } from '../../utils/lapEditing'
 import { computeSessionProgress } from '../../utils/sessionProgress'
 import { LaneEditorModal } from '../../components/LaneEditorModal'
+import { Icon } from '../../components/Icon'
 import { GroupCard } from '../../components/GroupCard'
 import { listSwimmers, createSwimmerIfNotExists } from '../../api/swimmers'
 import { pickRandomTempSwimmerName } from '../../api/constants'
@@ -38,7 +39,7 @@ function TimingModeHeader({ runDrills, timingDrillId, onExit }: {
       <div className="flex items-center gap-2 min-w-0">
         <button onClick={onExit}
           className="h-11 px-3.5 rounded-full border border-outline text-on-surface-variant text-label-sm font-bold flex items-center gap-1.5 hover:bg-surface-variant transition-all cursor-pointer shrink-0">
-          <span className="material-symbols-outlined text-base">arrow_back</span>
+          <Icon name="arrow_back" size="md" />
           Overview
         </button>
         <div className="min-w-0">
@@ -62,11 +63,11 @@ function EmptyState({ icon, title, actionLabel, actionIcon, compact, onAction }:
 }) {
   return (
     <div className={`text-center ${compact ? 'py-10' : 'py-16'}`}>
-      <span className={`material-symbols-outlined ${compact ? 'text-4xl' : 'text-5xl'} text-on-surface-variant mb-3`}>{icon}</span>
+      <Icon name={icon} size={compact ? '3xl' : '4xl'} color="on-surface-variant" className="mb-3" />
       <p className="text-on-surface-variant">{title}</p>
       <button onClick={onAction}
         className={`${compact ? 'mt-2' : 'mt-3'} h-11 px-4 flex items-center gap-1.5 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer mx-auto`}>
-        <span className="material-symbols-outlined text-base">{actionIcon}</span>
+        <Icon name={actionIcon} size="md" />
         {actionLabel}
       </button>
     </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { resetLibraryToDefaults } from '../api/drills'
 import { resetSettings, deleteAllData } from '../api/settings'
+import { Icon } from './Icon'
 
 interface ResetDataDialogProps {
   open: boolean
@@ -63,7 +64,7 @@ export function ResetDataDialog({ open, onConfirm, onCancel }: ResetDataDialogPr
         onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-full bg-error-container flex items-center justify-center">
-            <span className="material-symbols-outlined text-error text-2xl">delete_sweep</span>
+            <Icon name="delete_sweep" size="xl" color="error" />
           </div>
           <div>
             <h3 className="font-headline-md text-on-surface">Reset Data</h3>
@@ -91,9 +92,7 @@ export function ResetDataDialog({ open, onConfirm, onCancel }: ResetDataDialogPr
                 <span className="text-sm font-medium text-on-surface block">{option.label}</span>
                 <span className="text-xs text-on-surface-variant">{option.description}</span>
               </div>
-              <span className={`material-symbols-outlined text-lg ${option.enabled ? 'text-error' : 'text-on-surface-variant'}`}>
-                {option.icon}
-              </span>
+              <Icon name={option.icon} size="lg" color={option.enabled ? 'error' : 'on-surface-variant'} />
             </label>
           ))}
         </div>

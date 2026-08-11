@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import type { TimedGroup } from '../../context/LiveSessionContext'
 import type { RunDrill, LaneDrillResult } from '../../api/runs'
 import { groupDrillRows, stripRepPrefix } from '../../utils/sessionProgress'
+import { Icon } from '../Icon'
 
 interface DrillsSectionProps {
   runDrills: RunDrill[]
@@ -37,7 +38,7 @@ function MarkerCell({ status, onClick, label }: {
       {cfg.icon === '–' ? (
         <span className="text-base leading-none">–</span>
       ) : (
-        <span className="material-symbols-outlined text-sm">{cfg.icon}</span>
+        <Icon name={cfg.icon} size="sm" />
       )}
     </button>
   )
@@ -87,7 +88,7 @@ export function DrillsSection({
       title={`Time all lanes on drill #${num} (${stripRepPrefix(rd.name)})`}
       className="inline-flex items-center gap-1 px-2 h-8 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer active:scale-95"
     >
-      <span className="material-symbols-outlined text-sm">timer</span>
+      <Icon name="timer" size="sm" />
       <span className="hidden sm:inline">Time</span>
     </button>
   )
@@ -101,13 +102,13 @@ export function DrillsSection({
         aria-label={collapsed ? 'Expand drills' : 'Collapse drills'}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="material-symbols-outlined text-on-surface-variant">format_list_numbered</span>
+          <Icon name="format_list_numbered" color="on-surface-variant" />
           <span className="text-label-caps text-on-surface-variant">Drills</span>
           <span className="text-label-sm text-on-surface-variant font-medium tabular-nums truncate">
             {hasDrills ? `${drillGroups.length} drill${drillGroups.length === 1 ? '' : 's'} · ${totalMeters}m total` : 'No drills in this session'}
           </span>
         </span>
-        <span className="material-symbols-outlined text-on-surface-variant">{collapsed ? 'chevron_right' : 'expand_more'}</span>
+        <Icon name={collapsed ? 'chevron_right' : 'expand_more'} color="on-surface-variant" />
       </button>
 
       {!collapsed && (
@@ -157,7 +158,7 @@ export function DrillsSection({
                           <td className="hidden md:table-cell py-2.5 text-on-surface-variant tabular-nums">{groupIdx + 1}</td>
                           <td className="py-2.5 pr-2">
                             <button onClick={() => toggleGroup(key)} className="inline-flex items-center gap-1.5 text-left w-full cursor-pointer group">
-                              <span className="material-symbols-outlined text-base text-on-surface-variant">{isOpen ? 'expand_more' : 'chevron_right'}</span>
+                              <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size="md" color="on-surface-variant" />
                               <span>
                                 <span className="font-medium text-on-surface truncate block">
                                   {group.length}x {stripRepPrefix(group[0].name)}
@@ -216,11 +217,11 @@ export function DrillsSection({
           {hasDrills && (
             <div className="mt-3 px-3 md:px-5 pb-3 flex items-center gap-4 flex-wrap text-label-sm text-on-surface-variant">
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-on-primary"><span className="material-symbols-outlined text-[12px]">check</span></span>
+                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-on-primary"><Icon name="check" className="text-[12px]" /></span>
                 Done
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-tertiary-container text-on-tertiary-container ring-2 ring-tertiary"><span className="material-symbols-outlined text-[12px]">play_arrow</span></span>
+                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-tertiary-container text-on-tertiary-container ring-2 ring-tertiary"><Icon name="play_arrow" className="text-[12px]" /></span>
                 In progress
               </span>
               <span className="flex items-center gap-1.5">

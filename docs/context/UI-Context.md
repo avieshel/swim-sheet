@@ -44,7 +44,35 @@
 - Hover: `brightness-110`, `scale-105`, border color transitions
 
 ### Icons
-Material Symbols Outlined throughout. Icon naming uses `data-icon` attributes (e.g., `pool`, `search`, `groups`, `timer`, `analytics`, `edit`, `add`).
+All icons use the `<Icon>` component from `components/Icon.tsx`. Never use raw `<span className="material-symbols-outlined">` directly.
+
+**Props:**
+- `name: string` — Material Symbol name (e.g., `pool`, `search`, `edit`)
+- `size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl'` — default `md`
+- `color?: 'primary' | 'error' | 'on-surface-variant' | 'on-error' | 'current'` — default `current`
+- `fill?: boolean` — toggles filled variant
+- `className?: string` — escape hatch for responsive/animation classes
+- `style?: React.CSSProperties` — for inline styles
+
+**Size Scale:**
+| Token | px | Use Case |
+|-------|-----|----------|
+| `xs` | 12px | Badges, inline indicators |
+| `sm` | 14px | Metadata, row actions, chevrons |
+| `md` | 16px | Standard action icons (default) |
+| `lg` | 18px | Navigation, section headers |
+| `xl` | 24px | Nav cards, prominent actions |
+| `2xl` | 30px | Empty states, avatars |
+| `3xl` | 36px | Large empty states |
+| `4xl` | 48px | Hero/illustrative icons |
+
+**Examples:**
+```tsx
+<Icon name="pool" size="lg" color="primary" />
+<Icon name="bolt" fill />
+<Icon name="progress_activity" className="animate-spin" />
+<Icon name="expand_more" className="md:text-3xl" />
+```
 
 ### PWA / Home Screen Icons
 - **Source**: `favicon.svg` — text-based wordmark "Swim Sheet" (two lines) in Helvetica Neue bold, white on primary teal `#00677f` rounded square

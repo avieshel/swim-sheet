@@ -1,4 +1,5 @@
 import React, { useEffect, type ReactNode } from 'react'
+import { Icon } from './Icon'
 
 interface ConfirmDialogProps {
   open: boolean
@@ -44,9 +45,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-12 h-12 md:w-14 md:h-14 rounded-full mx-auto mb-4 flex items-center justify-center ${destructive ? 'bg-error-container' : 'bg-primary-container'}">
-          <span className={`material-symbols-outlined text-2xl md:text-3xl ${destructive ? 'text-error' : 'text-primary'}`}>
-            {destructive ? 'delete' : 'help_outline'}
-          </span>
+          <Icon name={destructive ? 'delete' : 'help_outline'} size="xl" color={destructive ? 'error' : 'primary'} className="md:text-3xl" />
         </div>
         <h3 className="font-headline-md text-on-surface mb-2">{title}</h3>
         <p className="font-body-md text-on-surface-variant mb-4">{message}</p>

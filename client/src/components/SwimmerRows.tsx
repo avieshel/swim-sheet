@@ -7,6 +7,7 @@ import { useSwimmerEditModal } from './useSwimmerEditModal'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { removeSwimmerFromRun } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
+import { Icon } from './Icon'
 
 function StrokeCountStepper({ value, onChange }: {
   value: number | undefined
@@ -139,7 +140,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
             )}
           </div>
           <button onClick={() => toggleLapEdit(`saved-${saved.dbId}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none -mr-1 mt-0.5">
-            <span className="material-symbols-outlined text-sm">{isEditing ? 'check' : 'more_horiz'}</span>
+            <Icon name={isEditing ? 'check' : 'more_horiz'} size="sm" />
           </button>
         </div>
       </div>
@@ -198,7 +199,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
         <button
           onClick={() => onClearSavedSwimmer?.(saved.dbId)}
           className="flex-1 flex items-center justify-center gap-1.5 h-11 md:h-12 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
-          <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+          <Icon name="restart_alt" size="xs" />
           Clear
         </button>
       </div>
@@ -338,11 +339,11 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           <div className="flex flex-col gap-px shrink-0">
 <button onClick={() => handleMoveSwimmer(swimmer.id, 'up')} disabled={idx === 0}
                 className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-base">keyboard_arrow_up</span>
+                <Icon name="keyboard_arrow_up" size="md" />
               </button>
               <button onClick={() => handleMoveSwimmer(swimmer.id, 'down')} disabled={idx >= group.swimmers.length - 1}
                 className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed">
-                <span className="material-symbols-outlined text-base">keyboard_arrow_down</span>
+                <Icon name="keyboard_arrow_down" size="md" />
               </button>
           </div>
           <div className="min-w-0 flex-1 flex flex-col">
@@ -386,7 +387,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
             className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
             title={isVirtual ? 'Remove swimmer' : 'Remove swimmer from this lane'}
           >
-            <span className="material-symbols-outlined text-sm">close</span>
+            <Icon name="close" size="sm" />
           </button>
         </div>
       </div>
@@ -439,7 +440,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           disabled={hasIndividualStart || swimmer.completed}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary text-on-primary hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
-          <span className="material-symbols-outlined text-label-sm">play_arrow</span>
+          <Icon name="play_arrow" size="xs" />
           <span>Start</span>
         </button>
         <button
@@ -447,7 +448,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           disabled={swimmer.completed}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary text-on-primary hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
-          <span className="material-symbols-outlined text-label-sm">flag</span>
+          <Icon name="flag" size="xs" />
           <span>Lap</span>
         </button>
         <button
@@ -455,7 +456,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           disabled={swimmer.completed}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
-          <span className="material-symbols-outlined text-label-sm">check</span>
+          <Icon name="check" size="xs" />
           <span>Finish</span>
         </button>
         <button
@@ -463,7 +464,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           disabled={startedAt == null && !swimmer.completed}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+          <Icon name="restart_alt" size="xs" />
           <span>Clear</span>
         </button>
       </div>

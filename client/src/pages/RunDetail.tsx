@@ -5,6 +5,7 @@ import type { RunSummary } from '../api/runs'
 import { formatTime } from '../utils/formatTime'
 import { downloadBlob } from '../utils/downloadBlob'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { Icon } from '../components/Icon'
 
 function isQuickStartNotes(notes: string | null | undefined): boolean {
   if (!notes) return false
@@ -89,13 +90,13 @@ export function RunDetail() {
 
   if (!run) return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <span className="material-symbols-outlined text-4xl text-outline-variant mb-3">run_circle</span>
+      <Icon name="run_circle" size="3xl" color="on-surface-variant" className="mb-3" />
       <p className="text-on-surface-variant font-body-md mb-4">Run not found.</p>
       <button
         onClick={() => navigate('/runs')}
         className="flex items-center gap-2 text-primary hover:underline cursor-pointer bg-transparent border-none font-body-md"
       >
-        <span className="material-symbols-outlined text-lg">arrow_back</span>
+        <Icon name="arrow_back" size="lg" />
         Back to Past Sessions
       </button>
     </div>
@@ -108,7 +109,7 @@ export function RunDetail() {
           onClick={() => navigate('/runs')}
           className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-body-md cursor-pointer bg-transparent border-none"
         >
-          <span className="material-symbols-outlined text-lg">arrow_back</span>
+          <Icon name="arrow_back" size="lg" />
           Back to Past Sessions
         </button>
         <div className="flex gap-2">
@@ -116,14 +117,14 @@ export function RunDetail() {
             onClick={handleExport}
             className="h-touch-target-min px-4 border-2 border-outline text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-lg">download</span>
+            <Icon name="download" size="lg" />
             Export
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="h-touch-target-min px-4 border-2 border-error/30 text-error rounded-lg font-label-sm flex items-center gap-2 hover:bg-error-container transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-lg">delete</span>
+            <Icon name="delete" size="lg" />
             Delete session
           </button>
         </div>
@@ -137,26 +138,26 @@ export function RunDetail() {
             </h1>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-label-sm text-on-surface-variant">
               <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">calendar_today</span>
+                <Icon name="calendar_today" size="sm" />
                 {run.date}
               </span>
               <span className="text-outline">·</span>
               <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">straighten</span>
+                <Icon name="straighten" size="sm" />
                 {run.poolLength}m
               </span>
               {run.poolName && (
                 <>
                   <span className="text-outline">·</span>
                   <span className="flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm">pool</span>
+                    <Icon name="pool" size="sm" />
                     {run.poolName}
                   </span>
                 </>
               )}
               <span className="text-outline">·</span>
               <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">groups</span>
+                <Icon name="groups" size="sm" />
                 {run.totalSwimmers} swimmer{run.totalSwimmers === 1 ? '' : 's'}
               </span>
             </div>
@@ -174,7 +175,7 @@ export function RunDetail() {
 
       <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant">
         <h3 className="font-headline-md text-headline-md text-on-surface mb-4 flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary">timer</span>
+          <Icon name="timer" color="primary" />
           Results
         </h3>
         {drillColumns.length === 0 || swimmers.length === 0 ? (

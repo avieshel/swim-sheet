@@ -5,6 +5,7 @@ import { CustomSelect } from './CustomSelect'
 import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, strokeOptions } from '../constants/drill'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 import { emptyDrillForm } from '../utils/drillHelpers'
+import { Icon } from './Icon'
 
 interface DrillItem {
   id: string
@@ -111,7 +112,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
           <div className="flex justify-between items-center mb-6">
             <h2 className="font-headline-md text-on-surface m-0">{title}</h2>
             <button onClick={onClose} className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors cursor-pointer bg-transparent border-none">
-              <span className="material-symbols-outlined">close</span>
+              <Icon name="close" />
             </button>
           </div>
 
@@ -246,7 +247,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                   })}
                   className="text-xs text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none"
                 >
-                  <span className="material-symbols-outlined text-sm">add_circle</span>
+                  <Icon name="add_circle" size="sm" />
                   Add Step
                 </button>
               </div>
@@ -367,7 +368,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                           disabled={(form.items || []).length === 1}
                           className="w-8 h-8 flex items-center justify-center text-outline hover:text-error disabled:opacity-0 transition-all cursor-pointer bg-transparent border-none"
                         >
-                          <span className="material-symbols-outlined text-lg">delete</span>
+                          <Icon name="delete" size="lg" />
                         </button>
                       </div>
                     </div>

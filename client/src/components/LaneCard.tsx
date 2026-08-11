@@ -1,5 +1,6 @@
 import { useContext } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
+import { Icon } from './Icon'
 
 export interface LaneCardProps {
   group: TimedGroup
@@ -28,7 +29,7 @@ export function LaneCard({ group, onManageSwimmers }: LaneCardProps) {
             className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-full bg-primary-container text-on-primary-container hover:brightness-95 transition-all cursor-pointer"
             title="Manage lane swimmers"
           >
-            <span className="material-symbols-outlined text-base">group</span>
+            <Icon name="group" size="md" />
             <span className="text-label-sm font-medium">Manage</span>
           </button>
         )}
@@ -50,7 +51,7 @@ export function LaneCard({ group, onManageSwimmers }: LaneCardProps) {
                 onClick={() => onManageSwimmers(liveGroup.lane)}
                 className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer active:scale-95"
               >
-                <span className="material-symbols-outlined text-base">group_add</span>
+                <Icon name="group_add" size="md" />
                 Add Swimmers
               </button>
             )}

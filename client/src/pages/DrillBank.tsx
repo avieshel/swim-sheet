@@ -8,6 +8,7 @@ import type { LibraryDrill, SafeLibraryDrill } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
+import { Icon } from '../components/Icon'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
@@ -194,14 +195,14 @@ export const DrillBank: React.FC = () => {
             onClick={() => openEditor()}
             className="h-10 md:h-12 px-4 md:px-6 bg-primary text-on-primary rounded-xl font-bold flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-primary/20 text-xs md:text-sm"
           >
-            <span className="material-symbols-outlined md:text-lg">add</span>
+            <Icon name="add" className="md:text-lg" />
             <span className="hidden sm:inline">New Library Drill</span>
           </button>
         </div>
       </div>
 
       <div className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant mb-6 flex items-center gap-3 shadow-sm">
-        <span className="material-symbols-outlined text-on-surface-variant">search</span>
+        <Icon name="search" color="on-surface-variant" />
         <input
           type="text"
           value={filter}
@@ -211,7 +212,7 @@ export const DrillBank: React.FC = () => {
         />
         {filter && (
           <button onClick={() => setFilter('')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
-            <span className="material-symbols-outlined text-lg">close</span>
+            <Icon name="close" size="lg" />
           </button>
         )}
       </div>
@@ -255,7 +256,7 @@ export const DrillBank: React.FC = () => {
                : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
            }`}
          >
-           <span className="material-symbols-outlined text-sm">trending_up</span>
+           <Icon name="trending_up" size="sm" />
            Popular
          </button>
        </div>
@@ -294,7 +295,7 @@ export const DrillBank: React.FC = () => {
                  ))}
                  {(d.popularity ?? 0) > 0 && (
                    <span className="text-caption-caps bg-primary-container text-on-primary-container px-2 py-0.5 rounded uppercase flex items-center gap-0.5">
-                     <span className="material-symbols-outlined text-xs">trending_up</span>
+                     <Icon name="trending_up" size="xs" />
                      {d.popularity}
                    </span>
                  )}
@@ -306,7 +307,7 @@ export const DrillBank: React.FC = () => {
 
       {filteredDrills.length === 0 && (
         <div className="text-center py-20 bg-surface-container-low rounded-2xl border border-dashed border-outline">
-          <span className="material-symbols-outlined text-5xl text-outline-variant mb-3">search_off</span>
+          <Icon name="search_off" size="4xl" color="on-surface-variant" className="mb-3" />
           <p className="text-on-surface-variant font-body-lg">No drills found matching your search.</p>
         </div>
       )}
@@ -315,7 +316,7 @@ export const DrillBank: React.FC = () => {
       {similarWarning && (
         <div className="mb-4 p-4 bg-warning-container text-on-warning-container rounded-xl border border-warning shadow-sm">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-warning-container">warning</span>
+            <Icon name="warning" color="on-surface-variant" />
             <div className="flex-1">
               <p className="font-bold text-sm mb-2">Similar drills found:</p>
               <ul className="list-disc list-inside text-sm space-y-1 mb-3">
@@ -408,7 +409,7 @@ export const DrillBank: React.FC = () => {
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-outline-variant/30">
               <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1">{detailDrill.name}</h2>
               <button onClick={() => setDetailDrill(null)} className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer bg-transparent border-none">
-                <span className="material-symbols-outlined">close</span>
+                <Icon name="close" />
               </button>
             </div>
             <div className="p-4 md:p-6 space-y-5">
@@ -457,21 +458,21 @@ export const DrillBank: React.FC = () => {
                   onClick={() => { setDetailDrill(null); openEditor(detailDrill) }}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                 >
-                  <span className="material-symbols-outlined">edit</span>
+                  <Icon name="edit" />
                   Edit Drill
                 </button>
                 <button
                   onClick={handleAddToSession}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 border-2 border-primary text-primary rounded-xl font-bold hover:bg-primary/5 active:scale-95 transition-all cursor-pointer bg-transparent"
                 >
-                  <span className="material-symbols-outlined">playlist_add</span>
+                  <Icon name="playlist_add" />
                   Add to Session
                 </button>
                 <button
                   onClick={() => { const id = detailDrill.id; setDetailDrill(null); handleDelete(id) }}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 border-2 border-error/30 text-error rounded-xl font-bold hover:bg-error-container/20 active:scale-95 transition-all cursor-pointer bg-transparent"
                 >
-                  <span className="material-symbols-outlined">delete</span>
+                  <Icon name="delete" />
                   Delete Drill
                 </button>
               </div>

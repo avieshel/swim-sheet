@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { EquipmentIcons, type EquipmentType } from '../components/EquipmentIcons'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
+import { Icon } from '../components/Icon'
 import { getSession, updateSession } from '../api/sessions'
 import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteDrill, updateLibraryDrill, deleteLibraryDrill, getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
@@ -309,7 +310,7 @@ export const SessionDetail: React.FC = () => {
         onClick={() => navigate('/sessions')}
         className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors mb-4 font-body-md cursor-pointer bg-transparent border-none"
       >
-        <span className="material-symbols-outlined text-lg">arrow_back</span>
+        <Icon name="arrow_back" size="lg" />
         Back to Templates
       </button>
 
@@ -373,7 +374,7 @@ export const SessionDetail: React.FC = () => {
               onClick={() => { setEditingMeta(true); setEditNotes(session.notes || '') }}
               className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
             >
-              <span className="material-symbols-outlined">edit</span>
+              <Icon name="edit" color="primary" />
             </button>
           </div>
         )}
@@ -390,7 +391,7 @@ export const SessionDetail: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-warning-container">warning</span>
+              <Icon name="warning" color="on-surface-variant" />
               <div className="flex-1">
                 <p className="font-bold text-sm mb-2">Similar drills found:</p>
                 <ul className="list-disc list-inside text-sm space-y-1 mb-3">
@@ -521,14 +522,14 @@ export const SessionDetail: React.FC = () => {
                 onClick={() => setShowDrillBank(!showDrillBank)}
                 className="h-10 md:h-12 px-3 md:px-4 bg-surface-container-high text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container-highest active:scale-95 transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg">library_books</span>
+                <Icon name="library_books" size="lg" />
                 <span className="hidden sm:inline">Drills</span>
               </button>
               <button
                 onClick={() => openRichEditor()}
                 className="h-10 md:h-12 px-3 md:px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
-                <span className="material-symbols-outlined text-lg">add</span>
+                <Icon name="add" size="lg" />
                 <span className="hidden sm:inline">Add Drill</span>
               </button>
             </div>
@@ -547,14 +548,14 @@ export const SessionDetail: React.FC = () => {
                         disabled={i === 0}
                         className="p-0.5 text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
                       >
-                        <span className="material-symbols-outlined text-sm">keyboard_arrow_up</span>
+                        <Icon name="keyboard_arrow_up" size="sm" />
                       </button>
                       <button
                         onClick={() => moveDrill(d, 1)}
                         disabled={i === drills.length - 1}
                         className="p-0.5 text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
                       >
-                        <span className="material-symbols-outlined text-sm">keyboard_arrow_down</span>
+                        <Icon name="keyboard_arrow_down" size="sm" />
                       </button>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -613,14 +614,14 @@ export const SessionDetail: React.FC = () => {
                       className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                       title="Edit drill"
                     >
-                      <span className="material-symbols-outlined text-lg">edit</span>
+                      <Icon name="edit" size="lg" color="primary" />
                     </button>
                     <button
                       onClick={() => handleDeleteDrill(d.id)}
                       className="p-2 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                       title="Remove drill"
                     >
-                      <span className="material-symbols-outlined text-lg">delete</span>
+                      <Icon name="delete" size="lg" color="error" />
                     </button>
                   </div>
                 </div>
@@ -634,7 +635,7 @@ export const SessionDetail: React.FC = () => {
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant lg:sticky lg:top-28 min-h-[40vh] md:min-h-[60vh] flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-headline-md text-on-surface m-0 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">library_books</span>
+                <Icon name="library_books" color="primary" />
                 Drills
               </h3>
               <button
@@ -648,7 +649,7 @@ export const SessionDetail: React.FC = () => {
             <div className="space-y-4 mb-4">
               {/* Search */}
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+                <Icon name="search" size="lg" color="on-surface-variant" className="absolute left-2 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={libraryFilter}
@@ -693,7 +694,7 @@ export const SessionDetail: React.FC = () => {
             <div className="space-y-2 flex-1 overflow-y-auto pr-1">
               {filteredLibrary.length === 0 ? (
                 <div className="text-center py-10">
-                  <span className="material-symbols-outlined text-outline-variant text-4xl mb-2">search_off</span>
+                  <Icon name="search_off" size="3xl" color="on-surface-variant" className="mb-2" />
                   <p className="text-label-sm text-on-surface-variant">No drills match your filters.</p>
                   {(libraryFilter || activeFocusFilter !== 'all' || activeTagFilters.length > 0) && (
                     <button 
@@ -726,21 +727,21 @@ export const SessionDetail: React.FC = () => {
                           className="p-1.5 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                           title="Add to session"
                         >
-                          <span className="material-symbols-outlined text-base">add_circle</span>
+                          <Icon name="add_circle" color="primary" />
                         </button>
                         <button
                           onClick={() => openRichEditor(libDrill, true)}
                           className="p-1.5 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                           title="Edit bank drill"
                         >
-                          <span className="material-symbols-outlined text-base">edit</span>
+                          <Icon name="edit" color="on-surface-variant" />
                         </button>
                         <button
                           onClick={() => handleDeleteLibraryDrill(libDrill)}
                           className="p-1.5 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                           title="Delete bank drill"
                         >
-                          <span className="material-symbols-outlined text-base">delete</span>
+                          <Icon name="delete" color="error" />
                         </button>
                       </div>
                     </div>

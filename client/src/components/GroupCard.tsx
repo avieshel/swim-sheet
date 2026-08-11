@@ -4,6 +4,7 @@ import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { addSwimmerToRun } from '../api/runs'
 import type { RunDrill, LaneDrillResult } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
+import { Icon } from './Icon'
 import { formatTime } from '../utils/formatTime'
 import { ActiveSwimmerRow, SavedSwimmerRow } from './SwimmerRows'
 import { SwimmerFormModal } from './SwimmerFormModal'
@@ -29,13 +30,13 @@ function GroupHeader({ name, lane, onEdit, collapsed, onToggleCollapsed }: {
         </span>
         <button onClick={onEdit}
           className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer ml-1">
-          <span className="material-symbols-outlined text-sm">edit</span>
+          <Icon name="edit" size="sm" />
         </button>
       </div>
       <button onClick={onToggleCollapsed}
         className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer"
         title={collapsed ? 'Show swimmers' : 'Hide swimmers'}>
-        <span className="material-symbols-outlined text-sm">{collapsed ? 'chevron_right' : 'expand_more'}</span>
+        <Icon name={collapsed ? 'chevron_right' : 'expand_more'} size="sm" />
       </button>
     </div>
   )
@@ -78,7 +79,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
                 {baseDrill?.name}
                 {showCompleted && (
                   <span className="text-primary flex items-center gap-0.5 text-label-sm">
-                    <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    <Icon name="check_circle" size="sm" fill />
                     Complete
                   </span>
                 )}
@@ -88,12 +89,12 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
               {isCompletedDrill ? formatTime(savedData?.drillEnd != null && savedData?.drillStart != null ? savedData.drillEnd - savedData.drillStart : 0) : formatTime(drillDuration)}
             </div>
           </div>
-          {totalStrokeCount > 0 && (
-              <div className="px-4 pb-2 text-label-sm font-bold text-on-surface-variant flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px]">water</span>
-                  {totalStrokeCount} total strokes
-              </div>
-          )}
+              {totalStrokeCount > 0 && (
+                  <div className="px-4 pb-2 text-label-sm font-bold text-on-surface-variant flex items-center gap-1.5">
+                      <Icon name="water" className="text-[16px]" />
+                      {totalStrokeCount} total strokes
+                  </div>
+              )}
 
           {/* Next Drill Preview */}
           {nextDrill && (
@@ -120,7 +121,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
           <div className="px-3 py-2 flex gap-1.5 justify-center">
             {showCompleted ? (
               <button disabled className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold bg-surface-container text-on-surface-variant cursor-not-allowed opacity-60">
-                <span className="material-symbols-outlined text-label-sm">check_circle</span>
+                <Icon name="check_circle" size="sm" />
                 Completed
               </button>
             ) : (
@@ -132,7 +133,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
                     : 'bg-primary text-on-primary hover:brightness-110 shadow-lg shadow-primary/20'
                 }`}
               >
-                <span className="material-symbols-outlined text-lg">{isDrillRunning ? 'stop' : 'play_arrow'}</span>
+                <Icon name={isDrillRunning ? 'stop' : 'play_arrow'} size="lg" />
                 {isDrillRunning ? 'Finish Drill' : 'Start Drill'}
               </button>
             )}
@@ -142,7 +143,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
                 onClick={onLapReset}
                 className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant"
               >
-                <span className="material-symbols-outlined text-label-sm">restart_alt</span>
+                <Icon name="restart_alt" size="sm" />
                 Reset
               </button>
             ) : null}
@@ -181,7 +182,7 @@ function DrillNav({ currentDrillIndex, runDrills, onSelectDrill }: {
       <button onClick={() => { const prev = runDrills[currentDrillIndex - 1]; if (prev) onSelectDrill(prev.id) }}
         disabled={currentDrillIndex <= 0}
         className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/40 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
-        <span className="material-symbols-outlined text-lg">chevron_left</span>
+        <Icon name="chevron_left" size="lg" />
       </button>
       <span className="text-label-sm text-on-surface-variant tabular-nums">
         Drill {currentDrillIndex + 1} / {runDrills.length}
@@ -189,7 +190,7 @@ function DrillNav({ currentDrillIndex, runDrills, onSelectDrill }: {
       <button onClick={() => { const nxt = runDrills[currentDrillIndex + 1]; if (nxt) onSelectDrill(nxt.id) }}
         disabled={currentDrillIndex < 0 || currentDrillIndex >= runDrills.length - 1}
         className="h-11 w-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
-        <span className="material-symbols-outlined text-lg">chevron_right</span>
+        <Icon name="chevron_right" size="lg" />
       </button>
     </div>
   )
@@ -248,7 +249,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
         onClick={() => setShowPopup(!showPopup)}
         className="w-full py-2.5 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
       >
-        <span className="material-symbols-outlined text-base">add</span>
+        <Icon name="add" />
         Add Swimmer
       </button>
 
@@ -262,7 +263,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
               onClick={handleTempAdd}
               className="w-full py-2.5 px-3 rounded-lg bg-primary-container text-on-primary-container font-medium text-sm flex items-center gap-2 hover:brightness-110 transition-all cursor-pointer"
             >
-              <span className="material-symbols-outlined text-base">casino</span>
+              <Icon name="casino" />
               Add Temp Swimmer
             </button>
           </div>
@@ -271,7 +272,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
             <>
               <div className="px-2 pb-2">
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-base">search</span>
+                  <Icon name="search" color="on-surface-variant" className="absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="Search roster..."
@@ -313,7 +314,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
               onClick={handleCreateNew}
               className="w-full py-2 px-3 rounded-lg text-left hover:bg-surface-variant transition-all cursor-pointer flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-base text-on-surface-variant">person_add</span>
+              <Icon name="person_add" color="on-surface-variant" />
               <span className="text-sm text-on-surface">Create new swimmer</span>
             </button>
           </div>

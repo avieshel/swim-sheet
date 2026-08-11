@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Icon } from './Icon'
 
 interface SelectOption {
   value: string | number
@@ -40,9 +41,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, options, onCh
         className="w-full flex items-center justify-between bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-2 py-1.5 text-sm outline-none rounded-t-md transition-colors text-left"
       >
         <span className="truncate flex items-center gap-1">{selectedOption ? selectedOption.label : 'Select...'}{selectedOption?.badge}</span>
-        <span className="material-symbols-outlined text-sm transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-          expand_more
-        </span>
+        <Icon name="expand_more" size="sm" className="transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
       </button>
 
       {isOpen && (

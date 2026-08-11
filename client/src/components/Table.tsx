@@ -4,6 +4,7 @@ import { getRunHistory, deleteRun } from '../api/runs'
 import type { RunHistoryData, RunSummary, RunSwimmerSummary } from '../api/runs'
 import { formatTime, formatWallTime } from '../utils/formatTime'
 import { ConfirmDialog } from './ConfirmDialog'
+import { Icon } from './Icon'
 
 interface TableProps {
   swimmerId?: string
@@ -36,9 +37,7 @@ function AttendeesCell({ run, onViewAll }: { run: RunSummary; onViewAll: () => v
           likely match
         </span>
       )}
-      <span className="material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-        open_in_full
-      </span>
+      <Icon name="open_in_full" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
     </button>
   )
 }
@@ -61,14 +60,14 @@ function SessionCell({ run, lastAttended }: { run: RunSummary; lastAttended?: bo
             <>
               <span className="text-outline">·</span>
               <span className="flex items-center gap-0.5 shrink-0">
-                <span className="material-symbols-outlined text-sm">schedule</span>
+                <Icon name="schedule" size="sm" />
                 {formatWallTime(run.startedAtMs)}
               </span>
             </>
           )}
           <span className="text-outline">·</span>
           <span className="flex items-center gap-0.5 shrink-0">
-            <span className="material-symbols-outlined text-sm">straighten</span>
+            <Icon name="straighten" size="sm" />
             {run.poolLength}m
           </span>
           {run.poolName && (
@@ -149,7 +148,7 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
             aria-label="Close"
             className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
           >
-            <span className="material-symbols-outlined text-lg">close</span>
+            <Icon name="close" size="lg" />
           </button>
         </div>
         <p className="font-body-md text-on-surface-variant mb-4 truncate">{run.templateName} · {run.date}</p>
@@ -179,7 +178,7 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
                     className="inline-flex items-center gap-1 text-primary text-label-sm font-bold hover:underline cursor-pointer shrink-0"
                   >
                     Stats
-                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    <Icon name="arrow_forward" size="sm" />
                   </Link>
                 ) : (
                   <span className="text-label-sm text-on-surface-variant shrink-0">No profile</span>
@@ -246,7 +245,7 @@ function RunRow({
               }}
               className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-on-surface-variant hover:text-error hover:bg-error-container/50 transition-colors cursor-pointer"
             >
-              <span className="material-symbols-outlined text-lg">delete</span>
+              <Icon name="delete" size="lg" />
             </button>
           </td>
         )}
@@ -263,7 +262,7 @@ function RunRow({
                     className="inline-flex items-center gap-1 mt-3 text-primary text-label-sm font-bold hover:underline cursor-pointer"
                   >
                     View full session
-                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    <Icon name="arrow_forward" size="sm" />
                   </Link>
                 </div>
               ) : (
@@ -347,7 +346,7 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
-        <span className="material-symbols-outlined animate-spin">progress_activity</span>
+        <Icon name="progress_activity" className="animate-spin" />
         <span className="font-body-md">Loading past sessions...</span>
       </div>
     )
@@ -356,7 +355,7 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
   if (error) {
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
-        <span className="material-symbols-outlined text-error">error_outline</span>
+        <Icon name="error_outline" color="error" />
         <span className="font-body-md">Couldn't load past sessions. Please try again.</span>
       </div>
     )
@@ -365,7 +364,7 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
   if (data == null || visibleRuns.length === 0) {
     return (
       <div className={`flex flex-col items-center justify-center py-12 text-center ${borderless ? '' : 'bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant'}`}>
-        <span className="material-symbols-outlined text-4xl text-outline-variant mb-3">history</span>
+        <Icon name="history" size="3xl" color="on-surface-variant" className="mb-3" />
         <p className="font-body-md text-on-surface-variant">No past sessions yet.</p>
       </div>
     )
