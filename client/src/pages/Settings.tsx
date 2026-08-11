@@ -53,6 +53,8 @@ export const Settings: React.FC = () => {
   })
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showResetDataDialog, setShowResetDataDialog] = useState(false)
+  const [poolLengthPreset, setPoolLengthPreset] = useState<'25' | '50' | 'custom'>('25')
+  const [poolLengthCustom, setPoolLengthCustom] = useState('25')
 
   // Team names state
   const [newTeamName, setNewTeamName] = useState('')
@@ -76,11 +78,12 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     getSettings().then(data => {
+      const pl = data.pool_length || 25
       setForm({
         team_name: data.team_name || '',
         coach_name: data.coach_name || '',
         team_names: data.team_names || [],
-        pool_length: (data.pool_length || 25).toString(),
+        pool_length: pl.toString(),
         distance_units: data.distance_units || 'meters',
         notification_enabled: !!data.notification_enabled,
         sync_interval: (data.sync_interval || 30000).toString(),
@@ -89,6 +92,14 @@ export const Settings: React.FC = () => {
         auto_save: !!data.auto_save,
         data_retention_days: (data.data_retention_days || 90).toString(),
       })
+      if (pl === 25) {
+        setPoolLengthPreset('25')
+      } else if (pl === 50) {
+        setPoolLengthPreset('50')
+      } else {
+        setPoolLengthPreset('custom')
+        setPoolLengthCustom(pl.toString())
+      }
       if (data.theme && data.theme !== 'auto') {
         document.documentElement.dataset.theme = data.theme
       }
@@ -173,12 +184,15 @@ export const Settings: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    const poolLength = poolLengthPreset === 'custom'
+      ? Math.min(100, Math.max(1, Number(poolLengthCustom) || 25))
+      : Number(poolLengthPreset)
     await updateSettings({
       team_name: form.team_name,
       coach_name: form.coach_name,
       team_names: form.team_names,
-      pool_length: Number(form.pool_length),
-      distance_units: form.distance_units,
+      pool_length: poolLength,
+      distance_units: 'meters',
       notification_enabled: form.notification_enabled,
       sync_interval: Number(form.sync_interval),
       theme: form.theme,
@@ -205,6 +219,8 @@ export const Settings: React.FC = () => {
       auto_save: true,
       data_retention_days: '90',
     })
+    setPoolLengthPreset('25')
+    setPoolLengthCustom('25')
     setShowResetConfirm(false)
     navigate('/')
   }
@@ -313,37 +329,54 @@ export const Settings: React.FC = () => {
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
-                <label htmlFor="pool_length" className="font-label-sm text-on-surface block mb-2">
+                <label className="font-label-sm text-on-surface block mb-2">
                   Default Pool Length
                 </label>
-                <select
-                  id="pool_length"
-                  name="pool_length"
-                  value={form.pool_length}
-                  onChange={handleInputChange}
-                  className="w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                >
-                  <option value="25">25 meters</option>
-                  <option value="50">50 meters</option>
-                  <option value="25y">25 yards</option>
-                  <option value="50y">50 yards</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="distance_units" className="font-label-sm text-on-surface block mb-2">
-                  Distance Units
-                </label>
-                <select
-                  id="distance_units"
-                  name="distance_units"
-                  value={form.distance_units}
-                  onChange={handleInputChange}
-                  className="w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                >
-                  <option value="meters">Meters</option>
-                  <option value="yards">Yards</option>
-                </select>
+                <CustomSelect
+                  value={poolLengthPreset}
+                  options={[
+                    { value: '25', label: '25m' },
+                    { value: '50', label: '50m' },
+                    { value: 'custom', label: `${poolLengthCustom}m` },
+                  ]}
+                  onChange={(val) => {
+                    const v = val as '25' | '50' | 'custom'
+                    setPoolLengthPreset(v)
+                    const num = v === 'custom' ? Number(poolLengthCustom) : Number(v)
+                    if (v !== 'custom' || (num >= 1 && num <= 100)) {
+                      setForm(prev => ({ ...prev, pool_length: String(num) }))
+                      updateSettings({ pool_length: num })
+                    }
+                  }}
+                />
+                {poolLengthPreset === 'custom' && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={poolLengthCustom}
+                      onChange={e => {
+                        const val = e.target.value
+                        setPoolLengthCustom(val)
+                        const num = Number(val)
+                        if (num >= 1 && num <= 100) {
+                          setForm(prev => ({ ...prev, pool_length: val }))
+                          updateSettings({ pool_length: num })
+                        }
+                      }}
+                      className={`w-24 bg-surface px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-center font-bold ${
+                        Number(poolLengthCustom) < 1 || Number(poolLengthCustom) > 100
+                          ? 'border-error text-error bg-error-container/10'
+                          : 'text-on-surface border-outline-variant focus:border-primary'
+                      }`}
+                    />
+                    <span className="text-on-surface-variant font-body-md">meters</span>
+                    {Number(poolLengthCustom) < 1 || Number(poolLengthCustom) > 100 ? (
+                      <span className="text-error text-label-sm font-bold">1–100m</span>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <div>

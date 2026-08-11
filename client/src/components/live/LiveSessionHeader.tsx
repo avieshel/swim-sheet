@@ -1,4 +1,4 @@
-import { useContext, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { LiveSessionContext } from '../../context/LiveSessionContext'
 import type { SessionRun } from '../../api/runs'
 import { formatSessionTime, formatWallTime } from '../../utils/formatTime'
@@ -28,14 +28,27 @@ export function LiveSessionHeader({
   onLaneChipClick, onCommitPoolLength
 }: LiveSessionHeaderProps) {
   const { groups } = useContext(LiveSessionContext)
-  const [editPoolLength, setEditPoolLength] = useState<string | null>(null)
+  const [poolLength, setPoolLength] = useState(run.poolLength)
+  const [showPicker, setShowPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
   const activeGroups = groups.filter(g => g.swimmers.length > 0)
   const swimmerCount = groups.reduce((sum, g) => sum + g.swimmers.length, 0)
 
-  const commitPoolLength = (value: string | null) => {
-    const v = parseFloat(value ?? '')
-    if (!isNaN(v) && v > 0) onCommitPoolLength(v)
-    setEditPoolLength(null)
+  useEffect(() => {
+    if (!showPicker) return
+    const handleClick = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showPicker])
+
+  const commit = (val: number) => {
+    const clamped = Math.min(100, Math.max(1, val))
+    setPoolLength(clamped)
+    onCommitPoolLength(clamped)
   }
 
   return (
@@ -59,32 +72,54 @@ export function LiveSessionHeader({
               {formatSessionTime(sessionElapsed)}
             </span>
           </div>
-          <p className="text-label-sm text-on-surface-variant truncate">{run.date} &middot; {run.poolName} &middot; {editPoolLength != null ? (
-            <span className="relative inline-flex items-center">
-              <input
-                type="number"
-                step="0.1"
-                min="1"
-                max="100"
-                value={editPoolLength}
-                onChange={e => setEditPoolLength(e.target.value)}
-                onBlur={() => commitPoolLength(editPoolLength)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-                  if (e.key === 'Escape') setEditPoolLength(null)
-                }}
-                className="w-14 px-1 py-0.5 rounded border border-outline text-on-surface bg-surface text-xs tabular-nums text-center outline-none"
-                autoFocus
-              />
-              <span className="ml-0.5">m</span>
+          <div className="flex items-center gap-2 text-label-sm text-on-surface-variant flex-wrap">
+            <span>{run.date}</span>
+            <span>&middot;</span>
+            <span>{run.poolName}</span>
+            <span>&middot;</span>
+            <span className="relative" ref={pickerRef}>
+              <span className="inline-flex items-center">
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={poolLength}
+                  onChange={e => {
+                    const num = Number(e.target.value)
+                    if (num >= 1 && num <= 100) commit(num)
+                  }}
+                  onFocus={() => setShowPicker(true)}
+                  className="w-12 px-1 py-0 bg-transparent border-b border-outline-variant text-on-surface text-label-sm tabular-nums text-center outline-none focus:border-primary transition-colors"
+                />
+                <span className="text-label-sm text-on-surface-variant">m</span>
+                <button
+                  onClick={() => setShowPicker(!showPicker)}
+                  className="p-0.5 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none"
+                >
+                  <Icon name="expand_more" size="sm" />
+                </button>
+              </span>
+              {showPicker && (
+                <div className="absolute z-[100] left-0 mt-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-xl py-1 min-w-[100px] animate-in fade-in zoom-in duration-100">
+                  {[25, 50].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => { commit(v); setShowPicker(false) }}
+                      className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                        poolLength === v
+                          ? 'bg-primary/10 text-primary font-bold'
+                          : 'text-on-surface hover:bg-primary-container/20'
+                      }`}
+                    >
+                      {v}m
+                    </button>
+                  ))}
+                </div>
+              )}
             </span>
-          ) : (
-            <button onClick={() => setEditPoolLength(String(run.poolLength))}
-              className="inline-flex items-center gap-0.5 hover:text-primary hover:underline transition-all cursor-pointer">
-              {run.poolLength}m
-              <Icon name="edit" className="text-[10px]" />
-            </button>
-          )} &middot; {drillCount} drills</p>
+            <span>&middot;</span>
+            <span>{drillCount} drills</span>
+          </div>
           <p className="text-label-sm text-on-surface-variant/70 mt-0.5">
             {sessionElapsed > 0 ? 'Started' : 'Created'} {formatWallTime(sessionStartedAt)}
             &middot; {progress.done} / {progress.total} drills

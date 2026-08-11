@@ -13,7 +13,6 @@ export interface Swimmer {
 export interface Session {
   id: string
   name: string
-  poolLength: number
   notes: string
   createdAt: string
   updatedAt: string
@@ -127,6 +126,7 @@ export interface SavedDrillData {
   drillStart: number
   drillEnd: number | null
   sessionStartedAt: number
+  poolLength: number
   swimmers: SavedSwimmerData[]
 }
 
@@ -238,6 +238,19 @@ class SwimSheetDB extends Dexie {
     })
 
     this.version(4).stores({
+      swimmers: 'id, &name, status, updatedAt',
+      sessions: 'id, createdAt, updatedAt',
+      drills: 'id, session_id, focus, updatedAt',
+      sessionRuns: 'id, session_id, status, date, updatedAt',
+      runDrills: 'id, run_id, parent_drill_id, updatedAt',
+      runSwimmers: 'id, run_id, swimmer_id',
+      laps: 'id, run_drill_id, swimmer_id, createdAt',
+      laneDrillResults: 'id, run_id, group_id, lane, run_drill_id, [run_id+group_id+run_drill_id], updatedAt',
+      libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+      _meta: 'key',
+    })
+
+    this.version(5).stores({
       swimmers: 'id, &name, status, updatedAt',
       sessions: 'id, createdAt, updatedAt',
       drills: 'id, session_id, focus, updatedAt',

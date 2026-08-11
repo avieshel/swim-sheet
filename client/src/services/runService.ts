@@ -12,10 +12,11 @@ import {
 } from '../db/dao'
 import { db } from '../db/schema'
 import type { SafeSessionRun, SafeRunDrill, SafeLaneDrillResult, SafeLap, SavedDrillData } from '../db/schema'
+import { settingsService } from './settingsService'
 
-function buildMarkerData(startedAt?: number): string | null {
+function buildMarkerData(startedAt?: number, poolLength = 25): string | null {
   return startedAt != null
-    ? JSON.stringify({ drillStart: startedAt, drillEnd: null, sessionStartedAt: startedAt, swimmers: [] })
+    ? JSON.stringify({ drillStart: startedAt, drillEnd: null, sessionStartedAt: startedAt, poolLength, swimmers: [] })
     : null
 }
 
@@ -105,10 +106,12 @@ export const runService = {
       .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
       .first()
     const now = new Date().toISOString()
+    const run = await getSessionRun(data.run_id)
+    const poolLength = run?.poolLength ?? 25
     if (existing) {
       await db.laneDrillResults.update(existing.id!, {
         completed: false,
-        data: existing.data ?? buildMarkerData(data.startedAt),
+        data: existing.data ?? buildMarkerData(data.startedAt, poolLength),
         updatedAt: now,
       })
       return existing.id!
@@ -120,7 +123,7 @@ export const runService = {
       run_drill_id: data.run_drill_id,
       lane: data.lane,
       completed: false,
-      data: buildMarkerData(data.startedAt),
+      data: buildMarkerData(data.startedAt, poolLength),
       id,
       updatedAt: now,
     })
@@ -207,9 +210,12 @@ export const runService = {
   getLapsForSwimmer: (runId: string, swimmerId: string) => getLapsForSwimmerInRun(runId, swimmerId),
   addLap: (data: SafeLap) => addLap(data),
 
-  createFromTemplate: async (sessionId: string, runData: { date: string; poolName: string; poolLength: number; notes?: string }): Promise<string> => {
+  createFromTemplate: async (sessionId: string, runData: { date: string; poolName: string; notes?: string }): Promise<string> => {
     const session = await getSession(sessionId)
     if (!session) throw new Error('Session template not found')
+
+    const settings = await settingsService.getSettings()
+    const poolLength = settings.pool_length || 25
 
     const drills = await getDrillsForSession(sessionId)
     drills.sort((a, b) => a.order - b.order)
@@ -218,7 +224,7 @@ export const runService = {
       session_id: sessionId,
       date: runData.date,
       poolName: runData.poolName,
-      poolLength: runData.poolLength,
+      poolLength,
       notes: runData.notes || '',
       status: 'active',
       session_started_at: Date.now(),
@@ -295,7 +301,6 @@ export const runService = {
     } else {
       sessionId = await addSession({
         name: DEFAULT_SESSION_NAME,
-        poolLength: 25,
         notes: '',
       })
       await addDrill({
@@ -316,7 +321,6 @@ export const runService = {
     const runId = await runService.createFromTemplate(sessionId, {
       date: new Date().toISOString().split('T')[0],
       poolName: 'Quick Time',
-      poolLength: 25,
       notes: JSON.stringify({ isQuickStart: true, version: 2 }),
     })
 

@@ -12,7 +12,6 @@ export interface DbSwimmer {
 export interface DbSession {
   id: string
   name: string
-  pool_length: number
   notes?: string
   created_at?: string
   updated_at?: string
@@ -270,7 +269,6 @@ export function initDb(db: Database) {
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL DEFAULT 'Untitled',
-      pool_length INTEGER DEFAULT 25,
       notes TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP

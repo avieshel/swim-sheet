@@ -33,6 +33,7 @@ const mockDao = vi.hoisted(() => ({
   addDrill: vi.fn(),
   searchSwimmers: vi.fn(),
   addSwimmer: vi.fn(),
+  DEFAULT_EQUIPMENT: ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard'],
 }))
 
 const mockDb = vi.hoisted(() => ({
@@ -43,6 +44,12 @@ const mockDb = vi.hoisted(() => ({
 
 vi.mock('../../db/dao', () => mockDao)
 vi.mock('../../db/schema', () => ({ db: mockDb }))
+vi.mock('../settingsService', () => ({
+  settingsService: {
+    getSettings: vi.fn().mockResolvedValue({ pool_length: 25 }),
+    updateSettings: vi.fn().mockResolvedValue(undefined),
+  },
+}))
 
 const { runService } = await import('../runService')
 
@@ -400,7 +407,7 @@ describe('runService', () => {
   })
 
   describe('createFromTemplate', () => {
-    const runData = { date: '2024-06-01', poolName: 'Main Pool', poolLength: 25 }
+    const runData = { date: '2024-06-01', poolName: 'Main Pool' }
 
     it('throws if session not found', async () => {
       mockDao.getSession.mockResolvedValue(undefined)
@@ -516,7 +523,7 @@ describe('runService', () => {
       mockDao.getAllSessions.mockResolvedValue([
         { id: 'sys1', name: 'Quick 100m freestyle (default)', notes: '' },
       ])
-      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)', poolLength: 25 })
+      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)' })
       mockDao.getDrillsForSession.mockResolvedValue([
         { id: 'd1', name: '100m Freestyle', items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }], repeatCount: 1, timingMode: 'individual', order: 0, description: '' },
       ])
@@ -538,7 +545,7 @@ describe('runService', () => {
       mockDao.getAllSessions.mockResolvedValue([])
       mockDao.addSession.mockResolvedValue('sys1')
       mockDao.addDrill.mockResolvedValue('d1')
-      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)', poolLength: 25 })
+      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)' })
       mockDao.getDrillsForSession.mockResolvedValue([
         { id: 'd1', name: '100m Freestyle', items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }], repeatCount: 1, timingMode: 'individual', order: 0, description: '' },
       ])
@@ -570,7 +577,7 @@ describe('runService', () => {
       mockDao.getAllSessions.mockResolvedValue([
         { id: 'sys1', name: 'Quick 100m freestyle (default)', notes: '' },
       ])
-      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)', poolLength: 25 })
+      mockDao.getSession.mockResolvedValue({ id: 'sys1', name: 'Quick 100m freestyle (default)' })
       mockDao.getDrillsForSession.mockResolvedValue([
         { id: 'd1', name: '100m Freestyle', items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }], repeatCount: 1, timingMode: 'individual', order: 0, description: '' },
       ])

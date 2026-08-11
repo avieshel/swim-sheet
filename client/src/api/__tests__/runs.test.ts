@@ -94,7 +94,7 @@ describe('runs API', () => {
   })
 
   it('createRunFromTemplate delegates to runService.createFromTemplate', async () => {
-    const runData = { date: '2024-01-01', poolName: 'Pool', poolLength: 25 }
+    const runData = { date: '2024-01-01', poolName: 'Pool' }
     vi.mocked(runService.createFromTemplate).mockResolvedValue('new-id')
     const result = await createRunFromTemplate('s1', runData)
     expect(runService.createFromTemplate).toHaveBeenCalledWith('s1', runData)

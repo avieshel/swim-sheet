@@ -49,7 +49,7 @@ describe('sessionService', () => {
   })
 
   it('create calls addSession with data', async () => {
-    const data = { name: 'New Session', poolLength: 25, notes: '' }
+    const data = { name: 'New Session', notes: '' }
     mockDao.addSession.mockResolvedValue('new-id')
     const result = await sessionService.create(data)
     expect(mockDao.addSession).toHaveBeenCalledExactlyOnceWith(data)

@@ -19,7 +19,6 @@ export const SessionDetail: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [editingMeta, setEditingMeta] = useState(false)
   const [editName, setEditName] = useState('')
-  const [editPoolLength, setEditPoolLength] = useState('25')
   const [editNotes, setEditNotes] = useState('')
 
   // Drill bank
@@ -61,7 +60,6 @@ export const SessionDetail: React.FC = () => {
     if (!s) { setLoading(false); return }
     setSession(s)
     setEditName(s.name)
-    setEditPoolLength(String(s.poolLength))
     setEditNotes(s.notes || '')
     const d = await getSessionDrills(id)
     if (isCancelled?.()) return
@@ -81,7 +79,6 @@ export const SessionDetail: React.FC = () => {
     const [s, d] = data
     setSession(s)
     setEditName(s.name)
-    setEditPoolLength(String(s.poolLength))
     setEditNotes(s.notes || '')
     setDrills(d)
     setLoading(false)
@@ -109,7 +106,7 @@ export const SessionDetail: React.FC = () => {
 
   const handleSaveMeta = async () => {
     if (!id || !editName.trim()) return
-    await updateSession(id, { name: editName.trim(), poolLength: Number(editPoolLength) || 25, notes: editNotes })
+    await updateSession(id, { name: editName.trim(), notes: editNotes })
     setEditingMeta(false)
     loadData()
   }
@@ -329,15 +326,6 @@ export const SessionDetail: React.FC = () => {
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Pool Length (m)</label>
-                <input
-                  type="number"
-                  value={editPoolLength}
-                  onChange={e => setEditPoolLength(e.target.value)}
-                  className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
-                />
-              </div>
             </div>
             <div className="mt-4">
               <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Focus / Notes</label>
@@ -365,7 +353,6 @@ export const SessionDetail: React.FC = () => {
                   </span>
                 ))}
               </div>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-1">{session.poolLength}m default pool</p>
               {session.notes && (
                 <p className="font-body-md text-body-md text-on-surface-variant mt-1 italic">{session.notes}</p>
               )}

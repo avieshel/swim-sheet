@@ -9,7 +9,8 @@ import {
   completeLaneResult,
   uncompleteLaneResult,
   deleteSwimmerFromLaneResult,
-  updateLaneResultSwimmer
+  updateLaneResultSwimmer,
+  getRun,
 } from '../api/runs'
 import type { TimedGroup, LiveSessionAction, TimerAction } from '../context/LiveSessionContext'
 import type { LiveTimingStore } from '../timing/liveTiming'
@@ -28,6 +29,8 @@ export const TimingService = {
     dispatch: Dispatch<LiveSessionAction>
   ) {
     const live = store.getDrillTiming(runId, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
+    const run = await getRun(runId)
+    const poolLength = run?.poolLength ?? 25
     
     const timingData = buildLaneResult({
       runId,
@@ -36,6 +39,7 @@ export const TimingService = {
       sessionStartedAt,
       now: sessionElapsed,
       live,
+      poolLength,
       swimmers: group.swimmers.map(s => ({
         dbId: s.dbId ?? '',
         name: s.name,

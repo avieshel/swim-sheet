@@ -62,7 +62,7 @@ export function completeRunWithLaps(runId: string, laps: CompleteRunLap[]): Prom
   return runService.completeRunWithLaps(runId, laps)
 }
 
-export function createRunFromTemplate(sessionId: string, runData: { date: string; poolName: string; poolLength: number; notes?: string }): Promise<string> {
+export function createRunFromTemplate(sessionId: string, runData: { date: string; poolName: string; notes?: string }): Promise<string> {
   return runService.createFromTemplate(sessionId, runData)
 }
 
@@ -190,6 +190,7 @@ export interface BuildLaneResultInput {
   now: number
   live: LiveDrillTiming
   swimmers: LaneResultSwimmerInput[]
+  poolLength: number
 }
 
 export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
@@ -210,6 +211,7 @@ export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
     drillStart: input.live.drillStart ?? 0,
     drillEnd: input.live.drillEnd ?? input.now,
     sessionStartedAt: input.sessionStartedAt,
+    poolLength: input.poolLength,
     swimmers,
   }
 }

@@ -37,7 +37,6 @@ interface CatalogSessionDrill {
 interface CatalogSession {
   version: number
   name: string
-  poolLength: number
   notes: string
   drills: CatalogSessionDrill[]
 }

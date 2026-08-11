@@ -472,7 +472,6 @@ async function seedDefaultSessionsOnce(): Promise<void> {
 
     const sessionId = await addSession({
       name: catalog.name,
-      poolLength: catalog.poolLength,
       notes: catalog.notes,
     })
 

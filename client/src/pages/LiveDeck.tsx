@@ -23,7 +23,6 @@ export const LiveDeck: React.FC = () => {
       const runId = await createRunFromTemplate(session.id, {
         date: new Date().toISOString().split('T')[0],
         poolName: 'Live',
-        poolLength: session.poolLength,
       })
       const run = await getRun(runId)
       const { groups, virtualSwimmers } = await buildStartLanes(null, { prefillTempSwimmers: false })
@@ -197,7 +196,6 @@ export const LiveDeck: React.FC = () => {
                 <Icon name="pool" color="primary" />
                 <div className="min-w-0">
                   <span className="block font-bold text-on-surface truncate">{s.name}</span>
-                  <span className="block text-label-sm text-on-surface-variant">{s.poolLength}m pool</span>
                 </div>
               </div>
               <span className="flex items-center gap-1 text-primary font-bold text-sm shrink-0">

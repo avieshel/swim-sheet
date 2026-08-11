@@ -21,6 +21,7 @@ vi.mock('../../db/dao', () => ({
     { id: '1', name: 'Alice', group: 'A', notes: '', createdAt: '', updatedAt: '' },
     { id: '2', name: 'Bob', group: 'A', notes: '', createdAt: '', updatedAt: '' },
   ]),
+  DEFAULT_EQUIPMENT: ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard'],
 }))
 
 const makeGroup = (id: string, lane: number, name: string, swimmers: TimedGroup['swimmers']): TimedGroup => ({

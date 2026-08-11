@@ -35,14 +35,14 @@ export function createSessionsRouter(db: Database): Router {
 
   router.post('/', (req, res) => {
     try {
-      const { name, pool_length, notes } = req.body
+      const { name, notes } = req.body
       if (!name) {
         return res.status(400).json({ error: 'Validation failed', details: { name: 'required' } })
       }
       const id = randomUUID()
       const now = new Date().toISOString()
-      db.prepare('INSERT INTO sessions (id, name, pool_length, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(id, name.trim(), Number(pool_length) || 25, notes?.trim() || null, now, now)
+      db.prepare('INSERT INTO sessions (id, name, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+        .run(id, name.trim(), notes?.trim() || null, now, now)
       const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id)
       res.status(201).json(session)
     } catch (error) {

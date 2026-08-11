@@ -24,7 +24,6 @@ export const SessionsList: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [showNewForm, setShowNewForm] = useState(false)
   const [formName, setFormName] = useState('')
-  const [formPoolLength, setFormPoolLength] = useState('25')
 
   // Confirmation state
   const [confirmState, setConfirmState] = useState<{
@@ -75,12 +74,10 @@ export const SessionsList: React.FC = () => {
     if (!formName.trim()) return
     await createSession({
       name: formName.trim(),
-      poolLength: Number(formPoolLength) || 25,
       notes: '',
     })
     setShowNewForm(false)
     setFormName('')
-    setFormPoolLength('25')
     loadSessions()
   }
 
@@ -169,15 +166,6 @@ export const SessionsList: React.FC = () => {
                 className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
               />
             </div>
-            <div>
-              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Default Pool Length (m)</label>
-              <input
-                type="number"
-                value={formPoolLength}
-                onChange={e => setFormPoolLength(e.target.value)}
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
-              />
-            </div>
           </div>
           <div className="flex gap-3 mt-6">
             <button
@@ -246,11 +234,6 @@ export const SessionsList: React.FC = () => {
                     </button>
                   </div>
                   <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Icon name="straighten" size="sm" />
-                      {s.poolLength}m
-                    </span>
-                    <span className="text-outline">·</span>
                     <span className="flex items-center gap-1">
                       <Icon name="fitness_center" size="sm" />
                       {s.drillCount} drills

@@ -46,12 +46,12 @@ const makeSwimmer = (overrides: Partial<Swimmer>): Swimmer => ({
 })
 
 const makeBlob = (swimmers: SavedDrillData['swimmers'], overrides: Partial<SavedDrillData> = {}): string =>
-  JSON.stringify({ drillStart: 0, drillEnd: 60000, sessionStartedAt: 0, swimmers, ...overrides })
+  JSON.stringify({ drillStart: 0, drillEnd: 60000, sessionStartedAt: 0, poolLength: 25, swimmers, ...overrides })
 
 describe('runHistoryService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Tuesday Endurance', poolLength: 25, notes: '', createdAt: '', updatedAt: '' })
+    mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Tuesday Endurance', notes: '', createdAt: '', updatedAt: '' })
   })
 
   it('returns empty history for an empty database', async () => {

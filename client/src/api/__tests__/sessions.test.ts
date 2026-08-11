@@ -36,7 +36,7 @@ describe('sessions API', () => {
   })
 
   it('createSession delegates to sessionService.create', async () => {
-    const data = { name: 'Test', poolLength: 25 }
+    const data = { name: 'Test' }
     vi.mocked(sessionService.create).mockResolvedValue('new-id')
     const result = await createSession(data as SafeSession)
     expect(sessionService.create).toHaveBeenCalledWith(data)
