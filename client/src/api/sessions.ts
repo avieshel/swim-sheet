@@ -5,8 +5,8 @@ export function listSessions(): Promise<Session[]> {
   return sessionService.list()
 }
 
-export function listAllSessions(): Promise<Session[]> {
-  return sessionService.listAll()
+export function listSessionsByUsage(): Promise<Session[]> {
+  return sessionService.listByUsage()
 }
 
 export function getSession(id: string): Promise<Session | undefined> {

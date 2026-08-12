@@ -9,6 +9,7 @@ import {
   getSession, getDrillsForSession, getAllSessions, addSession, addDrill, getAllLaps as daoGetAllLaps,
   searchSwimmers,
   addSwimmer,
+  deleteSessionRunCascade,
 } from '../db/dao'
 import { db } from '../db/schema'
 import type { SafeSessionRun, SafeRunDrill, SafeLaneDrillResult, SafeLap, SavedDrillData } from '../db/schema'
@@ -71,7 +72,14 @@ export interface CompleteLaneMarker {
 export const runService = {
   getActive: () => getActiveRun(),
   get: (id: string) => getSessionRun(id),
-  create: (data: SafeSessionRun) => addSessionRun(data),
+  create: async (data: SafeSessionRun): Promise<string> => {
+    // Enforce single active session: delete any existing active run
+    const existing = await getActiveRun()
+    if (existing) {
+      await deleteSessionRunCascade(existing.id!)
+    }
+    return addSessionRun(data)
+  },
   update: (id: string, data: Partial<SafeSessionRun>) => updateSessionRun(id, data),
   complete: (id: string) => completeSessionRun(id),
 

@@ -1,5 +1,5 @@
 import type { TimedGroup } from '../context/LiveSessionContext'
-import { listTempSwimmerNames, quickSessionTempSwimmerThreshold } from './constants'
+import { listTempSwimmerNames } from './constants'
 import { getSwimmerCount } from './stats'
 
 export interface RunLaneSetup {
@@ -8,28 +8,28 @@ export interface RunLaneSetup {
 }
 
 export interface StartLaneOptions {
-  // When true (used for the default/quick session), a small roster
-  // (realSwimmerCount <= TEMP_SWIMMER_THRESHOLD) pre-populates a hint:
-  // Lane 1 gets 2 temp swimmers, Lane 2 gets 1 — a newer coach sees that
-  // lanes can hold multiple swimmers and that more lanes exist.
+  // When true (used for the default/quick time session), lanes are pre-populated
+  // ONLY while the roster is empty (0 real swimmers): Lane 1 gets 2 temp
+  // swimmers, Lane 2 gets 1. This lets a brand-new coach clock a quick time
+  // immediately. Once the coach has added any real swimmer, quick time opens
+  // with empty lanes like every template session.
   prefillTempSwimmers?: boolean
 }
 
-// Shared start-lane construction. Both the quick session and a template session
-// started from the Live menu always get 2 lanes (the app supports up to 8, but
-// new sessions never instantiate that max up front).
+// Shared start-lane construction. Both the quick time session and a template
+// session started from the Live menu always get 2 lanes (the app supports up to
+// 8, but new sessions never instantiate that max up front).
 //
-// Temp swimmers are ONLY added for the default/quick session — custom template
-// sessions always start with two empty lanes so the coach assigns their own
-// swimmers.
+// Temp swimmers are ONLY added for the quick time session when the real roster
+// is empty — custom template sessions always start with two empty lanes so the
+// coach assigns their own swimmers.
 function buildLandingLanes(
   realSwimmerCount: number,
   drillId: string | null,
   options: StartLaneOptions,
 ): RunLaneSetup {
-  const threshold = quickSessionTempSwimmerThreshold()
   const tempNames = listTempSwimmerNames()
-  const addHint = options.prefillTempSwimmers === true && realSwimmerCount <= threshold
+  const addHint = options.prefillTempSwimmers === true && realSwimmerCount === 0
   const virtualSwimmers = addHint
     ? [
         { name: tempNames[0], dbId: `quick-${Date.now()}`, lane: 1 },
@@ -53,8 +53,8 @@ function buildLandingLanes(
   return { groups, virtualSwimmers }
 }
 
-// Create the start-lane setup for a freshly created live session. The default/
-// quick session passes prefillTempSwimmers: true; a template session passes
+// Create the start-lane setup for a freshly created live session. The quick
+// time session passes prefillTempSwimmers: true; a template session passes
 // false (or omits it) so it gets two empty lanes only.
 export async function buildStartLanes(drillId: string | null, options: StartLaneOptions = {}): Promise<RunLaneSetup> {
   const realSwimmerCount = await getSwimmerCount()

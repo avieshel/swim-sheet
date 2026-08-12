@@ -9,6 +9,7 @@ const mockDao = vi.hoisted(() => ({
   getDrillsForSession: vi.fn(),
   getCompletedRuns: vi.fn(),
   getActiveRun: vi.fn(),
+  getSessionRunUsage: vi.fn(),
   seedDefaultSessions: vi.fn(),
 }))
 
@@ -38,6 +39,23 @@ describe('sessionService', () => {
     expect(mockDao.seedDefaultSessions).not.toHaveBeenCalled()
     expect(mockDao.getAllSessions).toHaveBeenCalledOnce()
     expect(result).toEqual(expected)
+  })
+
+  it('listByUsage ranks sessions by use count, then recency, then creation', async () => {
+    mockDao.getAllSessions.mockResolvedValue([
+      { id: 'a', name: 'A', createdAt: '2026-01-01T00:00:00.000Z' },
+      { id: 'b', name: 'B', createdAt: '2026-01-02T00:00:00.000Z' },
+      { id: 'c', name: 'C', createdAt: '2026-01-03T00:00:00.000Z' },
+      { id: 'd', name: 'D', createdAt: '2026-01-04T00:00:00.000Z' },
+    ])
+    mockDao.getSessionRunUsage.mockResolvedValue([
+      { sessionId: 'c', count: 3, lastUsedAt: 200 },
+      { sessionId: 'b', count: 1, lastUsedAt: 999 },
+      { sessionId: 'a', count: 1, lastUsedAt: 100 },
+    ])
+    const result = await sessionService.listByUsage()
+    expect(result.map(s => s.id)).toEqual(['c', 'b', 'a', 'd'])
+    expect(mockDao.seedDefaultSessions).not.toHaveBeenCalled()
   })
 
   it('get calls getSession with id', async () => {

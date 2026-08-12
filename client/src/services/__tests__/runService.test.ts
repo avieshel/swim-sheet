@@ -6,6 +6,7 @@ const mockDao = vi.hoisted(() => ({
   getSessionRun: vi.fn(),
   getActiveRun: vi.fn(),
   completeSessionRun: vi.fn(),
+  deleteSessionRunCascade: vi.fn(),
   getRunDrillsForRun: vi.fn(),
   getRunDrill: vi.fn(),
   addRunDrill: vi.fn(),

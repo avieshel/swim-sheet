@@ -76,7 +76,7 @@ Functions:
   - `completeRun(id)`: Finalize completed run
   - `completeRunWithLaps(runId, laps)`: Complete with lap data
   - `createRunFromTemplate(sessionId, data)`: Start run from template
-  - `createQuickStartRun()`: Quick auto-start with default setup
+  - `createQuickStartRun()`: Create the default quick-time run (selected from the Live picker)
 
 - **Run Drills**
   - `getRunDrills(runId)`: Get drills for active session

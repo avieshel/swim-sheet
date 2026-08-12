@@ -182,13 +182,13 @@ Global drill library.
 ### LiveDeck (`/`)
 Real-time coaching view with Timed Groups. This is the root route — the app's default entry point.
 
-**Quick Timer Auto-Start** (no active run, initial mount):
-- LiveDeck automatically creates a quick-start session and enters the active run view with:
-  - 2 lanes: Lane 1 ("Michael Phelps" — 1 swimmer), Lane 2 ("Katie Ledecky" + "Caeleb Dressel" — 2 swimmers, hints at multi-swimmer capability)
-  - Default drill: 100m Freestyle
-  - Auto-start is `useRef`-guarded — fires only once per mount when no active run exists
-  - Per-lane controls: "Add Swimmer" (saves a real roster swimmer) and "Temp Swimmer" (adds a random famous swimmer name)
-- After completing a session, `autoStartedRef` is reset — next visit to `/` auto-starts a fresh quick-time session (no intermediate landing screen)
+**Live Picker** (no active run): the app **never auto-starts** a session. The Live screen shows a picker with a pinned **"100m freestyle quick time"** card first, then session templates ranked by **usage** (most-used, then most-recently-used, then newest). Selecting quick time with an **empty roster (0 real swimmers)** starts with 2 lanes:
+- Lane 1 ("Michael Phelps" + "Katie Ledecky" — 2 temp swimmers, hints at multi-swimmer capability), Lane 2 ("Caeleb Dressel" — 1 temp swimmer, hints more lanes exist)
+- Default drill: 100m Freestyle
+- A notice modal explains the temp swimmers were auto-added and can be removed now or swapped for real swimmers later
+- With any real swimmer on the roster, quick time (and every template) starts with **2 empty lanes** — temp hints are never pre-populated
+- Per-lane controls: "Add Swimmer" (saves a real roster swimmer) and "Temp Swimmer" (adds a random famous swimmer name)
+- After completing a session, the picker is shown again (fresh start; never auto-starts)
 
 **Active Run View** (run in progress):
 - **Session header box**: session name, "Live" indicator with pulsing dot, wall-time start (e.g. "Started 14:30"), date/pool/drill count, Play/Pause toggle, Lane Editor (pencil icon), Reset, Complete buttons
@@ -226,7 +226,7 @@ The LiveDeck supports two view modes to accommodate different coaching styles:
   - **Lanes panel (bottom, collapsible)** — a **collapsible container** for lane cards. The collapsed header is a **summary strip** ("Lanes · N lanes · N swimmers" + chevron); expanding shows a **responsive grid** (`r-grid` with a 360px minimum) so two lanes sit **side by side on wide screens** and **stack one under the other on mobile**.
   - **Lane cards are slim and assignment-focused** (`client/src/components/LaneCard.tsx`) — one per lane (**including empty lanes**): a big `L{n}` badge, lane name, **swimmer count** ("N swimmers assigned"), swimmer chips, a `casino` **quick-add temp swimmer** button, and a **Manage Swimmers** button (opens the lane editor scoped to that lane). Empty lanes show a dashed "Add Temp Swimmer" / "Manage Swimmers" card. **No note field, no in-card drill card, no Mark Done / Time buttons** — timing happens from drill-row "Time" buttons or the timing-mode `GroupCard`.
   - **Lane layout** — sessions start with **2 default lanes** (the app supports **up to 8 lanes**, but new sessions never instantiate 8).
-  - Temp (hint) swimmers are pre-populated **only for the default quick session**: while the real roster is ≤ `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD` (15), Lane 1 starts with 2 temp swimmers and Lane 2 with 1; above the threshold and for **every custom template session**, lanes start **empty** so the coach assigns their own swimmers.
+  - Temp (hint) swimmers are pre-populated **only for the quick time session and only while the real roster is empty (0 swimmers)**: Lane 1 starts with 2 temp swimmers and Lane 2 with 1. Once the coach has any real swimmer, quick time and **every custom template session** start with lanes **empty** so the coach assigns their own swimmers. When temp swimmers are auto-added, a notice modal explains they can be removed or later swapped for real swimmers.
   - No per-swimmer rows and no timers in the overview. The primary action is "Time" (per drill row) to enter timing for a drill.
 
 **Session-level progress and lane summary live in the session header** (owned by `ActiveRunView.tsx`, not OverviewView): a full-width **progress bar** with `done / total` and %, plus **per-lane chips** (`L{n}` + swimmer count + edit icon) that each call `openLaneEditor(lane)` to open the lane editor focused on that lane. Logical-drill counting (each repetition-group counts once per lane) is computed in `client/src/utils/sessionProgress.ts` (`computeSessionProgress`, `groupDrillRows`, `stripRepPrefix`), which also drives the structure table's repetition grouping.

@@ -43,7 +43,7 @@ All management actions (CRUD) work fully offline using IndexedDB. Changes sync w
 1. Coach opens app → sees Welcome/Splash screen
 2. Adds first swimmer (or multiple) via SwimmersList
 3. Creates first session template via SessionsList
-4. Selects session in LiveDeck (quick-time auto-start) or sets up from scratch
+4. Selects quick time or a template in the LiveDeck picker (ranked by usage) or sets up from scratch
 5. Adds drills to session, configures timing lanes
 6. Starts session, begins live timing
 

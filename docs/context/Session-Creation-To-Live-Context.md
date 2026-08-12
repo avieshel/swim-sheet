@@ -32,7 +32,7 @@ Initiative 2 (`service/runHistoryService.ts`).
 | Template creation | Bare inline form: **name + pool length only** (no drills, no guidance). Coach must create a shell, then go into the editor. | `SessionsList.tsx:176-215` (`showNewForm` block) |
 | Drill assembly | Done entirely in `SessionDetail` — up/down arrows, drill bank sidebar, `DrillEditorModal`. | `SessionDetail.tsx:484-730` |
 | **Promote to live** | **Does not exist anywhere in the UI.** `createRunFromTemplate` is dead to the UI — it is only called by `createQuickStartRun`. Docs claim a "Run" action on template cards, but no such button/code exists. | `api/runs.ts:58`, `services/runService.ts:126-201,203-243` |
-| Run hand-off | `LiveDeck` auto-starts a **quick-time** run whenever no active run exists. There is no way to start a *planned* run from a chosen template. | `LiveDeck.tsx:1181-1197` |
+| Run hand-off | `LiveDeck` shows the **Live picker** (never auto-starts): a pinned quick-time card plus template sessions ranked by usage. Selecting a template starts a planned run via `createRunFromTemplate`. | `LiveDeck.tsx` |
 | Active-run init | The planned-run init path already rebuilds groups from `RunSwimmer` links — so handed-off planned runs render correctly today, with one caveat (no drill pre-selected). | `LiveDeck.tsx:1146-1172` |
 | Default quick session | URL session `'Quick 100m freestyle (default)'` is created on demand as a **normal, visible** template. | `runService.ts:203-230` |
 
@@ -54,12 +54,12 @@ Decisions derived from this:
   identical in treatment to any other template card. It is **never hidden** by a
   "system"/`isQuickStart` filter.
 - **It is editable and renamable like any template.** If a coach renames or deletes it,
-  the next Quick Time auto-start recreates a fresh default template (`runService.ts:203-230`
+  the next Quick Time selection recreates a fresh default template (`runService.ts:203-230`
   already finds-on-demand by name). This is acceptable and simple; the lookup resilience
   (G-5 below) is a hardening option, not a blocker.
 - **Starting that template from the live/promotion flow is a normal planned run** — it is
-  not special-cased. The quick-time *auto-start* path (only when there is no active run)
-  is what populates its virtual swimmers.
+  not special-cased. The **quick time *selection*** path (from the Live picker) is what
+  populates its virtual swimmers (only while the roster is empty).
 - The default template carries the friendly label **"Quick Time — 100m Freestyle"** and a
   recognizable pool icon in the header so coaches understand it is the bootstrap session.
 

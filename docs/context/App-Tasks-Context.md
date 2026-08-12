@@ -107,7 +107,7 @@ All default to `stroke: 'freestyle'` with `distance` set in the seed array. Name
 
 **Problem**: New coach cannot start timing without first defining swimmers and a session template.
 
-**Solution**: "Quick Time" — app opens to `/` (root route) which auto-starts a quick-time session immediately (no picker, no taps). A run is created from the pre-configured **"Quick 100m freestyle (default)"** session template with a 100m freestyle drill and 3 default temp swimmers (Michael Phelps in Lane 1, Katie Ledecky + Caeleb Dressel in Lane 2), plus "Add Swimmer" / "Temp Swimmer" buttons to scale up instantly. The default session is a regular visible session — users can edit or delete it.
+**Solution**: "Quick Time" — the app opens to `/` (root route) and shows the **Live picker** (never auto-starts): a pinned **"100m freestyle quick time"** card first, then session templates ranked by usage. Selecting quick time creates a run from the pre-configured **"Quick 100m freestyle (default)"** session template with a 100m freestyle drill and, **only when the real roster is empty (0 swimmers)**, 3 default temp swimmers (Lane 1: Michael Phelps + Katie Ledecky; Lane 2: Caeleb Dressel) plus a notice modal; with any real swimmer the lanes start empty. "Add Swimmer" / "Temp Swimmer" buttons scale up instantly. The default session is a regular visible session — users can edit or delete it.
 
 **Design doc**: `docs/context/Quick-Start-Context.md`
 
@@ -119,8 +119,8 @@ All default to `stroke: 'freestyle'` with `distance` set in the seed array. Name
 2. **Service** (`client/src/services/sessionService.ts`): Removed system session filter — all sessions now visible
 3. **LiveDeck** (`client/src/pages/LiveDeck.tsx`):
    - Removed `SessionPicker` component — no dropdown, no "Start Timing" button
-   - Auto-start behavior via `useRef`-guarded `handleQuickStart()` — fires once when no active run exists
-   - `handleQuickStart` creates 3 virtual swimmers: Lane 1 (1 swimmer), Lane 2 (2 swimmers — hints at multi-swimmer capability)
+   - The Live picker is always shown (no auto-start): pinned "100m freestyle quick time" card + templates ranked by usage
+   - `handleQuickStart` creates 3 virtual swimmers (Lane 1: 2, Lane 2: 1 — multi-swimmer/multi-lane hints) **only when the roster is empty**, and shows a notice modal
    - Page refresh recovery: virtual swimmer state serialized in `SessionRun.notes` JSON, restored grouped by lane
    - `handleComplete` guard: skip Lap creation for swimmers with `"quick-"` prefixed `dbId`
 4. **App routing** (`client/src/App.tsx`): Root `/` → `LiveDeck`, `/dashboard` → `CoachDashboard`
@@ -129,14 +129,14 @@ All default to `stroke: 'freestyle'` with `distance` set in the seed array. Name
 **Key design decisions**:
 - **No schema changes needed** — default session is a regular Session record, uses existing `createRunFromTemplate` path
 - **Visible default session** — "Quick 100m freestyle (default)" appears in Sessions list, users can edit/delete it
-- **App opens to `/`** — auto-starts quick-time session immediately, fastest path to value (no picker, no taps)
-- **Lane 2 has 2 swimmers** — hints that multiple swimmers per lane are supported
+- **App opens to `/`** — shows the Live picker (quick time pinned first + templates ranked by usage); quick time is one tap away
+- **Lane 2 has 2 swimmers** — hints that multiple swimmers per lane are supported (empty-roster quick time only)
 - Virtual swimmers get synthetic `dbId: "quick-..."` — must be skipped in `handleComplete` Lap loop
 - Page refresh recovery: virtual swimmer state serialized in `SessionRun.notes` JSON
 - Full data model compatibility — history/review works identically for quick-time and full sessions
 
 **Priority**: High
-**Status**: Done — All steps completed. Quick Time Lap fully functional with auto-start, swimmer management, and name editing.
+**Status**: Done — All steps completed. Quick Time fully functional with an always-on Live picker, empty-roster temp-swimmer hints (+ notice modal), swimmer management, and name editing.
 
 ---
 
@@ -485,10 +485,12 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Root cause**: `LiveDeck` unconditionally auto-fired `handleQuickStart()` whenever no active run existed (`LiveDeck.tsx` root effect), so there was never a way to start any other session template.
 
-**Solution**: `LiveDeck` now loads session templates when no active run exists and branches:
+**Solution** (superseded — see current behavior below): `LiveDeck` loaded session templates when no active run exists and branched:
 - 0 templates → auto quick-start (creates the default 100m freestyle run) — path-to-value preserved.
 - 1 template → auto-selected; if it's the default quick-start session (`Quick 100m freestyle (default)`) quick-start runs, otherwise `createRunFromTemplate` starts it.
 - >1 templates → a "Start a Session" picker lists the templates (tap to start via `createRunFromTemplate`, using the template's pool length) plus an "or quick-start the default 100m freestyle" option.
+
+**Current behavior**: Auto-start has been **removed entirely**. `LiveDeck` always shows the Live picker — a pinned **"100m freestyle quick time"** card first, then template sessions ranked by usage (most-used → most-recently-used → newest). Selecting any option starts the run; if an active run exists it is restored.
 
 **Files**: `client/src/pages/LiveDeck.tsx`
 

@@ -33,7 +33,14 @@ export async function updateSwimmer(id: string, data: Partial<SafeSwimmer>): Pro
 }
 
 export async function deleteSwimmer(id: string): Promise<void> {
-  await db.swimmers.delete(id)
+  // Surgical hard-delete: remove the swimmer's run links and timing laps so no
+  // orphaned references remain, but keep runs and laneResult data blobs (they
+  // store the swimmer's name + times, so history stays readable).
+  await db.transaction('rw', [db.runSwimmers, db.laps, db.swimmers], async () => {
+    await db.runSwimmers.where('swimmer_id').equals(id).delete()
+    await db.laps.where('swimmer_id').equals(id).delete()
+    await db.swimmers.delete(id)
+  })
 }
 
 // ── Session Templates ─────────────────────────────────────
@@ -140,6 +147,23 @@ export async function getSessionRun(id: string): Promise<SessionRun | undefined>
 export async function getCompletedRuns(): Promise<SessionRun[]> {
   const runs = await db.sessionRuns.where('status').equals('completed').toArray()
   return runs.sort((a, b) => b.date.localeCompare(a.date))
+}
+
+export async function getSessionRunUsage(): Promise<{ sessionId: string; count: number; lastUsedAt: number }[]> {
+  const runs = await db.sessionRuns.toArray()
+  const usage = new Map<string, { count: number; lastUsedAt: number }>()
+  for (const run of runs) {
+    const current = usage.get(run.session_id) ?? { count: 0, lastUsedAt: 0 }
+    current.count += 1
+    const ts = run.session_started_at ?? new Date(run.createdAt).getTime()
+    if (ts > current.lastUsedAt) current.lastUsedAt = ts
+    usage.set(run.session_id, current)
+  }
+  return Array.from(usage.entries()).map(([sessionId, value]) => ({
+    sessionId,
+    count: value.count,
+    lastUsedAt: value.lastUsedAt,
+  }))
 }
 
 export async function addSessionRun(data: SafeSessionRun): Promise<string> {

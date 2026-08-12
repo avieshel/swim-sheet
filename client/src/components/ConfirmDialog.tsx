@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
+  onBackdropDismiss?: () => void
   children?: ReactNode
 }
 
@@ -24,6 +25,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmDisabled = false,
   onConfirm,
   onCancel,
+  onBackdropDismiss,
   children,
 }) => {
   useEffect(() => {
@@ -38,7 +40,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onBackdropDismiss?.()
+        }
+      }}
     >
       <div
         className="bg-surface-container-lowest w-full max-w-sm rounded-2xl p-4 md:p-6 shadow-2xl text-center"

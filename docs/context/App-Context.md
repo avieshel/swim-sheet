@@ -120,7 +120,7 @@ SwimSheet/
 
 | Path | Page | Description |
 |------|------|-------------|
-| `/` | LiveDeck | Quick-time auto-start — active session runner (default entry) |
+| `/` | LiveDeck | Live picker (no auto-start): pinned "100m freestyle quick time" option + templates ranked by usage; resumes an active run |
 | `/live` | LiveDeck | Alias for `/` (legacy compatibility) |
 | `/dashboard` | CoachDashboard | Home with hero, hub tiles, stats |
 | `/swimmers` | SwimmersList | Roster grid with search |

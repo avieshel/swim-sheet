@@ -87,6 +87,8 @@ A student/athlete registered by the coach.
 - Client API: `createSwimmerIfNotExists()` service function checks for duplicates before creation
 - UI: `SwimmerFormModal` validates against existing roster swimmers
 
+**Deletion:** `deleteSwimmer(id)` is a surgical hard-delete — it removes the swimmer's `runSwimmers` links and `laps`, but **keeps** the session runs and `laneDrillResult.data` blobs. Those blobs store the swimmer's name + times (`SavedSwimmerData`), so past sessions still render their name/times as a virtual entry instead of "Unknown Swimmer".
+
 ### Session (Template)
 Reusable training plan blueprint.
 

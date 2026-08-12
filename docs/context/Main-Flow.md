@@ -15,8 +15,8 @@ All user journeys the application supports, organized by flow.
 
 ### Flow: First-time user (roster = 0)
 
-1. Open app → `/` root route: with no templates (or only the default 100m freestyle), quick-time auto-starts immediately (no picker, no taps). With multiple templates, a session picker appears so the coach chooses which template to start.
-2. Live view appears with **2 lanes** (the default — the app supports up to 8 lanes but never instantiates that many up front):
+1. Open app → `/` root route: the **Live picker** always shows — **no auto-start**. Options are the pinned **"100m freestyle quick time"** card first, followed by any session templates ranked by **usage** (most-used first). With no templates the picker shows only the quick time option.
+2. Selecting **quick time** with an empty roster opens the Live view with **2 lanes**:
    - Lane 1: "Michael Phelps" + "Katie Ledecky" (2 temp swimmers — hints that a lane can hold more than one swimmer)
    - Lane 2: "Caeleb Dressel" (1 temp swimmer — hints that more than one lane exists)
    - On wide screens the two lanes sit side by side; on mobile they stack one under the other.
@@ -28,18 +28,18 @@ All user journeys the application supports, organized by flow.
 8. "Add Swimmer" / "Temp Swimmer" buttons to grow the session
 9. Inline editing of swimmer names and drill attributes
 10. Name edit → non-blocking promotion chip ("Save to roster?" or "Link to existing?")
-11. "Complete" button → saves all data, returns to fresh auto-start state
+11. "Complete" button → saves all data, returns to the Live picker (fresh start; never auto-starts)
 
-### Flow: Small roster (fewer than `T` swimmers, `T` = `QUICK_SESSION_TEMP_SWIMMER_THRESHOLD`, default 15)
+### Flow: Small roster (no real swimmers → temp hints)
 
-1. Same auto-start as above — hint temp swimmers are still pre-populated
+1. Quick time selected with **0 real swimmers**: a notice modal explains that temp swimmers were auto-added to let the coach clock a quick time, and that they can be removed or later swapped for real swimmers. Lanes start with the temp hints
 2. "Add Swimmer" shows dropdown menu: roster swimmers + "Temp Swimmer" option
 3. Selecting roster swimmer → creates lane with real swimmer (UUID dbId, no promotion needed)
 4. Selecting "Temp Swimmer" → virtual swimmer with next famous name
 
-### Flow: Established roster (≥ T swimmers — coach is already familiar with the app)
+### Flow: Established roster (≥ 1 real swimmer)
 
-1. Auto-start still creates **2 empty default lanes** but **no pre-populated temp swimmers** — the coach assigns real roster swimmers via the lane editor instead
+1. Quick time and every template session start with **2 empty default lanes** — no temp swimmers are pre-populated (temp hints only appear while the roster is empty); the coach assigns real roster swimmers via the lane editor instead
 2. "Add Swimmer" / lane quick-add offers roster swimmers + "Temp Swimmer" as needed
 3. Most recent RunSwimmer links can be surfaced as likely candidates (future enhancement)
 
