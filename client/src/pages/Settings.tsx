@@ -53,8 +53,8 @@ export const Settings: React.FC = () => {
   })
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [showResetDataDialog, setShowResetDataDialog] = useState(false)
-  const [poolLengthPreset, setPoolLengthPreset] = useState<'25' | '50' | 'custom'>('25')
-  const [poolLengthCustom, setPoolLengthCustom] = useState('25')
+  const [poolLengthValue, setPoolLengthValue] = useState('25')
+  const [poolLengthCustom, setPoolLengthCustom] = useState('')
 
   // Team names state
   const [newTeamName, setNewTeamName] = useState('')
@@ -92,12 +92,8 @@ export const Settings: React.FC = () => {
         auto_save: !!data.auto_save,
         data_retention_days: (data.data_retention_days || 90).toString(),
       })
-      if (pl === 25) {
-        setPoolLengthPreset('25')
-      } else if (pl === 50) {
-        setPoolLengthPreset('50')
-      } else {
-        setPoolLengthPreset('custom')
+      setPoolLengthValue(pl.toString())
+      if (pl !== 25 && pl !== 50) {
         setPoolLengthCustom(pl.toString())
       }
       if (data.theme && data.theme !== 'auto') {
@@ -184,9 +180,7 @@ export const Settings: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    const poolLength = poolLengthPreset === 'custom'
-      ? Math.min(100, Math.max(1, Number(poolLengthCustom) || 25))
-      : Number(poolLengthPreset)
+    const poolLength = Math.min(100, Math.max(1, Number(poolLengthValue) || 25))
     await updateSettings({
       team_name: form.team_name,
       coach_name: form.coach_name,
@@ -219,8 +213,8 @@ export const Settings: React.FC = () => {
       auto_save: true,
       data_retention_days: '90',
     })
-    setPoolLengthPreset('25')
-    setPoolLengthCustom('25')
+    setPoolLengthValue('25')
+    setPoolLengthCustom('')
     setShowResetConfirm(false)
     navigate('/')
   }
@@ -323,6 +317,119 @@ export const Settings: React.FC = () => {
           </div>
         </section>
 
+        {/* General App Settings */}
+        <section>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">General App Settings</h2>
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
+            <div className="space-y-4">
+              <div>
+                <label className="font-label-sm text-on-surface block mb-2">
+                  Default Pool Length
+                </label>
+                <div className="flex items-center flex-wrap gap-2">
+                  {[25, 50].map(v => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        const s = String(v)
+                        setPoolLengthValue(s)
+                        setForm(prev => ({ ...prev, pool_length: s }))
+                        updateSettings({ pool_length: v })
+                      }}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer border ${
+                        Number(poolLengthValue) === v && poolLengthValue === String(v)
+                          ? 'bg-primary text-on-primary border-primary'
+                          : 'bg-surface text-on-surface-variant/50 border-outline-variant hover:border-primary/50'
+                      }`}
+                    >
+                      {v}m
+                    </button>
+                  ))}
+                  <div className={`flex items-center gap-1 rounded-xl border overflow-hidden transition-all ${
+                    Number(poolLengthValue) !== 25 && Number(poolLengthValue) !== 50
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-surface text-on-surface border-outline-variant focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20'
+                  }`}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      placeholder="1–100"
+                      value={poolLengthCustom}
+                      onChange={e => {
+                        const val = e.target.value
+                        setPoolLengthCustom(val)
+                        const num = Number(val)
+                        if (num >= 1 && num <= 100) {
+                          setPoolLengthValue(val)
+                          setForm(prev => ({ ...prev, pool_length: val }))
+                          updateSettings({ pool_length: num })
+                        }
+                      }}
+                      className={`w-20 px-2 py-2 bg-transparent text-sm tabular-nums text-center outline-none border-none ${
+                        Number(poolLengthValue) !== 25 && Number(poolLengthValue) !== 50
+                          ? 'text-on-primary'
+                          : 'text-on-surface'
+                      }`}
+                    />
+                    <span className={`text-sm pr-2 ${
+                      Number(poolLengthValue) !== 25 && Number(poolLengthValue) !== 50
+                        ? 'text-on-primary'
+                        : 'text-on-surface-variant'
+                    }`}>m</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-label-sm text-on-surface block mb-2">
+                  Default Equipment
+                </label>
+                <div className="flex flex-wrap gap-2 min-h-[2rem] mb-2">
+                  {equipmentItems.map(item => (
+                    <div key={item} className="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-3 py-1.5 rounded-full text-sm font-bold">
+                      <span>{item}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleEquipRemove(item)}
+                        className="ml-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newEquipName}
+                    onChange={e => setNewEquipName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleEquipAdd() } }}
+                    placeholder="Add equipment item..."
+                    className="flex-1 bg-surface text-on-surface px-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleEquipAdd}
+                    disabled={!newEquipName.trim()}
+                    className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none text-sm"
+                  >
+                    Add
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleEquipReset}
+                  className="text-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none underline"
+                >
+                  Reset to defaults
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Application Preferences */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Application Preferences</h2>
@@ -330,140 +437,58 @@ export const Settings: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="font-label-sm text-on-surface block mb-2">
-                  Default Pool Length
+                  Font Size
                 </label>
-                <CustomSelect
-                  value={poolLengthPreset}
-                  options={[
-                    { value: '25', label: '25m' },
-                    { value: '50', label: '50m' },
-                    { value: 'custom', label: `${poolLengthCustom}m` },
-                  ]}
-                  onChange={(val) => {
-                    const v = val as '25' | '50' | 'custom'
-                    setPoolLengthPreset(v)
-                    const num = v === 'custom' ? Number(poolLengthCustom) : Number(v)
-                    if (v !== 'custom' || (num >= 1 && num <= 100)) {
-                      setForm(prev => ({ ...prev, pool_length: String(num) }))
-                      updateSettings({ pool_length: num })
-                    }
-                  }}
-                />
-                {poolLengthPreset === 'custom' && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={1}
-                      max={100}
-                      value={poolLengthCustom}
-                      onChange={e => {
-                        const val = e.target.value
-                        setPoolLengthCustom(val)
-                        const num = Number(val)
-                        if (num >= 1 && num <= 100) {
-                          setForm(prev => ({ ...prev, pool_length: val }))
-                          updateSettings({ pool_length: num })
-                        }
+                <div className="flex items-center gap-2">
+                  {(['small', 'medium', 'large'] as const).map(size => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, font_size: size }))
                       }}
-                      className={`w-24 bg-surface px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-center font-bold ${
-                        Number(poolLengthCustom) < 1 || Number(poolLengthCustom) > 100
-                          ? 'border-error text-error bg-error-container/10'
-                          : 'text-on-surface border-outline-variant focus:border-primary'
+                      className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all cursor-pointer border ${
+                        form.font_size === size
+                          ? 'bg-primary text-on-primary border-primary'
+                          : 'bg-surface text-on-surface-variant/50 border-outline-variant hover:border-primary/50'
                       }`}
-                    />
-                    <span className="text-on-surface-variant font-body-md">meters</span>
-                    {Number(poolLengthCustom) < 1 || Number(poolLengthCustom) > 100 ? (
-                      <span className="text-error text-label-sm font-bold">1–100m</span>
-                    ) : null}
-                  </div>
-                )}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
-                <label htmlFor="font_size" className="font-label-sm text-on-surface block mb-2">
-                  Font Size
+                <label htmlFor="theme" className="font-label-sm text-on-surface block mb-2">
+                  Theme
                 </label>
-                <select
-                  id="font_size"
-                  name="font_size"
-                  value={form.font_size}
-                  onChange={handleInputChange}
-                  className="w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                >
-                  <option value="small">Small</option>
-                  <option value="medium">Medium</option>
-                  <option value="large">Large</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="font-label-sm text-on-surface">
-                  Auto-save Sessions
-                </label>
-                <input
-                  type="checkbox"
-                  id="auto_save"
-                  name="auto_save"
-                  checked={form.auto_save}
-                  onChange={handleInputChange}
-                  className="w-12 h-6 bg-surface rounded-full border border-outline-variant appearance-none cursor-pointer peer-checked:bg-primary"
+                <CustomSelect
+                  value={form.theme}
+                  options={[
+                    { value: 'pool', label: 'Pool (Light)' },
+                    { value: 'open-water', label: 'Open Water (Dark)' },
+                    { value: 'auto', label: 'Automatic' },
+                  ]}
+                  onChange={(val) => {
+                    const newEvent = { target: { name: 'theme', value: val } } as React.ChangeEvent<HTMLSelectElement>
+                    handleInputChange(newEvent)
+                    if (val === 'auto') {
+                      delete document.documentElement.dataset.theme
+                    } else {
+                      document.documentElement.dataset.theme = val as string
+                    }
+                  }}
+                  className="w-full"
                 />
               </div>
             </div>
           </div>
         </section>
 
-        {/* Sync Settings */}
+        {/* Data Management */}
         <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Equipment</h2>
-          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2 min-h-[2rem]">
-                {equipmentItems.map(item => (
-                  <div key={item} className="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-3 py-1.5 rounded-full text-sm font-bold">
-                    <span>{item}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleEquipRemove(item)}
-                      className="ml-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newEquipName}
-                  onChange={e => setNewEquipName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleEquipAdd() } }}
-                  placeholder="Add equipment item..."
-                  className="flex-1 bg-surface text-on-surface px-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={handleEquipAdd}
-                  disabled={!newEquipName.trim()}
-                  className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none text-sm"
-                >
-                  Add
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={handleEquipReset}
-                className="text-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none underline"
-              >
-                Reset to defaults
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Sync Settings */}
-        <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Sync Settings</h2>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Data Management</h2>
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
@@ -495,15 +520,7 @@ export const Settings: React.FC = () => {
                   className="w-12 h-6 bg-surface rounded-full border border-outline-variant appearance-none cursor-pointer peer-checked:bg-primary"
                 />
               </div>
-            </div>
-          </div>
-        </section>
 
-        {/* Data Management */}
-        <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Data Management</h2>
-          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
-            <div className="space-y-4">
               {storageInfo && (
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
                   <span className="font-label-sm text-on-surface">Storage Used</span>
@@ -602,9 +619,9 @@ export const Settings: React.FC = () => {
         />
       </form>
 
-      {/* Language & Theme */}
+      {/* Language */}
       <section>
-        <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">App Configuration</h2>
+        <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Language</h2>
         <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
           <div className="space-y-4">
             <div>
@@ -621,29 +638,6 @@ export const Settings: React.FC = () => {
                   localStorage.setItem('selectedLanguage', val as string);
                   window.location.reload();
                 }}
-              />
-            </div>
-            <div>
-              <label htmlFor="theme" className="font-label-sm text-on-surface block mb-2">
-                Theme
-              </label>
-              <CustomSelect
-                value={form.theme}
-                options={[
-                  { value: 'pool', label: 'Pool (Light)' },
-                  { value: 'open-water', label: 'Open Water (Dark)' },
-                  { value: 'auto', label: 'Automatic' },
-                ]}
-                onChange={(val) => {
-                  const newEvent = { target: { name: 'theme', value: val } } as React.ChangeEvent<HTMLSelectElement>
-                  handleInputChange(newEvent)
-                  if (val === 'auto') {
-                    delete document.documentElement.dataset.theme
-                  } else {
-                    document.documentElement.dataset.theme = val as string
-                  }
-                }}
-                className="w-full"
               />
             </div>
           </div>
