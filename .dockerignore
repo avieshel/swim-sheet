@@ -5,6 +5,8 @@ client/dist
 client/dist/**
 server/dist
 server/dist/**
+server/data
+server/data/**
 **/.* 
 npm-debug.log
 Dockerfile

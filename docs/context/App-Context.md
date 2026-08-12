@@ -33,7 +33,7 @@ Offline-first PWA for swim coaches to track lap times, stroke counts, and athlet
 | Offline DB | Dexie.js 4 | IndexedDB wrapper — typed, queryable |
 | API | Custom `api/` wrappers | Consistent interface over Dexie + HTTP |
 | Services | Domain services | Business logic (runService, swimmerService, etc.) |
-| Sync | Custom sync engine | Last-write-wins with timestamps |
+| Sync | Custom sync engine | Push-only backup to server (never pulls data into the device) |
 | Install | PWA manifest + SW | Add to home screen, full offline |
 | Tests | Vitest (unit), Playwright (e2e) | Testing stack |
 | Static analysis | ESLint + tsc + knip | Lint, typecheck, dead-code detection (`npm run check`) |
@@ -51,9 +51,10 @@ Offline-first PWA for swim coaches to track lap times, stroke counts, and athlet
 
 ### Offline-First PWA
 - The app works fully offline using IndexedDB (Dexie)
-- The server is optional — needed for sync between devices and for first-time load
+- The server is optional — needed for first-time load and as a push-only backup target
 - PWA manifest enables "Add to Home Screen" on mobile
-- Service worker caches static assets
+- Service worker caches static assets only (never API responses)
+- **First run is always clean**: the client seeds only builtin templates (drill library, session catalog); it never contains or downloads previous/completed-session data. All coach session data is stored on the device.
 
 ### Client-Layer Architecture
 The client follows a four-layer architecture (enforced since architecture review):
@@ -137,5 +138,7 @@ Single Docker container (see `Dockerfile`):
 3. Builds the Express/TypeScript server
 4. Copies client build into server's `public` folder
 5. Starts server on port 3001
+
+The server creates a fresh SQLite DB at runtime (`/app/data/data.db`) — it is empty on boot. The local dev DB under `server/data/` (which may contain previous session data) is excluded from the Docker build context via `.dockerignore`, so it can never be baked into a downloaded image. Client data is never bundled either; the only static data shipped is builtin drill/session catalog templates.
 
 Development: run client (`npm run dev`) and server (`npm run dev`) separately. Client dev server proxies `/api` to server via Vite config.

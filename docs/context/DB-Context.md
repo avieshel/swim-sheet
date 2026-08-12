@@ -10,7 +10,7 @@ The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-fir
 - All CRUD operates against local IndexedDB via Dexie
 - The app works fully offline — the server is only needed for sync and first-time load
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
-- Schema versioning: current version is 4
+- Schema versioning: current version is 5
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
 
 ### Session → SessionRun (Template/Instance) Pattern
@@ -34,12 +34,12 @@ Drills have evolved beyond simple name/stroke/distance:
 - `repeatCount`, `timingMode`, `focus`, `labels` for drill classification
 - `LibraryDrill` is the global drill bank (builtin + personal + customized)
 
-### Sync (Last-Write-Wins)
+### Sync (Push-Only Backup to Server)
 - All tables include `updatedAt` / `updated_at` timestamp
-- Sync engine in `client/src/sync/` uses `fetch()` to push/pull from server
-- Conflicts resolved by most recent `updatedAt`
-- Sync pushes data in client format; server maps to snake_case
-- Backup/restore via localStorage serialization of all Dexie tables
+- Sync engine in `client/src/sync/syncEngine.ts` uses `fetch()` to **push** local data to the server (backup target)
+- The client **never pulls** data from the server — a device's database is empty on first run and is never seeded/injected with remote history
+- This guarantees a first-time user sees no previous/completed-session data; all session data lives on the device (Dexie) and sync is an outbound backup only
+- Backup/restore of the device DB itself is via localStorage serialization (`swimsheet_db_backup`)
 
 ### Naming Convention
 - Client: camelCase (`groupId`, `poolLength`, `updatedAt`)
