@@ -9,6 +9,15 @@
       "drillCount": 11,
       "totalDistance": 3200,
       "file": "distance-progression.json"
+    },
+    {
+      "id": "technique",
+      "name": "Technique",
+      "description": "Technique-focused freestyle session — body rotation, high-elbow catch, full pull, and coordination drills.",
+      "category": "technique",
+      "drillCount": 12,
+      "totalDistance": 2200,
+      "file": "technique.json"
     }
   ]
 }

@@ -34,12 +34,14 @@ Drills have evolved beyond simple name/stroke/distance:
 - `repeatCount`, `timingMode`, `focus`, `labels` for drill classification
 - `LibraryDrill` is the global drill bank (builtin + personal + customized)
 
-### Sync (Push-Only Backup to Server)
-- All tables include `updatedAt` / `updated_at` timestamp
-- Sync engine in `client/src/sync/syncEngine.ts` uses `fetch()` to **push** local data to the server (backup target)
-- The client **never pulls** data from the server — a device's database is empty on first run and is never seeded/injected with remote history
-- This guarantees a first-time user sees no previous/completed-session data; all session data lives on the device (Dexie) and sync is an outbound backup only
-- Backup/restore of the device DB itself is via localStorage serialization (`swimsheet_db_backup`)
+### Data Persistence & Backup (Local-Only)
+- All data lives on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). There is no server — the sync engine was removed and the client makes no `/api` calls.
+- **Persistent storage**: `navigator.storage.persist()` is requested once at startup (best-effort) to opt the origin out of automatic eviction. Status is surfaced in Settings.
+- **Automatic backup**: every mutation schedules a debounced (3s) write of the full DB snapshot to `localStorage` (`swimsheet_db_backup`), wired via Dexie table hooks (`creating`/`updating`/`deleting`) plus a startup save. Empty snapshots are never written (so a fresh install or a fully-wiped DB doesn't create a restorable empty backup).
+- **Backup format**: `{ formatVersion: 1, schemaVersion: 5, savedAt, tables }`. `restoreAllTables()` wipes + bulk-loads inside one transaction.
+- **Restore policy**: `ensureDbOpen()` restores from the backup **only** when (a) the DB opens but is empty, or (b) opening fails. It never restores a backup that is empty, is from an unsupported format, or was written by a newer schema (version guard). The backup is cleared after a successful restore. The previous behavior — restoring whenever a backup existed, and `db.delete()` on any open failure — was replaced.
+- **Manual export/import**: Settings → "Back up to file" downloads the same snapshot JSON; "Restore from file" validates and restores it after a confirm dialog. This is the only copy that survives device change / clear-site-data.
+- **Intentional wipes clear the backup** (`clearBackup()` runs in `deleteAllSwimmers` / `deleteAllSessions`) so an explicit reset isn't undone by an auto-restore.
 
 ### Naming Convention
 - Client: camelCase (`groupId`, `poolLength`, `updatedAt`)

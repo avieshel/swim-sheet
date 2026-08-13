@@ -1,6 +1,7 @@
 import React, { useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useActiveRun } from '../hooks/useActiveRun';
+import { settingsService } from '../services/settingsService';
 import { Icon } from './Icon';
 
 const navItems = [
@@ -18,14 +19,16 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const isActive = (path: string) => location.pathname.startsWith(path);
 
   useEffect(() => {
-    fetch('/api/v1/settings').then(r => {
-      if (!r.ok) return
-      return r.json()
-    }).then(data => {
+    settingsService.getSettings().then(data => {
       if (data?.theme && data.theme !== 'auto') {
         document.documentElement.dataset.theme = data.theme
       } else {
         delete document.documentElement.dataset.theme
+      }
+      if (data?.font_size && data.font_size !== 'medium') {
+        document.documentElement.dataset.fontSize = data.font_size
+      } else {
+        delete document.documentElement.dataset.fontSize
       }
     }).catch(() => {})
   }, [])

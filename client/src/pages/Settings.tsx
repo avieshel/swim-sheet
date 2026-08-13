@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT } from '../api/settings'
+import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, exportDatabase, importDatabase, getBackupInfo, getStoragePersistence, requestStoragePersistence, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
+import { downloadBlob } from '../utils/downloadBlob'
 import { CustomSelect } from '../components/CustomSelect'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ResetDataDialog } from '../components/ResetDataDialog'
@@ -37,7 +38,6 @@ function suggestTeamNames(name: string): string[] {
 export const Settings: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<SettingsForm>({
     team_name: '',
     coach_name: '',
@@ -68,6 +68,15 @@ export const Settings: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<{ bytes: number; tables: Record<string, number> } | null>(null)
   const [cleanupMsg, setCleanupMsg] = useState<string | null>(null)
   const [cleaningUp, setCleaningUp] = useState(false)
+
+  // Backup state
+  const [persistenceGranted, setPersistenceGranted] = useState<boolean | null>(null)
+  const [backupInfo, setBackupInfo] = useState<{ savedAt: string } | null>(() => getBackupInfo())
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [showImportConfirm, setShowImportConfirm] = useState(false)
+  const [backupMsg, setBackupMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (showResetConfirm) {
@@ -103,6 +112,14 @@ export const Settings: React.FC = () => {
   }, [])
 
   useEffect(() => {
+    if (form.font_size === 'medium') {
+      delete document.documentElement.dataset.fontSize
+    } else {
+      document.documentElement.dataset.fontSize = form.font_size
+    }
+  }, [form.font_size])
+
+  useEffect(() => {
     getEquipmentOptions().then(setEquipmentItems)
   }, [])
 
@@ -110,21 +127,30 @@ export const Settings: React.FC = () => {
     estimateDbSize().then(setStorageInfo)
   }, [])
 
+  useEffect(() => {
+    getStoragePersistence().then(setPersistenceGranted)
+  }, [])
+
   const handleTeamNameAdd = () => {
     const name = newTeamName.trim()
     if (!name || form.team_names.includes(name)) return
-    setForm(prev => ({ ...prev, team_names: [...prev.team_names, name] }))
+    const updated = [...form.team_names, name]
+    setForm(prev => ({ ...prev, team_names: updated }))
+    void updateSettings({ team_names: updated })
     setNewTeamName('')
     setSuggestions([])
   }
 
   const handleTeamNameRemove = (item: string) => {
-    setForm(prev => ({ ...prev, team_names: prev.team_names.filter(i => i !== item) }))
+    const updated = form.team_names.filter(i => i !== item)
+    setForm(prev => ({ ...prev, team_names: updated }))
+    void updateSettings({ team_names: updated })
   }
 
   const handleCoachNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
     setForm(prev => ({ ...prev, coach_name: val }))
+    void updateSettings({ coach_name: val })
     setSuggestions(suggestTeamNames(val))
   }
 
@@ -169,33 +195,72 @@ export const Settings: React.FC = () => {
     }
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    setBackupMsg(null)
+    try {
+      const json = await exportDatabase()
+      const blob = new Blob([json], { type: 'application/json' })
+      const date = new Date().toISOString().slice(0, 10)
+      downloadBlob(blob, `swimsheet-backup-${date}.json`)
+      setBackupInfo(getBackupInfo())
+    } catch (err) {
+      setBackupMsg('Export failed: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImportFile(file)
+    setShowImportConfirm(true)
+  }
+
+  const handleImportConfirm = async () => {
+    if (!importFile) return
+    setImporting(true)
+    setBackupMsg(null)
+    try {
+      const json = await importFile.text()
+      await importDatabase(json)
+      setShowImportConfirm(false)
+      window.location.reload()
+    } catch (err) {
+      setImporting(false)
+      setBackupMsg('Import failed: ' + (err instanceof Error ? err.message : 'invalid backup file'))
+      setShowImportConfirm(false)
+    }
+  }
+
+  const handleRequestPersistence = async () => {
+    const granted = await requestStoragePersistence()
+    setPersistenceGranted(granted)
+    setBackupMsg(granted ? 'Storage protection enabled' : 'Storage protection was not granted')
+  }
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     setForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
+    if (name === 'sync_interval') {
+      void updateSettings({ sync_interval: Number(value) })
+    } else if (name === 'notification_enabled') {
+      void updateSettings({ notification_enabled: (e.target as HTMLInputElement).checked })
+    } else if (name === 'data_retention_days') {
+      void updateSettings({ data_retention_days: Number(value) })
+    } else if (name === 'font_size') {
+      void updateSettings({ font_size: value })
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    const poolLength = Math.min(100, Math.max(1, Number(poolLengthValue) || 25))
-    await updateSettings({
-      team_name: form.team_name,
-      coach_name: form.coach_name,
-      team_names: form.team_names,
-      pool_length: poolLength,
-      distance_units: 'meters',
-      notification_enabled: form.notification_enabled,
-      sync_interval: Number(form.sync_interval),
-      theme: form.theme,
-      font_size: form.font_size,
-      auto_save: form.auto_save,
-      data_retention_days: Number(form.data_retention_days),
-    })
-    navigate('/')
-    setSaving(false)
+  const handleFontSizeChange = (size: string) => {
+    setForm(prev => ({ ...prev, font_size: size }))
+    void updateSettings({ font_size: size })
   }
 
   const handleReset = async () => {
@@ -215,6 +280,8 @@ export const Settings: React.FC = () => {
     })
     setPoolLengthValue('25')
     setPoolLengthCustom('')
+    delete document.documentElement.dataset.theme
+    delete document.documentElement.dataset.fontSize
     setShowResetConfirm(false)
     navigate('/')
   }
@@ -233,7 +300,7 @@ export const Settings: React.FC = () => {
         <p className="text-on-surface-variant font-body-md md:font-body-lg">Customize your SwimSheet experience</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
+      <div className="space-y-6 md:space-y-8">
         {/* Profile Settings */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Coach Profile</h2>
@@ -444,9 +511,7 @@ export const Settings: React.FC = () => {
                     <button
                       key={size}
                       type="button"
-                      onClick={() => {
-                        setForm(prev => ({ ...prev, font_size: size }))
-                      }}
+                      onClick={() => handleFontSizeChange(size)}
                       className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all cursor-pointer border ${
                         form.font_size === size
                           ? 'bg-primary text-on-primary border-primary'
@@ -478,9 +543,40 @@ export const Settings: React.FC = () => {
                     } else {
                       document.documentElement.dataset.theme = val as string
                     }
+                    void updateSettings({ theme: String(val) })
                   }}
                   className="w-full"
                 />
+              </div>
+
+              <div>
+                <label className="font-label-sm text-on-surface block mb-2">
+                  Language
+                </label>
+                <CustomSelect
+                  value={localStorage.getItem('selectedLanguage') || 'en'}
+                  options={[
+                    { value: 'en', label: 'English' },
+                    { value: 'he', label: 'עברית', badge: <span className="text-caption-caps font-bold px-1 py-0.5 rounded bg-amber-200 text-amber-800">Beta</span> },
+                  ]}
+                  onChange={(val) => {
+                    localStorage.setItem('selectedLanguage', val as string);
+                    window.location.reload();
+                  }}
+                />
+              </div>
+
+              <div className="border-t border-outline-variant/30 pt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-label-sm text-on-surface">Reset Settings</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowResetConfirm(true)}
+                    className="bg-surface-variant text-on-surface-variant font-bold px-4 py-2 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -567,29 +663,59 @@ export const Settings: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(true)}
-                  className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-6 py-4 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none"
-                >
-                  Reset Settings
-                </button>
+              <div className="border-t border-outline-variant/30 pt-4">
+                <div className="flex items-center justify-between gap-3 pb-2">
+                  <span className="font-label-sm text-on-surface">Storage Protection</span>
+                  <span className="flex items-center gap-3 text-right">
+                    <span className="font-body-md text-on-surface-variant">
+                      {persistenceGranted === null ? 'Checking...' : persistenceGranted ? 'Protected from automatic eviction' : 'Not protected — browser may evict data'}
+                    </span>
+                    {!persistenceGranted && (
+                      <button
+                        type="button"
+                        onClick={handleRequestPersistence}
+                        className="bg-primary text-on-primary font-bold px-4 py-2 rounded-xl hover:brightness-110 transition-all active:scale-95 cursor-pointer border-none text-sm whitespace-nowrap"
+                      >
+                        Request protection
+                      </button>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pb-2">
+                  <span className="font-label-sm text-on-surface">Last Automatic Backup</span>
+                  <span className="font-body-md text-on-surface-variant">
+                    {backupInfo ? new Date(backupInfo.savedAt).toLocaleString() : 'Never'}
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface-variant pb-3">
+                  SwimSheet keeps an automatic backup on this device. Back up to a file to keep a copy outside this browser (for example, before switching devices).
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleExport}
+                    disabled={exporting}
+                    className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
+                  >
+                    {exporting ? 'Exporting...' : 'Back up to file'}
+                  </button>
+                  <label className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none text-center">
+                    Restore from file
+                    <input type="file" accept="application/json,.json" onChange={handleImportFile} className="hidden" />
+                  </label>
+                </div>
+                {backupMsg && (
+                  <p className="text-sm text-on-surface-variant mt-1">{backupMsg}</p>
+                )}
+              </div>
 
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowResetDataDialog(true)}
                   className="flex-1 bg-error-container text-on-error-container font-bold px-6 py-4 rounded-xl hover:bg-error transition-all active:scale-95 cursor-pointer border-none"
                 >
                   Reset Data
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 bg-primary text-white font-bold px-6 py-4 rounded-xl hover:shadow-xl hover:bg-primary-hover active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-none"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
@@ -617,32 +743,19 @@ export const Settings: React.FC = () => {
           }}
           onCancel={() => setShowResetDataDialog(false)}
         />
-      </form>
 
-      {/* Language */}
-      <section>
-        <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Language</h2>
-        <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
-          <div className="space-y-4">
-            <div>
-              <label className="font-label-sm text-on-surface block mb-2">
-                Application Language
-              </label>
-              <CustomSelect
-                value={localStorage.getItem('selectedLanguage') || 'en'}
-                options={[
-                  { value: 'en', label: 'English' },
-                  { value: 'he', label: 'עברית', badge: <span className="text-caption-caps font-bold px-1 py-0.5 rounded bg-amber-200 text-amber-800">Beta</span> },
-                ]}
-                onChange={(val) => {
-                  localStorage.setItem('selectedLanguage', val as string);
-                  window.location.reload();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+        <ConfirmDialog
+          open={showImportConfirm}
+          title="Restore from backup?"
+          message="This will replace ALL current data (swimmers, session templates, completed sessions, results) with the contents of the backup file. This cannot be undone."
+          confirmLabel="Restore"
+          cancelLabel="Cancel"
+          destructive
+          confirmDisabled={importing}
+          onConfirm={handleImportConfirm}
+          onCancel={() => setShowImportConfirm(false)}
+        />
+      </div>
 
       {/* App Info */}
       <section className="mt-8">

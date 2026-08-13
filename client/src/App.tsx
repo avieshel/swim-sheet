@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { SyncStatus } from './components/SyncStatus'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { SwimmersList } from './pages/SwimmersList'
 import { SwimmerDetail } from './pages/SwimmerDetail'
@@ -35,7 +34,6 @@ function App() {
           <Route path="/runs/:id" element={<RunDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <SyncStatus />
         <UpdatePrompt />
       </Layout>
     </Router>

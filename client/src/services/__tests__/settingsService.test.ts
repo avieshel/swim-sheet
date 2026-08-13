@@ -5,7 +5,13 @@ const mockDao = vi.hoisted(() => ({
   setEquipmentOptions: vi.fn(),
   estimateDbSize: vi.fn(),
   cleanupOldData: vi.fn(),
-  deleteAllData: vi.fn(),
+  exportDatabase: vi.fn(),
+  importDatabase: vi.fn(),
+  getBackupInfo: vi.fn(),
+  getStoragePersistenceStatus: vi.fn(),
+  requestStoragePersistence: vi.fn(),
+  deleteAllSwimmers: vi.fn(),
+  deleteAllSessions: vi.fn(),
   DEFAULT_EQUIPMENT: ['fins', 'paddles'],
 }))
 
@@ -45,10 +51,50 @@ describe('settingsService', () => {
     expect(mockDao.cleanupOldData).toHaveBeenCalledWith(30)
   })
 
-  it('deleteAllData delegates to dao', async () => {
-    mockDao.deleteAllData.mockResolvedValue(undefined)
-    await settingsService.deleteAllData()
-    expect(mockDao.deleteAllData).toHaveBeenCalledOnce()
+  it('exportDatabase delegates to dao', async () => {
+    mockDao.exportDatabase.mockResolvedValue('{}')
+    const result = await settingsService.exportDatabase()
+    expect(mockDao.exportDatabase).toHaveBeenCalledOnce()
+    expect(result).toBe('{}')
+  })
+
+  it('importDatabase delegates to dao', async () => {
+    mockDao.importDatabase.mockResolvedValue(undefined)
+    await settingsService.importDatabase('{"tables":{}}')
+    expect(mockDao.importDatabase).toHaveBeenCalledWith('{"tables":{}}')
+  })
+
+  it('getBackupInfo delegates to dao', async () => {
+    mockDao.getBackupInfo.mockReturnValue({ savedAt: '2026-01-01T00:00:00.000Z' })
+    const result = settingsService.getBackupInfo()
+    expect(mockDao.getBackupInfo).toHaveBeenCalledOnce()
+    expect(result?.savedAt).toBe('2026-01-01T00:00:00.000Z')
+  })
+
+  it('getStoragePersistence delegates to dao', async () => {
+    mockDao.getStoragePersistenceStatus.mockResolvedValue(true)
+    const result = await settingsService.getStoragePersistence()
+    expect(mockDao.getStoragePersistenceStatus).toHaveBeenCalledOnce()
+    expect(result).toBe(true)
+  })
+
+  it('requestStoragePersistence delegates to dao', async () => {
+    mockDao.requestStoragePersistence.mockResolvedValue(true)
+    const result = await settingsService.requestStoragePersistence()
+    expect(mockDao.requestStoragePersistence).toHaveBeenCalledOnce()
+    expect(result).toBe(true)
+  })
+
+  it('deleteAllSwimmers delegates to dao', async () => {
+    mockDao.deleteAllSwimmers.mockResolvedValue(undefined)
+    await settingsService.deleteAllSwimmers()
+    expect(mockDao.deleteAllSwimmers).toHaveBeenCalledOnce()
+  })
+
+  it('deleteAllSessions delegates to dao', async () => {
+    mockDao.deleteAllSessions.mockResolvedValue(undefined)
+    await settingsService.deleteAllSessions()
+    expect(mockDao.deleteAllSessions).toHaveBeenCalledOnce()
   })
 
   it('exposes DEFAULT_EQUIPMENT', () => {

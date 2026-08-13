@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { resetLibraryToDefaults } from '../api/drills'
-import { resetSettings, deleteAllData } from '../api/settings'
+import { resetSettings, deleteAllSwimmers, deleteAllSessions } from '../api/settings'
 import { Icon } from './Icon'
 
 interface ResetDataDialogProps {
@@ -43,9 +43,11 @@ export function ResetDataDialog({ open, onConfirm, onCancel }: ResetDataDialogPr
       if (options.find(o => o.id === 'settings' && o.enabled)) {
         await resetSettings()
       }
-      if (options.find(o => o.id === 'swimmers' && o.enabled) || 
-          options.find(o => o.id === 'sessions' && o.enabled)) {
-        await deleteAllData()
+      if (options.find(o => o.id === 'swimmers' && o.enabled)) {
+        await deleteAllSwimmers()
+      }
+      if (options.find(o => o.id === 'sessions' && o.enabled)) {
+        await deleteAllSessions()
       }
       onConfirm()
     } catch {

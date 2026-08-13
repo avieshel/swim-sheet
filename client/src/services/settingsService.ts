@@ -1,4 +1,4 @@
-import { getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT, deleteAllData } from '../db/dao'
+import { getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, DEFAULT_EQUIPMENT, exportDatabase, importDatabase, getBackupInfo, getStoragePersistenceStatus, requestStoragePersistence, deleteAllSwimmers, deleteAllSessions } from '../db/dao'
 
 const SETTINGS_KEY = 'swimsheet-settings'
 
@@ -59,6 +59,12 @@ export const settingsService = {
   setEquipmentOptions: (items: string[]) => setEquipmentOptions(items),
   estimateDbSize: () => estimateDbSize(),
   cleanupOldData: (retentionDays: number) => cleanupOldData(retentionDays),
-  deleteAllData: () => deleteAllData(),
+  exportDatabase: () => exportDatabase(),
+  importDatabase: (json: string) => importDatabase(json),
+  getBackupInfo: () => getBackupInfo(),
+  getStoragePersistence: () => getStoragePersistenceStatus(),
+  requestStoragePersistence: () => requestStoragePersistence(),
+  deleteAllSwimmers: () => deleteAllSwimmers(),
+  deleteAllSessions: () => deleteAllSessions(),
   DEFAULT_EQUIPMENT,
 }

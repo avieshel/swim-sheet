@@ -265,22 +265,135 @@ class SwimSheetDB extends Dexie {
   }
 }
 
+export const DB_SCHEMA_VERSION = 5
 const BACKUP_KEY = 'swimsheet_db_backup'
+export const BACKUP_FORMAT_VERSION = 1
+
+interface BackupPayload {
+  formatVersion: number
+  schemaVersion: number
+  savedAt: string
+  tables: Record<string, unknown[]>
+}
+
+async function dbHasData(): Promise<boolean> {
+  for (const table of db.tables) {
+    if (table.name.startsWith('_')) continue
+    if ((await table.count()) > 0) return true
+  }
+  return false
+}
+
+async function snapshotAllTables(): Promise<Record<string, unknown[]>> {
+  const tables: Record<string, unknown[]> = {}
+  for (const table of db.tables) {
+    if (table.name.startsWith('_')) continue
+    tables[table.name] = await table.toArray()
+  }
+  return tables
+}
+
+export async function createBackupPayload(): Promise<BackupPayload> {
+  return {
+    formatVersion: BACKUP_FORMAT_VERSION,
+    schemaVersion: DB_SCHEMA_VERSION,
+    savedAt: new Date().toISOString(),
+    tables: await snapshotAllTables(),
+  }
+}
+
+export async function restoreAllTables(tables: Record<string, unknown[]>): Promise<void> {
+  const targets = db.tables.filter(t => !t.name.startsWith('_') && tables[t.name])
+  await db.transaction('rw', targets, async () => {
+    for (const table of targets) {
+      await table.clear()
+      const rows = tables[table.name] ?? []
+      if (rows.length > 0) {
+        await table.bulkAdd(rows)
+      }
+    }
+  })
+}
+
+export function clearBackup(): void {
+  localStorage.removeItem(BACKUP_KEY)
+}
+
+let backupTimer: ReturnType<typeof setTimeout> | undefined
+
+function scheduleBackup(): void {
+  if (backupTimer) clearTimeout(backupTimer)
+  backupTimer = setTimeout(() => {
+    backupTimer = undefined
+    void saveBackup()
+  }, 3000)
+}
+
+export async function saveBackup(): Promise<void> {
+  if (!db.isOpen()) return
+  try {
+    if (!(await dbHasData())) return
+    const payload = await createBackupPayload()
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(payload))
+  } catch {
+    // best-effort; a failed backup must never break the app
+  }
+}
+
+export function getLastBackupTime(): string | null {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY)
+    if (!raw) return null
+    const payload = JSON.parse(raw) as BackupPayload
+    return typeof payload.savedAt === 'string' ? payload.savedAt : null
+  } catch {
+    return null
+  }
+}
+
+export async function requestPersistentStorage(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.persist) return false
+    if (await navigator.storage.persisted()) return true
+    return await navigator.storage.persist()
+  } catch {
+    return false
+  }
+}
+
+export async function getStoragePersistence(): Promise<boolean> {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage?.persisted) return false
+    return await navigator.storage.persisted()
+  } catch {
+    return false
+  }
+}
+
+export const db = new SwimSheetDB()
+
+for (const table of db.tables) {
+  table.hook('creating', () => { scheduleBackup() })
+  table.hook('updating', () => { scheduleBackup() })
+  table.hook('deleting', () => { scheduleBackup() })
+}
 
 async function tryRestoreFromBackup(): Promise<boolean> {
   try {
     const raw = localStorage.getItem(BACKUP_KEY)
     if (!raw) return false
-    const snapshot: Record<string, unknown[]> = JSON.parse(raw)
+    const payload = JSON.parse(raw) as BackupPayload
+    if (payload.formatVersion !== BACKUP_FORMAT_VERSION) return false
+    if (payload.schemaVersion > DB_SCHEMA_VERSION) return false
+    const totalRows = Object.values(payload.tables).reduce((sum, rows) => sum + rows.length, 0)
+    if (totalRows === 0) {
+      clearBackup()
+      return false
+    }
     if (db.isOpen()) db.close()
     await db.delete()
     await db.open()
-    for (const [tableName, rows] of Object.entries(snapshot)) {
-      const table = db.tables.find(t => t.name === tableName)
-      if (table && rows.length > 0) {
-        await table.bulkAdd(rows)
-      }
-    }
+    await restoreAllTables(payload.tables)
     clearBackup()
     return true
   } catch {
@@ -288,35 +401,25 @@ async function tryRestoreFromBackup(): Promise<boolean> {
   }
 }
 
-function clearBackup(): void {
-  localStorage.removeItem(BACKUP_KEY)
+async function maybeRestoreWhenEmpty(): Promise<boolean> {
+  if (await dbHasData()) return false
+  if (!localStorage.getItem(BACKUP_KEY)) return false
+  const restored = await tryRestoreFromBackup()
+  if (!restored) clearBackup()
+  return restored
 }
 
-export const db = new SwimSheetDB()
-
 async function ensureDbOpen(): Promise<void> {
-  const staleBackup = localStorage.getItem(BACKUP_KEY)
-  if (staleBackup) {
-    const restored = await tryRestoreFromBackup()
-    if (restored) {
-      window.location.reload()
-      return
-    }
-    clearBackup()
-  }
-
   try {
     if (!db.isOpen()) {
       await db.open()
     }
   } catch {
-
     const restored = await tryRestoreFromBackup()
     if (restored) {
       window.location.reload()
       return
     }
-
     try {
       clearBackup()
       await db.delete()
@@ -324,7 +427,16 @@ async function ensureDbOpen(): Promise<void> {
     } catch {
       // ignore cleanup errors
     }
+    return
   }
+
+  const restored = await maybeRestoreWhenEmpty()
+  if (restored) {
+    window.location.reload()
+    return
+  }
+  void saveBackup()
+  void requestPersistentStorage()
 }
 
 if (typeof window !== 'undefined') {

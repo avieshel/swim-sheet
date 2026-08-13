@@ -132,6 +132,14 @@ html {
   font-size: clamp(14px, 1vw + 0.5rem, 18px);
 }
 
+html[data-font-size="small"] {
+  font-size: clamp(12px, 0.9vw + 0.45rem, 15px);
+}
+
+html[data-font-size="large"] {
+  font-size: clamp(17px, 1.2vw + 0.6rem, 22px);
+}
+
 body {
   -webkit-tap-highlight-color: transparent;
 }

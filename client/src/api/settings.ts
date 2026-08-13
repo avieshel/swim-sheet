@@ -29,8 +29,32 @@ export function cleanupOldData(retentionDays: number): Promise<number> {
   return settingsService.cleanupOldData(retentionDays)
 }
 
-export function deleteAllData(): Promise<void> {
-  return settingsService.deleteAllData()
+export function deleteAllSwimmers(): Promise<void> {
+  return settingsService.deleteAllSwimmers()
+}
+
+export function deleteAllSessions(): Promise<void> {
+  return settingsService.deleteAllSessions()
+}
+
+export function exportDatabase(): Promise<string> {
+  return settingsService.exportDatabase()
+}
+
+export function importDatabase(json: string): Promise<void> {
+  return settingsService.importDatabase(json)
+}
+
+export function getBackupInfo(): { savedAt: string } | null {
+  return settingsService.getBackupInfo()
+}
+
+export function getStoragePersistence(): Promise<boolean> {
+  return settingsService.getStoragePersistence()
+}
+
+export function requestStoragePersistence(): Promise<boolean> {
+  return settingsService.requestStoragePersistence()
 }
 
 export const DEFAULT_EQUIPMENT = settingsService.DEFAULT_EQUIPMENT

@@ -1,0 +1,240 @@
+{
+  "version": 1,
+  "name": "Technique",
+  "notes": "",
+  "drills": [
+    {
+      "name": "חימום",
+      "order": 0,
+      "stroke": "freestyle",
+      "distance": 300,
+      "items": [
+        {
+          "distance": 300,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [
+        "warmup"
+      ],
+      "description": ""
+    },
+    {
+      "name": "הלוך מינימום תנועות / חזור סגנון מלא",
+      "order": 1,
+      "stroke": "freestyle",
+      "distance": 50,
+      "items": [
+        {
+          "distance": 50,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 3,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "הגעה לחץ וקשת על הצד, חפיפה טובה יותר לא לגרוף מוקדם"
+    },
+    {
+      "name": "הלוך זיפרים, כף יד במים מצב 2 על צד / חזור סגנון מלא",
+      "order": 2,
+      "stroke": "freestyle",
+      "distance": 50,
+      "items": [
+        {
+          "distance": 50,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 3,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "הגעה לחץ וקשת על הצד, חפיפה טובה ולא לגרוף מוקדם\n"
+    },
+    {
+      "name": "הלוך אגרופים / חזור סגנון מלא",
+      "order": 3,
+      "stroke": "freestyle",
+      "distance": 50,
+      "items": [
+        {
+          "distance": 50,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 3,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "אגרוף משפשף ירך, גלגול גוף עד הסוף"
+    },
+    {
+      "name": "כוח מתגבר לאורך 50 מ׳",
+      "order": 4,
+      "stroke": "freestyle",
+      "distance": 150,
+      "items": [
+        {
+          "distance": 50,
+          "stroke": "freestyle",
+          "repeatCount": 3
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "מתחילים חלש ומסיימים חזק"
+    },
+    {
+      "name": "שריטות מים",
+      "order": 5,
+      "stroke": "freestyle",
+      "distance": 200,
+      "items": [
+        {
+          "distance": 200,
+          "stroke": "freestyle",
+          "repeatCount": 1,
+          "equipment": [
+            "fins"
+          ]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "הגעה לחץ וקשת על הצד, חפיפה לא לגרוף מוקדם"
+    },
+    {
+      "name": "חפיפה מלאה יד מחכה ליד",
+      "order": 6,
+      "stroke": "freestyle",
+      "distance": 200,
+      "items": [
+        {
+          "distance": 200,
+          "stroke": "freestyle",
+          "repeatCount": 1,
+          "equipment": [
+            "fins"
+          ]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "לגלגל את הגוף, נשימה בגלישה, יד מחכה בסבלנות"
+    },
+    {
+      "name": "רגליים חתירה + הלוך: ידיים חזה / חזור ידיים גב קלאסי",
+      "order": 7,
+      "stroke": "freestyle",
+      "distance": 150,
+      "items": [
+        {
+          "distance": 50,
+          "stroke": "freestyle",
+          "repeatCount": 3
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "קואורדינציה"
+    },
+    {
+      "name": "חתירה קל",
+      "order": 8,
+      "stroke": "freestyle",
+      "distance": 50,
+      "items": [
+        {
+          "distance": 50,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": ""
+    },
+    {
+      "name": "לשחות ארוך",
+      "order": 9,
+      "stroke": "freestyle",
+      "distance": 300,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 3,
+          "equipment": [
+            "pullbuoy"
+          ]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "חפיפה, חילוף וגלישה ארוכה "
+    },
+    {
+      "name": "גריפות ארוכות עד הסוף",
+      "order": 10,
+      "stroke": "freestyle",
+      "distance": 300,
+      "items": [
+        {
+          "distance": 300,
+          "stroke": "freestyle",
+          "repeatCount": 1,
+          "equipment": [
+            "paddles",
+            "pullbuoy"
+          ]
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [],
+      "description": "לא למהר, מתיחה לקצה, יד גורפת לאחור , סיום גריפה בירך"
+    },
+    {
+      "name": "שחרור",
+      "order": 11,
+      "stroke": "freestyle",
+      "distance": 100,
+      "items": [
+        {
+          "distance": 100,
+          "stroke": "freestyle",
+          "repeatCount": 1
+        }
+      ],
+      "repeatCount": 1,
+      "timingMode": "individual",
+      "focus": "none",
+      "labels": [
+        "cool down"
+      ],
+      "description": ""
+    }
+  ]
+}

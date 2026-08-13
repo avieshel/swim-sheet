@@ -1,4 +1,4 @@
-import { db } from './schema'
+import { db, createBackupPayload, restoreAllTables, saveBackup, clearBackup, getLastBackupTime, getStoragePersistence, requestPersistentStorage, DB_SCHEMA_VERSION, BACKUP_FORMAT_VERSION } from './schema'
 import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
 import { drillCatalog, sessionsCatalog } from '../data/catalog'
 
@@ -647,15 +647,49 @@ export async function cleanupOldData(retentionDays: number): Promise<number> {
   return oldRuns.length
 }
 
-export async function deleteAllData(): Promise<void> {
-  await db.transaction('rw', [db.swimmers, db.sessions, db.drills, db.sessionRuns, db.runDrills, db.runSwimmers, db.laps, db.laneDrillResults], async () => {
-    await db.swimmers.where('id').above(' ').delete()
-    await db.sessions.where('id').above(' ').delete()
-    await db.drills.where('id').above(' ').delete()
-    await db.sessionRuns.where('id').above(' ').delete()
-    await db.runDrills.where('id').above(' ').delete()
-    await db.runSwimmers.where('id').above(' ').delete()
-    await db.laps.where('id').above(' ').delete()
-    await db.laneDrillResults.where('id').above(' ').delete()
+export async function deleteAllSwimmers(): Promise<void> {
+  await db.transaction('rw', [db.runSwimmers, db.laps, db.swimmers], async () => {
+    await db.runSwimmers.clear()
+    await db.laps.clear()
+    await db.swimmers.clear()
   })
+  clearBackup()
+}
+
+export async function deleteAllSessions(): Promise<void> {
+  await db.transaction('rw', [db.sessions, db.drills], async () => {
+    await db.drills.clear()
+    await db.sessions.clear()
+  })
+  clearBackup()
+}
+
+// ── DB Backup & Restore ─────────────────────────────────────
+
+export async function exportDatabase(): Promise<string> {
+  const payload = await createBackupPayload()
+  await saveBackup()
+  return JSON.stringify(payload, null, 2)
+}
+
+export async function importDatabase(json: string): Promise<void> {
+  const payload = JSON.parse(json) as { formatVersion?: number; schemaVersion?: number; tables?: Record<string, unknown[]> }
+  if (!payload || payload.formatVersion !== BACKUP_FORMAT_VERSION) throw new Error('Unsupported backup format')
+  if (!payload.tables) throw new Error('Invalid backup file')
+  if (payload.schemaVersion && payload.schemaVersion > DB_SCHEMA_VERSION) throw new Error('Backup is from a newer app version')
+  await restoreAllTables(payload.tables)
+  await saveBackup()
+}
+
+export function getBackupInfo(): { savedAt: string } | null {
+  const savedAt = getLastBackupTime()
+  return savedAt ? { savedAt } : null
+}
+
+export function getStoragePersistenceStatus(): Promise<boolean> {
+  return getStoragePersistence()
+}
+
+export function requestStoragePersistence(): Promise<boolean> {
+  return requestPersistentStorage()
 }
