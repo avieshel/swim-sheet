@@ -113,7 +113,7 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-surface-container-lowest w-full max-w-md rounded-2xl p-4 md:p-6 shadow-2xl">
+      <div className="bg-surface-container-lowest w-full max-w-sm md:max-w-md rounded-2xl p-4 md:p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-4 md:mb-6">
           <h3 className="font-headline-md text-on-surface">
             {editingId ? 'Edit Athlete' : 'New Athlete'}

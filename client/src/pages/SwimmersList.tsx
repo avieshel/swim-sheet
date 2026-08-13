@@ -322,18 +322,6 @@ export const SwimmersList: React.FC = () => {
         </section>
       )}
 
-      {/* FAB: Add New Swimmer (mobile) */}
-      <button
-        onClick={openAddModal}
-        className="fixed right-4 md:right-6 bottom-20 md:bottom-10 w-14 h-14 md:w-16 md:h-16 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50 group"
-        aria-label="Add Swimmer"
-      >
-        <Icon name="add" size="2xl" className="md:text-[32px]" />
-        <span className="absolute right-full mr-4 bg-inverse-surface text-inverse-on-surface px-3 py-1 rounded-lg font-label-sm text-label-sm whitespace-nowrap pointer-events-none hidden md:block opacity-70">
-          Add Swimmer
-        </span>
-      </button>
-
       <SwimmerFormModal
         key={showModal ? editingId ?? 'add' : 'closed'}
         open={showModal}
