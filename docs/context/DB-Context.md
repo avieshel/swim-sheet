@@ -36,7 +36,7 @@ Drills have evolved beyond simple name/stroke/distance:
 
 ### Data Persistence & Backup (Local-Only)
 - All data lives on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). There is no server — the sync engine was removed and the client makes no `/api` calls.
-- **Persistent storage**: `navigator.storage.persist()` is requested once at startup (best-effort) to opt the origin out of automatic eviction. Status is surfaced in Settings.
+- **Persistent storage**: `navigator.storage.persist()` is requested once at startup (best-effort) to opt the origin out of automatic eviction. Status is surfaced in Settings, where the grant state shows a green check mark and an info ("i") icon opens a modal explaining what storage protection means and how it interacts with the automatic backup.
 - **Automatic backup**: every mutation schedules a debounced (3s) write of the full DB snapshot to `localStorage` (`swimsheet_db_backup`), wired via Dexie table hooks (`creating`/`updating`/`deleting`) plus a startup save. Empty snapshots are never written (so a fresh install or a fully-wiped DB doesn't create a restorable empty backup).
 - **Backup format**: `{ formatVersion: 1, schemaVersion: 5, savedAt, tables }`. `restoreAllTables()` wipes + bulk-loads inside one transaction.
 - **Restore policy**: `ensureDbOpen()` restores from the backup **only** when (a) the DB opens but is empty, or (b) opening fails. It never restores a backup that is empty, is from an unsupported format, or was written by a newer schema (version guard). The backup is cleared after a successful restore. The previous behavior — restoring whenever a backup existed, and `db.delete()` on any open failure — was replaced.

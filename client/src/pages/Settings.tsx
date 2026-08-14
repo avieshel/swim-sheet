@@ -6,6 +6,8 @@ import { downloadBlob } from '../utils/downloadBlob'
 import { CustomSelect } from '../components/CustomSelect'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ResetDataDialog } from '../components/ResetDataDialog'
+import { InfoDialog } from '../components/InfoDialog'
+import { Icon } from '../components/Icon'
 
 interface SettingsForm {
   team_name: string
@@ -71,6 +73,7 @@ export const Settings: React.FC = () => {
 
   // Backup state
   const [persistenceGranted, setPersistenceGranted] = useState<boolean | null>(null)
+  const [showStorageInfo, setShowStorageInfo] = useState(false)
   const [backupInfo, setBackupInfo] = useState<{ savedAt: string } | null>(() => getBackupInfo())
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -665,10 +668,25 @@ export const Settings: React.FC = () => {
 
               <div className="border-t border-outline-variant/30 pt-4">
                 <div className="flex items-center justify-between gap-3 pb-2">
-                  <span className="font-label-sm text-on-surface">Storage Protection</span>
+                  <span className="flex items-center gap-1.5 font-label-sm text-on-surface">
+                    Storage Protection
+                    <button
+                      type="button"
+                      onClick={() => setShowStorageInfo(true)}
+                      aria-label="What does storage protection mean?"
+                      className="w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer bg-transparent border-none"
+                    >
+                      <Icon name="info" size="sm" />
+                    </button>
+                  </span>
                   <span className="flex items-center gap-3 text-right">
                     <span className="font-body-md text-on-surface-variant">
-                      {persistenceGranted === null ? 'Checking...' : persistenceGranted ? 'Protected from automatic eviction' : 'Not protected — browser may evict data'}
+                      {persistenceGranted === null ? 'Checking...' : persistenceGranted ? (
+                        <span className="flex items-center gap-1.5">
+                          <Icon name="check_circle" size="sm" color="primary" fill />
+                          <span>Protected from automatic eviction</span>
+                        </span>
+                      ) : 'Not protected — browser may evict data'}
                     </span>
                     {!persistenceGranted && (
                       <button
@@ -755,6 +773,29 @@ export const Settings: React.FC = () => {
           onConfirm={handleImportConfirm}
           onCancel={() => setShowImportConfirm(false)}
         />
+
+        <InfoDialog
+          open={showStorageInfo}
+          title="Storage Protection"
+          onClose={() => setShowStorageInfo(false)}
+        >
+          <p>
+            SwimSheet stores all of your data on this device, inside the browser's storage. Browsers can
+            sometimes delete this data to free up space when your phone or tablet runs low — this is called
+            "automatic eviction."
+          </p>
+          <p>
+            <strong>Storage Protection</strong> asks the browser to mark SwimSheet as important, so it won't
+            be automatically evicted. When protection is active, your swimmers, session templates, and
+            completed results are much more likely to survive low-storage pressure.
+          </p>
+          <p className="rounded-xl bg-surface-container p-3 text-sm">
+            A green check means this device's browser has granted protection. On iOS, installing the app to
+            your home screen and opening it regularly strengthens this protection. If it can't be granted,
+            your data is still backed up automatically and you can always use <strong>Back up to file</strong>{' '}
+            below for a copy you control.
+          </p>
+        </InfoDialog>
       </div>
 
       {/* App Info */}

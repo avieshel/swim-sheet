@@ -345,6 +345,7 @@ App preferences.
 - Preferences: theme, font size, auto-save
 - Data management: export, import, reset
 - Sync: last sync, manual sync trigger
+- Data Management → Storage Protection: shows a green check mark + "Protected from automatic eviction" when persistent storage is granted, an info ("i") icon opens an InfoDialog explaining eviction protection, and a "Request protection" button when not granted.
 
 ---
 
@@ -363,6 +364,9 @@ Inline stroke count control for each lap row in the swimmer card (defined inside
 
 ### ConfirmDialog
 Reusable confirmation modal for destructive or neutral actions (delete, reset). Props: `open`, `title`, `message`, `confirmLabel` (default "Delete"), `cancelLabel`, `destructive` (default true — error button/icon), `confirmDisabled` (disables both buttons while an async action is in flight), `onConfirm`, `onCancel`. Both buttons render `type="button"` so it is safe to render inside a `<form>`. Used by RunDetail, ActiveRunView, SessionsList, SwimmersList, DrillBank, SessionDetail, GroupCard, LaneEditorModal, Table, and Settings (replaced two hand-rolled overlay dialogs). SwimmerDetail's multi-action delete dialog remains custom (it needs 3+ actions that this 2-button modal cannot express).
+
+### InfoDialog
+Reusable informational modal (no confirm action). Props: `open`, `title`, `children` (body content), `onClose`. Has a close button in the header plus a "Got it" button; scrolls if content overflows. Used by Settings for the Storage Protection explainer.
 
 ### CustomSelect
 Styled select dropdown used in drill editor and session setup.

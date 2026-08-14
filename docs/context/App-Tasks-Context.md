@@ -771,3 +771,25 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Priority**: High
 **Status**: In Progress — Export/download from SessionsList and import/file-pick UI not yet implemented
+
+---
+
+## A-047: Storage protection — check mark + info modal in Settings ✅
+
+**Source**: User request — "when it's 'protected' from eviction add a small 'check mark' and a 'what this mean' or 'i' with a modal and more information on this"
+
+**Solution**: The app already requests persistent storage (`navigator.storage.persist()`) at startup and surfaced a text status in Settings. This task upgraded the UI:
+
+- Added a new reusable `InfoDialog` modal component (`client/src/components/InfoDialog.tsx`) — informational overlay with close header button + "Got it" confirm, scrollable body.
+- Settings → Data Management → Storage Protection row now shows:
+  - A green filled `check_circle` icon next to "Protected from automatic eviction" when persistent storage is granted.
+  - An info ("i") icon button that opens the InfoDialog explaining eviction protection, what protection does, and how it interacts with the automatic backup / file export.
+  - The existing "Request protection" button remains when protection is not granted.
+
+**Files modified**:
+- `client/src/components/InfoDialog.tsx` (new)
+- `client/src/pages/Settings.tsx` — imports, `showStorageInfo` state, check mark + info icon, InfoDialog render
+- `docs/context/DB-Context.md`, `docs/context/UI-Context.md` — documented the check mark + info modal
+
+**Priority**: Medium
+**Status**: Done
