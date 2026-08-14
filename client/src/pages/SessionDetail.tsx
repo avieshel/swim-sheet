@@ -10,10 +10,14 @@ import type { Session } from '../api/sessions'
 import type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../api/drills'
 import { strokeColors } from '../constants/drill'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
+import { useStartLiveSession } from '../hooks/useStartLiveSession'
+import { useActiveRun } from '../hooks/useActiveRun'
 
 export const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { startLiveSession, starting: startingStart } = useStartLiveSession()
+  const activeRun = useActiveRun()
   const [session, setSession] = useState<Session | null>(null)
   const [drills, setDrills] = useState<Drill[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,6 +113,16 @@ export const SessionDetail: React.FC = () => {
     await updateSession(id, { name: editName.trim(), notes: editNotes })
     setEditingMeta(false)
     loadData()
+  }
+
+  const handleStartLive = async () => {
+    if (!session) return
+    if (activeRun?.session_id === session.id) {
+      navigate('/live')
+      return
+    }
+    await startLiveSession(session)
+    navigate('/live')
   }
 
   const openRichEditor = (drill?: Drill | LibraryDrill, isLibrary = false) => {
@@ -357,12 +371,24 @@ export const SessionDetail: React.FC = () => {
                 <p className="font-body-md text-body-md text-on-surface-variant mt-1 italic">{session.notes}</p>
               )}
             </div>
-            <button
-              onClick={() => { setEditingMeta(true); setEditNotes(session.notes || '') }}
-              className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-            >
-              <Icon name="edit" color="primary" />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => { void handleStartLive() }}
+                disabled={drills.length === 0 || startingStart}
+                className="flex items-center gap-1.5 h-11 min-w-[44px] px-4 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
+                title={drills.length === 0 ? 'Add at least one drill before starting this session' : undefined}
+              >
+                <Icon name={activeRun?.session_id === session.id ? 'visibility' : 'play_arrow'} size="sm" />
+                {activeRun?.session_id === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
+              </button>
+              <button
+                onClick={() => { setEditingMeta(true); setEditNotes(session.notes || '') }}
+                className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+              >
+                <Icon name="edit" color="primary" />
+              </button>
+            </div>
           </div>
         )}
       </div>

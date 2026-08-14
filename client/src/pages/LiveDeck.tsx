@@ -1,18 +1,19 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
-import { getActiveRun, getRun, createQuickStartRun, createRunFromTemplate, updateRun, getRunDrills, getRunSwimmerLinks, getRunSwimmers } from '../api/runs'
+import { getActiveRun, getRun, createQuickStartRun, updateRun, getRunDrills, getRunSwimmerLinks, getRunSwimmers } from '../api/runs'
 import { listSessionsByUsage } from '../api/sessions'
 import { buildStartLanes } from '../api/runSetup'
 import type { Session } from '../api/sessions'
 import type { SessionRun } from '../api/runs'
 import { ActiveRunView } from './live/ActiveRunView'
 import { Icon } from '../components/Icon'
+import { useStartLiveSession, DEFAULT_QUICK_SESSION_NAME } from '../hooks/useStartLiveSession'
 
-const QUICK_START_DEFAULT_SESSION_NAME = 'Quick 100m freestyle (default)'
 const QUICK_TIME_LABEL = '100m freestyle quick time'
 
 export const LiveDeck: React.FC = () => {
   const { dispatch } = useContext(LiveSessionContext)
+  const { startLiveSession } = useStartLiveSession()
   const [activeRun, setActiveRun] = useState<SessionRun | null>(null)
   const [checking, setChecking] = useState(true)
   const [sessionChoices, setSessionChoices] = useState<Session[] | null>(null)
@@ -23,15 +24,7 @@ export const LiveDeck: React.FC = () => {
   const handleStartSession = async (session: Session) => {
     setStartingSessionId(session.id)
     try {
-      const runId = await createRunFromTemplate(session.id, {
-        date: new Date().toISOString().split('T')[0],
-        poolName: 'Live',
-      })
-      const run = await getRun(runId)
-      const { groups, virtualSwimmers } = await buildStartLanes(null, { prefillTempSwimmers: false })
-      const notes = { isQuickStart: false, version: 2, virtualSwimmers }
-      await updateRun(runId, { notes: JSON.stringify(notes) })
-      dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId } })
+      const run = await startLiveSession(session)
       setActiveRun(run ?? null)
     } finally {
       setStartingSessionId(null)
@@ -156,7 +149,7 @@ export const LiveDeck: React.FC = () => {
     let cancelled = false
     const load = async () => {
       try {
-        const sessions = (await listSessionsByUsage()).filter(s => s.name !== QUICK_START_DEFAULT_SESSION_NAME)
+        const sessions = (await listSessionsByUsage()).filter(s => s.name !== DEFAULT_QUICK_SESSION_NAME)
         if (!cancelled) setSessionChoices(sessions)
       } catch {
         if (!cancelled) setSessionChoices([])

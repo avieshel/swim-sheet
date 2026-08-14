@@ -79,15 +79,23 @@ All user journeys the application supports, organized by flow.
 
 ## 2. Full Session Setup (Structured Path)
 
-**Entry**: Navigate to `/dashboard` → SessionSetup
+**Entry**: Start a live session from **any** of three doors, all sharing the same
+flow (see A-049):
+- `/sessions` — **Start Live** on a template card (one tap; the card also has "Open Template")
+- `/dashboard` → SessionSetup (structured pick — template, lanes, swimmers)
+- `/live` (`/` or `/live`) — the Live picker (quick time pinned first, then templates ranked by usage)
+
+Starting any session creates a `SessionRun` and lands on the live deck with **2 empty lanes**
+(custom templates) or the hinted temp-swimmer lanes (default quick template, empty roster);
+if the template is the active run's session the button reads **View Live**.
 
 ### Flow: Create and run a session from template
 
-1. Navigate to `/dashboard` or `/sessions`
+1. Navigate to `/dashboard`, `/sessions` (Start Live), or the Live picker
 2. Pick a session template from list
 3. Set date (default today), pool name, pool length
 4. Add swimmers from roster, assign to lanes
-5. "Start Session" → creates `SessionRun`, snapshots drills into `RunDrills`
+5. "Start Session" / "Start Live" → creates `SessionRun`, snapshots drills into `RunDrills`
 6. Transitions to LiveDeck active run view
 7. Execute drills with lane/group timing
 8. "Complete Session" → saves all data, status = `completed`

@@ -189,6 +189,13 @@ recent** `RunSwimmer` links per template). **Weak-path buttons:**
 (stopPropagation) + `SessionDetail` header button. Confirm → `startFromToLive` →
 `navigate('/live')`.
 
+> **Partial (A-049).** The "Start Live" primary action shipped on both `SessionsList`
+> cards and the `SessionDetail` header via a shared `useStartLiveSession` hook (now used
+> by `LiveDeck` too), navigating to `/live`. Templates with no drills are disabled. The
+> `LiveSessionSetupModal` (S-021 — date/pool pre-fill, "Quick start"/"Configure"
+> expander, overwrite undo toast) remains unimplemented; starting simply uses
+> `createRunFromTemplate` defaults, and an existing active run is auto-completed by the DAO.
+
 **S-023 — LiveDeck hand-off + post-Complete landing** — `client/src/pages/LiveDeck.tsx`
 - Verify planned-run active-run init (`:1146-1172`) renders a promoted run unchanged;
   if `Configure` set drill-1/notes, pass it through.

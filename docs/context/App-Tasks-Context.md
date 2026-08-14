@@ -809,3 +809,26 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Priority**: High
 **Status**: Done
+
+---
+
+## A-049: Main flow — start a live session from the Sessions view ✅
+
+**Source**: User request — "the main flow is that a coach has session templates (by default they have 100m freestyle) and an online catalog, and can start a 'live' session either from the sessions view or from the live view (if there isn't a live session running)".
+
+**Goal**: make the template → live-session main flow reachable from both entry points, with all controls pointing the same direction — no new widgets, no onboarding surfaces.
+
+**What shipped**:
+- **Shared start-live-session flow** — `client/src/hooks/useStartLiveSession.ts` (new): one `startLiveSession(session)` used by every entry point. It creates the run (`createRunFromTemplate`), opens 2 empty lanes (`buildStartLanes`), writes the run notes (`{ isQuickStart: false, version: 2, virtualSwimmers }`), and dispatches `INIT_FROM_RUN`. Exports `DEFAULT_QUICK_SESSION_NAME` (shared constant; previously duplicated in `LiveDeck` and `runService`). When the started template **is** the default quick session (`Quick 100m freestyle (default)`), it passes `prefillTempSwimmers: true` so the hinted temp-swimmer lanes appear from the Sessions view too (roster-empty only) — identical to the Live view's quick-time card.
+- **`LiveDeck`** (`/`, `/live`) — `handleStartSession` now delegates to the hook; behavior byte-for-byte the same (it already offered the "start from the live view" path).
+- **`SessionsList`** (`/sessions`) — each template card now has a **Start Live** primary action (stopPropagation, `play_arrow`, per-card "Starting…" state) next to "Open Template". If the template is the active run's session, the button becomes **View Live** → `/live` (never auto-completes the running session).
+- **`SessionDetail`** (`/sessions/:id`) — template header gains a **Start Live** button, disabled with a hint when the template has no drills; becomes **View Live** when it's the live session.
+
+**Design decisions**:
+- No schema/API changes — reuses `createRunFromTemplate` + `buildStartLanes`. Starting while another live run is active keeps the existing DAO behavior (auto-completes the prior run).
+- A template with 0 drills can't start (the deck would have nothing to time) — the button is disabled rather than erroring.
+
+**Files modified**: `client/src/hooks/useStartLiveSession.ts` (new), `client/src/pages/LiveDeck.tsx`, `client/src/pages/SessionsList.tsx`, `client/src/pages/SessionDetail.tsx`.
+
+**Priority**: High
+**Status**: Done — verified `npm run check` green (336 vitest). E2E not run: root `node_modules` lacks `@playwright/test`, so `playwright.config.ts` cannot load in this environment.

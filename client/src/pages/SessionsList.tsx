@@ -9,6 +9,7 @@ import type { RunSummary } from '../api/runs'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance } from '../utils/drillHelpers'
 import { strokeColorsSolid } from '../constants/drill'
 import { useActiveRun } from '../hooks/useActiveRun'
+import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
 
@@ -22,6 +23,7 @@ interface SessionWithTotals extends Session {
 export const SessionsList: React.FC = () => {
   const navigate = useNavigate()
   const activeRun = useActiveRun()
+  const { startLiveSession } = useStartLiveSession()
   const [sessions, setSessions] = useState<SessionWithTotals[]>([])
   const [recentRuns, setRecentRuns] = useState<RunSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +33,7 @@ export const SessionsList: React.FC = () => {
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [recentSearch, setRecentSearch] = useState('')
   const [showAllRecent, setShowAllRecent] = useState(false)
+  const [startingSessionId, setStartingSessionId] = useState<string | null>(null)
 
   // Confirmation state
   const [confirmState, setConfirmState] = useState<{
@@ -112,6 +115,20 @@ export const SessionsList: React.FC = () => {
         setConfirmState(prev => ({ ...prev, open: false }))
       }
     })
+  }
+
+  const handleStartLive = async (session: Session) => {
+    if (activeRun?.session_id === session.id) {
+      navigate('/live')
+      return
+    }
+    setStartingSessionId(session.id)
+    try {
+      await startLiveSession(session)
+      navigate('/live')
+    } finally {
+      setStartingSessionId(null)
+    }
   }
 
   const handleDeleteRun = (run: RunSummary) => {
@@ -360,12 +377,23 @@ export const SessionsList: React.FC = () => {
                 ))}
               </div>
 
-              {/* Action button */}
+              {/* Action buttons */}
               <div className="pt-3 border-t border-outline-variant/30">
-                <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
-                  Open Template
-                  <Icon name="arrow_forward" size="sm" />
-                </span>
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void handleStartLive(s) }}
+                    disabled={startingSessionId !== null && startingSessionId !== s.id}
+                    className="flex items-center gap-1.5 h-11 min-w-[44px] px-3 rounded-lg bg-primary text-on-primary font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
+                  >
+                    <Icon name={isLive ? 'visibility' : 'play_arrow'} size="sm" />
+                    {isLive ? 'View Live' : startingSessionId === s.id ? 'Starting...' : 'Start Live'}
+                  </button>
+                  <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
+                    Open Template
+                    <Icon name="arrow_forward" size="sm" />
+                  </span>
+                </div>
               </div>
             </div>
             )
