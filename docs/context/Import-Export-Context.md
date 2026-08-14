@@ -191,7 +191,7 @@ Download as {session-name-slugified}.swimsheet
 
 ### Creator fingerprint management
 
-- Stored in `db.meta` table under key `creatorFingerprint`
+- Stored in the `_meta` table (accessed as `db._meta`) under key `creatorFingerprint`
 - Generated via `crypto.randomUUID()` on first export
 - Coach can see/change their creator label in Settings
 - Fingerprint never changes once generated (stable identity anchor)

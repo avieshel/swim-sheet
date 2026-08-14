@@ -520,13 +520,13 @@ async function seedDefaultSessionsOnce(): Promise<void> {
 // ── Equipment Options ──────────────────────────────────────
 
 export async function getEquipmentOptions(): Promise<string[]> {
-  const meta = await db.meta.get('equipment')
+  const meta = await db._meta.get('equipment')
   if (meta) return JSON.parse(meta.value)
   return DEFAULT_EQUIPMENT
 }
 
 export async function setEquipmentOptions(items: string[]): Promise<void> {
-  await db.meta.put({ key: 'equipment', value: JSON.stringify(items) })
+  await db._meta.put({ key: 'equipment', value: JSON.stringify(items) })
 }
 
 // ── DB Management ───────────────────────────────────────────

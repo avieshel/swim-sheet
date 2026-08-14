@@ -793,3 +793,19 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Priority**: Medium
 **Status**: Done
+
+---
+
+## A-048: Settings crash — `db.meta` undefined (table registered as `_meta`) ✅
+
+**Source**: Bug report — switching to the Settings page throws `TypeError: Cannot read properties of undefined (reading 'get')` at `dao.ts:523` in `getEquipmentOptions`.
+
+**Root cause**: The Dexie store is registered as `_meta` (deliberately prefixed `_` so backup/restore/estimates skip it — the code filters tables by `t.name.startsWith('_')`), but the class property was declared `meta!` and the DAO accessed `db.meta`. Dexie instantiates table accessors under the registered store name, so `db.meta` was `undefined` and every `db.meta.get/put` threw.
+
+**Fix**:
+- `client/src/db/schema.ts` — renamed the class property to `_meta!: EntityTable<DbMeta, 'key'>`
+- `client/src/db/dao.ts` — `getEquipmentOptions`/`setEquipmentOptions` now use `db._meta`
+- `docs/context/Import-Export-Context.md` — corrected the `db.meta` → `db._meta` reference
+
+**Priority**: High
+**Status**: Done

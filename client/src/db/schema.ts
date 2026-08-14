@@ -183,7 +183,7 @@ class SwimSheetDB extends Dexie {
   laps!: EntityTable<Lap, 'id'>
   laneDrillResults!: EntityTable<LaneDrillResult, 'id'>
   libraryDrills!: EntityTable<LibraryDrill, 'id'>
-  meta!: EntityTable<DbMeta, 'key'>
+  _meta!: EntityTable<DbMeta, 'key'>
 
   constructor() {
     super('SwimSheetDB')
