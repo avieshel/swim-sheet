@@ -8,7 +8,8 @@ import {
   deleteLaneResultsForGroup,
   deleteSwimmerFromLaneResult,
   completeRunWithLaps,
-  discardTempSwimmer
+  discardTempSwimmer,
+  deleteRun
 } from '../../api/runs'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BatchPromotionModal } from '../../components/BatchPromotionModal'
@@ -161,6 +162,15 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
 
   const [showPromotionModal, setShowPromotionModal] = useState<Array<{ name: string; dbId: string }>>([])
+  const [showEmptyWarning, setShowEmptyWarning] = useState(false)
+  const [sessionLaps, setSessionLaps] = useState<CompleteRunLap[]>([])
+  const [sessionTemps, setSessionTemps] = useState<Array<{ name: string; dbId: string }>>([])
+
+  const finalizeSession = async (lapsToSave: CompleteRunLap[]) => {
+    await completeRunWithLaps(run.id, lapsToSave)
+    dispatch({ type: 'CLEAR' })
+    onComplete()
+  }
 
   const handleComplete = async () => {
     const laps: CompleteRunLap[] = []
@@ -191,31 +201,60 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       }
     }
 
-    // Always auto-save every valid swimmer's results immediately.
-    await completeRunWithLaps(run.id, laps)
+    setSessionLaps(laps)
+    setSessionTemps(tempWithTimings)
 
-    // Only temp swimmers recorded times — prompt to promote or ignore & discard.
+    // Temp swimmers recorded times → suggest promoting them (coach may skip).
     if (tempWithTimings.length > 0) {
       setShowPromotionModal(tempWithTimings)
+      return
+    }
+
+    // No temp swimmers: save valid results, or warn if there are none.
+    if (laps.length > 0) {
+      await finalizeSession(laps)
     } else {
-      dispatch({ type: 'CLEAR' })
-      onComplete()
+      setShowEmptyWarning(true)
     }
   }
 
   const handleSkipPromotion = async () => {
-    for (const swimmer of showPromotionModal) {
+    // Coach skipped promoting the temp swimmers.
+    if (sessionLaps.length > 0) {
+      // Valid results exist — discard the temp data and save the valid results.
+      for (const swimmer of showPromotionModal) {
+        await discardTempSwimmer(run.id, swimmer.dbId)
+      }
+      setShowPromotionModal([])
+      await finalizeSession(sessionLaps)
+    } else {
+      // No valid results at all — warn before discarding.
+      setShowPromotionModal([])
+      setShowEmptyWarning(true)
+    }
+  }
+
+  const handleConfirmPromotion = async () => {
+    // Promotions already persisted by BatchPromotionModal; save the valid results.
+    setShowPromotionModal([])
+    setSessionTemps([])
+    await finalizeSession(sessionLaps)
+  }
+
+  const handleWarningDiscard = async () => {
+    for (const swimmer of sessionTemps) {
       await discardTempSwimmer(run.id, swimmer.dbId)
     }
-    setShowPromotionModal([])
+    setShowEmptyWarning(false)
+    setSessionTemps([])
+    await deleteRun(run.id)
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
 
-  const handleConfirmPromotion = async () => {
-    setShowPromotionModal([])
-    dispatch({ type: 'CLEAR' })
-    onComplete()
+  const handleWarningPromote = () => {
+    setShowEmptyWarning(false)
+    setShowPromotionModal(sessionTemps)
   }
 
   const handleCompleteDrill = async (groupId: string) => {
@@ -358,6 +397,22 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
         runId={run.id}
         onConfirm={handleConfirmPromotion}
         onCancel={handleSkipPromotion}
+      />
+
+      <ConfirmDialog
+        open={showEmptyWarning}
+        title="Empty Session"
+        message={
+          sessionTemps.length > 0
+            ? "This session seems to be empty and will be discarded. You have guest swimmers with times — promote them to keep their results, or discard."
+            : "This session seems to be empty and will be discarded."
+        }
+        confirmLabel="Discard"
+        cancelLabel={sessionTemps.length > 0 ? "Promote temp swimmers" : "Keep editing"}
+        destructive={true}
+        onConfirm={handleWarningDiscard}
+        onCancel={sessionTemps.length > 0 ? handleWarningPromote : () => setShowEmptyWarning(false)}
+        onBackdropDismiss={() => setShowEmptyWarning(false)}
       />
 
       <ConfirmDialog
