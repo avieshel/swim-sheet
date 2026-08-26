@@ -8,7 +8,7 @@ import {
   deleteLaneResultsForGroup,
   deleteSwimmerFromLaneResult,
   completeRunWithLaps,
-  deleteRun
+  discardTempSwimmer
 } from '../../api/runs'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BatchPromotionModal } from '../../components/BatchPromotionModal'
@@ -161,40 +161,24 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
 
   const [showPromotionModal, setShowPromotionModal] = useState<Array<{ name: string; dbId: string }>>([])
-  const [sessionLaps, setSessionLaps] = useState<CompleteRunLap[]>([])
-  const [showEmptySessionConfirm, setShowEmptySessionConfirm] = useState(false)
-  const [pendingCompleteAction, setPendingCompleteAction] = useState<(() => Promise<void>) | null>(null)
-
-  const isSessionEmpty = (): boolean => {
-    const allSwimmers = groups.flatMap(g => g.swimmers)
-    if (allSwimmers.length === 0) return true
-    const hasRealSwimmers = allSwimmers.some(s => s.dbId && !s.dbId.startsWith('quick-'))
-    if (!hasRealSwimmers) return true
-    const hasTimingData = allSwimmers.some(s => {
-      const group = groups.find(g => g.swimmers.includes(s))
-      if (!group?.currentRunDrillId) return false
-      const live = store.getDrillTiming(run.id, group.id, group.currentRunDrillId, [s.dbId!].filter(Boolean))
-      return live.swimmers.some(l => l.lapTimestamps.length > 0)
-    })
-    if (!hasTimingData) return true
-    return false
-  }
 
   const handleComplete = async () => {
-    const allSwimmers = groups.flatMap(g => g.swimmers)
-    const unlinkedSwimmers = allSwimmers
-      .filter(s => s.dbId && s.dbId.startsWith('quick-'))
-      .map(s => ({ name: s.name, dbId: s.dbId! }))
-
     const laps: CompleteRunLap[] = []
+    const tempWithTimings: Array<{ name: string; dbId: string }> = []
+
     for (const group of groups) {
       const drillId = group.currentRunDrillId
       if (!drillId) continue
       const live = store.getDrillTiming(run.id, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
       for (const swimmer of group.swimmers) {
-        if (!swimmer.dbId || swimmer.dbId.startsWith('quick-')) continue
+        if (!swimmer.dbId) continue
+        const isTemp = swimmer.dbId.startsWith('quick-')
         const lt = live.swimmers.find(l => l.dbId === swimmer.dbId)
           ?? { dbId: swimmer.dbId, startedAt: null, completedAt: null, lapTimestamps: [] as number[] }
+        if (isTemp) {
+          if (lt.lapTimestamps.length > 0) tempWithTimings.push({ name: swimmer.name, dbId: swimmer.dbId })
+          continue
+        }
         const splits = lt.startedAt != null ? timestampSplits(lt.lapTimestamps, lt.startedAt) : []
         for (let li = 0; li < splits.length; li++) {
           laps.push({
@@ -207,47 +191,29 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       }
     }
 
-    const completeWithPromotion = async () => {
-      if (unlinkedSwimmers.length > 0) {
-        setSessionLaps(laps)
-        setShowPromotionModal(unlinkedSwimmers)
-      } else {
-        await completeRunWithLaps(run.id, laps)
-        dispatch({ type: 'CLEAR' })
-        onComplete()
-      }
-    }
+    // Always auto-save every valid swimmer's results immediately.
+    await completeRunWithLaps(run.id, laps)
 
-    if (isSessionEmpty()) {
-      setPendingCompleteAction(completeWithPromotion)
-      setShowEmptySessionConfirm(true)
+    // Only temp swimmers recorded times — prompt to promote or ignore & discard.
+    if (tempWithTimings.length > 0) {
+      setShowPromotionModal(tempWithTimings)
     } else {
-      await completeWithPromotion()
-    }
-  }
-
-  const handleEmptySessionConfirm = async (saveAnyway: boolean) => {
-    setShowEmptySessionConfirm(false)
-    if (saveAnyway && pendingCompleteAction) {
-      await pendingCompleteAction()
-    } else {
-      await deleteRun(run.id)
       dispatch({ type: 'CLEAR' })
       onComplete()
     }
-    setPendingCompleteAction(null)
   }
 
   const handleSkipPromotion = async () => {
-    await completeRunWithLaps(run.id, sessionLaps)
+    for (const swimmer of showPromotionModal) {
+      await discardTempSwimmer(run.id, swimmer.dbId)
+    }
+    setShowPromotionModal([])
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
 
   const handleConfirmPromotion = async () => {
-    // Promotions are already handled by BatchPromotionModal
-    // Just complete the run with the existing laps
-    await completeRunWithLaps(run.id, sessionLaps)
+    setShowPromotionModal([])
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
@@ -390,7 +356,6 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
         open={showPromotionModal.length > 0}
         swimmers={showPromotionModal}
         runId={run.id}
-        lane={groups[0]?.lane ?? 1}
         onConfirm={handleConfirmPromotion}
         onCancel={handleSkipPromotion}
       />
@@ -443,18 +408,6 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
           </div>
         </label>
       </ConfirmDialog>
-
-      <ConfirmDialog
-        open={showEmptySessionConfirm}
-        title="Session Complete"
-        message="Session complete — seems that it's empty. Discard?"
-        confirmLabel="Discard"
-        cancelLabel="Save anyway"
-        destructive={true}
-        onConfirm={() => handleEmptySessionConfirm(false)}
-        onCancel={() => handleEmptySessionConfirm(true)}
-        onBackdropDismiss={() => handleEmptySessionConfirm(false)}
-      />
 
       {showLaneEditor && <LaneEditorModal
         state={{ groups, runId: run.id }}

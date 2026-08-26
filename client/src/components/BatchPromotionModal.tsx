@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { searchSwimmers, createSwimmerIfNotExists } from '../api/swimmers'
-import { addSwimmerToRun } from '../api/runs'
+import { searchSwimmers } from '../api/swimmers'
+import { promoteAndLinkSwimmer, discardTempSwimmer } from '../api/runs'
 
 interface SwimmerToPromote {
   name: string
@@ -18,12 +18,11 @@ interface BatchPromotionModalProps {
   open: boolean
   swimmers: SwimmerToPromote[]
   runId: string
-  lane: number
-  onConfirm: (promoted: Array<{ name: string; dbId: string }>) => void
+  onConfirm: () => void
   onCancel: () => void
 }
 
-export function BatchPromotionModal({ open, swimmers, runId, lane, onConfirm, onCancel }: BatchPromotionModalProps) {
+export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel }: BatchPromotionModalProps) {
   const [userChoices, setUserChoices] = useState<Record<string, Partial<PromotionChoice>>>({})
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({})
   const [searchResults, setSearchResults] = useState<Record<string, Array<{ id: string; name: string }>>>({})
@@ -70,30 +69,20 @@ export function BatchPromotionModal({ open, swimmers, runId, lane, onConfirm, on
   const handleConfirm = async () => {
     setSaving(true)
     try {
-      const promoted: Array<{ name: string; dbId: string }> = []
-      for (const choice of swimmers.map(s => getChoice(s.dbId))) {
-        if (!choice.promote) continue
-
-        let realDbId: string
-        let realName: string
-
-        if (choice.selectedRosterId) {
-          realDbId = choice.selectedRosterId
-          realName = choice.swimmer.name
-        } else {
-          realName = choice.newSwimmerName || choice.swimmer.name
-          const existing = await searchSwimmers(realName)
-          if (existing.length > 0) {
-            realDbId = existing[0].id
-          } else {
-            realDbId = await createSwimmerIfNotExists({ name: realName, group: '', notes: '', status: 'active' })
-          }
+      for (const swimmer of swimmers) {
+        const choice = getChoice(swimmer.dbId)
+        if (!choice.promote) {
+          await discardTempSwimmer(runId, swimmer.dbId)
+          continue
         }
 
-        await addSwimmerToRun(runId, realDbId, lane)
-        promoted.push({ name: realName, dbId: realDbId })
+        const realName = choice.selectedRosterId
+          ? swimmer.name
+          : choice.newSwimmerName || swimmer.name
+
+        await promoteAndLinkSwimmer(runId, swimmer.dbId, realName, choice.selectedRosterId)
       }
-      onConfirm(promoted)
+      onConfirm()
     } finally {
       setSaving(false)
     }

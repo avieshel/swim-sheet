@@ -80,6 +80,10 @@ export function promoteAndLinkSwimmer(
   return runService.promoteAndLinkSwimmer(runId, syntheticDbId, name, explicitDbId, group)
 }
 
+export function discardTempSwimmer(runId: string, syntheticDbId: string): Promise<void> {
+  return runService.discardTempSwimmer(runId, syntheticDbId)
+}
+
 // ── Run Drills ──
 
 export function getRunDrills(runId: string): Promise<RunDrill[]> {

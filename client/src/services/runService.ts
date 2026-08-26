@@ -402,4 +402,25 @@ export const runService = {
 
     return realDbId
   },
+
+  discardTempSwimmer: async (runId: string, syntheticDbId: string): Promise<void> => {
+    const results = await getLaneDrillResults(runId)
+    for (const result of results) {
+      if (!result.data) continue
+      const data = JSON.parse(result.data) as SavedDrillData
+      if (!data.swimmers.some(s => s.dbId === syntheticDbId)) continue
+      data.swimmers = data.swimmers.filter(s => s.dbId !== syntheticDbId)
+      await db.laneDrillResults.update(result.id!, {
+        data: JSON.stringify(data),
+        completed: data.swimmers.length > 0 ? result.completed : false,
+        updatedAt: new Date().toISOString(),
+      })
+    }
+    const notesStr = (await getSessionRun(runId))?.notes || '{}'
+    const runNotes = JSON.parse(notesStr) as { virtualSwimmers?: VirtualSwimmer[]; isQuickStart?: boolean }
+    if (runNotes?.virtualSwimmers) {
+      runNotes.virtualSwimmers = runNotes.virtualSwimmers.filter((vs: VirtualSwimmer) => vs.dbId !== syntheticDbId)
+      await updateSessionRun(runId, { notes: JSON.stringify(runNotes) })
+    }
+  },
 }
