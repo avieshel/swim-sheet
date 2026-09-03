@@ -42,7 +42,7 @@ A coach opens the app, taps the pinned "100m freestyle quick time" option, and i
 - **One-tap scale** — "Add Swimmer" / "Temp Swimmer" buttons grow the session from 3 to N swimmers
 - **Inline editing** — drill name/distance/stroke and swimmer names are editable directly in the group card
 - **Name edit is the promotion signal** — editing a virtual swimmer's name triggers a non-blocking inline prompt to save to roster. The prompt must never interrupt timing (auto-dismiss, no modal, doesn't block Start/Lap/Finish).
-- **Promotion is optional** — coaches can tap × or ignore the prompt. Virtual swimmers remain usable for the session. Their timing data is always preserved in LaneDrillResult blobs regardless of promotion status.
+- **Promotion is optional (during the session)** — coaches can tap × or ignore the prompt; the virtual swimmer stays usable for the rest of the session and its timing data is preserved in `LaneDrillResult` blobs. At **session completion**, however, an unpromoted guest that the coach skips is **discarded** (its times are removed); only promoted (or real roster) swimmers persist to history. See Main-Flow.md "Post-session completion".
 
 ## Roster-Aware Behavior
 
@@ -395,7 +395,7 @@ const templateName = s?.name === 'Quick 100m freestyle (default)' ? 'Quick Time'
 |-----------|----------|
 | **Start/Finish/Lap** | Work fully — `dbId: "quick-..."` is a valid string for TimestampStore keys |
 | **handleCompleteDrill** | Saves to LaneDrillResult blob — `dbId` stored as JSON field, works fine |
-| **handleComplete** | **Must skip** virtual swimmers — their `dbId` starts with `"quick-"` (see §8) |
+| **handleComplete** | Resolves guest (`quick-*`) swimmers: those with times are offered promotion (`promoteAndLinkSwimmer`) or discard (`discardTempSwimmer`); only valid results are saved, and an empty/all-guest session is discarded after a warning (see Main-Flow.md) |
 | **Lane Editor** | Virtual swimmers show in lane groups, can coexist with real swimmers |
 | **Page refresh** | By default, lost (no RunSwimmer records). Recovery via `notes` JSON (see §10) |
 
@@ -575,42 +575,47 @@ The `notes` JSON is updated on every `RENAME_SWIMMER`, `ADD_GROUP`, `REMOVE_GROU
 | `RunDrill` | 1 drill (100m freestyle) | N drills from template | ✅ Yes |
 | `RunSwimmer` | None created | 1 per swimmer assigned | ✅ Yes — quick time skips this |
 | `LaneDrillResult` | Timing data saved here | Timing data saved here | ✅ Yes |
-| `Lap` | Saved for virtual swimmers too | Saved for real swimmers | ✅ Yes — but virtual Laps are orphaned (see below) |
+| `Lap` | Not saved for virtual swimmers directly (skipped in `handleComplete`); a promoted guest's laps are re-pointed to its real `dbId`, a skipped guest's are discarded | Saved for real swimmers | ✅ Yes — no orphan `quick-*` Lap rows |
 | `Swimmer` | None created | 1 per roster entry | ✅ Yes |
 | `Session.notes` | `{ isQuickStart: true, version: 1, virtualSwimmers: [...] }` | User notes | ✅ Yes — JSON key namespace is clean |
 
 **No schema changes needed.** The default session approach avoids making `session_id` nullable.
 
-### The Lap Record Issue (Critical)
+### The Lap Record Issue (resolved)
 
-`handleComplete` (LiveDeck.tsx:510) iterates all swimmers and saves Lap records for any with a truthy `dbId`. Virtual swimmers have `dbId: "quick-..."` which is truthy, so the loop creates Lap records with `swimmer_id: "quick-..."` — orphan records with no matching Swimmer.
+Historically `handleComplete` saved a Lap record for every swimmer with a truthy
+`dbId`, which for virtual swimmers (`quick-...`) produced orphan Lap rows with no
+matching `Swimmer`. The fix keeps virtual swimmers out of the `Lap` loop, and the
+post-session flow (Main-Flow.md "Post-session completion") resolves each guest
+explicitly so no orphan data survives:
 
-**Fix**: In the `handleComplete` loop, skip swimmers whose `dbId` starts with `"quick-"`:
+- **Promoted guests** → `promoteAndLinkSwimmer()` re-points/creates their Lap rows
+  under the real roster `dbId` — no orphans.
+- **Skipped guests** → `discardTempSwimmer()` removes their `LaneDrillResult` data —
+  no orphan rows, and the discarded data does not linger in history.
 
 ```ts
 for (const swimmer of group.swimmers) {
   if (!swimmer.dbId || swimmer.dbId.startsWith('quick-')) continue
-  // existing lap-saving logic
+  // existing lap-saving logic (valid swimmers only)
 }
 ```
-
-Their data is already persisted in LaneDrillResult blobs via `handleCompleteDrill`, so nothing is lost.
 
 ### Dual Save Path
 
 | Path | When | Writes to | Virtual swimmer safe? |
 |------|------|-----------|----------------------|
 | `handleCompleteDrill` | All swimmers in a group complete a single drill | `LaneDrillResult` blob | ✅ Yes — `dbId` is just a JSON field |
-| `handleComplete` | Coach taps "Complete" on the whole session | `Lap` table | ❌ Without the `"quick-"` guard — orphan records |
+| `handleComplete` | Coach taps "Complete" on the whole session | `Lap` table | ✅ Guests are skipped in the Lap loop; promoted guests are re-pointed to a real `dbId`, skipped guests are discarded — no orphans |
 
-**Recommendation**: LaneDrillResult blobs are the universal persistence layer. Lap records are an optimization for per-swimmer queries. For quick-time sessions, the LaneDrillResult blobs are sufficient. The `"quick-"` guard prevents data corruption.
+**Recommendation**: LaneDrillResult blobs are the universal persistence layer. Lap records are an optimization for per-swimmer queries. For quick-time sessions, the LaneDrillResult blobs are sufficient, and the `"quick-"` guard + completion promote/discard flow prevents data corruption.
 
 ### Virtual Swimmer State Breakdown
 
 | Concern | Current state | Risk | Fix |
 |---------|--------------|------|-----|
 | TimestampStore keys | Uses `dbId` as key suffix | None — `"quick-..."` is a valid string | None |
-| `handleComplete` skip guard | `if (swimmer.dbId)` — truthy for `"quick-"` | **High** — orphan Lap records | Add `!dbId.startsWith('quick-')` check |
+| `handleComplete` skip guard | Skips `quick-*` swimmers; completion flow promotes or discards them | None | — |
 | `handleCompleteDrill` save | Saves to LaneDrillResult | None — `dbId` is a JSON field | None |
 | Page refresh recovery | Lost — no RunSwimmer records | Medium | Store/restore from `notes` JSON |
 | Drill override persistence | `drillOverride` in-memory only | Low | Include in `notes` JSON |  
@@ -694,27 +699,28 @@ This appears **below** the swimmer card so it doesn't interfere with the Start/L
 | **Name edit** (saved/completed drill) | Inline chip on the saved swimmer card | Immediately after name change |
 | **"💾 Save" icon** on virtual swimmer card | Same inline chip, searches current name | On tap |
 | **"🔗 Link to existing" from context menu** | Opens swimmer search/selector → select target → confirm | On menu selection |
-| **Post-session "Complete"** | Summary modal listing all un-promoted virtual swimmers | On session end |
+| **Post-session "Complete"** | Promote/skip modal for any guest (`quick-*`) swimmer that recorded times; skipped guests are discarded, promoted become valid | On session end |
 
 The "Link to existing" flow is for the case where the coach knows the virtual swimmer matches an existing roster entry but under a **different name** (e.g., "Jellyfish Jill" is actually "Jane Smith"). The name edit flow handles the case where the coach types the real name. Both paths converge on `promoteAndLinkSwimmer()`.
 
-The post-session modal catches any virtual swimmers the coach never edited but might want to keep:
+The post-session modal (see Main-Flow.md "Post-session completion") catches any guest (`quick-*`) swimmer that recorded times but was never edited, and asks the coach to **promote** it to the roster or **skip** it. This is the coach's decision point for keeping vs. discarding guest data:
 
 ```
 Session Complete — 4 swimmers timed
   ┌──────────────────────────────────────┐
-  │ Save swimmers to your roster?        │
+  │ Promote Swimmers to Roster           │
+  │ Choose which swimmers to keep.        │
   │                                      │
   │ [✓] Salty Sally         (edited ✓)   │
   │ [✓] Bubbles                          │
   │ [✓] Jellyfish Jill      (edited ✓)   │
   │ [ ] Starfish Steve                   │
   │                                      │
-  │         [Save Selected] [Not Now]    │
+  │      [Skip All] [Promote N]          │
   └──────────────────────────────────────┘
 ```
 
-Checked swimmers with edited names are pre-selected. Unedited ones default to unchecked — weaker signal, coach opts in.
+Checked swimmers with edited names are pre-selected. Unedited ones default to unchecked — weaker signal, coach opts in. Promoting runs `promoteAndLinkSwimmer()` (kept as valid results); skipping runs `discardTempSwimmer()` (data removed). If no valid results remain after this choice, an empty-session warning offers one last chance to promote before discarding the run.
 
 #### Implementation: `promoteAndLinkSwimmer()` service method
 
@@ -846,8 +852,8 @@ This keeps the swimmer's position, completed state, and lapStrokeCounts intact �
 | Edits name → confirms "link to existing" | ✅ Promotion runs (LaneDrillResult + Lap + RunSwimmer) | ✅ Fully linked |
 | Edits name → confirms "create new" | ✅ Promotion runs | ✅ Fully linked |
 | Edits name → dismisses the chip | ❌ No promotion — display name only | ✅ Display shows name, but `SwimmerDetail` is empty |
-| Never edits names → completes session | ❌ No promotion | ✅ Display from LaneDrillResult, no DB records |
-| Never edits names → post-session "Save Selected" | ✅ Promotion runs for each checked swimmer | ✅ Fully linked |
+| Never edits names → completes session | ❌ No promotion | ✅ (legacy) Display from LaneDrillResult, no DB records — but in the current flow a skipped guest is **discarded** at completion, so it does not persist |
+| Never edits names → post-session "Promote" | ✅ Promotion runs for each checked swimmer | ✅ Fully linked |
 
 **The data model fully supports this.** The promotion procedure is the bridge that converts ephemeral virtual swimmers into permanent DB records with all timing data intact. Without it, the display works (LaneDrillResult blobs are self-contained) but the swimmer doesn't appear in `SwimmerDetail` or any DB-backed query.
 
@@ -1014,7 +1020,7 @@ Persona B now has a full roster and session templates. They notice the "Quick St
 8. **LiveDeck**: `QuickTimeRunView` — Add Swimmer dropdown (roster + random), inline name/drill editing, swimmer card context menu ("Link to existing..."), promotion chip UI
 9. **CoachDashboard**: Accessible at `/dashboard` for full session setup (SessionSetup flow)
 10. **Constants**: `FAMOUS_SWIMMER_NAMES` array (31 famous swimmer names)
-11. **Post-session prompt**: Summary modal listing un-promoted virtual swimmers on session complete
+11. **Post-session prompt**: Promote/skip modal for any guest (`quick-*`) swimmer that recorded times on session complete — promoted guests become valid, skipped guests are discarded (see Main-Flow.md "Post-session completion")
 
 ## Verification
 

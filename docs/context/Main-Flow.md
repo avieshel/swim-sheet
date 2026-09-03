@@ -68,12 +68,37 @@ All user journeys the application supports, organized by flow.
 4. No match → "Save 'Name' to your roster?" → confirm → create Swimmer + promotion runs
 5. Non-blocking inline chip below swimmer card, auto-dismiss after 5s, "Don't ask again this session"
 
-### Flow: Post-session promotion
+### Flow: Post-session completion (save / promote / discard)
 
-1. On "Complete", summary modal lists all unpromoted virtual swimmers
-2. Pre-check swimmers with edited names
-3. "Save Selected" → promotion runs for each checked swimmer
-4. "Not Now" → dismiss, virtual swimmers remain ephemeral
+**Intent — let the coach make a good decision.** At completion the app separates
+*throwaway/test* swimmers (temporary "guest" swimmers with `quick-*` ids) from *valid*
+swimmers (real roster swimmers), and **only valid results persist into history**.
+Guest swimmers that recorded times are surfaced for promotion so their data is never
+silently lost — but the coach may discard them. The net effect is that the past-sessions
+view stays clean: no orphan guest data, no empty clutter.
+
+1. On **Complete**, scan every lane for swimmers that recorded lap times.
+2. **If any guest (`quick-*`) swimmer recorded times** → open the promotion modal
+   ("Promote Swimmers to Roster"). For each guest the coach may:
+   - **Promote** → `promoteAndLinkSwimmer()` rewrites the guest's `dbId` to a real
+     roster swimmer (existing or newly created) and re-points/creates their lap
+     records, so the data is kept as a **valid result**; or
+   - **Skip** (untick / "Skip All") → the guest's times are **discarded** (not saved).
+3. **After the promotion decision**, evaluate valid results:
+   - **Valid results exist** (real swimmers with times, or guests just promoted) →
+     save those results via `completeRunWithLaps()` and finish.
+   - **No valid results** (e.g. every swimmer was a guest the coach skipped) → show a
+     clear warning: *"This session seems to be empty and will be discarded."* The
+     coach may **Promote temp swimmers** (re-opens the modal) or **Discard** (the run
+     is deleted — nothing is saved).
+4. **No guest swimmers recorded times**:
+   - Valid results exist → save and finish.
+   - No valid results at all → same empty-session warning (with "Keep editing" instead
+     of a promote option).
+
+Outcome: a completed session in history contains **only valid swimmers**. Discarded
+guest data never pollutes the past-sessions view, and the coach is always given the
+chance to keep a guest's times before anything is thrown away.
 
 ---
 
@@ -367,7 +392,7 @@ The active run has two modes. **Overview** is the default — a session-level vi
 | Active run on page load | Restores from notes JSON + RunSwimmer links |
 | Roster swimmer name duplicate | Blocked with inline error in SwimmerFormModal |
 | Delete template with completed runs | Template deleted, runs preserved (no effect) |
-| Complete session with virtual swimmers | LaneDrillResult saved, Lap records skipped for `quick-*` dbIds |
+| Complete session with virtual swimmers | If any guest (`quick-*`) recorded times, coach is prompted to **promote** (→ valid, kept via `promoteAndLinkSwimmer`) or **skip** (→ discarded via `discardTempSwimmer`). Only valid (promoted/roster) results persist. An all-guest/empty session shows a warning and is discarded (deleted) — no orphan guest data is saved. |
 | Browser offline | All CRUD works via Dexie; sync deferred |
 | Page refresh during active run | Recovery from `SessionRun.notes` JSON |
 | Page refresh in Overview Mode | View mode restored from `SessionRun.notes` JSON |

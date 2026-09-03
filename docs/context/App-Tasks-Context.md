@@ -122,7 +122,7 @@ All default to `stroke: 'freestyle'` with `distance` set in the seed array. Name
    - The Live picker is always shown (no auto-start): pinned "100m freestyle quick time" card + templates ranked by usage
    - `handleQuickStart` creates 3 virtual swimmers (Lane 1: 2, Lane 2: 1 — multi-swimmer/multi-lane hints) **only when the roster is empty**, and shows a notice modal
    - Page refresh recovery: virtual swimmer state serialized in `SessionRun.notes` JSON, restored grouped by lane
-   - `handleComplete` guard: skip Lap creation for swimmers with `"quick-"` prefixed `dbId`
+   - `handleComplete` (ActiveRunView) separates guest (`quick-*`) swimmers from valid swimmers: guest times are offered for promotion (`promoteAndLinkSwimmer`) or discarded (`discardTempSwimmer`); only valid results are saved via `completeRunWithLaps`, and an all-guest/empty session is discarded after a warning.
 4. **App routing** (`client/src/App.tsx`): Root `/` → `LiveDeck`, `/dashboard` → `CoachDashboard`
 5. **Constants** (`client/src/constants/`): `FAMOUS_SWIMMER_NAMES` array (31 famous swimmer names) used by "Temp Swimmer" button
 
@@ -131,7 +131,7 @@ All default to `stroke: 'freestyle'` with `distance` set in the seed array. Name
 - **Visible default session** — "Quick 100m freestyle (default)" appears in Sessions list, users can edit/delete it
 - **App opens to `/`** — shows the Live picker (quick time pinned first + templates ranked by usage); quick time is one tap away
 - **Lane 2 has 2 swimmers** — hints that multiple swimmers per lane are supported (empty-roster quick time only)
-- Virtual swimmers get synthetic `dbId: "quick-..."` — must be skipped in `handleComplete` Lap loop
+- Virtual swimmers get synthetic `dbId: "quick-..."` — at completion they are resolved (promoted to a valid roster swimmer or discarded); only valid results are saved, so history never retains orphan guest data.
 - Page refresh recovery: virtual swimmer state serialized in `SessionRun.notes` JSON
 - Full data model compatibility — history/review works identically for quick-time and full sessions
 
@@ -601,7 +601,7 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Solution**: Every chip carries a synthetic id; lap rows materialize only for owner-linked swimmers (promoted to roster via `promoteAndLinkSwimmer` or completed with an owner). Untimed reps produce zero lap rows. Keep the one-motion add, enforce the identity chain.
 
-**Product-owner decision (three-persona review)**: laps recorded under never-promoted `quick-…` ids are **retained but excluded from progress tracking until the chip is promoted** to a roster swimmer — data is never lost, but it never counts toward per-swimmer progress as orphan data.
+**Product-owner decision (three-persona review)**: at session completion the coach is explicitly asked to **promote** a guest (`quick-…`) that recorded times to a real roster swimmer (keeping the data, now identity-linked) or **discard** it. Discarded guest data is removed — it never lingers as orphan/excluded rows. The identity chain stays unbroken: only owner-linked (promoted or real) swimmers persist to history, and no `quick-…` lap rows remain. Data is never *silently* lost — the coach makes the call at Complete (see Main-Flow.md "Post-session completion").
 
 **Files**: `client/src/context/LiveSessionContext.tsx`, `client/src/services/runService.ts`, `client/src/pages/LiveDeck.tsx`
 

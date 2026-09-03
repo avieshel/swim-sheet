@@ -299,7 +299,7 @@ interface TimestampStore {
 }
 ```
 
-**Persistence projection:** "Submitting" a drill is a pure projection, not ad-hoc timestamp reconstruction in the view. `api/runs.buildLaneResult({ runId, groupId, drillId, sessionStartedAt, now, live: LiveDrillTiming, swimmers })` returns the `SavedDrillData` blob (using `timestampSplits`); `handleCompleteDrill` stringifies it into `setLaneResult`. `handleComplete` collects laps via `store.getDrillTiming(...)` + `timestampSplits` and calls `api/runs.completeRunWithLaps(...)`.
+**Persistence projection:** "Submitting" a drill is a pure projection, not ad-hoc timestamp reconstruction in the view. `api/runs.buildLaneResult({ runId, groupId, drillId, sessionStartedAt, now, live: LiveDrillTiming, swimmers })` returns the `SavedDrillData` blob (using `timestampSplits`); `handleCompleteDrill` stringifies it into `setLaneResult`. `handleComplete` collects laps for **valid (non-`quick-`) swimmers** via `store.getDrillTiming(...)` + `timestampSplits`, then routes guest (`quick-*`) swimmers with times through the promotion/discard flow (see Main-Flow.md "Post-session completion"): promoted guests are re-pointed to a real `dbId` and kept; skipped guests are discarded; only valid results are saved via `api/runs.completeRunWithLaps(...)`, and an empty/all-guest session is discarded after a warning.
 
 **Timing model:**
 - One global session timer: `sessionElapsed` ticks via `tick()` exposed from context

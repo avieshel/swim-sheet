@@ -26,7 +26,7 @@ session management").
 | Times read source | Timing data exists in two places: `LaneDrillResult.data` blobs (per-drill `SavedDrillData.swimmers[].laps`, client-only) and the `Lap` table (per-lap rows, mirrored server-side). No unified read model exists. | `db/schema.ts:96-128`, `db/schema.ts:152-162` |
 | Run list query | `getCompletedRuns()` sorts by date desc; `getRunsForSwimmer(id)` joins via `RunSwimmer`. | `dao.ts:140-143`, `dao.ts:251-256` |
 | Per-run timing query | `getLaneDrillResults(runId)` (blobs) + `getLapsForRunDrill`/`getLapsForSwimmerInRun` (laps). No `getLapsForRun`. | `dao.ts:199-205,264-273` |
-| Quick-time runs | Contain `quick-*` virtual swimmers (no `Swimmer`/`RunSwimmer` records) — must appear in the **sessions** history (attendee names from blob `name`), but are **not** filterable per-swimmer until promoted. | `runService.ts:203-243` |
+| Quick-time runs | May contain `quick-*` virtual swimmers (no `Swimmer`/`RunSwimmer` records). At **completion** skipped guests are discarded, so only **promoted** guests reach history (re-pointed to a real `dbId`); legacy/unresolved runs may still show a guest by blob `name` but are **not** filterable per-swimmer. | `runService.ts:341-425` |
 
 ---
 
@@ -164,9 +164,14 @@ Per-run detail renders, from the same read model:
 - **Blobs are client-only** (`LaneDrillResult` does not sync). The history table works
   fully offline; server-backed runs (post-sync on another device) may lack blobs — the
   `Lap` fallback covers them. Cross-device: encourage promotion so laps are mirrored.
-- **Virtual swimmers** show in sessions history by name only (blob data), and are excluded
-  from the swimmer filter until promoted (`A-030`). They must not create phantom
-  `RunSwimmer` rows.
+- **Only valid swimmers persist into history.** At completion, each guest (`quick-*`)
+  swimmer is resolved: **promoted** → re-pointed to a real roster `dbId` and surfaced as
+  a normal, filterable attendee; **skipped** → removed from `LaneDrillResult` blobs +
+  `notes.virtualSwimmers` and discarded. So completed runs normally contain **no**
+  virtual swimmers — the past-sessions view stays clean. (Legacy runs that predate this
+  resolution may still show a `quick-*` guest by blob name only; such guests remain
+  excluded from the swimmer filter until promoted and must never create phantom
+  `RunSwimmer` rows.)
 - **Performance**: the projection is N+1 across blob reads; guard with a single
   `where('run_id').anyOf(runIds)` batch per table (Dexie `anyOf`), and memoize in the
   component. Acceptable at roster scale; revisit if pagination is needed.
