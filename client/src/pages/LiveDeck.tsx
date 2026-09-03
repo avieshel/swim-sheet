@@ -210,10 +210,7 @@ export const LiveDeck: React.FC = () => {
               <span className="block text-label-sm text-on-surface-variant">Instant 100m freestyle timer — two lanes ready to go.</span>
             </div>
           </div>
-          <span className="flex items-center gap-1 text-primary font-bold text-sm shrink-0">
-            {startingQuickStart ? 'Starting...' : 'Start'}
-            <Icon name="arrow_forward" size="md" />
-          </span>
+          <Icon name="arrow_forward" size="md" color="primary" />
         </button>
 
         {sessionChoices === null && (
@@ -235,10 +232,11 @@ export const LiveDeck: React.FC = () => {
                 <span className="block font-bold text-on-surface truncate">{s.name}</span>
               </div>
             </div>
-            <span className="flex items-center gap-1 text-primary font-bold text-sm shrink-0">
-              {startingSessionId === s.id ? 'Starting...' : 'Start'}
-              <Icon name="arrow_forward" size="md" />
-            </span>
+            {startingSessionId === s.id ? (
+              <span className="text-label-sm text-on-surface-variant shrink-0">Starting…</span>
+            ) : (
+              <Icon name="arrow_forward" size="md" color="primary" />
+            )}
           </button>
         ))}
 

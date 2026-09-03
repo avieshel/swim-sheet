@@ -44,17 +44,8 @@ export function LaneCard({ group, onManageSwimmers }: LaneCardProps) {
             </span>
           ))
         ) : (
-          <div className="w-full rounded-xl bg-surface-container p-4 flex flex-col items-center gap-3">
-            <p className="text-label-sm text-on-surface-variant text-center">No swimmers in this lane yet.</p>
-            {onManageSwimmers && (
-              <button
-                onClick={() => onManageSwimmers(liveGroup.lane)}
-                className="h-11 px-4 flex items-center justify-center gap-1.5 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer active:scale-95"
-              >
-                <Icon name="group_add" size="md" />
-                Add Swimmers
-              </button>
-            )}
+          <div className="w-full rounded-xl border-2 border-dashed border-outline-variant p-4 flex items-center justify-center">
+            <p className="text-label-sm text-on-surface-variant text-center">No swimmers in this lane yet — use <span className="font-bold">Manage</span> above to add some.</p>
           </div>
         )}
       </div>

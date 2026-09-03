@@ -319,10 +319,10 @@ export const SessionDetail: React.FC = () => {
     <div>
       <button
         onClick={() => navigate('/sessions')}
-        className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors mb-4 font-body-md cursor-pointer bg-transparent border-none"
+        className="h-11 px-3 mb-4 inline-flex items-center gap-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer border-none"
       >
-        <Icon name="arrow_back" size="lg" />
-        Back to Templates
+        <Icon name="arrow_back" size="sm" />
+        <span className="text-label-sm font-medium">Back to Templates</span>
       </button>
 
       {/* Template Metadata */}
@@ -384,7 +384,8 @@ export const SessionDetail: React.FC = () => {
               </button>
               <button
                 onClick={() => { setEditingMeta(true); setEditNotes(session.notes || '') }}
-                className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                aria-label="Edit template name and notes"
+                className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
               >
                 <Icon name="edit" color="primary" />
               </button>
@@ -559,16 +560,18 @@ export const SessionDetail: React.FC = () => {
                       <button
                         onClick={() => moveDrill(d, -1)}
                         disabled={i === 0}
-                        className="p-0.5 text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
+                        aria-label="Move drill up"
+                        className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
                       >
-                        <Icon name="keyboard_arrow_up" size="sm" />
+                        <Icon name="keyboard_arrow_up" />
                       </button>
                       <button
                         onClick={() => moveDrill(d, 1)}
                         disabled={i === drills.length - 1}
-                        className="p-0.5 text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
+                        aria-label="Move drill down"
+                        className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
                       >
-                        <Icon name="keyboard_arrow_down" size="sm" />
+                        <Icon name="keyboard_arrow_down" />
                       </button>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -624,17 +627,17 @@ export const SessionDetail: React.FC = () => {
                   <div className="flex gap-1">
                     <button
                       onClick={() => openRichEditor(d)}
-                      className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                      title="Edit drill"
+                      aria-label="Edit drill"
+                      className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                     >
-                      <Icon name="edit" size="lg" color="primary" />
+                      <Icon name="edit" color="primary" />
                     </button>
                     <button
                       onClick={() => handleDeleteDrill(d.id)}
-                      className="p-2 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                      title="Remove drill"
+                      aria-label="Remove drill"
+                      className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                     >
-                      <Icon name="delete" size="lg" color="error" />
+                      <Icon name="delete" color="error" />
                     </button>
                   </div>
                 </div>
@@ -678,7 +681,7 @@ export const SessionDetail: React.FC = () => {
                   <button
                     key={f}
                     onClick={() => setActiveFocusFilter(f)}
-                    className={`flex-1 py-1.5 text-label-sm font-bold rounded-md transition-all cursor-pointer capitalize ${activeFocusFilter === f ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    className={`flex-1 h-9 md:h-10 text-label-sm font-bold rounded-md transition-all cursor-pointer capitalize ${activeFocusFilter === f ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
                   >
                     {f}
                   </button>
@@ -687,14 +690,14 @@ export const SessionDetail: React.FC = () => {
 
               {/* Tag Filters */}
               {allLibraryTags.length > 0 && (
-                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1 bg-surface-container-low/50 rounded-lg">
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-surface-container-low/50 rounded-lg">
                   {allLibraryTags.map(tag => {
                     const active = activeTagFilters.includes(tag)
                     return (
                       <button
                         key={tag}
                         onClick={() => toggleTagFilter(tag)}
-                        className={`px-2 py-0.5 rounded-full text-caption-caps font-bold uppercase tracking-wider transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
+                        className={`h-7 px-2 rounded-full text-caption-caps font-bold uppercase tracking-wider transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
                       >
                         {tag}
                       </button>
@@ -737,22 +740,22 @@ export const SessionDetail: React.FC = () => {
                       <div className="flex gap-1 shrink-0">
                         <button
                           onClick={() => handleAddFromLibrary(libDrill)}
-                          className="p-1.5 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                          title="Add to session"
+                          aria-label="Add to session"
+                          className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                         >
                           <Icon name="add_circle" color="primary" />
                         </button>
                         <button
                           onClick={() => openRichEditor(libDrill, true)}
-                          className="p-1.5 text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                          title="Edit bank drill"
+                          aria-label="Edit bank drill"
+                          className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                         >
                           <Icon name="edit" color="on-surface-variant" />
                         </button>
                         <button
                           onClick={() => handleDeleteLibraryDrill(libDrill)}
-                          className="p-1.5 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                          title="Delete bank drill"
+                          aria-label="Delete bank drill"
+                          className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                         >
                           <Icon name="delete" color="error" />
                         </button>

@@ -337,9 +337,10 @@ export const SessionsList: React.FC = () => {
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                      className="p-1.5 text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
+                      aria-label={`Delete ${s.name}`}
+                      className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
                     >
-                      <Icon name="delete" size="lg" />
+                      <Icon name="delete" />
                     </button>
                   </div>
                   <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">

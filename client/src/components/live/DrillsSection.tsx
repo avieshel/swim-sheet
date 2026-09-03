@@ -31,7 +31,7 @@ function MarkerCell({ status, onClick, label }: {
       onClick={() => onClick()}
       title={label}
       aria-label={label}
-      className={`inline-flex items-center justify-center h-8 w-8 rounded-lg text-sm font-bold transition-all ${
+      className={`inline-flex items-center justify-center h-10 w-10 md:h-11 md:w-11 rounded-lg text-sm font-bold transition-all ${
         cfg.base
       } cursor-pointer hover:brightness-110 active:scale-90`}
     >
@@ -86,7 +86,7 @@ export function DrillsSection({
     <button
       onClick={() => onEnterTiming(rd.id)}
       title={`Time all lanes on drill #${num} (${stripRepPrefix(rd.name)})`}
-      className="inline-flex items-center gap-1 px-2 h-8 rounded-lg bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer active:scale-95"
+      className="inline-flex items-center gap-1 h-10 md:h-11 px-3 rounded-lg bg-primary/10 text-primary text-label-sm font-bold hover:bg-primary/20 transition-all cursor-pointer active:scale-95"
     >
       <Icon name="timer" size="sm" />
       <span className="hidden sm:inline">Time</span>
@@ -178,7 +178,7 @@ export function DrillsSection({
                                 <button
                                   onClick={() => group.forEach(d => onToggleDrillDone(g.id, d.id, null))}
                                   title={`L${g.lane}: ${doneCount} of ${group.length} repetitions done — tap to ${allDone ? 'undo all' : 'complete all'}`}
-                                  className={`inline-flex items-center justify-center h-8 rounded-lg px-2 text-xs font-bold tabular-nums cursor-pointer hover:brightness-110 active:scale-95 transition-all ${
+                                  className={`inline-flex items-center justify-center h-10 md:h-11 rounded-lg px-3 text-label-sm font-bold tabular-nums cursor-pointer hover:brightness-110 active:scale-95 transition-all ${
                                     allDone ? 'bg-primary text-on-primary' : someDone ? 'bg-tertiary-container text-on-tertiary-container' : 'bg-surface-variant text-on-surface-variant/40 hover:bg-tertiary-container/50'
                                   }`}
                                 >
@@ -217,15 +217,15 @@ export function DrillsSection({
           {hasDrills && (
             <div className="mt-3 px-3 md:px-5 pb-3 flex items-center gap-4 flex-wrap text-label-sm text-on-surface-variant">
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-primary text-on-primary"><Icon name="check" className="text-[12px]" /></span>
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary text-on-primary"><Icon name="check" className="text-[12px]" /></span>
                 Done
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-tertiary-container text-on-tertiary-container ring-2 ring-tertiary"><Icon name="play_arrow" className="text-[12px]" /></span>
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-tertiary-container text-on-tertiary-container ring-2 ring-tertiary"><Icon name="play_arrow" className="text-[12px]" /></span>
                 In progress
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-surface-variant text-on-surface-variant/50">
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-surface-variant text-on-surface-variant/50">
                   <span className="text-[12px] font-bold leading-none">–</span>
                 </span>
                 Not started

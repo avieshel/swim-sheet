@@ -69,7 +69,7 @@ export const CoachDashboard: React.FC = () => {
 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                 <Link
                   to="/live"
-                  className="bg-surface-container-lowest text-primary font-bold px-8 py-4 rounded-xl flex items-center gap-2 hover:shadow-xl active:scale-95 transition-all no-underline"
+                  className="bg-surface-container-lowest text-primary font-bold h-11 md:h-12 px-6 rounded-full flex items-center gap-2 hover:shadow-xl active:scale-95 transition-all no-underline"
                 >
                   <Icon name="bolt" fill />
                   Quick Time Lap

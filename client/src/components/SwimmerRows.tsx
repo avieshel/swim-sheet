@@ -59,6 +59,7 @@ interface SavedSwimmerRowProps {
 export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, onClearSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: SavedSwimmerRowProps) {
   const { dispatch } = useContext(LiveSessionContext)
   const lapEntries = saved.laps ?? []
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const displayTime = (() => {
     if (saved.startedAt == null) return '--:--.--'
@@ -134,7 +135,10 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                         onEditSavedSwimmer(group.id, runDrillId!, entry.dbId, { laps: adjustedLaps, startedAt: undefined })
                       }
                     }}
-                    className="h-9 w-9 rounded-full bg-error/70 text-on-error text-[6px] flex items-center justify-center leading-none hover:bg-error transition-colors shrink-0">✕</button>
+                    aria-label="Clear go offset"
+                    className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-error/10 text-error hover:bg-error hover:text-on-error transition-colors shrink-0">
+                    <Icon name="close" size="sm" />
+                  </button>
                 )}
               </span>
             )}
@@ -160,7 +164,10 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                       const newLaps = removeLapEntry(lapEntries, i)
                       onEditSavedSwimmer(group.id, runDrillId!, saved.dbId, { laps: newLaps })
                     }}
-                    className="h-7 w-7 rounded-full bg-error/70 text-on-error text-[6px] flex items-center justify-center leading-none hover:bg-error transition-colors shrink-0">✕</button>
+                    aria-label={`Remove lap ${i + 1}`}
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-error/10 text-error hover:bg-error hover:text-on-error transition-colors shrink-0">
+                    <Icon name="close" size="sm" />
+                  </button>
                 ) : null}
                 <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-right">#{i + 1}</span>
                 <span className="text-body-lg text-on-surface font-bold shrink-0">{formatTime(entry.time)}</span>
@@ -197,12 +204,26 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
       <hr className="border-outline-variant/20 mx-3" />
       <div className="px-3 py-2 flex gap-1.5">
         <button
-          onClick={() => onClearSavedSwimmer?.(saved.dbId)}
-          className="flex-1 flex items-center justify-center gap-1.5 h-11 md:h-12 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
-          <Icon name="restart_alt" size="xs" />
-          Clear
+          onClick={() => setConfirmClear(true)}
+          className="h-9 px-3 flex items-center justify-center gap-1.5 rounded-full text-label-sm font-bold transition-all cursor-pointer active:scale-95 border border-outline text-on-surface-variant hover:bg-surface-variant">
+          <Icon name="restart_alt" size="sm" />
+          Clear swimmer
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear swimmer?"
+        message={`Clear ${saved.name}'s offsets, laps, and timing data for this drill?`}
+        confirmLabel="Clear"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={() => {
+          setConfirmClear(false)
+          onClearSavedSwimmer?.(saved.dbId)
+        }}
+        onCancel={() => setConfirmClear(false)}
+      />
 
       {modal}
     </div>

@@ -220,7 +220,7 @@ export const DrillBank: React.FC = () => {
        <div className="flex flex-wrap gap-1.5 mb-4">
          <button
            onClick={() => setActiveLabel(null)}
-           className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
+           className={`h-9 md:h-10 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
              activeLabel === null
                ? 'bg-primary text-on-primary'
                : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
@@ -238,7 +238,7 @@ export const DrillBank: React.FC = () => {
              <button
                key={label}
                onClick={() => setActiveLabel(activeLabel === label ? null : label)}
-               className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
+               className={`h-9 md:h-10 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
                  activeLabel === label
                    ? 'bg-primary text-on-primary'
                    : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
@@ -250,7 +250,7 @@ export const DrillBank: React.FC = () => {
          })}
          <button
            onClick={() => setSortByPopularity(!sortByPopularity)}
-           className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-none flex items-center gap-1 ${
+           className={`h-9 md:h-10 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer border-none flex items-center gap-1 ${
              sortByPopularity
                ? 'bg-primary text-on-primary'
                : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
@@ -287,8 +287,8 @@ export const DrillBank: React.FC = () => {
                   <span className={`${strokeColors[d.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>{d.stroke} {d.distance}m</span>
                 )}
               </div>
-              
-               <div className="flex flex-wrap gap-1 min-h-[1.25rem]">
+
+               <div className="flex flex-wrap gap-1 min-h-[1.25rem] mb-3">
                  {d.focus && d.focus !== 'none' && <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{d.focus}</span>}
                  {d.labels?.map(l => (
                    <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
@@ -299,6 +299,33 @@ export const DrillBank: React.FC = () => {
                      {d.popularity}
                    </span>
                  )}
+               </div>
+
+               <div className="flex items-center gap-1.5 pt-2 border-t border-outline-variant/20" onClick={(e) => e.stopPropagation()}>
+                 <button
+                   onClick={async () => {
+                     openDetail(d)
+                     await handleAddToSession()
+                   }}
+                   className="flex-1 h-9 px-3 inline-flex items-center justify-center gap-1.5 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
+                 >
+                   <Icon name="playlist_add" size="sm" />
+                   Add to Session
+                 </button>
+                 <button
+                   onClick={() => openEditor(d)}
+                   aria-label={`Edit ${d.name}`}
+                   className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                 >
+                   <Icon name="edit" />
+                 </button>
+                 <button
+                   onClick={() => handleDelete(d.id!)}
+                   aria-label={`Delete ${d.name}`}
+                   className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                 >
+                   <Icon name="delete" />
+                 </button>
                </div>
             </div>
           </div>

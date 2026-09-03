@@ -6,4 +6,3 @@ See:
 - [`docs/context/UI-Context.md`](docs/context/UI-Context.md) — design system, screen specs, components
 - [`docs/context/Test-Context.md`](docs/context/Test-Context.md) — testing guidelines
 - [`docs/context/App-Tasks-Context.md`](docs/context/App-Tasks-Context.md) — remaining app tasks
-- [`docs/context/UI-Tasks-Context.md`](docs/context/UI-Tasks-Context.md) — remaining UI tasks

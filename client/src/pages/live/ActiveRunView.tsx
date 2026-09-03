@@ -42,7 +42,7 @@ function TimingModeHeader({ runDrills, timingDrillId, onExit }: {
         <button onClick={onExit}
           className="h-11 px-3.5 rounded-full border border-outline text-on-surface-variant text-label-sm font-bold flex items-center gap-1.5 hover:bg-surface-variant transition-all cursor-pointer shrink-0">
           <Icon name="arrow_back" size="md" />
-          Overview
+          Exit timing
         </button>
         <div className="min-w-0">
           <div className="text-label-caps text-on-surface-variant">Timing all lanes</div>

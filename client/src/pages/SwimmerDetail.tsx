@@ -95,10 +95,10 @@ export const SwimmerDetail: React.FC = () => {
     <div>
       <button
         onClick={() => navigate('/swimmers')}
-        className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors mb-4 font-body-md cursor-pointer bg-transparent border-none"
+        className="h-11 px-3 mb-4 inline-flex items-center gap-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer border-none"
       >
-        <Icon name="arrow_back" size="lg" />
-        Back to Swimmers
+        <Icon name="arrow_back" size="sm" />
+        <span className="text-label-sm font-medium">Back to Swimmers</span>
       </button>
 
       {/* Profile Header */}

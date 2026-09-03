@@ -293,13 +293,15 @@ export const SwimmersList: React.FC = () => {
                 </Link>
                 <button
                   onClick={() => openEditModal(s)}
-                  className="p-2 text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                  aria-label={`Edit ${s.name}`}
+                  className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
                   <Icon name="edit" />
                 </button>
                 <button
                   onClick={() => { setDeleteTarget(s); }}
-                  className="p-2 text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                  aria-label={`Delete ${s.name}`}
+                  className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
                   <Icon name="delete" />
                 </button>

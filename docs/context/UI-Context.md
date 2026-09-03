@@ -38,6 +38,18 @@
 | gutter | 1rem |
 | touch-target-min | 48px |
 
+### Button Size Scale
+| Size | Mobile / Desktop | Use Case |
+|-------|------------------|----------|
+| Primary | `h-11 md:h-12` | Filled tonal/filled primary CTAs (Start/Finish/Drill, Add Swimmers, Save) |
+| Secondary pill | `h-9 md:h-10` | Outlined / tonal secondaries (preset chips, "Back to …", Manage, Reset) |
+| Tertiary inline | `h-9` | Single-line secondary actions (banner CTAs, picker card icons) |
+| Icon button | `h-9 w-9` | List-row icon actions (edit, delete, reorder); always pair with `aria-label` |
+| Compact row | `h-8 w-8` | Destructive inside a dense row (e.g. per-lap ×); only when space-constrained |
+| Lane/section badge | `h-11 w-11` | Non-button circular badges (lane number, group header icons) |
+
+Lap-row destructive icons use `bg-error/10 text-error` with strong-error hover; never use a `text-[Npx]` ✕ glyph (unreadable). Touch targets are enforced across filter chips, list-row icons, and detail back-links — not just primary actions.
+
 ### Shadows & Effects
 - `custom-shadow`: `0px 4px 20px rgba(0,0,0,0.12)`
 - Glass panel: `backdrop-blur` with semi-transparent backgrounds
@@ -389,7 +401,7 @@ Rich drill editor with support for:
 - Grid layouts adapt: 1col → 2col → 3col (swimmers), 1col → 4col (live deck)
 - Bottom nav appears on mobile only (`md:hidden`)
 - Desktop TopAppBar shows inline nav links
-- Touch targets minimum 48px
+- Touch targets minimum 48px for primary actions; filter chips and list-row icons use `h-9` (36px) per the Button Size Scale
 - Font sizes use clamp() or responsive Tailwind classes (migrating from fixed px values)
 
 ## Touch & Mobile Support

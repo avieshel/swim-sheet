@@ -210,10 +210,10 @@ export function LiveSessionHeader({
             </div>
             <button
               onClick={onOpenLaneEditor}
-              className="h-9 px-3 flex items-center justify-center gap-1.5 rounded-lg bg-warning text-on-warning text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer"
+              className="h-9 px-3 flex items-center justify-center gap-1.5 rounded-full bg-warning text-on-warning text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer"
             >
               <Icon name="group_add" size="md" />
-              Add Swimmers
+              Open Lane Editor
             </button>
           </div>
         </div>

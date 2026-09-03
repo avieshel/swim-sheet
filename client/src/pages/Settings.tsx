@@ -407,7 +407,7 @@ export const Settings: React.FC = () => {
                         setForm(prev => ({ ...prev, pool_length: s }))
                         updateSettings({ pool_length: v })
                       }}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer border ${
+                      className={`h-9 md:h-10 px-4 rounded-xl text-label-sm font-bold transition-all cursor-pointer border ${
                         Number(poolLengthValue) === v && poolLengthValue === String(v)
                           ? 'bg-primary text-on-primary border-primary'
                           : 'bg-surface text-on-surface-variant/50 border-outline-variant hover:border-primary/50'
@@ -515,7 +515,7 @@ export const Settings: React.FC = () => {
                       key={size}
                       type="button"
                       onClick={() => handleFontSizeChange(size)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold capitalize transition-all cursor-pointer border ${
+                      className={`h-9 md:h-10 px-4 rounded-xl text-label-sm font-bold capitalize transition-all cursor-pointer border ${
                         form.font_size === size
                           ? 'bg-primary text-on-primary border-primary'
                           : 'bg-surface text-on-surface-variant/50 border-outline-variant hover:border-primary/50'
@@ -575,7 +575,7 @@ export const Settings: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowResetConfirm(true)}
-                    className="bg-surface-variant text-on-surface-variant font-bold px-4 py-2 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none"
+                    className="h-9 px-3 bg-surface-variant text-on-surface-variant text-label-sm font-bold rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none"
                   >
                     Reset
                   </button>
