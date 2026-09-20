@@ -3,7 +3,8 @@ import { getRunHistory as getRunHistoryFromService, getRunById as getRunByIdFrom
 import type { RunHistoryData, RunSummary } from '../services/runHistoryService'
 import type { SafeSessionRun, SessionRun, SafeRunDrill, RunDrill, SafeLaneDrillResult, LaneDrillResult, Swimmer, RunSwimmer, SafeLap, Lap, SavedDrillData } from '../db/schema'
 import type { CompleteRunLap, StartLaneMarker, CompleteLaneMarker } from '../services/runService'
-import type { LiveDrillTiming } from '../timing/liveTiming'
+import type { LiveDrillTiming, LiveTimingStore } from '../timing/liveTiming'
+import type { TimedGroup } from '../context/LiveSessionContext'
 import { timestampSplits } from '../utils/lapEditing'
 
 // REST contract (local facade over runService → dao). Verbs map to HTTP methods;
@@ -222,6 +223,81 @@ export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
 
 export function updateLaneResultSwimmer(runId: string, groupId: string, runDrillId: string, swimmerDbId: string, updates: import('../services/runService').LaneResultSwimmerUpdate): Promise<void> {
   return runService.updateLaneResultSwimmer(runId, groupId, runDrillId, swimmerDbId, updates)
+}
+
+// ── Session completion sanitize ──────────────────────────────────
+// The "temp structure" for a running session is the persisted
+// LaneDrillResult.data blobs (completed drills) plus the in-memory
+// LiveTimingStore (the still-active drill). Completion must read both:
+// blob-first so laps from completed drills survive the store clearing that
+// happens on drill complete.
+
+export interface CollectSessionLapsResult {
+  laps: CompleteRunLap[]
+  tempWithTimings: Array<{ name: string; dbId: string }>
+}
+
+export async function collectSessionLaps(
+  runId: string,
+  groups: TimedGroup[],
+  store: LiveTimingStore,
+): Promise<CollectSessionLapsResult> {
+  const laps: CompleteRunLap[] = []
+  const tempWithTimings: Array<{ name: string; dbId: string }> = []
+  const laneResults = await runService.getLaneResults(runId)
+  const persistedDrillIds = new Set<string>()
+
+  for (const result of laneResults) {
+    if (!result.data) continue
+    let data: SavedDrillData
+    try {
+      data = JSON.parse(result.data)
+    } catch {
+      continue
+    }
+    persistedDrillIds.add(result.run_drill_id)
+    for (const sw of data.swimmers) {
+      if (!sw.dbId) continue
+      if (sw.dbId.startsWith('quick-')) {
+        if (sw.laps.length > 0) tempWithTimings.push({ name: sw.name, dbId: sw.dbId })
+        continue
+      }
+      for (const lap of sw.laps) {
+        laps.push({
+          runDrillId: result.run_drill_id,
+          swimmerId: sw.dbId,
+          time: lap.time,
+          strokeCount: lap.strokeCount ?? 0,
+        })
+      }
+    }
+  }
+
+  for (const group of groups) {
+    const drillId = group.currentRunDrillId
+    if (!drillId || persistedDrillIds.has(drillId)) continue
+    const live = store.getDrillTiming(runId, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
+    for (const swimmer of group.swimmers) {
+      if (!swimmer.dbId) continue
+      const lt = live.swimmers.find(l => l.dbId === swimmer.dbId)
+        ?? { dbId: swimmer.dbId, startedAt: null, completedAt: null, lapTimestamps: [] as number[] }
+      if (swimmer.dbId.startsWith('quick-')) {
+        if (lt.lapTimestamps.length > 0) tempWithTimings.push({ name: swimmer.name, dbId: swimmer.dbId })
+        continue
+      }
+      const splits = lt.startedAt != null ? timestampSplits(lt.lapTimestamps, lt.startedAt) : []
+      for (let li = 0; li < splits.length; li++) {
+        laps.push({
+          runDrillId: drillId,
+          swimmerId: swimmer.dbId,
+          time: splits[li],
+          strokeCount: swimmer.lapStrokeCounts[li + 1] ?? 0,
+        })
+      }
+    }
+  }
+
+  return { laps, tempWithTimings }
 }
 
 // ── Laps ──

@@ -9,7 +9,8 @@ import {
   deleteSwimmerFromLaneResult,
   completeRunWithLaps,
   discardTempSwimmer,
-  deleteRun
+  deleteRun,
+  collectSessionLaps
 } from '../../api/runs'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { BatchPromotionModal } from '../../components/BatchPromotionModal'
@@ -17,7 +18,6 @@ import type { SessionRun, RunDrill, LaneDrillResult, Swimmer as DbSwimmer } from
 import type { CompleteRunLap } from '../../api/runs'
 import { getSession } from '../../api/sessions'
 import { TimingService } from '../../services/TimingService'
-import { timestampSplits } from '../../utils/lapEditing'
 import { computeSessionProgress } from '../../utils/sessionProgress'
 import { LaneEditorModal } from '../../components/LaneEditorModal'
 import { Icon } from '../../components/Icon'
@@ -173,33 +173,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   }
 
   const handleComplete = async () => {
-    const laps: CompleteRunLap[] = []
-    const tempWithTimings: Array<{ name: string; dbId: string }> = []
-
-    for (const group of groups) {
-      const drillId = group.currentRunDrillId
-      if (!drillId) continue
-      const live = store.getDrillTiming(run.id, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
-      for (const swimmer of group.swimmers) {
-        if (!swimmer.dbId) continue
-        const isTemp = swimmer.dbId.startsWith('quick-')
-        const lt = live.swimmers.find(l => l.dbId === swimmer.dbId)
-          ?? { dbId: swimmer.dbId, startedAt: null, completedAt: null, lapTimestamps: [] as number[] }
-        if (isTemp) {
-          if (lt.lapTimestamps.length > 0) tempWithTimings.push({ name: swimmer.name, dbId: swimmer.dbId })
-          continue
-        }
-        const splits = lt.startedAt != null ? timestampSplits(lt.lapTimestamps, lt.startedAt) : []
-        for (let li = 0; li < splits.length; li++) {
-          laps.push({
-            runDrillId: drillId,
-            swimmerId: swimmer.dbId,
-            time: splits[li],
-            strokeCount: swimmer.lapStrokeCounts[li + 1] ?? 0,
-          })
-        }
-      }
-    }
+    const { laps, tempWithTimings } = await collectSessionLaps(run.id, groups, store)
 
     setSessionLaps(laps)
     setSessionTemps(tempWithTimings)

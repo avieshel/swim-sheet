@@ -1,10 +1,19 @@
-import { describe, it, expect, vi } from 'vitest'
-import { buildLaneResult } from '../runs'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { buildLaneResult, collectSessionLaps } from '../runs'
 import type { BuildLaneResultInput } from '../runs'
 import { createLiveTimingStore } from '../../timing/liveTiming'
 import type { LiveDrillTiming } from '../../timing/liveTiming'
 import { timestampSplits } from '../../utils/lapEditing'
 import type { CompleteRunLap } from '../../services/runService'
+import { runService } from '../../services/runService'
+import type { TimedGroup } from '../../context/LiveSessionContext'
+import type { LaneDrillResult, SavedSwimmerData } from '../../db/schema'
+
+vi.mock('../../services/runService', () => ({
+  runService: {
+    getLaneResults: vi.fn(),
+  },
+}))
 
 const RID = 'run-1'
 const GID = 'group-1'
@@ -655,4 +664,133 @@ describe('CompleteRunLap construction (handleComplete-equivalent logic)', () => 
     expect(laps[1].strokeCount).toBe(0)
   })
 
+})
+
+// ── Session completion sanitize (collectSessionLaps) ───────────────
+// Regression: completing a session must collect laps from the persisted
+// LaneDrillResult.data blobs (the temp structure for completed drills), not
+// only from the volatile in-memory store (which is cleared on drill complete).
+
+describe('collectSessionLaps — session completion sanitize', () => {
+  const DID2 = 'drill-2'
+
+  beforeEach(() => vi.clearAllMocks())
+
+  function group(id: string, swimmerDbIds: string[], drillId: string | null): TimedGroup {
+    return {
+      id,
+      lane: 1,
+      name: `Lane ${id}`,
+      swimmers: swimmerDbIds.map((dbId, idx) => ({
+        id: Date.now() + idx + Math.random(),
+        dbId,
+        name: dbId.startsWith('quick-') ? 'Mia' : 'Alice',
+        completed: false,
+        lapStrokeCounts: {},
+      })),
+      currentRunDrillId: drillId,
+    }
+  }
+
+  function laneResult(runDrillId: string, swimmers: SavedSwimmerData[]): LaneDrillResult {
+    return {
+      id: `lr-${runDrillId}`,
+      run_id: RID,
+      group_id: GID,
+      lane: 1,
+      run_drill_id: runDrillId,
+      completed: true,
+      data: JSON.stringify({ drillStart: 2000, drillEnd: 20000, sessionStartedAt: 0, poolLength: 25, swimmers }),
+      updatedAt: '',
+    }
+  }
+
+  it('collects real swimmer laps from persisted blobs even when the store is empty (drill already completed)', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      laneResult(DID, [
+        { dbId: 'sw-1', name: 'Alice', startedAt: 2000, completedAt: 20000, laps: [{ time: 4000, strokeCount: 14 }, { time: 5000, strokeCount: 16 }], completed: true },
+        { dbId: 'sw-2', name: 'Bob', startedAt: 2000, completedAt: 20000, laps: [{ time: 6000, strokeCount: 12 }], completed: true },
+      ]),
+    ])
+
+    const result = await collectSessionLaps(RID, [], createLiveTimingStore())
+
+    expect(result.laps).toEqual([
+      { runDrillId: DID, swimmerId: 'sw-1', time: 4000, strokeCount: 14 },
+      { runDrillId: DID, swimmerId: 'sw-1', time: 5000, strokeCount: 16 },
+      { runDrillId: DID, swimmerId: 'sw-2', time: 6000, strokeCount: 12 },
+    ])
+    expect(result.tempWithTimings).toEqual([])
+  })
+
+  it('falls back to the in-memory store for the current active drill', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([])
+    const store = createLiveTimingStore()
+    store.markSwimmerStart(RID, GID, DID, 'sw-1', 2000)
+    store.markSwimmerLap(RID, GID, DID, 'sw-1', 6000)
+    store.markSwimmerLap(RID, GID, DID, 'sw-1', 12000)
+    store.markSwimmerDone(RID, GID, DID, 'sw-1', 20000)
+
+    const result = await collectSessionLaps(RID, [group(GID, ['sw-1'], DID)], store)
+
+    expect(result.laps).toEqual([
+      { runDrillId: DID, swimmerId: 'sw-1', time: 4000, strokeCount: 0 },
+      { runDrillId: DID, swimmerId: 'sw-1', time: 6000, strokeCount: 0 },
+    ])
+    expect(result.tempWithTimings).toEqual([])
+  })
+
+  it('flags temp swimmers with timings as promotion candidates and skips their laps', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([])
+    const store = createLiveTimingStore()
+    store.markSwimmerStart(RID, GID, DID, 'quick-1', 1000)
+    store.markSwimmerLap(RID, GID, DID, 'quick-1', 5000)
+    store.markSwimmerDone(RID, GID, DID, 'quick-1', 8000)
+
+    const result = await collectSessionLaps(RID, [group(GID, ['quick-1'], DID)], store)
+
+    expect(result.laps).toEqual([])
+    expect(result.tempWithTimings).toEqual([{ name: 'Mia', dbId: 'quick-1' }])
+  })
+
+  it('flags temp swimmers with timings from persisted blobs too', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      laneResult(DID, [
+        { dbId: 'quick-1', name: 'Mia', startedAt: 1000, completedAt: 8000, laps: [{ time: 5000, strokeCount: 0 }], completed: true },
+      ]),
+    ])
+
+    const result = await collectSessionLaps(RID, [], createLiveTimingStore())
+
+    expect(result.laps).toEqual([])
+    expect(result.tempWithTimings).toEqual([{ name: 'Mia', dbId: 'quick-1' }])
+  })
+
+  it('merges persisted blobs and the active-drill store without double counting', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      laneResult(DID, [
+        { dbId: 'sw-1', name: 'Alice', startedAt: 1000, completedAt: 9000, laps: [{ time: 3000, strokeCount: 18 }], completed: true },
+      ]),
+    ])
+    const store = createLiveTimingStore()
+    store.markSwimmerStart(RID, GID, DID2, 'sw-1', 1000)
+    store.markSwimmerLap(RID, GID, DID2, 'sw-1', 4000)
+    store.markSwimmerDone(RID, GID, DID2, 'sw-1', 9000)
+
+    const result = await collectSessionLaps(RID, [group(GID, ['sw-1'], DID2)], store)
+
+    expect(result.laps).toEqual([
+      { runDrillId: DID, swimmerId: 'sw-1', time: 3000, strokeCount: 18 },
+      { runDrillId: DID2, swimmerId: 'sw-1', time: 3000, strokeCount: 0 },
+    ])
+  })
+
+  it('returns no laps and no temps when no timing exists anywhere', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([])
+
+    const result = await collectSessionLaps(RID, [group(GID, ['sw-1'], DID)], createLiveTimingStore())
+
+    expect(result.laps).toEqual([])
+    expect(result.tempWithTimings).toEqual([])
+  })
 })

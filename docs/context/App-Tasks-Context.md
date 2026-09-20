@@ -832,3 +832,22 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Priority**: High
 **Status**: Done — verified `npm run check` green (336 vitest). E2E not run: root `node_modules` lacks `@playwright/test`, so `playwright.config.ts` cannot load in this environment.
+
+---
+
+## A-050: Completing a session with timed real roster swimmers showed "empty session" ✅
+
+**Source**: Bug report — completing a session in which real (roster) swimmers recorded times showed "This session seems to be empty" and, if the coach hit Discard, the run was deleted (data loss).
+
+**Root cause**: `ActiveRunView.handleComplete` built the completion `laps` **only** from the volatile in-memory `LiveTimingStore`, restricted to each group's current drill (`currentRunDrillId`). Completed drills are persisted to `LaneDrillResult.data` blobs (`SavedDrillData.swimmers[].laps`) **and then the store is cleared** (`TimingService.completeDrill`, `toggleDrillDone`, and the GroupCard all-swimmers-complete auto-complete effect). So at Complete time the store was empty → `laps.length === 0` → empty warning → Discard → `deleteRun`. The exit path never looked at the persisted blobs it itself had written.
+
+**Fix**: new `collectSessionLaps(runId, groups, store)` in `client/src/api/runs.ts` returns `{ laps, tempWithTimings }`, **blob-first**: it reads `runService.getLaneResults(runId)`, JSON-parses each `data` blob's `swimmers[].laps` (already split times + stroke counts), applying the same temp rules as before (`quick-*` dbIds → promotion candidates, skipped from `laps`). It only falls back to the in-memory store for drills **not** already covered by a data-bearing blob (the still-active drill), so a completed drill whose blob exists can never be double-counted or lost. `ActiveRunView.handleComplete` now calls it instead of the inline loop; the empty-warning / promotion / discard exit paths are unchanged.
+
+**Notes**:
+- Sanitize ordering preserved: empty session → delete warning (default); temps with timings → promotion modal; real swimmers → silent save.
+- Promoted temps' laps were already written by `promoteAndLinkSwimmer` (blob-based) and are excluded from `sessionLaps`, so no double-write — same semantics as before the fix.
+
+**Files modified**: `client/src/api/runs.ts` (+78), `client/src/pages/live/ActiveRunView.tsx` (−32), `client/src/api/__tests__/saveFlow.test.ts` (+142, 6 new tests).
+
+**Priority**: High
+**Status**: Done — TDD: 6 failing tests written first (blob-laps regression, active-drill store fallback, temp-in-store flagged, temp-in-blob flagged, blob+store merge without double count, empty), then the fix; `npm run check` green (342 vitest).
