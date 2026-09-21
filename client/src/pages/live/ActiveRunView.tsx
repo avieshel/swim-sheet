@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LiveSessionContext } from '../../context/LiveSessionContext'
+import { LiveSessionContext, type TimedGroup } from '../../context/LiveSessionContext'
 import type { LapEntry } from '../../api/types'
 import { 
   getRunDrills, getLaneResults, updateRun, 
@@ -18,7 +18,6 @@ import type { SessionRun, RunDrill, LaneDrillResult, Swimmer as DbSwimmer } from
 import type { CompleteRunLap } from '../../api/runs'
 import { getSession } from '../../api/sessions'
 import { TimingService } from '../../services/TimingService'
-import { computeSessionProgress } from '../../utils/sessionProgress'
 import { LaneEditorModal } from '../../components/LaneEditorModal'
 import { Icon } from '../../components/Icon'
 import { GroupCard } from '../../components/GroupCard'
@@ -30,26 +29,80 @@ import { LaneSwimmersSection } from '../../components/live/LaneSwimmersSection'
 
 // ── Presentational sub-components (logic lives in ActiveRunView) ─────────────
 
-function TimingModeHeader({ runDrills, timingDrillId, onExit }: {
+function TimingModeHeader({ runDrills, timingDrillId, laneDrillResults, groups, onExit, onToggleDrillDone }: {
   runDrills: RunDrill[]
   timingDrillId: string
+  laneDrillResults: LaneDrillResult[]
+  groups: TimedGroup[]
   onExit: () => void
+  onToggleDrillDone: (groupId: string, runDrillId: string, advanceTo: string | null) => void
 }) {
   const index = runDrills.findIndex(d => d.id === timingDrillId)
+  const drill = runDrills.find(d => d.id === timingDrillId)
+  const activeGroups = groups.filter(g => g.swimmers.length > 0)
+
+  const isDone = drill && activeGroups.length > 0 && activeGroups.every(g =>
+    laneDrillResults.some(r => r.group_id === g.id && r.run_drill_id === drill.id && r.completed)
+  )
+
+  const handleToggle = () => {
+    if (!drill) return
+    const done = isDone
+    activeGroups.forEach(g => {
+      const isDoneForGroup = laneDrillResults.some(r => r.group_id === g.id && r.run_drill_id === drill.id && r.completed)
+      if (done === isDoneForGroup) {
+        onToggleDrillDone(g.id, drill.id, null)
+      }
+    })
+  }
+
+  if (!drill) return null
+
   return (
-    <div className="flex items-center justify-between gap-3 mb-4 rounded-xl bg-surface-container-lowest border border-outline-variant p-3 md:p-4">
-      <div className="flex items-center gap-2 min-w-0">
-        <button onClick={onExit}
-          className="h-11 px-3.5 rounded-full border border-outline text-on-surface-variant text-label-sm font-bold flex items-center gap-1.5 hover:bg-surface-variant transition-all cursor-pointer shrink-0">
-          <Icon name="arrow_back" size="md" />
-          Exit timing
-        </button>
-        <div className="min-w-0">
-          <div className="text-label-caps text-on-surface-variant">Timing all lanes</div>
-          <div className="font-headline-md text-on-surface truncate">
-            Drill {index + 1} of {runDrills.length} · {runDrills.find(d => d.id === timingDrillId)?.name ?? 'Drill'}
+    <div className="flex items-center justify-between gap-3 mb-4 rounded-2xl bg-surface-container-lowest border border-outline-variant p-3 md:p-4">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <span className="text-label-sm text-on-surface-variant tabular-nums w-5 shrink-0">
+          {index + 1}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-on-surface truncate">{drill.name}</div>
+          <div className="text-label-sm text-on-surface-variant">
+            {drill.distance}m {drill.stroke}
           </div>
         </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={onExit}
+          title="Exit timing / Done"
+          className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer relative"
+        >
+          <Icon name="timer" size="sm" />
+          <span className="absolute -top-1 -right-1 flex items-center justify-center w-3 h-3 rounded-full bg-surface text-error text-[10px] font-bold">
+            &times;
+          </span>
+        </button>
+
+        <button
+          onClick={handleToggle}
+          title={isDone ? 'Mark incomplete' : 'Mark complete'}
+          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+            isDone
+              ? 'bg-primary border-primary text-on-primary'
+              : 'border-outline-variant hover:border-primary text-transparent'
+          }`}
+        >
+          {isDone && <Icon name="check" size="xs" />}
+        </button>
+
+        <button
+          onClick={onExit}
+          className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+          title="Collapse / Exit timing"
+        >
+          <Icon name="expand_less" size="sm" />
+        </button>
       </div>
     </div>
   )
@@ -90,6 +143,13 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const [rosterSwimmers, setRosterSwimmers] = useState<DbSwimmer[]>([])
   const [timingDrillId, setTimingDrillId] = useState<string | null>(null)
   const activeGroups = groups.filter(g => g.swimmers.length > 0)
+  const totalDistance = runDrills.reduce((sum, d) => sum + (d.distance || 0), 0)
+  const completedDistance = runDrills.reduce((sum, drill) => {
+    const completed = activeGroups.some(lane =>
+      laneDrillResults.some(r => r.group_id === lane.id && r.run_drill_id === drill.id && r.completed)
+    )
+    return sum + (completed ? drill.distance : 0)
+  }, 0)
 
   const enterTiming = (drillId: string) => {
     dispatch({ type: 'SET_ALL_DRILLS', payload: { runDrillId: drillId } })
@@ -158,7 +218,6 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [sessionRunning, tick])
 
-  const progress = computeSessionProgress(runDrills, laneDrillResults, activeGroups)
 
 
   const [showPromotionModal, setShowPromotionModal] = useState<Array<{ name: string; dbId: string }>>([])
@@ -287,29 +346,36 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   return (
     <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden">
       {/* Header */}
-      <LiveSessionHeader
-        templateName={templateName}
-        run={run}
-        drillCount={runDrills.length}
-        progress={progress}
-        sessionRunning={sessionRunning}
-        sessionElapsed={sessionElapsed}
-        sessionStartedAt={sessionStartedAt}
-        onToggleSession={() => {
-          dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })
-        }}
-        onComplete={handleComplete}
-        onReset={() => setShowResetSessionConfirm(true)}
-        onOpenLaneEditor={() => openLaneEditor()}
-        onEditSession={() => navigate(`/sessions/${run.session_id}`)}
-        onLaneChipClick={lane => openLaneEditor(lane)}
-        onCommitPoolLength={value => { updateRun(run.id, { poolLength: value }) }}
-      />
+       <LiveSessionHeader
+         templateName={templateName}
+         run={run}
+         drillCount={runDrills.length}
+         totalDistance={totalDistance}
+         completedDistance={completedDistance}
+         sessionRunning={sessionRunning}
+         sessionElapsed={sessionElapsed}
+         sessionStartedAt={sessionStartedAt}
+         onToggleSession={() => {
+           dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })
+         }}
+         onComplete={handleComplete}
+         onReset={() => setShowResetSessionConfirm(true)}
+         onOpenLaneEditor={() => openLaneEditor()}
+         onEditSession={() => navigate(`/sessions/${run.session_id}`)}
+         onCommitPoolLength={value => { updateRun(run.id, { poolLength: value }) }}
+       />
 
       {/* Timing Mode or Drills/Lanes */}
       {timingDrillId ? (
         <div className="p-3 md:p-4 border-t border-outline-variant/20">
-          <TimingModeHeader runDrills={runDrills} timingDrillId={timingDrillId} onExit={exitTiming} />
+           <TimingModeHeader
+             runDrills={runDrills}
+             timingDrillId={timingDrillId}
+             laneDrillResults={laneDrillResults}
+             groups={groups}
+             onExit={exitTiming}
+             onToggleDrillDone={handleToggleDrillDone}
+           />
           {activeGroups.length > 0 ? (
             <section className="mb-8">
               <div className="r-grid" style={{ '--grid-min': 'min(100%, 360px)' } as React.CSSProperties}>
