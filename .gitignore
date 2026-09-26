@@ -8,3 +8,6 @@ test-results
 playwright-report
 server/data/
 server/tsconfig.tsbuildinfo
+.env
+client/.env
+supabase/.env
