@@ -50,12 +50,20 @@ export function LiveSessionHeader({
     onCommitPoolLength(clamped)
   }
 
+  const handleMainAction = () => {
+    if (!sessionRunning && activeGroups.length === 0) {
+      onOpenLaneEditor()
+      return
+    }
+    onToggleSession()
+  }
+
   return (
     <div className="p-3 md:p-4">
       {/* Collapsed high-level bar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <h2 className="font-headline-md text-on-surface truncate">{templateName}</h2>
+          <h2 className="font-headline-md font-bold text-on-surface truncate">{templateName}</h2>
           {sessionRunning ? (
             <span className="w-3 h-3 rounded-full bg-primary animate-pulse shrink-0" title="Live" />
           ) : sessionElapsed > 0 ? (
@@ -65,13 +73,24 @@ export function LiveSessionHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={handleMainAction}
+            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
+              sessionRunning
+                ? 'bg-primary border-primary text-on-primary'
+                : 'border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary'
+            }`}
+            title={sessionRunning ? 'Pause session' : sessionElapsed > 0 ? 'Resume session' : 'Start session'}
+          >
+            <Icon name={sessionRunning ? 'stop' : 'play_arrow'} size="xs" />
+          </button>
           <span className={`font-display-timer text-xl md:text-2xl font-bold tabular-nums leading-none ${sessionRunning ? 'text-on-surface' : 'text-on-surface-variant/60'}`}>
             {formatSessionTime(sessionElapsed)}
           </span>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
+            className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
             title={isExpanded ? 'Collapse details' : 'Expand details'}
           >
             <Icon name={isExpanded ? 'expand_more' : 'chevron_right'} color="on-surface-variant" size="md" />
@@ -84,13 +103,7 @@ export function LiveSessionHeader({
         <div className="mt-4 pt-4 border-t border-outline-variant/20 animate-in fade-in duration-150 space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => {
-                if (!sessionRunning && activeGroups.length === 0) {
-                  onOpenLaneEditor()
-                  return
-                }
-                onToggleSession()
-              }}
+              onClick={handleMainAction}
               className={`flex items-center justify-center gap-1.5 h-10 px-4 text-label-sm rounded-full font-bold transition-all cursor-pointer active:scale-95 ${
                 sessionRunning
                   ? 'bg-primary-container text-on-primary-container hover:brightness-95'
