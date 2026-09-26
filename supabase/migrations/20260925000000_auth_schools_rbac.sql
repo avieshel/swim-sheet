@@ -1,4 +1,4 @@
-# Migration: 20260925000000_auth_schools_rbac.sql
+-- Migration: 20260925000000_auth_schools_rbac.sql
 -- Enables multi-tenant swim schools, RBAC permissions, and privacy/GDPR support
 
 -- 1. Profiles (Global user metadata linked to Supabase Auth)
