@@ -74,6 +74,7 @@ export const analytics = {
         batch.map(e => ({
           event_name: e.event_name,
           properties: e.properties,
+          device_id: e.device_id,
           app_version: '1.0.0',
           platform: 'pwa',
         }))
