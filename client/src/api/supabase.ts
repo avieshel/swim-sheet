@@ -21,11 +21,6 @@ export async function testSupabaseConnection(): Promise<boolean> {
   }
 }
 
-// Exported for downstream usage across the service layer
-export const supabaseApi = {
-  client: supabase,
-  testConnection: testSupabaseConnection,
-}
 
 
 

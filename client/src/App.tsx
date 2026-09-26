@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import { Layout } from './components/Layout'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { SwimmersList } from './pages/SwimmersList'
@@ -13,8 +14,14 @@ import { LiveDeck } from './pages/LiveDeck'
 import { Settings } from './pages/Settings'
 import { RunsHistory } from './pages/RunsHistory'
 import { RunDetail } from './pages/RunDetail'
+import { analytics } from './services/analyticsService'
+import { testSupabaseConnection } from './api/supabase'
 
 function App() {
+  useEffect(() => {
+    analytics.track('app_opened', { timestamp: Date.now() })
+    void testSupabaseConnection()
+  }, [])
   return (
     <Router>
       <Layout>
