@@ -1,7 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:push": "supabase db push"
   },
   "devDependencies": {
     "husky": "^9.1.7"
