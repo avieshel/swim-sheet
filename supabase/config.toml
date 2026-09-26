@@ -1,0 +1,21 @@
+# Supabase Local Configuration
+
+project_id = "swimsheet"
+
+[api]
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:3001"]
+jwt_expiry = 3600
+enable_signup = true
+
+[edge_function]
+verify_jwt = true
