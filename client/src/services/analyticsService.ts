@@ -94,6 +94,7 @@ export const analytics = {
 }
 
 if (typeof window !== 'undefined') {
+  ;(window as unknown as Record<string, unknown>).analytics = analytics
   window.addEventListener('online', () => {
     void analytics.flush()
   })
