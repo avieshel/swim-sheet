@@ -3,6 +3,7 @@ import { LiveSessionContext } from '../context/LiveSessionContext'
 import { createRunFromTemplate, updateRun, getRun } from '../api/runs'
 import { buildStartLanes } from '../api/runSetup'
 import type { Session } from '../api/sessions'
+import { analytics } from '../services/analyticsService'
 
 export const DEFAULT_QUICK_SESSION_NAME = 'Quick 100m freestyle (default)'
 
@@ -18,6 +19,7 @@ export function useStartLiveSession(): {
   const [starting, setStarting] = useState(false)
 
   const startLiveSession = async (session: Session): Promise<import('../api/runs').SessionRun | undefined> => {
+    analytics.track('start_drill', { session_name: session.name })
     setStarting(true)
     try {
       const runId = await createRunFromTemplate(session.id, {

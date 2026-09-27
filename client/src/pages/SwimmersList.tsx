@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
+import { analytics } from '../services/analyticsService'
 
 interface SwimmerStats {
   lastRun: { runId: string; date: string; templateName: string } | null
@@ -63,6 +64,7 @@ export const SwimmersList: React.FC = () => {
   const loadSwimmers = async () => applySwimmers(await loadSwimmerData())
 
   useEffect(() => {
+    analytics.track('view_swimmers')
     let cancelled = false
     loadSwimmerData()
       .then(data => { if (!cancelled) applySwimmers(data) })

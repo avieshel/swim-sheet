@@ -12,6 +12,7 @@ import { useActiveRun } from '../hooks/useActiveRun'
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
+import { analytics } from '../services/analyticsService'
 
 interface SessionWithTotals extends Session {
   drillCount: number
@@ -82,6 +83,7 @@ export const SessionsList: React.FC = () => {
   }, [loadSessionData])
 
   useEffect(() => {
+    analytics.track('view_sessions')
     let cancelled = false
     Promise.all([loadSessionData(), getRunHistory()])
       .then(([templates, history]) => {
