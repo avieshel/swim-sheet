@@ -97,4 +97,5 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     void analytics.flush()
   })
+  ;(window as unknown as Record<string, unknown>).analytics = analytics
 }
