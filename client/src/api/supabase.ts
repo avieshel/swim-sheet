@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { config } from '../config'
 
 let cachedClient: SupabaseClient | null = null
 let cachedUrl = ''
@@ -6,8 +7,8 @@ let cachedKey = ''
 
 export function getSupabase(): SupabaseClient {
   try {
-    const url = localStorage.getItem('swimsheet_supabase_url') || (import.meta.env.VITE_SUPABASE_URL as string) || ''
-    const key = localStorage.getItem('swimsheet_supabase_anon_key') || (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || ''
+    const url = config.getSupabaseUrl()
+    const key = config.getSupabaseAnonKey()
 
     if (!url || !key) {
       return {} as SupabaseClient
