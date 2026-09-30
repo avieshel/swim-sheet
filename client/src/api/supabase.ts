@@ -5,7 +5,7 @@ let cachedClient: SupabaseClient | null = null
 let cachedUrl = ''
 let cachedKey = ''
 
-export function getSupabase(): SupabaseClient {
+function getSupabase(): SupabaseClient {
   try {
     const url = config.getSupabaseUrl()
     const key = config.getSupabaseAnonKey()
