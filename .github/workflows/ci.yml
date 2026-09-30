@@ -45,10 +45,11 @@ jobs:
           name: dist
           path: client/dist
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: kitabisa/cloudflare-pages-action@v2
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: swim-sheet
           directory: client/dist
           branch: main
+          productionBranch: main
