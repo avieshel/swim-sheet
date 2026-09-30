@@ -47,9 +47,9 @@ jobs:
       - name: Deploy to Cloudflare Pages
         uses: kitabisa/cloudflare-pages-action@v2
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: swim-sheet
-          directory: client/dist
+          api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          account-id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          project-name: swim-sheet
+          build-directory: client/dist
           branch: main
-          productionBranch: main
+          production-branch: main
