@@ -19,7 +19,14 @@ import { testSupabaseConnection } from './api/supabase'
 
 function App() {
   useEffect(() => {
-    analytics.track('app_opened', { timestamp: Date.now() })
+    const sessionId = localStorage.getItem('swimsheet_session_id')
+    const sessionStart = Number(localStorage.getItem('swimsheet_session_start') || '0')
+    const now = Date.now()
+    const isNewSession = !sessionId || now - sessionStart > 30 * 60 * 1000
+
+    if (isNewSession) {
+      analytics.track('app_opened', { timestamp: now })
+    }
     void testSupabaseConnection()
   }, [])
   return (
