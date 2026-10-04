@@ -1,4 +1,4 @@
-import { supabase } from '../api/supabase'
+import { getCurrentUserId, supabase } from '../api/supabase'
 import { v7 as uuidv7 } from 'uuid'
 
 const DEVICE_ID_KEY = 'swimsheet_device_id'
@@ -10,6 +10,7 @@ const SESSION_TIMEOUT_MS = 30 * 60 * 1000
 interface AnalyticsEvent {
   event_name: string
   properties: Record<string, unknown>
+  user_id: string | null
   device_id: string
   session_id: string
   timestamp: number
@@ -85,6 +86,7 @@ export const analytics = {
       const event: AnalyticsEvent = {
         event_name: eventName,
         properties,
+        user_id: getCurrentUserId(),
         device_id: getDeviceId(),
         session_id: getOrCreateSessionId(),
         timestamp: createdAt,
@@ -119,6 +121,7 @@ export const analytics = {
         batch.map(e => ({
           event_name: e.event_name,
           properties: e.properties,
+          user_id: e.user_id,
           device_id: e.device_id,
           session_id: e.session_id,
           timestamp: e.timestamp,

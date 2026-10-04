@@ -1,5 +1,5 @@
 -- Migration: 20260925000002_cleanup_analytics_events.sql
--- Adds cleanup function to purge analytics events older than 7 days
+-- Adds cleanup function to purge analytics events older than 21 days
 
 create or replace function cleanup_old_analytics_events()
 returns void
@@ -8,7 +8,7 @@ security definer
 as $$
 begin
   delete from analytics_events
-  where created_at < now() - interval '7 days';
+  where created_at < now() - interval '21 days';
 end;
 $$;
 
