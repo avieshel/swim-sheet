@@ -4,6 +4,7 @@ export interface Swimmer {
   id: string
   name: string
   group: string
+  labels?: string[]
   notes: string
   status: 'active' | 'inactive'
   createdAt: string
@@ -14,6 +15,8 @@ export interface Session {
   id: string
   name: string
   notes: string
+  visibility?: 'private' | 'school'
+  assignedTo?: string | null
   createdAt: string
   updatedAt: string
 }
