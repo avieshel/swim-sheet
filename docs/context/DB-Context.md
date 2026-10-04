@@ -10,8 +10,23 @@ The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-fir
 - All CRUD operates against local IndexedDB via Dexie
 - The app works fully offline — the server is only needed for sync and first-time load
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
-- Schema versioning: current version is 5
+- Schema versioning: current version is 5 (tenant/share fields may appear as optional columns ahead of a formal v6 claim migration)
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
+
+### Flexible identity model (confirmed product cases)
+One tenant abstraction supports all three confirmed coaching patterns without a second architecture:
+
+| Case | Mechanism |
+|------|-----------|
+| Solo coach, multiple groups (masters vs private lessons) | `swimmers.group` (primary bucket) + optional `swimmers.labels[]` (multi-tags). **Not** a separate swim school. |
+| Shared swim school / head coach distributing work | `swim_schools` + `school_memberships` + roles. Head coach = `swim_school_owner` (full + distribute). Coaches = `swim_coach`. |
+| Share or withhold a session | `sessions.visibility`: `private` (default; creator + owner only) \| `school` (all school members can view/use). |
+| Distribute weekly sessions to a coach | `sessions.assigned_to` (profile id). Assignment implies visibility for that coach. |
+| Track weekly load / student totals | `session_runs.school_id` (+ per-swimmer links) once results sync ships; aggregates are school-scoped. |
+
+**Local-first:** PWA keeps working with no account. A default local school is created for tagging; login **claims** local schools into Supabase (same UUID). Sync/collab only for claimed schools.
+
+**RLS:** domain rows always scoped by `school_id` + membership. Session SELECT allows `visibility = 'school'` OR creator OR `assigned_to` OR `school:manage`. Deletes remain owner-only.
 
 ### Session → SessionRun (Template/Instance) Pattern
 - `Session` is a reusable template with drills
