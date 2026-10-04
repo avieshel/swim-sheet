@@ -11,3 +11,7 @@ server/tsconfig.tsbuildinfo
 .env
 client/.env
 supabase/.env
+
+# Agent skill packs (installed locally, not vendored)
+.agents/
+skills-lock.json
