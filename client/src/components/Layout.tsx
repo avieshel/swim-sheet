@@ -1,5 +1,5 @@
-import React, { useEffect, type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useActiveRun } from '../hooks/useActiveRun';
 import { settingsService } from '../services/settingsService';
 import { Icon } from './Icon';
@@ -12,7 +12,7 @@ const navItems = [
   { path: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
-export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const Layout: React.FC = () => {
   const location = useLocation();
   const activeRun = useActiveRun();
 
@@ -67,7 +67,7 @@ export const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
 
       {/* Main Content */}
       <main className="flex-1 r-container py-stack-md md:py-stack-lg pb-28 md:pb-12 overflow-x-hidden">
-        {children}
+        <Outlet />
       </main>
 
       {/* BottomNavBar (Mobile) */}

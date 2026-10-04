@@ -62,7 +62,7 @@ Cloudflare Pages automatically builds and deploys the application when connected
 | Root directory | `client` |
 | Node.js version | `22` |
 
-No other configuration is needed — the `_headers`, `_redirects`, and `robots.txt` files in `client/public/` are copied into the build output automatically. `_redirects` only maps known app routes to `index.html`; all other paths return a real 404, and `robots.txt` plus the `X-Robots-Tag: noindex` header keep the private app out of search indexes.
+No other configuration is needed — the `_headers`, `_redirects`, and `robots.txt` files in `client/public/` are copied into the build output automatically. `_redirects` only maps known app routes (plus `/about`) to `index.html`; all other paths return a real 404. `robots.txt` allows crawling and points at `sitemap.xml`; the public landing page (`/about`) is indexable, while app screens (including `/`) carry a per-route `<meta name="robots" content="noindex">` tag (see `client/src/utils/routeMeta.ts`) so the private app stays out of search results.
 
 ### How it works
 

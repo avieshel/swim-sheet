@@ -3,6 +3,8 @@
 
 # SPA fallback — only known app routes serve index.html.
 # Unknown paths (bot probes, typos) fall through to a real 404.
+/about  /index.html  200
+/about/*  /index.html  200
 /dashboard  /index.html  200
 /dashboard/*  /index.html  200
 /swimmers  /index.html  200

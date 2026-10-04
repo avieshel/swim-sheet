@@ -1,7 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { Layout } from './components/Layout'
+import { RouteMeta } from './components/RouteMeta'
 import { UpdatePrompt } from './components/UpdatePrompt'
+import { Landing } from './pages/Landing'
 import { SwimmersList } from './pages/SwimmersList'
 import { SwimmerDetail } from './pages/SwimmerDetail'
 import { SessionsList } from './pages/SessionsList'
@@ -26,8 +28,10 @@ function App() {
   }, [])
   return (
     <Router>
-      <Layout>
-        <Routes>
+      <RouteMeta />
+      <Routes>
+        <Route path="/about" element={<Landing />} />
+        <Route element={<Layout />}>
           <Route path="/" element={<LiveDeck />} />
           <Route path="/dashboard" element={<CoachDashboard />} />
           <Route path="/swimmers" element={<SwimmersList />} />
@@ -42,9 +46,9 @@ function App() {
           <Route path="/runs" element={<RunsHistory />} />
           <Route path="/runs/:id" element={<RunDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <UpdatePrompt />
-      </Layout>
+        </Route>
+      </Routes>
+      <UpdatePrompt />
     </Router>
   )
 }

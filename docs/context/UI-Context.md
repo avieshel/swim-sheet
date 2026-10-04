@@ -104,10 +104,16 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 - **Bottom Nav (mobile)**: 4 tabs — Home, Swimmers, Sessions, Live. Active tab highlighted with `bg-secondary-container` / filled icon.
 - **Main content**: `max-w-7xl mx-auto` container with responsive padding.
 - **Desktop**: TopAppBar nav replaces bottom nav.
+- **Scope**: `Layout` is a pathless layout route (renders `<Outlet />`) wrapping all app routes, including `/` (LiveDeck). The public landing page (`/about`) renders outside it with its own header/footer.
 
 ---
 
 ## Screens
+
+### Landing (`/about`)
+- Public, indexable marketing page rendered outside `App Shell`. Own minimal header (logo + "Open app" → `/live`), hero with CTA, 6-card feature grid, 3-step "How it works", 5-question FAQ, closing CTA band, footer. Uses shared design tokens (`r-container`, `font-headline-*`, gradient hero pattern from CoachDashboard) and the `Icon` component.
+- Injects FAQ **JSON-LD** structured data (`FAQPage`) via an inline `<script type="application/ld+json">`.
+- Static copy only — no data-layer imports (pages here must not touch `db/`). Covered by `tests/landing.spec.ts`.
 
 ---
 
