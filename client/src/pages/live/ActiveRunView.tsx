@@ -18,6 +18,7 @@ import type { SessionRun, RunDrill, LaneDrillResult, Swimmer as DbSwimmer } from
 import type { CompleteRunLap } from '../../api/runs'
 import { getSession } from '../../api/sessions'
 import { TimingService } from '../../services/TimingService'
+import { Events, analytics } from '../../services/analyticsEvents'
 import { LaneEditorModal } from '../../components/LaneEditorModal'
 import { Icon } from '../../components/Icon'
 import { GroupCard } from '../../components/GroupCard'
@@ -227,6 +228,14 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
   const finalizeSession = async (lapsToSave: CompleteRunLap[]) => {
     await completeRunWithLaps(run.id, lapsToSave)
+    analytics.track(Events.SessionCompleted({
+      swimmerCount: new Set(lapsToSave.map(l => l.swimmerId)).size,
+      lapCount: lapsToSave.length,
+      drillCount: runDrills.length,
+      totalDistance,
+      durationMs: sessionElapsed,
+      isQuickStart: isQuickStart(run),
+    }))
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
@@ -281,6 +290,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     setShowEmptyWarning(false)
     setSessionTemps([])
     await deleteRun(run.id)
+    analytics.track(Events.SessionDiscarded())
     dispatch({ type: 'CLEAR' })
     onComplete()
   }
@@ -328,6 +338,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
   const handleResetSession = async () => {
     const refreshed = await TimingService.resetSession(run.id, groups, runDrills, store, dispatch, resetClearSwimmers)
+    analytics.track(Events.SessionReset(resetClearSwimmers))
     setLaneDrillResults(refreshed)
     setShowResetSessionConfirm(false)
     setResetClearSwimmers(false)
@@ -549,6 +560,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
         }}
         onSaveTempSwimmer={async (swimmerId, groupId, data) => {
           const newId = await createSwimmerIfNotExists({ name: data.name, group: data.group, notes: data.notes, status: data.status as 'active' | 'inactive' })
+          analytics.track(Events.SwimmerCreated('live_session', rosterSwimmers.length))
           dispatch({ type: 'UPDATE_SWIMMER_DBID', payload: { groupId, swimmerId, dbId: newId } })
           const group = groups.find(g => g.id === groupId)
           if (group) {

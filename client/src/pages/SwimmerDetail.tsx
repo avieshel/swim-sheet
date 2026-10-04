@@ -6,6 +6,7 @@ import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import { RunHistoryTable } from '../components/Table'
 import { downloadBlob } from '../utils/downloadBlob'
 import { Icon } from '../components/Icon'
+import { Events, analytics } from '../services/analyticsEvents'
 
 export const SwimmerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -30,6 +31,7 @@ export const SwimmerDetail: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       if (!id) return
+      analytics.track(Events.ViewSwimmerProfile())
       const s = await getSwimmer(id)
       if (!s) { setLoading(false); return }
       setSwimmer(s)
@@ -55,6 +57,7 @@ export const SwimmerDetail: React.FC = () => {
     if (!id) return
     setDeleting(true)
     await deleteSwimmer(id)
+    analytics.track(Events.SwimmerDeleted('profile'))
     setShowDeleteConfirm(false)
     navigate('/swimmers')
   }
@@ -70,6 +73,7 @@ export const SwimmerDetail: React.FC = () => {
     } catch {
       await deleteSwimmer(id)
     }
+    analytics.track(Events.SwimmerDeleted('profile'))
     setShowDeleteConfirm(false)
     navigate('/swimmers')
   }
@@ -173,6 +177,7 @@ export const SwimmerDetail: React.FC = () => {
         onSave={async (data) => {
           if (!id) return
           await updateSwimmer(id, data)
+          analytics.track(Events.SwimmerUpdated('profile'))
           setSwimmer({ ...swimmer, ...data })
           setShowEditModal(false)
         }}

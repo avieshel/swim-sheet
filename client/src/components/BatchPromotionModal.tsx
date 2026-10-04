@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { searchSwimmers } from '../api/swimmers'
 import { promoteAndLinkSwimmer, discardTempSwimmer } from '../api/runs'
+import { Events, analytics } from '../services/analyticsEvents'
 
 interface SwimmerToPromote {
   name: string
@@ -82,6 +83,8 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
 
         await promoteAndLinkSwimmer(runId, swimmer.dbId, realName, choice.selectedRosterId)
       }
+      const promoted = swimmers.filter(s => getChoice(s.dbId).promote)
+      analytics.track(Events.SwimmerPromoted(promoted.length, promoted.filter(s => !getChoice(s.dbId).selectedRosterId).length))
       onConfirm()
     } finally {
       setSaving(false)

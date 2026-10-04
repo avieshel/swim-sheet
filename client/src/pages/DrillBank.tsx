@@ -9,6 +9,7 @@ import type { Session } from '../api/sessions'
 import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { Icon } from '../components/Icon'
+import { Events, analytics } from '../services/analyticsEvents'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
@@ -60,7 +61,7 @@ export const DrillBank: React.FC = () => {
   useEffect(() => {
     let cancelled = false
     loadDrillsData()
-      .then(data => { if (!cancelled) applyDrills(data) })
+      .then(data => { if (!cancelled) { applyDrills(data); analytics.track(Events.ViewDrillBank(data.length)) } })
       .catch(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -94,6 +95,7 @@ export const DrillBank: React.FC = () => {
       stroke: detailDrill.stroke,
       distance: detailDrill.distance,
     })
+    analytics.track(Events.DrillAddedToSession('drill_bank', detailDrill.stroke, detailDrill.distance))
     await bumpDrillPopularity(detailDrill.id!)
     setAddingToSession(false)
     setDetailDrill(null)
@@ -116,6 +118,7 @@ export const DrillBank: React.FC = () => {
       message: 'Are you sure you want to permanently remove this drill from the bank?',
       onConfirm: async () => {
         await deleteLibraryDrill(id)
+        analytics.track(Events.DrillDeleted('library'))
         loadDrills()
         setConfirmState(prev => ({ ...prev, open: false }))
       }
@@ -389,8 +392,10 @@ export const DrillBank: React.FC = () => {
              if (editingDrill.id) {
                await updateLibraryDrill(editingDrill.id, data as unknown as Partial<SafeLibraryDrill>)
                if (asVariant) await bumpDrillPopularity(editingDrill.id!)
+               analytics.track(Events.DrillUpdated('library'))
              } else {
                await createLibraryDrill(data as unknown as SafeLibraryDrill)
+               analytics.track(Events.DrillCreated('library', data.stroke ?? '', data.distance ?? 0))
              }
              setShowEditor(false)
              loadDrills()
@@ -412,6 +417,7 @@ export const DrillBank: React.FC = () => {
             message: 'Are you sure you want to permanently remove this drill from the bank?',
             onConfirm: async () => {
               await deleteLibraryDrill(editingDrill.id!)
+              analytics.track(Events.DrillDeleted('library'))
               loadDrills()
               setConfirmState(prev => ({ ...prev, open: false }))
             }

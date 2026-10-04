@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CatalogSessionIndex } from '../api/catalog'
 import { fetchSessionFile, importSession } from '../api/catalog'
 import { Icon } from './Icon'
+import { Events, analytics } from '../services/analyticsEvents'
 
 interface SessionCatalogCardProps {
   session: CatalogSessionIndex
@@ -18,6 +19,7 @@ export function SessionCatalogCard({ session, isImported, onImported }: SessionC
     try {
       const data = await fetchSessionFile(session.file)
       await importSession(data)
+      analytics.track(Events.SessionImported(data.drills?.length ?? session.drillCount, session.category))
       onImported()
     } finally {
       setImporting(false)

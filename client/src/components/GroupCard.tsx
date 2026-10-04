@@ -10,6 +10,7 @@ import { ActiveSwimmerRow, SavedSwimmerRow } from './SwimmerRows'
 import { SwimmerFormModal } from './SwimmerFormModal'
 import { createSwimmerIfNotExists } from '../api/swimmers'
 import { pickRandomTempSwimmerName } from '../api/constants'
+import { Events, analytics } from '../services/analyticsEvents'
 
 // ── Presentational sub-components (logic lives in GroupCard) ────────────────
 
@@ -375,6 +376,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
       return
     }
     const newId = await createSwimmerIfNotExists({ name: data.name, group: data.group, notes: data.notes, status: data.status as 'active' | 'inactive' })
+    analytics.track(Events.SwimmerCreated('live_session', rosterSwimmers?.length ?? 0))
     dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: data.name, dbId: newId } })
     await addSwimmerToRun(runId, newId, liveGroup.lane).catch(() => {})
     onSwimmerSaved?.()
@@ -452,7 +454,9 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
+    const notStarted = liveGroup.swimmers.filter(s => s.dbId && store.getSwimmerTiming(runId, liveGroup.id, liveGroup.currentRunDrillId!, s.dbId).startedAt == null).length
     ensureSessionRunning()
+    analytics.track(Events.SwimmerStarted(liveGroup.lane, notStarted))
     store.markSwimmerStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
   }
 
@@ -460,6 +464,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
+    analytics.track(Events.LapRecorded(liveGroup.lane, 1))
     store.markSwimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
   }
 
@@ -467,6 +472,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     if (!runId || !liveGroup.currentRunDrillId) return
     const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
     if (!swimmer || !swimmer.dbId) return
+    analytics.track(Events.SwimmerCompleted(liveGroup.lane, 1))
     store.markSwimmerDone(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
     dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId } })
     const otherActive = liveGroup.swimmers.filter(s => s.id !== swimmerId && !s.completed)
@@ -487,6 +493,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     const active = liveGroup.swimmers
       .filter(s => s.dbId && started.has(s.dbId) && !s.completed)
       .map(s => s.dbId!)
+    analytics.track(Events.SwimmerCompleted(liveGroup.lane, active.length))
     store.batchStopSwimmers(runId, liveGroup.id, currentDrillId, active, sessionElapsed)
     for (const swimmer of liveGroup.swimmers) {
       if (!swimmer.completed) {
@@ -506,6 +513,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
           store.markGroupStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
         }
       }
+      analytics.track(Events.SwimmerStarted(liveGroup.lane, liveGroup.swimmers.filter(s => s.dbId).length))
     }
   }
 
@@ -529,6 +537,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     const active = liveGroup.swimmers
       .filter(s => s.dbId && !s.completed)
       .map(s => s.dbId!)
+    analytics.track(Events.LapRecorded(liveGroup.lane, active.length))
     store.markGroupLap(runId, liveGroup.id, liveGroup.currentRunDrillId, active, sessionElapsed)
   }
 

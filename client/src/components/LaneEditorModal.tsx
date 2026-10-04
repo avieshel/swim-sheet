@@ -5,6 +5,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
 import { SwimmerFormModal, type SwimmerFormData } from './SwimmerFormModal'
 import type { TimedGroup } from '../context/LiveSessionContext'
+import { Events, analytics } from '../services/analyticsEvents'
 
 interface LaneEditorModalProps {
   state: { groups: TimedGroup[]; runId?: string | null }
@@ -343,6 +344,7 @@ export function LaneEditorModal({
           editingId={null}
           onSave={async (data) => {
             await createSwimmerIfNotExists({ name: data.name, group: data.group, notes: data.notes, status: data.status as 'active' | 'inactive' })
+            analytics.track(Events.SwimmerCreated('live_session', allSwimmers.length))
             const updated = await listSwimmers()
             setAllSwimmers(updated)
             setShowCreateModal(false)

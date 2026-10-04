@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon'
 import { listSwimmers } from '../api/swimmers'
 import { listSessions, listCompletedRuns } from '../api/sessions'
 import { getRunDrill, getAllLaps } from '../api/runs'
+import { Events, analytics } from '../services/analyticsEvents'
 
 export const CoachDashboard: React.FC = () => {
   const [stats, setStats] = useState({
@@ -39,6 +40,7 @@ export const CoachDashboard: React.FC = () => {
         lapCount: laps.length,
         totalDistance,
       })
+      analytics.track(Events.ViewDashboard(swimmers.length, templates.length, completed.length, laps.length))
       setLoading(false)
     }
     load()

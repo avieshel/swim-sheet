@@ -12,6 +12,7 @@ import { strokeColors } from '../constants/drill'
 import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
+import { Events, analytics } from '../services/analyticsEvents'
 
 export const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -97,7 +98,15 @@ export const SessionDetail: React.FC = () => {
   useEffect(() => {
     let cancelled = false
     loadSessionData()
-      .then(data => { if (!cancelled && data) applySessionData(data) })
+      .then(data => {
+        if (!cancelled && data) {
+          applySessionData(data)
+          analytics.track(Events.ViewSessionTemplate(
+            data[1].length,
+            data[1].reduce((sum, d) => sum + getDrillTotalDistance(d), 0)
+          ))
+        }
+      })
       .catch(() => { if (!cancelled) setLoading(false) })
     const seedAndLoad = async () => {
       await seedLibraryDrills()
@@ -111,6 +120,7 @@ export const SessionDetail: React.FC = () => {
   const handleSaveMeta = async () => {
     if (!id || !editName.trim()) return
     await updateSession(id, { name: editName.trim(), notes: editNotes })
+    analytics.track(Events.SessionUpdated())
     setEditingMeta(false)
     loadData()
   }
@@ -159,6 +169,7 @@ export const SessionDetail: React.FC = () => {
       labels: libDrill.labels || [],
       description: libDrill.description || '',
     })
+    analytics.track(Events.DrillAddedToSession('session_detail', libDrill.stroke, libDrill.distance))
     loadData()
   }
 
@@ -170,6 +181,7 @@ export const SessionDetail: React.FC = () => {
       confirmLabel: 'Remove',
       onConfirm: async () => {
         await deleteDrill(drillId)
+        analytics.track(Events.DrillDeleted('session'))
         loadData()
         setConfirmState(prev => ({ ...prev, open: false }))
       }
@@ -184,6 +196,7 @@ export const SessionDetail: React.FC = () => {
       confirmLabel: 'Delete',
       onConfirm: async () => {
         await deleteLibraryDrill(drill.id)
+        analytics.track(Events.DrillDeleted('library'))
         loadLibrary()
         setConfirmState(prev => ({ ...prev, open: false }))
       }
@@ -451,6 +464,7 @@ export const SessionDetail: React.FC = () => {
           const save = async () => {
             if (editingLibraryId) {
               await updateLibraryDrill(editingLibraryId, data as unknown as Partial<SafeLibraryDrill>)
+              analytics.track(Events.DrillUpdated('library'))
               setShowRichEditor(false)
               loadLibrary()
               return
@@ -460,8 +474,10 @@ export const SessionDetail: React.FC = () => {
             const drillData = { ...data, session_id: id, order: data.id ? (richDrill.order ?? nextOrder) : nextOrder }
             if (data.id) {
               await updateDrill(data.id, drillData as unknown as Partial<SafeDrill>)
+              analytics.track(Events.DrillUpdated('session'))
             } else {
               await createDrill(drillData as unknown as SafeDrill)
+              analytics.track(Events.DrillCreated('session', data.stroke ?? '', data.distance ?? 0))
             }
             setShowRichEditor(false)
             loadData()
@@ -490,8 +506,10 @@ export const SessionDetail: React.FC = () => {
             onConfirm: async () => {
               if (editingLibraryId) {
                 await deleteLibraryDrill(editingLibraryId)
+                analytics.track(Events.DrillDeleted('library'))
               } else {
                 await deleteDrill(richDrill.id!)
+                analytics.track(Events.DrillDeleted('session'))
               }
               setShowRichEditor(false)
               loadData()

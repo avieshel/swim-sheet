@@ -12,7 +12,7 @@ import { useActiveRun } from '../hooks/useActiveRun'
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
-import { analytics } from '../services/analyticsService'
+import { Events, analytics } from '../services/analyticsEvents'
 
 interface SessionWithTotals extends Session {
   drillCount: number
@@ -83,13 +83,13 @@ export const SessionsList: React.FC = () => {
   }, [loadSessionData])
 
   useEffect(() => {
-    analytics.track('view_sessions')
     let cancelled = false
     Promise.all([loadSessionData(), getRunHistory()])
       .then(([templates, history]) => {
         if (cancelled) return
         applySessions(templates)
         setRecentRuns(history.runs)
+        analytics.track(Events.ViewSessions(templates.length, history.runs.length))
       })
       .catch(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -101,6 +101,7 @@ export const SessionsList: React.FC = () => {
       name: formName.trim(),
       notes: '',
     })
+    analytics.track(Events.SessionCreated(sessions.length + 1))
     setShowNewForm(false)
     setFormName('')
     loadAll()
@@ -113,6 +114,7 @@ export const SessionsList: React.FC = () => {
       message: `Are you sure you want to permanently delete the template "${name}"?`,
       onConfirm: async () => {
         await deleteSession(id)
+        analytics.track(Events.SessionDeleted(sessions.length - 1))
         loadAll()
         setConfirmState(prev => ({ ...prev, open: false }))
       }

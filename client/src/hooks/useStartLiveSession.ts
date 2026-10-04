@@ -2,8 +2,10 @@ import { useContext, useState } from 'react'
 import { LiveSessionContext } from '../context/LiveSessionContext'
 import { createRunFromTemplate, updateRun, getRun } from '../api/runs'
 import { buildStartLanes } from '../api/runSetup'
+import { getSessionDrills } from '../api/drills'
+import { getDrillTotalDistance } from '../utils/drillHelpers'
 import type { Session } from '../api/sessions'
-import { analytics } from '../services/analyticsService'
+import { Events, analytics } from '../services/analyticsEvents'
 
 export const DEFAULT_QUICK_SESSION_NAME = 'Quick 100m freestyle (default)'
 
@@ -19,7 +21,18 @@ export function useStartLiveSession(): {
   const [starting, setStarting] = useState(false)
 
   const startLiveSession = async (session: Session): Promise<import('../api/runs').SessionRun | undefined> => {
-    analytics.track('start_drill', { session_name: session.name })
+    void getSessionDrills(session.id)
+      .then(drills => {
+        analytics.track(
+          Events.StartDrill(session.name, {
+            drillCount: drills.length,
+            totalDistance: drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0),
+          })
+        )
+      })
+      .catch(() => {
+        analytics.track(Events.StartDrill(session.name))
+      })
     setStarting(true)
     try {
       const runId = await createRunFromTemplate(session.id, {

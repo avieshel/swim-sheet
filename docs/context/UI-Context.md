@@ -409,3 +409,49 @@ Rich drill editor with support for:
 - `touch-none` prevents scroll interference during drag
 - `-webkit-tap-highlight-color: transparent` removes tap flash
 - Scrolling containers use `-webkit-overflow-scrolling: touch`
+
+---
+
+## Analytics Events
+
+Instrumentation is defined in one place: `client/src/services/analyticsEvents.ts` — typed `Events.*` factories plus the `analytics` facade. Call sites use `analytics.track(Events.ViewSwimmers(count))`; the old `(string, properties)` signature no longer compiles, so event names and payloads cannot drift from the registry (`analyticsEventsRegistry.ts` was a conflicting draft and has been deleted).
+
+Events queue in localStorage (`swimsheet_analytics_queue`, capped at 500 — oldest dropped) and flush in batches of 50 to Supabase `analytics_events`. Delivery is at-least-once: every event carries a client-generated `event_id` (uuidv7, unique index via migration `20261004000002`) so a retried batch that already landed fails with `23505` and is treated as delivered. Systemic failures keep the queue and retry with exponential backoff (5s → 5min); row-level failures (SQLSTATE class 22/23) recursively split the batch to isolate the poison event, which moves to a dead-letter list (last 20, `swimsheet_analytics_dead_letter`) instead of blocking the other 49. Flushes run on every `track`, on `online`, and on `pagehide`/`visibilitychange` via `fetch keepalive` so closing the tab doesn't lose the queue. Every event carries `device_id`, `session_id`, timestamps, timezone, and `app_version` (the build's git commit). Sessions use a 30-min inactivity window: immutable `swimsheet_session_start` + sliding `swimsheet_session_last`; `isNewSession()` gates `app_opened` in `App.tsx`.
+
+**Payload policy (per Supabase-Tasks.md Task 4): counts, enums, and action types only — no swimmer names, lap times, or free-text notes.**
+
+### Event catalog
+
+| Event | Payload | Emitted From |
+|-------|---------|--------------|
+| `app_opened` | — | `App.tsx` when `isNewSession()` (new 30-min session window) |
+| `view_swimmers` | `swimmer_count` | SwimmersList mount (after roster loads) |
+| `view_swimmer_profile` | — | SwimmerDetail mount |
+| `view_sessions` | `template_count`, `completed_run_count` | SessionsList mount |
+| `view_session_template` | `drill_count`, `total_distance` | SessionDetail mount |
+| `view_drill_bank` | `drill_count` | DrillBank mount |
+| `view_dashboard` | `swimmer_count`, `template_count`, `completed_run_count`, `lap_count` | CoachDashboard mount |
+| `view_runs_history` | `run_count`, `swimmer_filter` (`all`\|`swimmer`) | RunsHistory mount |
+| `swimmer_created` | `source` (`roster`\|`live_session`), `swimmer_count` | SwimmersList form, GroupCard create-new, LaneEditorModal create-new, ActiveRunView temp→roster save |
+| `swimmer_updated` | `source` (`roster`\|`profile`), `swimmer_count?` | SwimmersList form, SwimmerDetail form |
+| `swimmer_deleted` | `source` (`roster`\|`profile`), `swimmer_count?` | SwimmersList card, SwimmerDetail delete |
+| `swimmer_promoted` | `promoted_count`, `new_swimmer_count` | BatchPromotionModal confirm (temp→roster) |
+| `session_created` | `template_count` | SessionsList "Create Template" |
+| `session_imported` | `drill_count`, `category` | SessionCatalogCard import |
+| `session_updated` | — | SessionDetail name/notes save |
+| `session_deleted` | `template_count` | SessionsList template delete |
+| `start_drill` | `session_name`, `drill_count`, `total_distance` | `useStartLiveSession` (template → live run) |
+| `quick_time_started` | `virtual_swimmer_count` | LiveDeck quick-time start |
+| `session_completed` | `swimmer_count`, `lap_count`, `drill_count`, `total_distance`, `duration_ms`, `is_quick_start` | ActiveRunView finalize (run saved) |
+| `session_discarded` | — | ActiveRunView empty-session discard |
+| `session_reset` | `clear_swimmers` | ActiveRunView reset-session confirm |
+| `drill_created` | `source` (`library`\|`session`), `stroke`, `distance` | DrillBank editor, SessionDetail rich editor |
+| `drill_updated` | `source` (`library`\|`session`) | DrillBank editor, SessionDetail rich editor |
+| `drill_deleted` | `source` (`library`\|`session`) | DrillBank, SessionDetail (list + editor) |
+| `drill_added_to_session` | `source` (`drill_bank`\|`session_detail`), `stroke`, `distance` | Library → session copy |
+| `drill_completed` | `lane`, `swimmer_count`, `distance`, `stroke` | TimingService.completeDrill (timed drill saved per group, manual or auto) |
+| `swimmer_started` | `lane`, `swimmer_count` | GroupCard start tap (individual or lane Go; only not-yet-started swimmers counted) |
+| `swimmer_completed` | `lane`, `swimmer_count` | GroupCard finish tap / lane stop |
+| `lap_recorded` | `lane`, `swimmer_count` | GroupCard lap tap (individual or group lap) |
+
+Future upgrade candidates (not yet implemented): swimmers-with-session counts over 7/30/60-day windows, timing-mode breakdowns, per-swimmer activity.

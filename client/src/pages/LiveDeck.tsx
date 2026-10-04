@@ -8,6 +8,7 @@ import type { SessionRun } from '../api/runs'
 import { ActiveRunView } from './live/ActiveRunView'
 import { Icon } from '../components/Icon'
 import { useStartLiveSession, DEFAULT_QUICK_SESSION_NAME } from '../hooks/useStartLiveSession'
+import { Events, analytics } from '../services/analyticsEvents'
 
 const QUICK_TIME_LABEL = '100m freestyle quick time'
 
@@ -36,6 +37,7 @@ export const LiveDeck: React.FC = () => {
     try {
       const { runId, drillId } = await createQuickStartRun()
       const { groups, virtualSwimmers } = await buildStartLanes(drillId, { prefillTempSwimmers: true })
+      analytics.track(Events.QuickTimeStarted(virtualSwimmers.length))
       const notes = { isQuickStart: true, version: 2, virtualSwimmers }
       await updateRun(runId, { notes: JSON.stringify(notes) })
       dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId } })

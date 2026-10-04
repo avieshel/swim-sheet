@@ -11,12 +11,14 @@ import {
   deleteSwimmerFromLaneResult,
   updateLaneResultSwimmer,
   getRun,
+  getRunDrill,
 } from '../api/runs'
 import type { TimedGroup, LiveSessionAction, TimerAction } from '../context/LiveSessionContext'
 import type { LiveTimingStore } from '../timing/liveTiming'
 import type { Dispatch } from 'react'
 import type { LaneDrillResult } from '../api/runs'
 import type { LapEntry } from '../api/types'
+import { Events, analytics } from './analyticsEvents'
 
 export const TimingService = {
   async completeDrill(
@@ -30,6 +32,7 @@ export const TimingService = {
   ) {
     const live = store.getDrillTiming(runId, group.id, drillId, group.swimmers.filter(s => s.dbId).map(s => s.dbId!))
     const run = await getRun(runId)
+    const runDrill = await getRunDrill(drillId).catch(() => undefined)
     const poolLength = run?.poolLength ?? 25
     
     const timingData = buildLaneResult({
@@ -56,6 +59,10 @@ export const TimingService = {
       completed: true,
       data: JSON.stringify(timingData),
     })
+
+    if (runDrill) {
+      analytics.track(Events.DrillCompleted(group.lane, group.swimmers.length, runDrill.distance, runDrill.stroke))
+    }
 
     store.clearDrill(runId, group.id, drillId)
     dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: group.id } })

@@ -851,3 +851,59 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Priority**: High
 **Status**: Done — TDD: 6 failing tests written first (blob-laps regression, active-drill store fallback, temp-in-store flagged, temp-in-blob flagged, blob+store merge without double count, empty), then the fix; `npm run check` green (342 vitest).
+
+---
+
+## A-051: Usage analytics — instrument key user interactions ✅
+
+**Source**: User request — "create analytics events + payloads to analyze user interactions: overall usage (creating/editing drills & sessions, timing swimmers, creating swimmers), e.g. total swimmer count when viewing swimmers. Simple metrics for now; better windowed metrics in a future upgrade."
+
+Instrumented the existing `analytics.track` pipeline (`services/analyticsService.ts` → localStorage queue → Supabase `analytics_events`) with 25 events across all core flows. Payload policy follows Supabase-Tasks.md Task 4: **counts, enums, and action types only — no swimmer names, lap times, or free-text notes.**
+
+Event groups:
+- **Page views with counts**: `view_swimmers` (+`swimmer_count`), `view_sessions` (+`template_count`, `completed_run_count`), `view_drill_bank` (+`drill_count`), `view_session_template` (+`drill_count`, `total_distance`), `view_swimmer_profile`, `view_dashboard` (+4 counts), `view_runs_history` (+`run_count`, `swimmer_filter`)
+- **Drills**: `drill_created` / `drill_updated` / `drill_deleted` (with `source: library|session`), `drill_added_to_session` (`source: drill_bank|session_detail`)
+- **Sessions**: `session_created`, `session_imported` (catalog), `session_updated`, `session_deleted`, `start_drill` (enriched with `drill_count`, `total_distance`), `quick_time_started`, `session_completed` (`swimmer_count`, `lap_count`, `drill_count`, `total_distance`, `duration_ms`, `is_quick_start`), `session_discarded`, `session_reset`
+- **Swimmers**: `swimmer_created` (+`swimmer_count`, `source: roster|live_session`), `swimmer_updated`, `swimmer_deleted`, `swimmer_promoted` (temp→roster, +`new_swimmer_count`)
+- **Live timing**: `swimmer_started` / `swimmer_completed` / `lap_recorded` (per tap, +`lane`, `swimmer_count`), `drill_completed` (per timed-drill save, +`lane`, `swimmer_count`, `distance`, `stroke`)
+
+**Files modified**: `SwimmersList.tsx`, `SwimmerDetail.tsx`, `SessionsList.tsx`, `SessionDetail.tsx`, `DrillBank.tsx`, `SessionCatalogCard.tsx`, `CoachDashboard.tsx`, `RunsHistory.tsx`, `LiveDeck.tsx`, `live/ActiveRunView.tsx`, `components/GroupCard.tsx`, `components/BatchPromotionModal.tsx`, `hooks/useStartLiveSession.ts`, `services/TimingService.ts` (all under `client/src/`), plus `docs/context/UI-Context.md` (event catalog).
+
+**Notes**:
+- `GroupCard.handleSwimmerComplete` now guards on `swimmer.completed` (no-op for already-finished swimmers) so the event and the timing data are only written once per swimmer — consistent with the row UI, which disables those buttons when completed.
+- `start_drill` kept its pre-existing name for historical continuity; payload extended.
+- `drill_completed` fires in `TimingService.completeDrill`, covering both the manual "Complete" tap and the all-swimmers-done auto-save path.
+
+**Priority**: Medium
+**Status**: Done — `npm run check` green (lint + tsc + knip + 344 vitest). Future upgrade candidates noted in `UI-Context.md` → Analytics Events (windowed swimmer-activity metrics 7/30/60d, timing-mode breakdowns).
+
+---
+
+## A-052: Analytics hardening — single registry, reliable delivery, idempotent retries
+
+**Source**: User request — review the events registry against Amplitude/Snowplow/PostHog patterns and adopt what fits; "fix all the issues as you suggested."
+
+Adopted from platform practices: single typed tracking plan (Segment/Amplitude style), at-least-once delivery with idempotency keys (Snowplow `event_id`), exponential-backoff retries + unload flush (`sendBeacon`/keepalive pattern), poison-event isolation instead of all-or-nothing batches, immutable session start + sliding last-activity (Amplitude session model), build-hash `app_version`.
+
+**Registry consolidation**
+- Kept `analyticsEvents.ts` (typed `Events.*` factories — name + payload construction in one place; compiler enforces payloads). Deleted conflicting draft `analyticsEventsRegistry.ts`.
+- `analytics.track(event)` now takes one `TrackedEvent` — raw string calls no longer compile. Facade re-exports `analytics` + `isNewSession`.
+- All 29 catalog events wired at 48 emission points (A-051's catalog is now actually live; count payloads emit post-load where needed, `view_runs_history` gated to once per mount).
+
+**Delivery pipeline** (`analyticsService.ts`, TDD — 9 tests in `services/__tests__/analyticsService.test.ts`, written first)
+- Fixed re-queue duplication bug (failed batches were re-appended while still in storage → queue grew on every failure).
+- Added `event_id` (uuidv7) per event; migration `20261004000002_analytics_event_id.sql` adds nullable uuid + unique index → retried batch hitting `23505` is treated as delivered.
+- Systemic errors: exponential backoff 5s→5min (timer, was: no retry at all); row-level errors (SQLSTATE 22/23): recursive batch split isolates the bad event into a dead-letter list (last 20) so it can't block the other 49.
+- Unload flush: `pagehide`/`visibilitychange(hidden)` → `fetch keepalive`; plus existing `online` trigger.
+- Queue capped at 500 (drop oldest); flush guarded against concurrent runs.
+- Sessions: immutable `session_start` + sliding `session_last` (was: start rewritten on every event — session duration unrecoverable); `isNewSession()` exported so `App.tsx` no longer reads storage keys directly.
+- `app_version` = build git commit (`VITE_GIT_COMMIT`) instead of hardcoded `1.0.0`; `properties.timestamp` removed from `app_opened` (redundant with the `timestamp` column).
+
+**Files modified**: `services/analyticsService.ts`, `services/analyticsEvents.ts`, deleted `services/analyticsEventsRegistry.ts`, `services/__tests__/analyticsService.test.ts` (new), `supabase/migrations/20261004000002_analytics_event_id.sql` (new), 16 pages/components/hooks + `App.tsx` (wiring), `docs/context/UI-Context.md`.
+
+**Logged-out delivery verified**: RLS insert policy is `with check (true)` for all roles (`20260925000001:19-21`) + `grant insert to anon` (`20260925000003:4`); `user_id` is a nullable FK, so anon inserts with `user_id: null` are valid. Client authenticates with the anon key only (no session dependency) and uses `Prefer: return=minimal` (blocked SELECT policies don't matter). Live smoke test: anon POST with `user_id: null` → HTTP 201. Migration `20261004000002` was applied to the hosted DB via `npm run db:push` during verification (before that, all inserts would have failed with `PGRST204` on the missing `event_id` column). Regression-locked by a unit test asserting `user_id: null` + anon-only auth headers.
+
+**Known follow-up**: identify-on-login (`user_id` is captured per event from the Supabase session but is always null until the login screen lands — wire anonymous→identified merge then).
+
+**Priority**: High
+**Status**: Done — `npm run check` green (lint + tsc + knip + 354 vitest).

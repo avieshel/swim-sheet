@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { RunHistoryTable } from '../components/Table'
 import { getRunHistory } from '../api/runs'
@@ -6,6 +6,7 @@ import type { RunSummary } from '../api/runs'
 import { listSwimmers } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
 import { Icon } from '../components/Icon'
+import { Events, analytics } from '../services/analyticsEvents'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
 
@@ -28,6 +29,7 @@ export const RunsHistory: React.FC = () => {
     runs: null,
     error: false,
   })
+  const viewTracked = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -52,6 +54,10 @@ export const RunsHistory: React.FC = () => {
     getRunHistory(selected || undefined)
       .then(result => {
         if (cancelled) return
+        if (!viewTracked.current) {
+          viewTracked.current = true
+          analytics.track(Events.ViewRunsHistory(result.runs.length, selected === '' ? 'all' : 'swimmer'))
+        }
         setLoadState({ selected, runs: result.runs, error: false })
       })
       .catch(() => {

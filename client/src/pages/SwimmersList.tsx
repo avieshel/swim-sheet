@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
-import { analytics } from '../services/analyticsService'
+import { Events, analytics } from '../services/analyticsEvents'
 
 interface SwimmerStats {
   lastRun: { runId: string; date: string; templateName: string } | null
@@ -64,10 +64,13 @@ export const SwimmersList: React.FC = () => {
   const loadSwimmers = async () => applySwimmers(await loadSwimmerData())
 
   useEffect(() => {
-    analytics.track('view_swimmers')
     let cancelled = false
     loadSwimmerData()
-      .then(data => { if (!cancelled) applySwimmers(data) })
+      .then(data => {
+        if (cancelled) return
+        applySwimmers(data)
+        analytics.track(Events.ViewSwimmers(data.length))
+      })
       .catch(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [])
@@ -106,6 +109,7 @@ export const SwimmersList: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     await deleteSwimmer(id)
+    analytics.track(Events.SwimmerDeleted('roster', swimmers.length - 1))
     setDeleteTarget(null)
     loadSwimmers()
   }
@@ -335,8 +339,10 @@ export const SwimmersList: React.FC = () => {
         onSave={async (data) => {
           if (editingId) {
             await updateSwimmer(editingId, data)
+            analytics.track(Events.SwimmerUpdated('roster', swimmers.length))
           } else {
             await createSwimmerIfNotExists(data)
+            analytics.track(Events.SwimmerCreated('roster', swimmers.length + 1))
           }
           setShowModal(false)
           loadSwimmers()
