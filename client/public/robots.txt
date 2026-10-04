@@ -1,0 +1,4 @@
+# SwimSheet is a private coaching application with no public pages to index.
+# https://developers.google.com/search/docs/crawling-indexing/robots/robots-txt
+User-agent: *
+Disallow: /

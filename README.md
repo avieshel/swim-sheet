@@ -62,7 +62,7 @@ Cloudflare Pages automatically builds and deploys the application when connected
 | Root directory | `client` |
 | Node.js version | `22` |
 
-No other configuration is needed — the `_headers` and `_redirects` files in `client/public/` are copied into the build output automatically.
+No other configuration is needed — the `_headers`, `_redirects`, and `robots.txt` files in `client/public/` are copied into the build output automatically. `_redirects` only maps known app routes to `index.html`; all other paths return a real 404, and `robots.txt` plus the `X-Robots-Tag: noindex` header keep the private app out of search indexes.
 
 ### How it works
 

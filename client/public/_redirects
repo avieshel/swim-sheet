@@ -1,2 +1,19 @@
-# SPA fallback — all routes serve index.html
-/*  /index.html  200
+# Favicon requested by hardcoded bot/browser paths
+/favicon.ico  /favicon.svg  301
+
+# SPA fallback — only known app routes serve index.html.
+# Unknown paths (bot probes, typos) fall through to a real 404.
+/dashboard  /index.html  200
+/dashboard/*  /index.html  200
+/swimmers  /index.html  200
+/swimmers/*  /index.html  200
+/sessions  /index.html  200
+/sessions/*  /index.html  200
+/drills  /index.html  200
+/drills/*  /index.html  200
+/live  /index.html  200
+/live/*  /index.html  200
+/settings  /index.html  200
+/settings/*  /index.html  200
+/runs  /index.html  200
+/runs/*  /index.html  200
