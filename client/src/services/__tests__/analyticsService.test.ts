@@ -19,6 +19,7 @@ interface Row {
   user_id: string | null
   session_id: string
   app_version: string
+  build_sha: string
   platform: string
 }
 
@@ -83,6 +84,7 @@ describe('analyticsService', () => {
     expect(rows[0].event_id.length).toBeGreaterThan(0)
     expect(rows[0].session_id).toEqual(expect.any(String))
     expect(rows[0].app_version).toBe('dev')
+    expect(rows[0].build_sha).toBe('dev')
     expect(rows[0].platform).toBe('pwa')
     expect(queued()).toHaveLength(0)
   })
@@ -129,6 +131,7 @@ describe('analyticsService', () => {
       user_id: null,
       session_id: 's',
       app_version: 'dev',
+      build_sha: 'dev',
       platform: 'pwa',
     })
     localStorage.setItem(
@@ -160,6 +163,7 @@ describe('analyticsService', () => {
       user_id: null,
       session_id: 's',
       app_version: 'dev',
+      build_sha: 'dev',
       platform: 'pwa',
     })
     localStorage.setItem(QUEUE_KEY, JSON.stringify([mk('a'), mk('b')]))
@@ -198,6 +202,7 @@ describe('analyticsService', () => {
       user_id: null,
       session_id: 's',
       app_version: 'dev',
+      build_sha: 'dev',
       platform: 'pwa',
     }))
     localStorage.setItem(QUEUE_KEY, JSON.stringify(seeded))

@@ -883,7 +883,7 @@ Event groups:
 
 **Source**: User request — review the events registry against Amplitude/Snowplow/PostHog patterns and adopt what fits; "fix all the issues as you suggested."
 
-Adopted from platform practices: single typed tracking plan (Segment/Amplitude style), at-least-once delivery with idempotency keys (Snowplow `event_id`), exponential-backoff retries + unload flush (`sendBeacon`/keepalive pattern), poison-event isolation instead of all-or-nothing batches, immutable session start + sliding last-activity (Amplitude session model), build-hash `app_version`.
+Adopted from platform practices: single typed tracking plan (Segment/Amplitude style), at-least-once delivery with idempotency keys (Snowplow `event_id`), exponential-backoff retries + unload flush (`sendBeacon`/keepalive pattern), poison-event isolation instead of all-or-nothing batches, immutable session start + sliding last-activity (Amplitude session model), `app_version` (semver) + `build_sha` (commit hash) as separate fields.
 
 **Registry consolidation**
 - Kept `analyticsEvents.ts` (typed `Events.*` factories — name + payload construction in one place; compiler enforces payloads). Deleted conflicting draft `analyticsEventsRegistry.ts`.
@@ -897,7 +897,7 @@ Adopted from platform practices: single typed tracking plan (Segment/Amplitude s
 - Unload flush: `pagehide`/`visibilitychange(hidden)` → `fetch keepalive`; plus existing `online` trigger.
 - Queue capped at 500 (drop oldest); flush guarded against concurrent runs.
 - Sessions: immutable `session_start` + sliding `session_last` (was: start rewritten on every event — session duration unrecoverable); `isNewSession()` exported so `App.tsx` no longer reads storage keys directly.
-- `app_version` = build git commit (`VITE_GIT_COMMIT`) instead of hardcoded `1.0.0`; `properties.timestamp` removed from `app_opened` (redundant with the `timestamp` column).
+- Two version fields instead of hardcoded `1.0.0`: `app_version` = semantic version from `package.json` (`__APP_VERSION__`, platform convention) and `build_sha` = build git commit (`VITE_GIT_COMMIT`, migration `20261004000003_analytics_build_sha.sql`) for exact-deploy correlation; `properties.timestamp` removed from `app_opened` (redundant with the `timestamp` column).
 
 **Files modified**: `services/analyticsService.ts`, `services/analyticsEvents.ts`, deleted `services/analyticsEventsRegistry.ts`, `services/__tests__/analyticsService.test.ts` (new), `supabase/migrations/20261004000002_analytics_event_id.sql` (new), 16 pages/components/hooks + `App.tsx` (wiring), `docs/context/UI-Context.md`.
 

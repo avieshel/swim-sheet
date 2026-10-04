@@ -17,7 +17,8 @@ const RETRY_BASE_MS = 5000
 const RETRY_MAX_MS = 5 * 60 * 1000
 const RETRY_MAX_ATTEMPTS = 16
 
-const APP_VERSION = import.meta.env.VITE_GIT_COMMIT || 'dev'
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+const BUILD_SHA = import.meta.env.VITE_GIT_COMMIT || 'dev'
 const PLATFORM = 'pwa'
 const REST_TABLE_PATH = '/rest/v1/analytics_events'
 
@@ -176,6 +177,7 @@ function toRow(e: AnalyticsEvent, sentAt: number): Record<string, unknown> {
     device_local_tstamp: e.device_local_tstamp,
     timezone: e.timezone,
     app_version: APP_VERSION,
+    build_sha: BUILD_SHA,
     platform: PLATFORM,
   }
 }
