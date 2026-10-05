@@ -897,7 +897,7 @@ Adopted from platform practices: single typed tracking plan (Segment/Amplitude s
 - Unload flush: `pagehide`/`visibilitychange(hidden)` → `fetch keepalive`; plus existing `online` trigger.
 - Queue capped at 500 (drop oldest); flush guarded against concurrent runs.
 - Sessions: immutable `session_start` + sliding `session_last` (was: start rewritten on every event — session duration unrecoverable); `isNewSession()` exported so `App.tsx` no longer reads storage keys directly.
-- `app_version` = build git commit (`VITE_GIT_COMMIT`) instead of hardcoded `1.0.0`; `properties.timestamp` removed from `app_opened` (redundant with the `timestamp` column).
+- `app_version` = build git commit (`VITE_GIT_COMMIT`, truncated to 7 chars) instead of hardcoded `1.0.0`; `properties.timestamp` removed from `app_opened` (redundant with the `timestamp` column).
 
 **Files modified**: `services/analyticsService.ts`, `services/analyticsEvents.ts`, deleted `services/analyticsEventsRegistry.ts`, `services/__tests__/analyticsService.test.ts` (new), `supabase/migrations/20261004000002_analytics_event_id.sql` (new), 16 pages/components/hooks + `App.tsx` (wiring), `docs/context/UI-Context.md`.
 
