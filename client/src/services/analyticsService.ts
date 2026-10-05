@@ -1,5 +1,6 @@
 import { getCurrentUserId } from '../api/supabase'
 import { config } from '../config'
+import { getFullDeviceContext, type DeviceContext } from './deviceContext'
 import { v7 as uuidv7 } from 'uuid'
 
 const DEVICE_ID_KEY = 'swimsheet_device_id'
@@ -162,7 +163,7 @@ function addDeadLetters(entries: DeadLetter[]): void {
   }
 }
 
-function toRow(e: AnalyticsEvent, sentAt: number): Record<string, unknown> {
+function toRow(e: AnalyticsEvent, sentAt: number, ctx: DeviceContext): Record<string, unknown> {
   return {
     event_id: e.event_id,
     event_name: e.event_name,
@@ -177,6 +178,12 @@ function toRow(e: AnalyticsEvent, sentAt: number): Record<string, unknown> {
     timezone: e.timezone,
     app_version: APP_VERSION,
     platform: PLATFORM,
+    device_country: ctx.country,
+    device_language: ctx.language,
+    device_os: ctx.os,
+    device_type: ctx.type,
+    device_screen: ctx.screen,
+    device_connection: ctx.connection,
   }
 }
 
@@ -198,6 +205,7 @@ async function insertRows(
 
   const sentAt = Date.now()
   try {
+    const ctx = await getFullDeviceContext()
     const res = await fetch(`${url}${REST_TABLE_PATH}`, {
       method: 'POST',
       headers: {
@@ -206,7 +214,7 @@ async function insertRows(
         Authorization: `Bearer ${key}`,
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify(rows.map(e => toRow(e, sentAt))),
+      body: JSON.stringify(rows.map(e => toRow(e, sentAt, ctx))),
       ...(keepalive ? { keepalive: true } : {}),
     })
     if (res.ok) return { kind: 'ok', code: '', retryable: true }

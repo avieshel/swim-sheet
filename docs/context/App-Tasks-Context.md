@@ -907,3 +907,18 @@ Adopted from platform practices: single typed tracking plan (Segment/Amplitude s
 
 **Priority**: High
 **Status**: Done — `npm run check` green (lint + tsc + knip + 354 vitest).
+
+---
+
+## A-053: Analytics device context — country, language, hardware, network
+
+**Source**: User request — add device context to analytics events: country, browser language, OS, device type, screen size, connection type; country from Cloudflare (`/cdn-cgi/trace` or CF-IPCountry), no raw IP (PII decision).
+
+**Design (approved)**: six nullable columns — `device_country` (2-letter, same-origin `GET /cdn-cgi/trace`, parse `loc=`, localStorage cache 7-day TTL with negative caching, `null` fallback on non-CF hosts), `device_language`, `device_os` (UserAgentData.platform → UA sniff fallback), `device_type` (UserAgentData mobile/tablet → viewport width), `device_screen` (`WxH`), `device_connection` (Network Information `effectiveType`). Country is awaited inside `insertRows()` so batches never ship without it unless the trace fetch fails.
+
+**Files**: `client/src/services/deviceContext.ts` (new), `client/src/services/analyticsService.ts` (`toRow` + `insertRows`), `client/src/services/__tests__/deviceContext.test.ts` (new), `client/src/services/__tests__/analyticsService.test.ts` (deviceContext mocked + row assertions), `supabase/migrations/20261005000000_analytics_device_context.sql` (new), `docs/context/UI-Context.md`.
+
+**Schema verification (2026-10-05)**: safe failing-insert probes against the live project (`gzmmfnmegymbkkjxgmit`) confirm **none** of the six columns exist remotely yet — control probes (`device_id`, `session_id`, `timezone`) hit `23502` as expected, new-column probes return `PGRST204`. The migration must be applied (`npm run db:push`) before this code ships, otherwise every flush dead-letters with `PGRST204`.
+
+**Priority**: Medium
+**Status**: Implemented — pending remote migration application; `npm run check` green.

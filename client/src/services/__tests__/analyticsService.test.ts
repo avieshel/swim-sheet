@@ -4,6 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mockGetCurrentUserId = vi.hoisted(() => vi.fn<() => string | null>(() => null))
 vi.mock('../../api/supabase', () => ({ getCurrentUserId: mockGetCurrentUserId }))
 
+vi.mock('../deviceContext', () => ({
+  getFullDeviceContext: vi.fn(async () => ({
+    country: 'IL',
+    language: 'en-US',
+    os: 'macOS',
+    type: 'desktop',
+    screen: '1440x900',
+    connection: '4g',
+  })),
+}))
+
 import { analytics, isNewSession } from '../analyticsService'
 
 const QUEUE_KEY = 'swimsheet_analytics_queue'
@@ -20,6 +31,12 @@ interface Row {
   session_id: string
   app_version: string
   platform: string
+  device_country?: string | null
+  device_language?: string
+  device_os?: string
+  device_type?: string
+  device_screen?: string
+  device_connection?: string | null
 }
 
 function okResponse() {
@@ -84,6 +101,12 @@ describe('analyticsService', () => {
     expect(rows[0].session_id).toEqual(expect.any(String))
     expect(rows[0].app_version).toBe('dev')
     expect(rows[0].platform).toBe('pwa')
+    expect(rows[0].device_country).toBe('IL')
+    expect(rows[0].device_language).toBe('en-US')
+    expect(rows[0].device_os).toBe('macOS')
+    expect(rows[0].device_type).toBe('desktop')
+    expect(rows[0].device_screen).toBe('1440x900')
+    expect(rows[0].device_connection).toBe('4g')
     expect(queued()).toHaveLength(0)
   })
 
