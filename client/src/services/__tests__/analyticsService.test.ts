@@ -215,7 +215,7 @@ describe('analyticsService', () => {
     expect(queued()).toHaveLength(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
-    await vi.advanceTimersByTimeAsync(5000)
+    await vi.advanceTimersByTimeAsync(30000)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(queued()).toHaveLength(0)
@@ -285,5 +285,105 @@ describe('analyticsService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls[1][1]?.keepalive).toBe(true)
     expect(queued()).toHaveLength(0)
+  })
+
+  it('drops the queue to dead-letter after max retries and resets', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(errResponse(500, 'XX000'))
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(queued()).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // Walk through all 4 retries: 30s, 60s, 120s, 120s = 330s total
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(queued()).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(queued()).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(queued()).toHaveLength(0)
+
+    const dl = deadLetter()
+    expect(dl).toHaveLength(1)
+    expect(dl[0].event.event_name).toBe('view_swimmers')
+    expect(dl[0].error_code).toBe('MAX_RETRIES_EXCEEDED')
+  })
+
+  it('drops a batch to dead-letter on 4xx without retrying and continues flushing', async () => {
+    const mk = (name: string): Row => ({
+      event_id: 'id-' + name,
+      event_name: name,
+      properties: {},
+      user_id: null,
+      session_id: 's',
+      app_version: 'dev',
+      platform: 'pwa',
+    })
+    // First batch (50 events, all malformed). Second batch (1 event, succeeds).
+    // Seed 50 bad events then track() 1 good one so they go in separate batches.
+    const bad = Array.from({ length: 50 }, (_, i) => mk('bad-' + i))
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(bad))
+
+    fetchMock.mockResolvedValueOnce(errResponse(400, 'PGRST102'))
+    fetchMock.mockResolvedValueOnce(okResponse())
+
+    await analytics.flush()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // Now add a fresh good event and flush again
+    analytics.track({ name: 'good' })
+    await drain()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(0)
+
+    const dl = deadLetter()
+    expect(dl.length).toBeGreaterThanOrEqual(20)
+    expect(dl[dl.length - 1].error_code).toMatch(/^HTTP_4XX:PGRST102$/)
+  })
+
+  it('keeps retrying on network errors', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    fetchMock.mockResolvedValueOnce(okResponse())
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(30000)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(0)
+  })
+
+  it('reports queue stats through getStats', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValueOnce(errResponse(500, 'XX000'))
+    fetchMock.mockResolvedValue(okResponse())
+
+    analytics.track({ name: 'view_swimmers' })
+    analytics.track({ name: 'view_swimmers' })
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const failed = analytics.getStats()
+    expect(failed.queued).toBe(3)
+    expect(failed.flushInProgress).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(0)
+
+    const recovered = analytics.getStats()
+    expect(recovered.queued).toBe(0)
+    expect(recovered.eventsDelivered).toBeGreaterThanOrEqual(3)
   })
 })

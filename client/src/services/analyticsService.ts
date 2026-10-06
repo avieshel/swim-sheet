@@ -14,9 +14,9 @@ const SESSION_TIMEOUT_MS = 30 * 60 * 1000
 const MAX_QUEUE = 500
 const MAX_DEAD_LETTER = 20
 const BATCH_SIZE = 50
-const RETRY_BASE_MS = 5000
-const RETRY_MAX_MS = 5 * 60 * 1000
-const RETRY_MAX_ATTEMPTS = 16
+const RETRY_BASE_MS = 30000
+const RETRY_MAX_MS = 120000
+const RETRY_MAX_ATTEMPTS = 4
 
 const APP_VERSION = import.meta.env.VITE_GIT_COMMIT?.slice(0, 7) || 'dev'
 const PLATFORM = 'pwa'
@@ -52,6 +52,7 @@ interface BatchOutcome {
   dead: DeadLetter[]
   systemic: boolean
   retryable: boolean
+  code?: string
 }
 
 function getTimezone(): string {
@@ -230,11 +231,15 @@ async function insertRows(
       return { kind: 'duplicate', code: '23505', retryable: true }
     }
     // SQLSTATE class 22 (data exception) and 23 (integrity constraint)
-    // affect individual rows; everything else is systemic.
+    // affect individual rows; splitting the batch isolates the poison row.
     if (/^2[23]\d{3}$/.test(code)) {
       return { kind: 'poison', code, retryable: true }
     }
-    return { kind: 'systemic', code, retryable: true }
+    // 5xx and no-response network errors are transient — worth retrying.
+    // 4xx means the server rejected this payload shape; retrying with the
+    // same payload produces the same failure, so drop instead.
+    const retryable = res.status >= 500 || res.status === 0
+    return { kind: 'systemic', code, retryable }
   } catch {
     return { kind: 'systemic', code: 'NETWORK', retryable: true }
   }
@@ -251,7 +256,7 @@ async function sendBatch(
     return { sent: ids, dead: [], systemic: false, retryable: result.retryable }
   }
   if (result.kind === 'systemic') {
-    return { sent: [], dead: [], systemic: true, retryable: result.retryable }
+    return { sent: [], dead: [], systemic: true, retryable: result.retryable, code: result.code }
   }
 
   if (batch.length === 1) {
@@ -278,6 +283,9 @@ async function sendBatch(
 let flushing = false
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let retryAttempts = 0
+let eventsProduced = 0
+let eventsDelivered = 0
+let eventsDeadLettered = 0
 
 function cancelRetry(): void {
   if (retryTimer) {
@@ -314,8 +322,16 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
         const remove = new Set([...outcome.sent, ...outcome.dead.map(d => d.event.event_id)])
         saveQueue(getQueue().filter(e => !remove.has(e.event_id)))
         if (outcome.dead.length > 0) addDeadLetters(outcome.dead)
+        eventsDelivered += outcome.sent.length
+        eventsDeadLettered += outcome.dead.length
       }
       if (outcome.systemic) {
+        if (!outcome.retryable) {
+          dropBatchToDeadLetter(batch, `HTTP_4XX:${outcome.code ?? 'UNKNOWN'}`)
+          saveQueue(getQueue().filter(e => !batch.some(b => b.event_id === e.event_id)))
+          eventsDeadLettered += batch.length
+          continue
+        }
         systemic = true
         retryable = outcome.retryable
         break
@@ -323,7 +339,15 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
       if (opts?.keepalive) break
     }
     if (systemic) {
-      scheduleRetry(retryable)
+      if (retryAttempts >= RETRY_MAX_ATTEMPTS) {
+        const remaining = getQueue().length
+        dropQueueToDeadLetter('MAX_RETRIES_EXCEEDED')
+        eventsDeadLettered += remaining
+        cancelRetry()
+        retryAttempts = 0
+      } else {
+        scheduleRetry(retryable)
+      }
     } else {
       cancelRetry()
       retryAttempts = 0
@@ -333,7 +357,54 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
   }
 }
 
+function dropBatchToDeadLetter(batch: AnalyticsEvent[], errorCode: string): void {
+  try {
+    const now = Date.now()
+    const dead: DeadLetter[] = batch.map(event => ({
+      event,
+      error_code: errorCode,
+      at: now,
+    }))
+    addDeadLetters(dead)
+  } catch {
+    // best-effort drop
+  }
+}
+
+function dropQueueToDeadLetter(reason: string): void {
+  try {
+    const queue = getQueue()
+    if (queue.length === 0) return
+    const now = Date.now()
+    const dead: DeadLetter[] = queue.map(event => ({
+      event,
+      error_code: reason,
+      at: now,
+    }))
+    addDeadLetters(dead)
+    saveQueue([])
+  } catch {
+    // best-effort drop
+  }
+}
+
+export interface AnalyticsStats {
+  eventsProduced: number
+  eventsDelivered: number
+  eventsDeadLettered: number
+  queued: number
+  flushInProgress: boolean
+}
+
 export const analytics = {
+  getStats: (): AnalyticsStats => ({
+    eventsProduced,
+    eventsDelivered,
+    eventsDeadLettered,
+    queued: getQueue().length,
+    flushInProgress: flushing,
+  }),
+
   track: (event: TrackedEvent) => {
     try {
       const createdAt = Date.now()
@@ -354,6 +425,7 @@ export const analytics = {
       const queue = getQueue()
       queue.push(queued)
       saveQueue(queue)
+      eventsProduced++
 
       void analytics.flush()
     } catch {
