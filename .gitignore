@@ -12,7 +12,7 @@ server/tsconfig.tsbuildinfo
 client/.env
 supabase/.env
 supabase/.branches/
-supabase/.temp/start-secrets/
+supabase/.temp/
 
 # Agent skill packs (installed locally, not vendored)
 .agents/
