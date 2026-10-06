@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { config } from '../config'
 
 describe('config', () => {
@@ -21,6 +21,7 @@ describe('config', () => {
 
   afterEach(() => {
     config.resetTestConfig()
+    vi.unstubAllEnvs()
     if (typeof globalThis.localStorage !== 'undefined') {
       localStorage.clear()
     }
@@ -36,11 +37,13 @@ describe('config', () => {
     expect(config.getSupabaseAnonKey()).toBe('test-anon-key')
   })
 
-  it('falls back to localStorage or env when test config is not set', () => {
+  it('ignores legacy localStorage configuration and uses environment values', () => {
     localStorage.setItem('swimsheet_supabase_url', 'https://local.supabase.co')
     localStorage.setItem('swimsheet_supabase_anon_key', 'local-anon-key')
+    vi.stubEnv('VITE_SUPABASE_URL', 'http://127.0.0.1:54321')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'local-publishable-key')
 
-    expect(config.getSupabaseUrl()).toBe('https://local.supabase.co')
-    expect(config.getSupabaseAnonKey()).toBe('local-anon-key')
+    expect(config.getSupabaseUrl()).toBe('http://127.0.0.1:54321')
+    expect(config.getSupabaseAnonKey()).toBe('local-publishable-key')
   })
 })

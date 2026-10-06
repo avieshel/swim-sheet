@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ResetDataDialog } from '../components/ResetDataDialog'
 import { InfoDialog } from '../components/InfoDialog'
 import { Icon } from '../components/Icon'
+import { AccountSection } from '../components/AccountSection'
 
 interface SettingsForm {
   team_name: string
@@ -304,6 +305,7 @@ export const Settings: React.FC = () => {
       </div>
 
       <div className="space-y-6 md:space-y-8">
+        <AccountSection />
         {/* Profile Settings */}
         <section>
           <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Coach Profile</h2>

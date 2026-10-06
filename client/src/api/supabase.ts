@@ -1,5 +1,6 @@
 import { createClient, type Session, type SupabaseClient, type User } from '@supabase/supabase-js'
 import { config } from '../config'
+import { createAuthStorage, SESSION_STORAGE_KEY } from './authStorage'
 
 let cachedClient: SupabaseClient | null = null
 let cachedUrl = ''
@@ -23,7 +24,12 @@ function getSupabase(): SupabaseClient {
     }
 
     if (!cachedClient || cachedUrl !== url || cachedKey !== key) {
-      cachedClient = createClient(url, key)
+      cachedClient = createClient(url, key, {
+        auth: {
+          storage: createAuthStorage(),
+          storageKey: SESSION_STORAGE_KEY,
+        },
+      })
       cachedUrl = url
       cachedKey = key
       authListenerAttached = false
@@ -36,6 +42,8 @@ function getSupabase(): SupabaseClient {
       })
       void cachedClient.auth.getSession().then(({ data }) => {
         setUserFromSession(data.session)
+      }).catch(() => {
+        setUserFromSession(null)
       })
     }
 
@@ -120,6 +128,12 @@ export async function getSession(): Promise<Session | null> {
   const { data } = await client.auth.getSession()
   setUserFromSession(data.session)
   return data.session
+}
+
+export function onAuthStateChange(cb: (session: Session | null) => void): () => void {
+  const client = getSupabase()
+  const { data } = client.auth.onAuthStateChange((_event, session) => cb(session))
+  return () => data.subscription.unsubscribe()
 }
 
 export async function signOut(): Promise<void> {

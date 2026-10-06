@@ -127,6 +127,15 @@ describe('analyticsService', () => {
     expect(queued()).toHaveLength(0)
   })
 
+  it('stamps user_id when a Supabase session exists', async () => {
+    mockGetCurrentUserId.mockReturnValue('user-123')
+
+    analytics.track({ name: 'app_opened' })
+    await drain()
+
+    expect(sentRows(0)[0].user_id).toBe('user-123')
+  })
+
   it('does not duplicate the batch when a flush fails and is retried later', async () => {
     fetchMock.mockResolvedValueOnce(errResponse(500, 'XX000'))
 

@@ -58,6 +58,10 @@ Lap-row destructive icons use `bg-error/10 text-error` with strong-error hover; 
 ### Icons
 All icons use the `<Icon>` component from `components/Icon.tsx`. Never use raw `<span className="material-symbols-outlined">` directly.
 
+Settings begins with an Account section. Signed-out users can choose device persistence and start Google or development test login; it explains that existing data remains local until cloud sync is enabled. Signed-in users see their avatar or initials, account identity, unchanged-local-data copy, and a secondary sign-out action. Authentication controls handle offline Google login and inline failures without changing Coach Profile state.
+
+The desktop header shows a compact signed-in account indicator linking to Settings, using the profile avatar when available or a single initial fallback. It is omitted while auth is loading, when signed out, and from the mobile bottom navigation.
+
 **Props:**
 - `name: string` — Material Symbol name (e.g., `pool`, `search`, `edit`)
 - `size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl'` — default `md`
@@ -114,6 +118,13 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 - Public, indexable marketing page rendered outside `App Shell`. Own minimal header (logo + "Open app" → `/live`), hero with CTA, 6-card feature grid, 3-step "How it works", 5-question FAQ, closing CTA band, footer. Uses shared design tokens (`r-container`, `font-headline-*`, gradient hero pattern from CoachDashboard) and the `Icon` component.
 - Injects FAQ **JSON-LD** structured data (`FAQPage`) via an inline `<script type="application/ld+json">`.
 - Static copy only — no data-layer imports (pages here must not touch `db/`). Covered by `tests/landing.spec.ts`.
+
+### Auth callback (`/auth/callback`)
+- OAuth handoff screen rendered outside `Layout`, so it has no app header or mobile bottom navigation.
+- Shows a quiet `Signing in…` loading state while auth restoration settles.
+- Redirects signed-in users to `/settings`; OAuth cancellation/error query parameters also return directly to `/settings`.
+- Shows a short signed-out error with a `Back to Settings` link when no OAuth error is present.
+- Route metadata is non-indexable.
 
 ---
 

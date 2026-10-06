@@ -30,6 +30,9 @@ export default defineConfig([
         patterns: [{
           group: ['**/db/**'],
           message: 'Pages and components must not import from db/ directly. Use api/ or services/ instead.',
+        }, {
+          group: ['@supabase/supabase-js', '**/api/supabase'],
+          message: 'Pages and components must not import Supabase directly. Use api/auth or the Auth context.',
         }],
       }],
     },

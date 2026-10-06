@@ -3,6 +3,7 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useActiveRun } from '../hooks/useActiveRun';
 import { settingsService } from '../services/settingsService';
 import { Icon } from './Icon';
+import { AccountIndicator } from './AccountIndicator';
 
 const navItems = [
   { path: '/swimmers', label: 'Swimmers', icon: 'groups' },
@@ -61,6 +62,7 @@ export const Layout: React.FC = () => {
                 </Link>
               ))}
             </nav>
+            <AccountIndicator />
           </div>
         </div>
       </header>

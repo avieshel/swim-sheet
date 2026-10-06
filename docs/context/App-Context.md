@@ -96,7 +96,7 @@ SwimSheet/
 │   │   ├── api/            # API layer (unified Dexie + HTTP)
 │   │   ├── components/     # Shared UI components
 │   │   ├── constants/      # Shared constants (drill options, etc.)
-│   │   ├── context/        # React context (LiveSessionContext)
+│   │   ├── context/        # React context (AuthContext, LiveSessionContext)
 │   │   ├── db/             # Dexie schema + DAO (pure CRUD)
 │   │   ├── pages/          # Route page components
 │   │   │   └── live/       # ActiveRunView (live session runner) — split from LiveDeck
@@ -149,4 +149,4 @@ The server creates a fresh SQLite DB at runtime (`/app/data/data.db`) — it is 
 
 Development: run client (`npm run dev`) and server (`npm run dev`) separately. Client dev server proxies `/api` to server via Vite config.
 
-Supabase client config lives in a single gitignored root `.env` file (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`). Vite reads it via `envDir: '..'` in `client/vite.config.ts`; there are no `client/.env` or `supabase/.env` files. The value for `VITE_SUPABASE_ANON_KEY` is the Supabase **publishable** key (`sb_publishable_...`), never the secret key. CI reads the same values from GitHub Actions secrets (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
+Supabase client config is mode-specific at the repository root because `client/vite.config.ts` uses `envDir: '..'`: local Docker values live in the ignored `.env.development.local`, hosted local-production values may live in the ignored `.env.production.local`, and `.env.example` documents the required variables. The root `.env` contains no Supabase credentials. `client/src/config.ts` intentionally does not read Supabase configuration from localStorage, preventing stale hosted values from overriding the active Vite mode. The value for `VITE_SUPABASE_ANON_KEY` is the Supabase **publishable** key (`sb_publishable_...`), never the secret key. CI reads hosted values from GitHub Actions secrets (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`). `AuthProvider` wraps the application router, restores the Supabase session on startup, and exposes auth status, user, persistence preference, and auth actions through `useAuth`; it does not access Dexie. Supabase CLI runs `supabase/seed.sql` against the local Docker `postgres` database only — never against hosted projects (the CLI does not apply seed files to linked remote databases; hosted pushes use migrations via `supabase db push`). The seed creates a local-only `auth.users` row (`dev@swimsheet.local`) so the in-app dev test-user sign-in works after `npx supabase db reset`. The matching `public.profiles` row is created automatically by the existing `handle_new_user` trigger. This file intentionally has no runtime environment guard — it relies on the Supabase CLI's standard behavior (`db reset` local only, `db push` never runs seed).

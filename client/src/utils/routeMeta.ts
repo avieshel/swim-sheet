@@ -28,6 +28,7 @@ const staticRoutes: Record<string, RouteMeta> = {
   '/': appMeta('Live Deck', 'Live timing deck for running swim practices on deck, lap by lap.'),
   '/live': appMeta('Live Deck', 'Live timing deck for running swim practices on deck, lap by lap.'),
   '/about': landingMeta,
+  '/auth/callback': appMeta('Signing In', 'Completing sign-in.'),
   '/dashboard': appMeta('Coach Dashboard', 'Overview of recent sessions, runs, and roster activity.'),
   '/swimmers': appMeta('Swimmers', 'Manage your swimmer roster, groups, and notes.'),
   '/sessions': appMeta('Sessions', 'Build and organize swim practice session templates.'),

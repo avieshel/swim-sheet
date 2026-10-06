@@ -17,6 +17,12 @@ describe('resolveRouteMeta', () => {
     expect(meta.title).toContain('Live Deck')
   })
 
+  it('marks /auth/callback as an app route', () => {
+    const meta = resolveRouteMeta('/auth/callback')
+    expect(meta.index).toBe(false)
+    expect(meta.title).toContain('Signing In')
+  })
+
   it('strips trailing slashes before matching', () => {
     expect(resolveRouteMeta('/live/')).toEqual(resolveRouteMeta('/live'))
     expect(resolveRouteMeta('/about/')).toEqual(resolveRouteMeta('/about'))

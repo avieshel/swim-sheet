@@ -18,6 +18,8 @@ import { RunsHistory } from './pages/RunsHistory'
 import { RunDetail } from './pages/RunDetail'
 import { Events, analytics, isNewSession } from './services/analyticsEvents'
 import { testSupabaseConnection } from './api/supabase'
+import { AuthProvider } from './context/AuthProvider'
+import { AuthCallback } from './pages/AuthCallback'
 
 function App() {
   useEffect(() => {
@@ -27,10 +29,12 @@ function App() {
     void testSupabaseConnection()
   }, [])
   return (
-    <Router>
-      <RouteMeta />
-      <Routes>
+    <AuthProvider>
+      <Router>
+        <RouteMeta />
+        <Routes>
         <Route path="/about" element={<Landing />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<Layout />}>
           <Route path="/" element={<LiveDeck />} />
           <Route path="/dashboard" element={<CoachDashboard />} />
@@ -47,9 +51,10 @@ function App() {
           <Route path="/runs/:id" element={<RunDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-      </Routes>
-      <UpdatePrompt />
-    </Router>
+        </Routes>
+        <UpdatePrompt />
+      </Router>
+    </AuthProvider>
   )
 }
 

@@ -922,3 +922,13 @@ Adopted from platform practices: single typed tracking plan (Segment/Amplitude s
 
 **Priority**: Medium
 **Status**: Implemented — pending remote migration application; `npm run check` green.
+
+---
+
+## Cloud login: OAuth callback route ✅
+
+Added identity-only `/auth/callback` outside the app `Layout` for the Supabase/Google login handoff. The route waits for auth restoration before redirecting signed-in users to `/settings`, replaces only known `access_denied` cancellation responses (query or hash) with a return to Settings, and shows a short error with a back link for other OAuth failures. It is marked noindex and has explicit SPA fallback entries. Background Supabase session restoration also handles rejection without an unhandled promise.
+
+**Files modified**: `client/src/pages/AuthCallback.tsx`, `client/src/pages/__tests__/AuthCallback.test.tsx`, `client/src/api/supabase.ts`, `client/src/App.tsx`, `client/src/utils/routeMeta.ts`, `client/src/utils/routeMeta.test.ts`, `client/public/_redirects`.
+
+**Status**: Done — focused callback and route metadata tests pass.
