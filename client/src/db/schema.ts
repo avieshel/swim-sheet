@@ -13,10 +13,10 @@ export interface Swimmer {
 
 export interface Session {
   id: string
+  assignedTo?: string | null
   name: string
   notes: string
   visibility?: 'private' | 'organization'
-  assignedTo?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -42,6 +42,8 @@ export interface Drill {
   id: string
   session_id: string
   name: string
+  stroke: string
+  distance: number
   order: number
   items: DrillItem[]
   repeatCount: number
@@ -49,8 +51,6 @@ export interface Drill {
   focus: 'technique' | 'fitness' | 'none'
   labels: string[]
   description: string
-  stroke: string
-  distance: number
   createdAt: string
   updatedAt: string
 }
@@ -73,6 +73,7 @@ export interface SessionRun {
 export interface RunDrill {
   id: string
   run_id: string
+  parent_drill_id?: string
   name: string
   stroke: string
   distance: number
@@ -81,7 +82,6 @@ export interface RunDrill {
   instructions?: string
   interval?: string
   equipment?: string[]
-  parent_drill_id?: string
   createdAt: string
   updatedAt: string
 }

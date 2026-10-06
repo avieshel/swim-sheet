@@ -9,6 +9,8 @@
 -- IF NOT EXISTS so a re-run on an already-applied fresh DB will not error on
 -- those; policies assume a fresh apply.
 --
+-- Column order: id → FKs → ownership → domain → status → created_at, updated_at, deleted_at
+--
 -- Structure:
 --   profiles (1:1 with auth.users)
 --   organizations (tenant root)
@@ -39,8 +41,8 @@ create table if not exists profiles (
 -- ── 2. Organizations (tenant root) ──────────────────────────────────────
 create table if not exists organizations (
   id uuid primary key default gen_random_uuid(),
-  name text not null,
   created_by uuid references profiles(id),
+  name text not null,
   created_at timestamptz default now(),
   updated_at timestamptz not null default now()
 );
@@ -87,13 +89,13 @@ create table if not exists feature_toggles (
 create table if not exists organization_invites (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
+  created_by uuid references profiles(id) on delete set null,
   code text not null unique,
   role_name text not null default 'coach',
-  created_by uuid references profiles(id) on delete set null,
-  created_at timestamptz not null default now(),
   expires_at timestamptz,
   used_by uuid references profiles(id) on delete set null,
-  used_at timestamptz
+  used_at timestamptz,
+  created_at timestamptz not null default now()
 );
 create index if not exists idx_organization_invites_organization_id on organization_invites(organization_id);
 
@@ -102,12 +104,12 @@ create table if not exists swimmers (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
   user_id uuid references profiles(id) on delete set null,
+  created_by uuid references profiles(id) on delete set null,
   name text not null,
   group_name text,
   notes text,
   labels jsonb,
   status text default 'active',
-  created_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
@@ -118,11 +120,11 @@ create table if not exists sessions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
   created_by uuid references profiles(id) on delete cascade,
+  assigned_to uuid references profiles(id) on delete set null,
   name text not null,
   notes text,
-  visibility text not null default 'private',
-  assigned_to uuid references profiles(id) on delete set null,
   pool_length integer default 25,
+  visibility text not null default 'private',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
@@ -192,6 +194,7 @@ create table if not exists run_drills (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references organizations(id) on delete cascade,
   run_id uuid not null references session_runs(id) on delete cascade,
+  parent_drill_id uuid,
   created_by uuid references profiles(id) on delete set null,
   name text not null,
   stroke text not null default '',
@@ -201,7 +204,6 @@ create table if not exists run_drills (
   instructions text,
   interval text,
   equipment jsonb,
-  parent_drill_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
@@ -260,26 +262,26 @@ create index if not exists idx_laps_swimmer_id on laps(swimmer_id);
 -- ── 7. Analytics events (telemetry sink) ────────────────────────────────
 create table if not exists analytics_events (
   id uuid primary key default gen_random_uuid(),
+  event_id uuid,
   user_id uuid references auth.users(id) on delete set null,
   device_id text not null,
+  session_id uuid,
   event_name text not null,
   properties jsonb not null default '{}',
   app_version text,
   platform text,
-  created_at timestamptz default now(),
-  session_id uuid,
+  timezone text,
   timestamp bigint,
   device_created_tstamp bigint,
   device_sent_tstamp bigint,
   device_local_tstamp bigint,
-  timezone text,
-  event_id uuid,
   device_country text,
   device_language text,
   device_os text,
   device_type text,
   device_screen text,
-  device_connection text
+  device_connection text,
+  created_at timestamptz default now()
 );
 create index if not exists idx_analytics_events_device_session on analytics_events (device_id, session_id);
 create index if not exists idx_analytics_events_timestamp on analytics_events (timestamp);

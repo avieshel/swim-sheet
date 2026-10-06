@@ -62,6 +62,9 @@ Drills have evolved beyond simple name/stroke/distance:
 - Client: camelCase (`groupId`, `poolLength`, `updatedAt`)
 - Server: snake_case (`group_id`, `pool_length`, `updated_at`)
 
+### Column order
+Tables and TypeScript interfaces follow: `id` → FKs → ownership → domain attributes → status/flags → `created_at`, `updated_at`, `deleted_at`. Keep that audit trailer together, with `deleted_at` last.
+
 ---
 
 ## Data Model
@@ -112,9 +115,11 @@ Reusable training plan blueprint.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
+| `assignedTo` | `assigned_to` | string/TEXT | Optional coach profile id |
 | `name` | `name` | string/TEXT | Required |
 | `poolLength` | `pool_length` | number/INTEGER | Default pool length in meters |
 | `notes` | `notes` | string/TEXT | Optional |
+| `visibility` | `visibility` | 'private' \| 'organization'/TEXT | Default 'private' |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
@@ -163,6 +168,7 @@ Snapshot of a Drill at the time a SessionRun starts.
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
 | `run_id` | `run_id` | string/TEXT | FK → SessionRun |
+| `parent_drill_id` | `parent_drill_id` | string/TEXT | Optional FK → source drill for repeated reps |
 | `name` | `name` | string/TEXT | Snapshot of drill name |
 | `stroke` | `stroke` | string/TEXT | Snapshot of drill stroke |
 | `distance` | `distance` | number/INTEGER | Snapshot of drill distance |
