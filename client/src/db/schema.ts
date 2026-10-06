@@ -15,7 +15,7 @@ export interface Session {
   id: string
   name: string
   notes: string
-  visibility?: 'private' | 'school'
+  visibility?: 'private' | 'organization'
   assignedTo?: string | null
   createdAt: string
   updatedAt: string

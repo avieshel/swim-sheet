@@ -19,6 +19,7 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
+    envDir: '..',
     define: {
       __APP_VERSION__: JSON.stringify(pkg.version),
       'import.meta.env.VITE_GIT_COMMIT': JSON.stringify(getGitCommit()),

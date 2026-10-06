@@ -19,14 +19,14 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 | Case | Mechanism |
 |------|-----------|
 | Solo coach, multiple groups (masters vs private lessons) | `swimmers.group` (primary bucket) + optional `swimmers.labels[]` (multi-tags). **Not** a separate swim school. |
-| Shared swim school / head coach distributing work | `swim_schools` + `school_memberships` + roles. Head coach = `swim_school_owner` (full + distribute). Coaches = `swim_coach`. |
-| Share or withhold a session | `sessions.visibility`: `private` (default; creator + owner only) \| `school` (all school members can view/use). |
+| Shared organization / head coach distributing work | `organizations` + `organization_memberships` + roles. Head coach = `owner` (full + distribute). Coaches = `coach`. |
+| Share or withhold a session | `sessions.visibility`: `private` (default; creator + owner only) \| `organization` (all organization members can view/use). |
 | Distribute weekly sessions to a coach | `sessions.assigned_to` (profile id). Assignment implies visibility for that coach. |
-| Track weekly load / student totals | `session_runs.school_id` (+ per-swimmer links) once results sync ships; aggregates are school-scoped. |
+| Track weekly load / student totals | `session_runs.organization_id` (+ per-swimmer links) once results sync ships; aggregates are organization-scoped. |
 
-**Local-first:** PWA keeps working with no account. A default local school is created for tagging; login **claims** local schools into Supabase (same UUID). Sync/collab only for claimed schools.
+**Local-first:** PWA keeps working with no account. A default local organization is created for tagging; login **claims** local organizations into Supabase (same UUID). Sync/collab only for claimed organizations.
 
-**RLS:** domain rows always scoped by `school_id` + membership. Session SELECT allows `visibility = 'school'` OR creator OR `assigned_to` OR `school:manage`. Deletes remain owner-only.
+**RLS:** domain rows always scoped by `organization_id` + membership. Session SELECT allows `visibility = 'organization'` OR creator OR `assigned_to` OR `organization:manage`. Deletes remain owner-only.
 
 ### Session → SessionRun (Template/Instance) Pattern
 - `Session` is a reusable template with drills

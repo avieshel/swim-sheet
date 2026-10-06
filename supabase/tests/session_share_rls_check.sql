@@ -3,15 +3,15 @@
 
 begin;
 
-delete from sessions where school_id in (
+delete from sessions where organization_id in (
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 );
-delete from swimmers where school_id in (
+delete from swimmers where organization_id in (
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 );
-delete from school_memberships where school_id in (
+delete from organization_memberships where organization_id in (
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 );
@@ -20,70 +20,70 @@ delete from role_permissions where role_id in (
   'aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 );
-delete from school_roles where id in (
+delete from organization_roles where id in (
   'aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 );
-delete from swim_schools where id in (
+delete from organizations where id in (
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 );
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at) values
-  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner@school-a.test', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'coach@school-a.test', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
-  ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'coach@school-b.test', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
+  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner@org-a.test', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'coach@org-a.test', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'coach@org-b.test', crypt('password', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
 on conflict (id) do nothing;
 
 insert into profiles (id, email, full_name) values
-  ('11111111-1111-1111-1111-111111111111', 'owner@school-a.test', 'Owner A'),
-  ('22222222-2222-2222-2222-222222222222', 'coach@school-a.test', 'Coach A'),
-  ('33333333-3333-3333-3333-333333333333', 'coach@school-b.test', 'Coach B')
+  ('11111111-1111-1111-1111-111111111111', 'owner@org-a.test', 'Owner A'),
+  ('22222222-2222-2222-2222-222222222222', 'coach@org-a.test', 'Coach A'),
+  ('33333333-3333-3333-3333-333333333333', 'coach@org-b.test', 'Coach B')
 on conflict (id) do nothing;
 
-insert into swim_schools (id, name, created_by) values
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'School A', '11111111-1111-1111-1111-111111111111'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'School B', '33333333-3333-3333-3333-333333333333')
+insert into organizations (id, name, created_by) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Org A', '11111111-1111-1111-1111-111111111111'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Org B', '33333333-3333-3333-3333-333333333333')
 on conflict (id) do nothing;
 
-insert into school_roles (id, school_id, name, description) values
-  ('aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'swim_school_owner', 'School owner'),
-  ('aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'swim_coach', 'Full coach'),
-  ('bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'swim_school_owner', 'School owner')
+insert into organization_roles (id, organization_id, name, description) values
+  ('aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'owner', 'Organization owner'),
+  ('aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'coach', 'Full coach'),
+  ('bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'owner', 'Organization owner')
 on conflict do nothing;
 
 insert into role_permissions (role_id, permission_id)
 select r.id, p.id
-from school_roles r
+from organization_roles r
 cross join permissions p
-where (r.school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and r.name = 'swim_school_owner')
-   or (r.school_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' and r.name = 'swim_school_owner')
+where (r.organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and r.name = 'owner')
+   or (r.organization_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' and r.name = 'owner')
 on conflict do nothing;
 
--- Coach A: session create/edit, swimmer view/create/edit, sync — no deletes, no school:manage
+-- Coach A: session create/edit, swimmer view/create/edit, sync — no deletes, no organization:manage
 insert into role_permissions (role_id, permission_id)
 select 'aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa', p.id
 from (values
   ('session:create'), ('session:edit'), ('drill:create'), ('drill:edit'),
-  ('library:manage'), ('swimmer:create'), ('swimmer:edit'), ('swimmer:view_school'), ('sync:use')
+  ('library:manage'), ('swimmer:create'), ('swimmer:edit'), ('swimmer:view_organization'), ('sync:use')
 ) as t(permission_id)
 join permissions p on p.id = t.permission_id
 on conflict do nothing;
 
-insert into school_memberships (user_id, school_id, role_id) values
+insert into organization_memberships (user_id, organization_id, role_id) values
   ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
   ('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
   ('33333333-3333-3333-3333-333333333333', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'bbbbbbb1-bbbb-bbbb-bbbb-bbbbbbbbbbbb')
-on conflict (user_id, school_id) do nothing;
+on conflict (user_id, organization_id) do nothing;
 
-insert into sessions (id, school_id, name, visibility, assigned_to, created_by) values
+insert into sessions (id, organization_id, name, visibility, assigned_to, created_by) values
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Private session', 'private', null, '11111111-1111-1111-1111-111111111111'),
-  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Shared session', 'school', null, '11111111-1111-1111-1111-111111111111'),
+  ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Shared session', 'organization', null, '11111111-1111-1111-1111-111111111111'),
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Assigned session', 'private', '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111')
 on conflict (id) do nothing;
 
-insert into swimmers (id, school_id, name, group_name, labels, created_by) values
+insert into swimmers (id, organization_id, name, group_name, labels, created_by) values
   ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Masters Swimmer', 'masters', '["masters","private-lessons"]', '11111111-1111-1111-1111-111111111111')
 on conflict (id) do nothing;
 
@@ -105,51 +105,51 @@ end $$;
 
 set local role authenticated;
 
--- Coach A: member of School A
+-- Coach A: member of Org A
 select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
 do $$
 declare n bigint;
 begin
-  select count(*) into n from sessions where school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  select count(*) into n from sessions where organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   if n <> 2 then
-    raise exception 'coach A expected 2 visible sessions (school+assigned), got %', n;
+    raise exception 'coach A expected 2 visible sessions (organization+assigned), got %', n;
   end if;
   if exists (select 1 from sessions where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc') then
     raise exception 'coach A should not see owner private session';
   end if;
   if not exists (select 1 from sessions where id = 'dddddddd-dddd-dddd-dddd-dddddddddddd') then
-    raise exception 'coach A missing school-visible session';
+    raise exception 'coach A missing organization-visible session';
   end if;
   if not exists (select 1 from sessions where id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee') then
     raise exception 'coach A missing assigned session';
   end if;
 
-  select count(*) into n from sessions where school_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  select count(*) into n from sessions where organization_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
   if n <> 0 then
     raise exception 'coach A leaked cross-tenant sessions: %', n;
   end if;
 
   if not exists (
     select 1 from swimmers
-    where school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    where organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
       and labels::text like '%private-lessons%'
   ) then
     raise exception 'coach A missing swimmer labels';
   end if;
 end $$;
 
--- Coach B: other school
+-- Coach B: other organization
 select set_config('request.jwt.claim.sub', '33333333-3333-3333-3333-333333333333', true);
 do $$
 declare n bigint;
 begin
-  select count(*) into n from sessions where school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  select count(*) into n from sessions where organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   if n <> 0 then
-    raise exception 'coach B leaked School A sessions: %', n;
+    raise exception 'coach B leaked Org A sessions: %', n;
   end if;
-  select count(*) into n from swimmers where school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  select count(*) into n from swimmers where organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   if n <> 0 then
-    raise exception 'coach B leaked School A swimmers: %', n;
+    raise exception 'coach B leaked Org A swimmers: %', n;
   end if;
 end $$;
 
@@ -158,7 +158,7 @@ select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111
 do $$
 declare n bigint;
 begin
-  select count(*) into n from sessions where school_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  select count(*) into n from sessions where organization_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   if n <> 3 then
     raise exception 'owner A expected 3 sessions, got %', n;
   end if;

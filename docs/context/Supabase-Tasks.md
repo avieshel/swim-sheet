@@ -26,9 +26,9 @@ Initialize Supabase locally using Docker, create the core database schema mirror
 ### Instructions for Agent
 1. Run `npx supabase init` and `npx supabase start` to boot local Docker containers.
 2. Create migration file `supabase/migrations/20260925000000_initial_schema.sql` containing:
-   - `swim_schools` table
-   - `school_memberships` table with roles (`owner`, `head_coach`, `assistant_coach`)
-   - `swimmers`, `sessions`, `drills`, `session_runs`, `run_drills`, `run_swimmers`, `lane_drill_results` referencing `school_id` and `user_id`.
+   - `organizations` table
+   - `organization_memberships` table with roles (`owner`, `coach`, `collaborator`)
+   - `swimmers`, `sessions`, `drills`, `session_runs`, `run_drills`, `run_swimmers`, `lane_drill_results` referencing `organization_id` and `user_id`.
    - `analytics_events` table for user telemetry.
    - `llm_usage` table for tracking token costs.
 3. Enable RLS on all tables and write strict access policies.
@@ -98,14 +98,14 @@ Create a Supabase Edge Function (`session-copilot`) that exposes conversational 
 
 ---
 
-## Task 6: Swim School Multi-Coach Sharing
+## Task 6: Organization Multi-Coach Sharing
 
 ### Objective
-Implement multi-tenant Swim School creation, coach role invitations, and RLS-enforced shared access to swimmers, session templates, and analytics.
+Implement multi-tenant Organization creation, coach role invitations, and RLS-enforced shared access to swimmers, session templates, and analytics.
 
 ### Instructions for Agent
-1. Create `client/src/pages/SwimSchoolSettings.tsx`:
-   - UI to create a "Swim School" organization or join via invite code.
-   - Manage collaborator roles (`owner`, `head_coach`, `assistant_coach`).
-2. Update DAO and API wrappers to filter queries by `school_id` when Cloud Mode and School membership are active.
-3. Verify RLS policies in Supabase ensure coaches can only read/write swimmers and sessions belonging to their shared school.
+1. Create `client/src/pages/OrganizationSettings.tsx`:
+   - UI to create an "Organization" or join via invite code.
+   - Manage collaborator roles (`owner`, `coach`, `collaborator`).
+2. Update DAO and API wrappers to filter queries by `organization_id` when Cloud Mode and Organization membership are active.
+3. Verify RLS policies in Supabase ensure coaches can only read/write swimmers and sessions belonging to their shared organization.

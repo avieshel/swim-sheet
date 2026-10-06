@@ -148,3 +148,5 @@ Single Docker container (see `Dockerfile`):
 The server creates a fresh SQLite DB at runtime (`/app/data/data.db`) — it is empty on boot. The local dev DB under `server/data/` (which may contain previous session data) is excluded from the Docker build context via `.dockerignore`, so it can never be baked into a downloaded image. Client data is never bundled either; the only static data shipped is builtin drill/session catalog templates.
 
 Development: run client (`npm run dev`) and server (`npm run dev`) separately. Client dev server proxies `/api` to server via Vite config.
+
+Supabase client config lives in a single gitignored root `.env` file (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`). Vite reads it via `envDir: '..'` in `client/vite.config.ts`; there are no `client/.env` or `supabase/.env` files. The value for `VITE_SUPABASE_ANON_KEY` is the Supabase **publishable** key (`sb_publishable_...`), never the secret key. CI reads the same values from GitHub Actions secrets (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`).
