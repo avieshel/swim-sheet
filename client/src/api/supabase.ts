@@ -132,6 +132,7 @@ export async function getSession(): Promise<Session | null> {
 
 export function onAuthStateChange(cb: (session: Session | null) => void): () => void {
   const client = getSupabase()
+  if (!client.auth?.onAuthStateChange) return () => {}
   const { data } = client.auth.onAuthStateChange((_event, session) => cb(session))
   return () => data.subscription.unsubscribe()
 }
