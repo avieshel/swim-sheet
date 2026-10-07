@@ -31,7 +31,14 @@ export interface SyncConflict {
   remoteRev: string
 }
 
-export type SyncPhase = 'idle' | 'initializing' | 'pushing' | 'pulling' | 'ready' | 'error'
+export type SyncPhase =
+  | 'idle'
+  | 'initializing'
+  | 'pushing'
+  | 'pulling'
+  | 'ready'
+  | 'error'
+  | 'needs_first_merge'
 
 export type SyncErrorKind = 'offline' | 'auth' | 'conflict' | 'validation' | 'unexpected'
 
@@ -48,6 +55,7 @@ export interface SyncState {
   inFlight: boolean
   error: SyncError | null
   conflicts: SyncConflict[]
+  firstMergeSummary?: FirstMergeSummary | null
 }
 
 export interface SyncResult {
