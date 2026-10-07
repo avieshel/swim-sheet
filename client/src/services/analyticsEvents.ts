@@ -169,6 +169,28 @@ export const Events = {
     name: 'lap_recorded',
     properties: { lane, swimmer_count: swimmerCount },
   }),
+  AppSettings: (
+    action:
+      | 'sign_in'
+      | 'sign_out'
+      | 'sync'
+      | 'clear_data'
+      | 'set_equipment'
+      | 'set_pool_length'
+      | 'set_team_names'
+      | 'set_coach_name'
+      | 'backup_exported'
+      | 'backup_imported'
+      | 'cleanup_run'
+      | 'reset_settings'
+      | 'request_persist'
+      | 'set_data_retention'
+      | 'toggle_notifications',
+    extra?: Record<string, unknown>
+  ): TrackedEvent => ({
+    name: 'app_settings',
+    properties: { action, ...(extra ?? {}) },
+  }),
 }
 
 export { analytics, isNewSession } from './analyticsService'

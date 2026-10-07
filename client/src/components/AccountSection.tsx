@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { canUseTestLogin } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
+import { Events, analytics } from '../services/analyticsEvents'
 import { Icon } from './Icon'
 
 function initials(name: string | undefined, email: string | undefined): string {
@@ -26,11 +27,16 @@ export function AccountSection() {
     }
   }, [])
 
-  const runAuthAction = async (action: () => Promise<void>, message: string) => {
+  const runAuthAction = async (
+    action: () => Promise<void>,
+    message: string,
+    successEvent?: () => void
+  ) => {
     setBusy(true)
     setError(null)
     try {
       await action()
+      successEvent?.()
     } catch {
       setError(message)
     } finally {
@@ -64,7 +70,11 @@ export function AccountSection() {
             </div>
             <button
               type="button"
-              onClick={() => void runAuthAction(signOut, "Couldn't sign out. Please try again.")}
+              onClick={() =>
+                void runAuthAction(signOut, "Couldn't sign out. Please try again.", () =>
+                  analytics.track(Events.AppSettings('sign_out'))
+                )
+              }
               disabled={busy}
               className="shrink-0 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-xl hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none"
             >
@@ -89,7 +99,11 @@ export function AccountSection() {
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
-                onClick={() => void runAuthAction(signInWithGoogle, "Couldn't sign in. Please try again.")}
+                onClick={() =>
+                  void runAuthAction(signInWithGoogle, "Couldn't sign in. Please try again.", () =>
+                    analytics.track(Events.AppSettings('sign_in', { method: 'google' }))
+                  )
+                }
                 disabled={busy || !online}
                 className="flex-1 h-11 bg-primary text-on-primary font-bold px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none"
               >
@@ -98,7 +112,11 @@ export function AccountSection() {
               {canUseTestLogin() && (
                 <button
                   type="button"
-                  onClick={() => void runAuthAction(signInAsTestUser, "Couldn't sign in. Please try again.")}
+                  onClick={() =>
+                    void runAuthAction(signInAsTestUser, "Couldn't sign in. Please try again.", () =>
+                      analytics.track(Events.AppSettings('sign_in', { method: 'test' }))
+                    )
+                  }
                   disabled={busy}
                   className="h-11 bg-surface-variant text-on-surface-variant font-bold px-4 rounded-xl hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none"
                 >

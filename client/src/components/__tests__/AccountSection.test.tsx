@@ -18,6 +18,18 @@ const mockDexieApis = vi.hoisted(() => ({
   deleteSession: vi.fn(),
 }))
 
+const mockAnalytics = vi.hoisted(() => ({
+  analytics: { track: vi.fn() },
+  Events: {
+    AppSettings: vi.fn((action: string, extra?: Record<string, unknown>) => ({
+      name: 'app_settings',
+      properties: { action, ...(extra ?? {}) },
+    })),
+  },
+}))
+
+vi.mock('../../services/analyticsEvents', () => mockAnalytics)
+
 vi.mock('../../api/auth', () => mockAuth)
 vi.mock('../../api/authStorage', () => ({
   isPersistEnabled: vi.fn(() => true),
@@ -106,5 +118,48 @@ describe('AccountSection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in as test user' }))
     expect(await screen.findByText(/couldn't sign in/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /Continue with Google/i })).toHaveProperty('disabled', false)
+  })
+
+  it('tracks app_settings sign_in with method google when Google sign-in succeeds', async () => {
+    renderAccount()
+    fireEvent.click(await screen.findByRole('button', { name: /Continue with Google/i }))
+    await waitFor(() => expect(mockAuth.signInWithGoogle).toHaveBeenCalled())
+    expect(mockAnalytics.analytics.track).toHaveBeenCalledWith({
+      name: 'app_settings',
+      properties: { action: 'sign_in', method: 'google' },
+    })
+  })
+
+  it('tracks app_settings sign_in with method test when test sign-in succeeds', async () => {
+    renderAccount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in as test user' }))
+    await waitFor(() => expect(mockAuth.signInAsTestUser).toHaveBeenCalled())
+    expect(mockAnalytics.analytics.track).toHaveBeenCalledWith({
+      name: 'app_settings',
+      properties: { action: 'sign_in', method: 'test' },
+    })
+  })
+
+  it('tracks app_settings sign_out when sign-out succeeds', async () => {
+    mockAuth.restoreSession.mockResolvedValue({
+      id: 'u1',
+      email: 'coach@gmail.com',
+      user_metadata: { full_name: 'Coach' },
+    })
+    renderAccount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(mockAuth.signOut).toHaveBeenCalled())
+    expect(mockAnalytics.analytics.track).toHaveBeenCalledWith({
+      name: 'app_settings',
+      properties: { action: 'sign_out' },
+    })
+  })
+
+  it('does not track app_settings when sign-in fails', async () => {
+    mockAuth.signInWithGoogle.mockRejectedValue(new Error('oauth failed'))
+    renderAccount()
+    fireEvent.click(await screen.findByRole('button', { name: /Continue with Google/i }))
+    await screen.findByText(/couldn't sign in/i)
+    expect(mockAnalytics.analytics.track).not.toHaveBeenCalled()
   })
 })

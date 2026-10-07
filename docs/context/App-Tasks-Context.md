@@ -932,3 +932,15 @@ Added identity-only `/auth/callback` outside the app `Layout` for the Supabase/G
 **Files modified**: `client/src/pages/AuthCallback.tsx`, `client/src/pages/__tests__/AuthCallback.test.tsx`, `client/src/api/supabase.ts`, `client/src/App.tsx`, `client/src/utils/routeMeta.ts`, `client/src/utils/routeMeta.test.ts`, `client/public/_redirects`.
 
 **Status**: Done — focused callback and route metadata tests pass.
+
+---
+
+## A-054: `app_settings` analytics event for Settings & Account actions ✅
+
+**Source**: User request — track observable user actions in the Settings page (not personal preferences). Single event family `app_settings` with closed-set `action` property mapping to backend Settings module.
+
+Added `Events.AppSettings(action, extra)` factory to `client/src/services/analyticsEvents.ts` (15 actions: `sign_in`, `sign_out`, `sync`, `clear_data`, `set_equipment`, `set_pool_length`, `set_team_names`, `set_coach_name`, `backup_exported`, `backup_imported`, `cleanup_run`, `reset_settings`, `request_persist`, `set_data_retention`, `toggle_notifications`). Wired at success paths in `Settings.tsx` (with 500ms debounce for text/numeric inputs: `coach_name`, `sync_interval`, `data_retention`) and `AccountSection.tsx` (sign-in/sign-out via `runAuthAction` success branch). Excludes personal preferences (theme, font size, language, keep-me-signed-in). `set_equipment` carries the full list of items; success-only tracking for actions that can fail (export, import, cleanup, persist request).
+
+**Files modified**: `client/src/services/analyticsEvents.ts`, `client/src/pages/Settings.tsx`, `client/src/components/AccountSection.tsx`, `client/src/components/__tests__/AccountSection.test.tsx` (4 new cases), `client/src/pages/__tests__/Settings.test.tsx` (new — 6 cases), `docs/context/UI-Context.md`.
+
+**Status**: Done — `npm run check` green (lint + tsc + knip + 430 vitest).

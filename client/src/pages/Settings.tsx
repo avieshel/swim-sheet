@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, exportDatabase, importDatabase, getBackupInfo, getStoragePersistence, requestStoragePersistence, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
@@ -9,6 +9,9 @@ import { ResetDataDialog } from '../components/ResetDataDialog'
 import { InfoDialog } from '../components/InfoDialog'
 import { Icon } from '../components/Icon'
 import { AccountSection } from '../components/AccountSection'
+import { Events, analytics } from '../services/analyticsEvents'
+
+type AppSettingsAction = Parameters<typeof Events.AppSettings>[0]
 
 interface SettingsForm {
   team_name: string
@@ -89,6 +92,19 @@ export const Settings: React.FC = () => {
     return () => { document.body.style.overflow = '' }
   }, [showResetConfirm])
 
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const trackDebounced = (key: string, action: AppSettingsAction, extra: Record<string, unknown>) => {
+    const existing = debounceTimers.current[key]
+    if (existing) clearTimeout(existing)
+    debounceTimers.current[key] = setTimeout(() => {
+      analytics.track(Events.AppSettings(action, extra))
+      delete debounceTimers.current[key]
+    }, 500)
+  }
+  useEffect(() => () => {
+    Object.values(debounceTimers.current).forEach(clearTimeout)
+  }, [])
+
   useEffect(() => {
     getSettings().then(data => {
       const pl = data.pool_length || 25
@@ -143,12 +159,14 @@ export const Settings: React.FC = () => {
     void updateSettings({ team_names: updated })
     setNewTeamName('')
     setSuggestions([])
+    analytics.track(Events.AppSettings('set_team_names', { count: updated.length }))
   }
 
   const handleTeamNameRemove = (item: string) => {
     const updated = form.team_names.filter(i => i !== item)
     setForm(prev => ({ ...prev, team_names: updated }))
     void updateSettings({ team_names: updated })
+    analytics.track(Events.AppSettings('set_team_names', { count: updated.length }))
   }
 
   const handleCoachNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,6 +174,7 @@ export const Settings: React.FC = () => {
     setForm(prev => ({ ...prev, coach_name: val }))
     void updateSettings({ coach_name: val })
     setSuggestions(suggestTeamNames(val))
+    trackDebounced('coach_name', 'set_coach_name', { length: val.length })
   }
 
   const handleEquipAdd = () => {
@@ -165,17 +184,20 @@ export const Settings: React.FC = () => {
     setEquipmentItems(updated)
     setEquipmentOptions(updated)
     setNewEquipName('')
+    analytics.track(Events.AppSettings('set_equipment', { items: updated }))
   }
 
   const handleEquipRemove = (item: string) => {
     const updated = equipmentItems.filter(i => i !== item)
     setEquipmentItems(updated)
     setEquipmentOptions(updated)
+    analytics.track(Events.AppSettings('set_equipment', { items: updated }))
   }
 
   const handleEquipReset = () => {
     setEquipmentItems(DEFAULT_EQUIPMENT)
     setEquipmentOptions(DEFAULT_EQUIPMENT)
+    analytics.track(Events.AppSettings('set_equipment', { items: DEFAULT_EQUIPMENT }))
   }
 
   const formatBytes = (bytes: number) => {
@@ -192,6 +214,7 @@ export const Settings: React.FC = () => {
       setCleanupMsg(`Cleaned up ${deleted} old session(s)`)
       const info = await estimateDbSize()
       setStorageInfo(info)
+      analytics.track(Events.AppSettings('cleanup_run', { deleted }))
     } catch (err) {
       setCleanupMsg('Cleanup failed: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
@@ -208,6 +231,7 @@ export const Settings: React.FC = () => {
       const date = new Date().toISOString().slice(0, 10)
       downloadBlob(blob, `swimsheet-backup-${date}.json`)
       setBackupInfo(getBackupInfo())
+      analytics.track(Events.AppSettings('backup_exported', { bytes: blob.size }))
     } catch (err) {
       setBackupMsg('Export failed: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
@@ -230,6 +254,7 @@ export const Settings: React.FC = () => {
     try {
       const json = await importFile.text()
       await importDatabase(json)
+      analytics.track(Events.AppSettings('backup_imported', { bytes: json.length }))
       setShowImportConfirm(false)
       window.location.reload()
     } catch (err) {
@@ -243,6 +268,7 @@ export const Settings: React.FC = () => {
     const granted = await requestStoragePersistence()
     setPersistenceGranted(granted)
     setBackupMsg(granted ? 'Storage protection enabled' : 'Storage protection was not granted')
+    analytics.track(Events.AppSettings('request_persist', { granted }))
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -253,10 +279,13 @@ export const Settings: React.FC = () => {
     }))
     if (name === 'sync_interval') {
       void updateSettings({ sync_interval: Number(value) })
+      trackDebounced('sync_interval', 'sync', { sync_interval_ms: Number(value) })
     } else if (name === 'notification_enabled') {
       void updateSettings({ notification_enabled: (e.target as HTMLInputElement).checked })
+      analytics.track(Events.AppSettings('toggle_notifications', { enabled: (e.target as HTMLInputElement).checked }))
     } else if (name === 'data_retention_days') {
       void updateSettings({ data_retention_days: Number(value) })
+      trackDebounced('data_retention', 'set_data_retention', { data_retention_days: Number(value) })
     } else if (name === 'font_size') {
       void updateSettings({ font_size: value })
     }
@@ -269,6 +298,7 @@ export const Settings: React.FC = () => {
 
   const handleReset = async () => {
     await resetSettings()
+    analytics.track(Events.AppSettings('reset_settings'))
     setForm({
       team_name: '',
       coach_name: '',
@@ -408,6 +438,7 @@ export const Settings: React.FC = () => {
                         setPoolLengthValue(s)
                         setForm(prev => ({ ...prev, pool_length: s }))
                         updateSettings({ pool_length: v })
+                        analytics.track(Events.AppSettings('set_pool_length', { pool_length: v }))
                       }}
                       className={`h-9 md:h-10 px-4 rounded-xl text-label-sm font-bold transition-all cursor-pointer border ${
                         Number(poolLengthValue) === v && poolLengthValue === String(v)
@@ -437,6 +468,7 @@ export const Settings: React.FC = () => {
                           setPoolLengthValue(val)
                           setForm(prev => ({ ...prev, pool_length: val }))
                           updateSettings({ pool_length: num })
+                          analytics.track(Events.AppSettings('set_pool_length', { pool_length: num }))
                         }
                       }}
                       className={`w-20 px-2 py-2 bg-transparent text-sm tabular-nums text-center outline-none border-none ${
@@ -758,6 +790,7 @@ export const Settings: React.FC = () => {
           onConfirm={() => {
             setShowResetDataDialog(false)
             setCleanupMsg('Data has been reset')
+            analytics.track(Events.AppSettings('clear_data'))
             estimateDbSize().then(setStorageInfo)
             setTimeout(() => navigate('/'), 1000)
           }}
