@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { RunDrillStroke, Stroke } from '../types/swimming'
-import { migrateLegacyRecord } from './recordMigration'
+import { migrateLegacyRecord, normalizeLegacyBackupTables } from './recordMigration'
 
 export interface Swimmer {
   id: string
@@ -328,11 +328,12 @@ export async function createBackupPayload(): Promise<BackupPayload> {
 }
 
 export async function restoreAllTables(tables: Record<string, unknown[]>): Promise<void> {
-  const targets = db.tables.filter(t => !t.name.startsWith('_') && tables[t.name])
+  const normalizedTables = normalizeLegacyBackupTables(tables)
+  const targets = db.tables.filter(t => !t.name.startsWith('_') && normalizedTables[t.name])
   await db.transaction('rw', targets, async () => {
     for (const table of targets) {
       await table.clear()
-      const rows = tables[table.name] ?? []
+      const rows = normalizedTables[table.name] ?? []
       if (rows.length > 0) {
         await table.bulkAdd(rows)
       }
@@ -426,7 +427,7 @@ async function tryRestoreFromBackup(): Promise<boolean> {
   }
 }
 
-async function maybeRestoreWhenEmpty(): Promise<boolean> {
+export async function maybeRestoreWhenEmpty(): Promise<boolean> {
   if (await dbHasData()) return false
   if (!localStorage.getItem(BACKUP_KEY)) return false
   const restored = await tryRestoreFromBackup()

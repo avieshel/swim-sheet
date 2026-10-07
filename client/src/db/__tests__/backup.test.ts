@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { db, saveBackup, clearBackup, getLastBackupTime, getStoragePersistence, DB_SCHEMA_VERSION, BACKUP_FORMAT_VERSION } from '../schema'
+import { db, saveBackup, clearBackup, getLastBackupTime, getStoragePersistence, maybeRestoreWhenEmpty, DB_SCHEMA_VERSION, BACKUP_FORMAT_VERSION } from '../schema'
 import { exportDatabase, importDatabase, deleteAllSwimmers, deleteAllSessions, getBackupInfo } from '../dao'
 
 class MemoryStorage {
@@ -92,6 +92,41 @@ describe('database import', () => {
     expect(restored?.status).toBe('active')
   })
 
+  it('imports schema-v5 rows with legacy field names', async () => {
+    const payload = {
+      formatVersion: BACKUP_FORMAT_VERSION,
+      schemaVersion: 5,
+      savedAt: now(),
+      tables: {
+        drills: [{ id: 'legacy-drill', session_id: 'legacy-session' }],
+        laps: [{ id: 'legacy-lap', run_drill_id: 'legacy-run-drill', swimmer_id: 'legacy-swimmer', stroke_count: 14 }],
+      },
+    }
+
+    await importDatabase(JSON.stringify(payload))
+
+    const drill = await db.drills.get('legacy-drill')
+    const lap = await db.laps.get('legacy-lap')
+    expect(drill).toMatchObject({ sessionId: 'legacy-session' })
+    expect(drill).not.toHaveProperty('session_id')
+    expect(lap).toMatchObject({ runDrillId: 'legacy-run-drill', swimmerId: 'legacy-swimmer', strokeCount: 14 })
+    expect(lap).not.toHaveProperty('stroke_count')
+  })
+
+  it('accepts an older backup without schemaVersion and normalizes its records', async () => {
+    const payload = {
+      formatVersion: BACKUP_FORMAT_VERSION,
+      savedAt: now(),
+      tables: { runSwimmers: [{ id: 'legacy-link', run_id: 'r1', swimmer_id: 'sw1' }] },
+    }
+
+    await importDatabase(JSON.stringify(payload))
+
+    const link = await db.runSwimmers.get('legacy-link')
+    expect(link).toMatchObject({ runId: 'r1', swimmerId: 'sw1' })
+    expect(link).not.toHaveProperty('run_id')
+  })
+
   it('rejects malformed JSON', async () => {
     await expect(importDatabase('{not json')).rejects.toThrow()
   })
@@ -140,6 +175,35 @@ describe('automatic localStorage backup', () => {
 
     expect(localStorage.getItem('swimsheet_db_backup')).toBeNull()
     expect(getLastBackupTime()).toBeNull()
+  })
+
+  it('restores a schema-v5 localStorage backup with camelCase fields', async () => {
+    const payload = {
+      formatVersion: BACKUP_FORMAT_VERSION,
+      schemaVersion: 5,
+      savedAt: now(),
+      tables: {
+        sessionRuns: [{
+          id: 'legacy-run',
+          session_id: 's1',
+          session_started_at: 10,
+          session_paused_at: null,
+          session_pause_duration: 5,
+        }],
+        laneDrillResults: [{ id: 'legacy-result', run_id: 'legacy-run', group_id: 'g1', run_drill_id: 'rd1' }],
+      },
+    }
+    localStorage.setItem('swimsheet_db_backup', JSON.stringify(payload))
+
+    expect(await maybeRestoreWhenEmpty()).toBe(true)
+
+    const run = await db.sessionRuns.get('legacy-run')
+    const result = await db.laneDrillResults.get('legacy-result')
+    expect(run).toMatchObject({ sessionId: 's1', sessionStartedAt: 10, sessionPausedAt: null, sessionPauseDuration: 5 })
+    expect(run).not.toHaveProperty('session_id')
+    expect(result).toMatchObject({ runId: 'legacy-run', groupId: 'g1', runDrillId: 'rd1' })
+    expect(result).not.toHaveProperty('run_drill_id')
+    expect(localStorage.getItem('swimsheet_db_backup')).toBeNull()
   })
 })
 
