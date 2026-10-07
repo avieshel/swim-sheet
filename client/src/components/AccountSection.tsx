@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { Events, analytics } from '../services/analyticsEvents'
 import { Icon } from './Icon'
 import { syncService } from '../sync/syncService'
-import type { SyncState, SyncConflict } from '../sync/types'
+import type { SyncState, SyncConflict, SyncError } from '../sync/types'
 
 function initials(name: string | undefined, email: string | undefined): string {
   const source = name?.trim() || email?.trim() || '?'
@@ -30,6 +30,27 @@ function conflictSummary(c: SyncConflict): string {
   return `${c.table} ${c.rowId}${detail}`
 }
 
+function formatLastSync(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'unknown'
+  return d.toLocaleString()
+}
+
+function describeSyncError(error: SyncError): string {
+  switch (error.kind) {
+    case 'auth':
+      return "You're signed out. Sign in to sync."
+    case 'offline':
+      return "You're offline — we'll sync when you reconnect."
+    case 'conflict':
+      return 'Some items need your review above.'
+    case 'validation':
+      return 'Some of your data could not be synced. Try again.'
+    default:
+      return "Sync couldn't finish. Please try again."
+  }
+}
+
 export function AccountSection() {
   const { user, status, persist, setPersist, signInWithGoogle, signInAsTestUser, signOut } = useAuth()
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
@@ -37,7 +58,10 @@ export function AccountSection() {
   const [error, setError] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<SyncState>(() => syncService.getState())
 
-  useEffect(() => syncService.subscribe(setSyncState), [])
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe(setSyncState)
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     const setOnlineState = () => setOnline(navigator.onLine)
@@ -69,6 +93,11 @@ export function AccountSection() {
   const fullName = user?.user_metadata?.full_name as string | undefined
   const email = user?.email ?? ''
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
+
+  const [dismissedFirstMerge, setDismissedFirstMerge] = useState(false)
+  const phase = syncState.phase
+  const summary = syncState.firstMergeSummary
+  const showFirstMerge = !!user && phase === 'needs_first_merge' && !!summary && !dismissedFirstMerge
 
   return (
     <section>
@@ -130,6 +159,75 @@ export function AccountSection() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {showFirstMerge && (
+            <div className="mt-4 border border-primary/40 rounded-xl p-3">
+              <p className="font-bold text-on-surface mb-1">Review &amp; merge your data</p>
+              <p className="text-sm text-on-surface-variant mb-2">
+                {summary.localCount} local item(s), {summary.cloudCount} cloud item(s)
+                {summary.catalogMatches > 0 ? `, ${summary.catalogMatches} match(es) by catalog` : ''}. We'll
+                merge your existing local data with the cloud rather than overwriting it.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void syncService.confirmFirstMerge()}
+                  className="bg-primary text-on-primary font-bold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all cursor-pointer border-none text-sm"
+                >
+                  Merge &amp; Sync
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedFirstMerge(true)}
+                  className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!!user && phase === 'needs_first_merge' && !!summary && dismissedFirstMerge && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setDismissedFirstMerge(false)}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+              >
+                Review &amp; merge
+              </button>
+            </div>
+          )}
+
+          {!!user && phase !== 'needs_first_merge' && (
+            <div className="mt-4 flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-on-surface-variant">
+                Last synced: {syncState.lastSyncAt ? formatLastSync(syncState.lastSyncAt) : 'never'}
+                {syncState.pendingCount > 0 ? ` • ${syncState.pendingCount} pending` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => void syncService.syncNow()}
+                disabled={syncState.inFlight}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+              >
+                {syncState.inFlight ? 'Syncing…' : 'Sync now'}
+              </button>
+            </div>
+          )}
+
+          {!!user && syncState.error && (
+            <div className="mt-4 border border-error/40 rounded-xl p-3">
+              <p className="text-sm text-error mb-2">{describeSyncError(syncState.error)}</p>
+              <button
+                type="button"
+                onClick={() => void syncService.syncNow()}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+              >
+                Retry
+              </button>
             </div>
           )}
           </>
