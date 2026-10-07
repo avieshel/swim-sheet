@@ -13,10 +13,6 @@ const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDril
 // them as local changes.
 let isApplyingRemote = false
 
-export function setApplyingRemote(value: boolean): void {
-  isApplyingRemote = value
-}
-
 function metaKey(table: SyncTable, rowId: string): string {
   return `${table}:${rowId}`
 }
@@ -31,15 +27,15 @@ export function attachSyncHooks(): void {
     t.hook('creating', (_primKey, obj) => {
       if (isApplyingRemote) return
       const id = obj.id
-      if (id) void markDirty(table, id)
+      if (id) void markDirty(table, id).catch(() => {})
     })
     t.hook('updating', (_modifications, primKey) => {
       if (isApplyingRemote) return
-      void markDirty(table, String(primKey))
+      void markDirty(table, String(primKey)).catch(() => {})
     })
     t.hook('deleting', (primKey) => {
       if (isApplyingRemote) return
-      void markDirtyDelete(table, String(primKey))
+      void markDirtyDelete(table, String(primKey)).catch(() => {})
     })
   }
 }
@@ -60,7 +56,7 @@ export async function markDirty(table: SyncTable, id: string, catalogKey?: strin
   await db._sync_meta.put(row)
 }
 
-export async function markDirtyDelete(table: SyncTable, id: string): Promise<void> {
+async function markDirtyDelete(table: SyncTable, id: string): Promise<void> {
   const key = metaKey(table, id)
   const existing = await db._sync_meta.get(key)
   const row: SyncMetaRow = {

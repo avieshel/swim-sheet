@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { Events, analytics } from '../services/analyticsEvents'
 import { Icon } from './Icon'
 import { syncService } from '../sync/syncService'
+import { createBackupPayload } from '../api/backup'
 import type { SyncState, SyncConflict, SyncError } from '../sync/types'
 
 function initials(name: string | undefined, email: string | undefined): string {
@@ -49,6 +50,19 @@ function describeSyncError(error: SyncError): string {
     default:
       return "Sync couldn't finish. Please try again."
   }
+}
+
+async function downloadBackup(): Promise<void> {
+  const payload = await createBackupPayload()
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `swimsheet-backup-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export function AccountSection() {
@@ -214,6 +228,13 @@ export function AccountSection() {
                 className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
               >
                 {syncState.inFlight ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void downloadBackup()}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+              >
+                Export backup
               </button>
             </div>
           )}

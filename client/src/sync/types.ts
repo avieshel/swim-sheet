@@ -1,6 +1,6 @@
 export type SyncTable = 'swimmers' | 'sessions' | 'drills' | 'libraryDrills'
 
-export type SyncOp = 'upsert' | 'delete'
+type SyncOp = 'upsert' | 'delete'
 
 export interface LocalChange {
   table: SyncTable
@@ -40,7 +40,7 @@ export type SyncPhase =
   | 'error'
   | 'needs_first_merge'
 
-export type SyncErrorKind = 'offline' | 'auth' | 'conflict' | 'validation' | 'unexpected'
+type SyncErrorKind = 'offline' | 'auth' | 'conflict' | 'validation' | 'unexpected'
 
 export interface SyncError {
   kind: SyncErrorKind

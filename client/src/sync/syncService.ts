@@ -46,6 +46,7 @@ function emptyCursors(): Record<SyncTable, string | null> {
 class SyncService {
   private transport: SyncTransport = supabaseSyncTransport
   private currentOrgId: string | null = null
+  private homeOrgId: string | null = null
   private lastResult: SyncResult | null = null
   private lastSyncAt: string | null = null
   private hooksAttached = false
@@ -262,6 +263,26 @@ class SyncService {
     return false
   }
 
+  // The user's canonical single-member org (from ensurePersonalOrganization).
+  // Pre-sign-in (unclaimed) rows are claimed to this org, never to a foreign
+  // org, so syncing against a different account never leaks local data.
+  private async resolveHomeOrg(orgId: string): Promise<string> {
+    if (this.homeOrgId) return this.homeOrgId
+    try {
+      return await this.transport.ensurePersonalOrganization()
+    } catch {
+      return orgId
+    }
+  }
+
+  private async claimUnclaimed(homeOrg: string): Promise<void> {
+    if (homeOrg === '') return
+    const unclaimed = await db._sync_meta.where('orgId').equals('').toArray()
+    for (const m of unclaimed) {
+      await db._sync_meta.put({ ...m, orgId: homeOrg })
+    }
+  }
+
   async resolveConflict(
     conflictId: string,
     resolution: 'local' | 'remote',
@@ -336,6 +357,9 @@ class SyncService {
     let conflicts: SyncConflict[] = []
     try {
       this.setPhase('pushing')
+      const homeOrg = await this.resolveHomeOrg(orgId)
+      this.homeOrgId = homeOrg
+      await this.claimUnclaimed(homeOrg)
       const pending = await getPendingChanges(orgId)
       const res = await this.transport.push(pending, orgId)
       conflicts = res.conflicts
@@ -444,4 +468,3 @@ class SyncService {
 }
 
 export const syncService = new SyncService()
-export type { SyncService }
