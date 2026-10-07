@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto'
 import Dexie from 'dexie'
 import { describe, expect, it } from 'vitest'
 
-describe('Dexie v6 schema migration', () => {
+describe('Dexie schema migration (v5 to latest)', () => {
   it('converts all v5 record fields and preserves relationships and indexes', async () => {
     const legacyDb = new Dexie('SwimSheetDB')
     legacyDb.version(5).stores({
@@ -51,7 +51,7 @@ describe('Dexie v6 schema migration', () => {
       deleteCurrentDb = () => db.delete()
       await db.open()
 
-      expect(db.verno).toBe(6)
+      expect(db.verno).toBe(7)
       expect(await db.drills.get('d1')).toMatchObject({ sessionId: 's1' })
       expect(await db.sessionRuns.get('r1')).toMatchObject({
         sessionId: 's1',
