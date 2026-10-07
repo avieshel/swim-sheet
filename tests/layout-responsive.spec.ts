@@ -34,10 +34,10 @@ test.describe('Responsive Layout — lane card fits controls at every breakpoint
       for (let i = 1; i <= 3; i++) {
         const swId = crypto.randomUUID();
         await db.swimmers.add({
-          id: swId, name: `Swimmer ${i}`, group: '', notes: '', createdAt: now, updatedAt: now,
+          id: swId, name: `Swimmer ${i}`, group: '', notes: '', status: 'active', createdAt: now, updatedAt: now,
         });
         await db.runSwimmers.add({
-          runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now,
+          id: crypto.randomUUID(), runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now,
         });
       }
     });

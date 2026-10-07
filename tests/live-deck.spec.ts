@@ -19,7 +19,7 @@ test.describe('Live Deck', () => {
       });
       const swimmerId = crypto.randomUUID();
       await db.swimmers.add({
-        id: swimmerId, name: 'Alice', group: '', notes: '', createdAt: now, updatedAt: now,
+        id: swimmerId, name: 'Alice', group: '', notes: '', status: 'active', createdAt: now, updatedAt: now,
       });
       await db.sessionRuns.add({
         id: runId, sessionId, date: new Date().toISOString().split('T')[0],
@@ -74,7 +74,7 @@ test.describe('Live Deck', () => {
       await db.sessionRuns.add({ id: runId, sessionId: 'ignored', date: now.split('T')[0], poolName: 'Test', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now });
       await db.runDrills.add({ id: drillId, runId, name: '100m Free', stroke: 'freestyle', distance: 100, order: 0, notes: '', createdAt: now, updatedAt: now });
       const swId = crypto.randomUUID();
-      await db.swimmers.add({ id: swId, name: 'TouchTest', group: '', notes: '', createdAt: now, updatedAt: now });
+      await db.swimmers.add({ id: swId, name: 'TouchTest', group: '', notes: '', status: 'active', createdAt: now, updatedAt: now });
       await db.runSwimmers.add({ id: crypto.randomUUID(), runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now });
     });
     await page.goto('/live');
@@ -96,9 +96,9 @@ test.describe('Live Deck', () => {
   test('completed drill shows visual distinction', async ({ page }) => {
     await page.goto('/');
     await page.waitForFunction(() => (window as any).db?.isOpen?.(), null, { timeout: 5000 });
-    const now = new Date().toISOString();
     await page.evaluate(async () => {
       const db = (window as any).db;
+      const now = new Date().toISOString();
       const runId = crypto.randomUUID();
       const drillId = crypto.randomUUID();
       await db.sessions.add({ id: crypto.randomUUID(), name: 'Completion Test', poolLength: 25, notes: '', createdAt: now, updatedAt: now });
@@ -106,7 +106,7 @@ test.describe('Live Deck', () => {
       await db.sessionRuns.add({ id: runId, sessionId: 'ignored', date: now.split('T')[0], poolName: 'Test', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now });
       await db.runDrills.add({ id: drillId, runId, name: '50m Free', stroke: 'freestyle', distance: 50, order: 0, notes: '', createdAt: now, updatedAt: now });
       const swId = crypto.randomUUID();
-      await db.swimmers.add({ id: swId, name: 'Completer', group: '', notes: '', createdAt: now, updatedAt: now });
+      await db.swimmers.add({ id: swId, name: 'Completer', group: '', notes: '', status: 'active', createdAt: now, updatedAt: now });
       await db.runSwimmers.add({ id: crypto.randomUUID(), runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now });
     });
     await page.goto('/live');

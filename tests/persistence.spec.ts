@@ -25,7 +25,7 @@ test.describe('Drill Persistence', () => {
       });
 
       await db.swimmers.add({
-        id: swimmerId, name: 'Bob', group: '', notes: '', createdAt: now, updatedAt: now,
+        id: swimmerId, name: 'Bob', group: '', notes: '', status: 'active', createdAt: now, updatedAt: now,
       });
 
       await db.sessionRuns.add({
