@@ -3,6 +3,8 @@ import { canUseTestLogin } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { Events, analytics } from '../services/analyticsEvents'
 import { Icon } from './Icon'
+import { syncService } from '../sync/syncService'
+import type { SyncState, SyncConflict } from '../sync/types'
 
 function initials(name: string | undefined, email: string | undefined): string {
   const source = name?.trim() || email?.trim() || '?'
@@ -11,11 +13,31 @@ function initials(name: string | undefined, email: string | undefined): string {
   return source.slice(0, 2).toUpperCase()
 }
 
+const DIFF_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'created_at', 'updated_at'])
+
+function conflictSummary(c: SyncConflict): string {
+  const local = (c.local ?? {}) as Record<string, unknown>
+  const remote = (c.remote ?? {}) as Record<string, unknown>
+  const diffs: string[] = []
+  for (const key of Object.keys({ ...local, ...remote })) {
+    if (DIFF_SKIP.has(key)) continue
+    const left = local[key]
+    const right = remote[key]
+    if (left !== right) diffs.push(`${key}: ${JSON.stringify(left)} → ${JSON.stringify(right)}`)
+    if (diffs.length >= 3) break
+  }
+  const detail = diffs.length > 0 ? ` — ${diffs.join(', ')}` : ''
+  return `${c.table} ${c.rowId}${detail}`
+}
+
 export function AccountSection() {
   const { user, status, persist, setPersist, signInWithGoogle, signInAsTestUser, signOut } = useAuth()
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [syncState, setSyncState] = useState<SyncState>(() => syncService.getState())
+
+  useEffect(() => syncService.subscribe(setSyncState), [])
 
   useEffect(() => {
     const setOnlineState = () => setOnline(navigator.onLine)
@@ -55,6 +77,7 @@ export function AccountSection() {
         {status === 'loading' ? (
           <p className="text-on-surface-variant">Checking account...</p>
         ) : user ? (
+          <>
           <div className="flex items-center gap-3">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full object-cover" />
@@ -81,6 +104,35 @@ export function AccountSection() {
               Sign out
             </button>
           </div>
+          {syncState.conflicts.length > 0 && (
+            <div className="mt-4 border border-error/40 rounded-xl p-3">
+              <p className="font-bold text-error mb-2">Sync conflicts ({syncState.conflicts.length})</p>
+              <ul className="space-y-3">
+                {syncState.conflicts.map((c) => (
+                  <li key={c.id}>
+                    <p className="text-sm text-on-surface-variant">{conflictSummary(c)}</p>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => void syncService.resolveConflict(c.id, 'remote')}
+                        className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+                      >
+                        Use cloud
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void syncService.resolveConflict(c.id, 'local')}
+                        className="bg-primary-container text-on-primary-container font-bold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all cursor-pointer border-none text-sm"
+                      >
+                        Keep mine
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          </>
         ) : (
           <div className="space-y-4">
             <p className="text-on-surface-variant">

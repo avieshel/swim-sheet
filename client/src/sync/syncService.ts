@@ -262,6 +262,59 @@ class SyncService {
     return false
   }
 
+  async resolveConflict(
+    conflictId: string,
+    resolution: 'local' | 'remote',
+    transport: SyncTransport = this.transport,
+  ): Promise<void> {
+    const parts = conflictId.split(':')
+    let orgId: string | null
+    let table: SyncTable
+    let rowId: string
+    if (parts.length >= 3) {
+      orgId = parts[0]
+      table = parts[1] as SyncTable
+      rowId = parts.slice(2).join(':')
+    } else {
+      orgId = this.currentOrgId
+      table = parts[0] as SyncTable
+      rowId = parts[1]
+    }
+    if (!orgId) throw new Error('no active organization for conflict resolution')
+    const key = `${table}:${rowId}`
+    const meta = await db._sync_meta.get(key)
+    if (!meta || meta.status !== 'conflict') return
+
+    if (resolution === 'remote') {
+      const remote = (meta.remoteJson ? JSON.parse(meta.remoteJson) : {}) as Record<string, unknown>
+      await applyRemoteChanges(
+        [{ table, id: rowId, op: 'upsert', payload: remote, catalogKey: meta.catalogKey, updatedAt: meta.rev ?? '', deletedAt: null }],
+        orgId,
+      )
+      await setMetaSynced(table, rowId, orgId, meta.rev ?? '', false)
+      return
+    }
+
+    const local = (meta.localJson ? JSON.parse(meta.localJson) : {}) as Record<string, unknown>
+    const res = await transport.push(
+      [{ table, id: rowId, op: 'upsert', payload: local, catalogKey: meta.catalogKey, rev: meta.localRev ?? null }],
+      orgId,
+    )
+    if (res.conflicts.length > 0) {
+      await setMetaConflict({
+        id: conflictId,
+        table,
+        rowId,
+        local,
+        remote: (meta.remoteJson ? JSON.parse(meta.remoteJson) : {}) as Record<string, unknown>,
+        localRev: meta.localRev ?? null,
+        remoteRev: meta.rev ?? '',
+      })
+      return
+    }
+    await setMetaSynced(table, rowId, orgId, meta.localRev ?? '', false)
+  }
+
   setActiveOrg(orgId: string): void {
     this.currentOrgId = orgId
     void this.refresh()
