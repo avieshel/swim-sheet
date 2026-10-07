@@ -4,7 +4,7 @@
 
 **Goal:** Let one signed-in coach use the same swimmers, session templates, and personal/customized library drills across devices, without ever blocking local use, by adding a small `syncService` module that captures local changes, pushes them to Supabase with timestamp-based version checks, and applies pulled changes as diffs.
 
-**Architecture:** Dexie stays the local working DB. All sync logic lives behind a new `client/src/sync/` boundary (`syncService` public API + `cloudAdapter` Supabase mapping + `syncStore` local metadata/hooks). Local changes are captured by attaching Dexie table hooks to the four syncable tables, so existing pages/services/DAO do not change. The server `updated_at` timestamp is the version token; conditional updates surface stale edits as conflicts instead of silently overwriting.
+**Architecture:** Dexie stays the local working DB. All sync logic lives behind a new `client/src/sync/` boundary (`syncService` public API + `syncStore` local metadata/hooks + `SupabaseSyncTransport`, the single `SyncTransport` implementation that talks to Supabase). `syncService` depends on the injected `SyncTransport` interface, so the network layer is swappable and mockable. Local changes are captured by attaching Dexie table hooks to the four syncable tables, so existing pages/services/DAO do not change. The server `updated_at` timestamp is the version token; conditional updates surface stale edits as conflicts instead of silently overwriting.
 
 **Tech Stack:** React 19 + TypeScript (strict), Dexie 4 (IndexedDB), `@supabase/supabase-js` v2, Vitest + fake-indexeddb, Playwright (e2e).
 
@@ -33,7 +33,7 @@ New code is confined to `client/src/sync/` (≤4 files). Outside that module, ch
 
 These are the silent-but-likely failure modes the task tests should pin (each is added to its owning task):
 
-1. **Offline / adapter throws during a local save** — coach's swimmer/session write still commits and the app keeps working; the change is queued for retry. Test: spy `cloudAdapter.pushChanges` to throw, assert domain row present + meta `pending`.
+1. **Offline / adapter throws during a local save** — coach's swimmer/session write still commits and the app keeps working; the change is queued for retry. Test: spy `SyncTransport.push` to throw, assert domain row present + meta `pending`.
 2. **Account switch** — pending rows from account A are never uploaded to account B. Test: mark A's row pending, switch `orgId` to B, run push, assert zero Supabase writes for B and A's meta unchanged.
 3. **First merge duplicate prevention** — two devices each seeded with the starter session / customized builtin drill reconcile to one account row, not two. Test: seed both locally, first-merge, assert exactly one cloud row per catalog key.
 4. **Stale revision conflict** — a push whose expected version is older than the server's surfaces a conflict preserving both versions. Test: set meta rev older than a mocked newer cloud row; assert conflict recorded, local row retained.
@@ -45,10 +45,10 @@ These are the silent-but-likely failure modes the task tests should pin (each is
 
 | File | Responsibility |
 |------|----------------|
-| `client/src/sync/types.ts` (new) | Shared sync types (`SyncTable`, `LocalChange`, `CloudChange`, `SyncState`, `SyncConflict`, `SyncResult`, `FirstMergeSummary`). |
+| `client/src/sync/types.ts` (new) | Shared sync types (`SyncTable`, `LocalChange`, `CloudChange`, `SyncState`, `SyncConflict`, `SyncResult`, `FirstMergeSummary`) **and the `SyncTransport` interface** (the injected network seam). |
 | `client/src/sync/syncStore.ts` (new) | Dexie `_sync_meta` / `_sync_cursor` tables, hook attachment, dirty tracking, collect-pending, apply-remote, cursor get/set, state read. No network. |
-| `client/src/sync/cloudAdapter.ts` (new) | Supabase mapping + `ensurePersonalOrganization`, `pushChanges`, `pullChanges`. The only file importing `@supabase/supabase-js`. |
-| `client/src/sync/syncService.ts` (new) | Public orchestrator: `init/start/stop/syncNow/subscribe/getState/previewFirstMerge/confirmFirstMerge/resolveConflict`, auto-trigger wiring, status emission. |
+| `client/src/sync/SupabaseSyncTransport.ts` (new) | The one implementation of `SyncTransport`. The **only** file importing `@supabase/supabase-js`; owns Supabase DTO mapping + `ensurePersonalOrganization`, `push`, `pull`. |
+| `client/src/sync/syncService.ts` (new) | Public orchestrator: `init(transport?)/start/stop/syncNow/subscribe/getState/previewFirstMerge/confirmFirstMerge/resolveConflict`. Depends on `SyncTransport` (injected) + `syncStore`. No Supabase import. |
 | `client/src/db/schema.ts` (modify) | Add `_sync_meta`, `_sync_cursor` tables; bump Dexie version; add `catalogKey?: string` to `Session` and `LibraryDrill`. |
 | `client/src/db/dao.ts` (modify) | In `seedDefaultSessions`/`seedLibraryDrills`/`patchLibraryDrills`, set `catalogKey` on seeded starter sessions / builtin drills. |
 | `client/src/context/AuthContext.tsx` (modify) | Call `syncService.init()` once; on auth change call `start()`/`stop()`. |
@@ -114,25 +114,35 @@ test('applyRemote does not re-enqueue a change', async () => {
 
 - [ ] **Step 5: Commit** — `git commit -m "feat(sync): local metadata store and change capture"`
 
-### Task 2: Cloud adapter — mapping, org provisioning, push/pull
+### Task 2: Supabase transport — `SyncTransport` interface + implementation
 
 **Files:**
-- Create: `client/src/sync/cloudAdapter.ts`
-- Test: `client/src/sync/__tests__/cloudAdapter.test.ts`
+- Create: `client/src/sync/types.ts` (add `SyncTransport` interface)
+- Create: `client/src/sync/SupabaseSyncTransport.ts`
+- Test: `client/src/sync/__tests__/SupabaseSyncTransport.test.ts`
 
 **Interfaces:**
 - Consumes: `getCurrentUserId`, `supabase` from `client/src/api/supabase.ts`; `LocalChange`, `CloudChange`, `SyncConflict` from `types.ts`.
 - Produces:
-  - `ensurePersonalOrganization(): Promise<string>`
-  - `pushChanges(changes: LocalChange[], orgId: string): Promise<{ conflicts: SyncConflict[] }>`
-  - `pullChanges(orgId: string, cursors: Record<SyncTable, string | null>): Promise<{ changes: CloudChange[]; nextCursors: Record<SyncTable, string> }>`
-  - `toCloudRow(table, change, orgId, userId)`, `fromCloudRow(table, row)` (pure, exported for tests)
+  - `SyncTransport` interface (in `types.ts`):
+    ```ts
+    interface SyncTransport {
+      ensurePersonalOrganization(): Promise<string>
+      push(changes: LocalChange[], orgId: string): Promise<{ conflicts: SyncConflict[] }>
+      pull(orgId: string, cursors: Record<SyncTable, string | null>): Promise<{
+        changes: CloudChange[]
+        nextCursors: Record<SyncTable, string>
+      }>
+    }
+    ```
+  - `SupabaseSyncTransport` class implementing `SyncTransport`; singleton `supabaseSyncTransport: SyncTransport`.
+  - Pure, exported helpers `toCloudRow(table, change, orgId, userId)`, `fromCloudRow(table, row)` (for tests).
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
-import { toCloudRow, fromCloudRow, pushChanges, pullChanges } from '../cloudAdapter'
-import type { LocalChange } from '../types'
+import { toCloudRow, fromCloudRow, SupabaseSyncTransport } from '../SupabaseSyncTransport'
+import type { LocalChange, SyncTransport } from '../types'
 
 test('swimmer maps group -> group_name and adds org/user', () => {
   const c: LocalChange = { table: 'swimmers', id: 's1', op: 'upsert', payload: { id:'s1', name:'A', group:'U17', labels:[], notes:'', status:'active', createdAt:'t', updatedAt:'t' }, rev: null }
@@ -140,25 +150,27 @@ test('swimmer maps group -> group_name and adds org/user', () => {
   expect(row).toMatchObject({ id:'s1', organization_id:'org-A', created_by:'u1', name:'A', group_name:'U17' })
 })
 
-test('pushChanges reports a stale-revision conflict', async () => {
+test('push reports a stale-revision conflict', async () => {
   const stub = makeSupabaseStub({ updateAffected: 0, currentRow: { id:'s1', name:'Server', updated_at:'newer', deleted_at:null } })
-  const conflicts = await pushChanges([{ table:'swimmers', id:'s1', op:'upsert', payload:{ id:'s1', name:'Local', group:'', labels:[], notes:'', status:'active', createdAt:'t', updatedAt:'old' }, rev:'old' }], 'org-A', stub)
-  expect(conflicts.conflicts).toHaveLength(1)
-  expect(conflicts.conflicts[0]).toMatchObject({ rowId:'s1', localRev:'old', remoteRev:'newer' })
+  const transport: SyncTransport = new SupabaseSyncTransport(stub)
+  const { conflicts } = await transport.push([{ table:'swimmers', id:'s1', op:'upsert', payload:{ id:'s1', name:'Local', group:'', labels:[], notes:'', status:'active', createdAt:'t', updatedAt:'old' }, rev:'old' }], 'org-A')
+  expect(conflicts).toHaveLength(1)
+  expect(conflicts[0]).toMatchObject({ rowId:'s1', localRev:'old', remoteRev:'newer' })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails** — `vitest client/src/sync/__tests__/cloudAdapter.test.ts`. Expected: FAIL.
+- [ ] **Step 2: Run test to verify it fails** — `vitest client/src/sync/__tests__/SupabaseSyncTransport.test.ts`. Expected: FAIL.
 
-- [ ] **Step 3: Implement `cloudAdapter.ts`**
-  - `ensurePersonalOrganization()` calls `supabase.rpc('ensure_personal_organization')` and returns `data` (org id); throws a classified `auth` error on no session.
+- [ ] **Step 3: Implement `SupabaseSyncTransport.ts`**
+  - Constructor accepts a Supabase-like client (so tests inject `makeSupabaseStub`); the production singleton is constructed with the real `supabase` from `client/src/api/supabase.ts`.
+  - `ensurePersonalOrganization()` calls `client.rpc('ensure_personal_organization')` and returns `data` (org id); throws a classified `auth` error on no session.
   - DTO maps per table: `swimmers` `group`↔`group_name`; `sessions` pass `visibility`/`catalog_key`, `assigned_to=null`, `created_by=userId`; `drills` JSON-stringify `items`; `library_drills` JSON `items`, `source`, `catalog_key`. `toCloudRow` always sets `organization_id=orgId`, `created_by=userId`. `fromCloudRow` reverses and restores camelCase.
-  - `pushChanges`: for each change, map to cloud row. For `upsert`, call `supabase.from(table).upsert(row)`; if the table already carries a `rev` (expected `updated_at`) and the update path could collide, follow with a conditional guard: read the row's current `updated_at` and, if it differs from `rev` and `rev` is non-null, treat as conflict (use the stub's `updateAffected`/currentRow contract in tests). For `delete`, `supabase.from(table).update({ deleted_at: now() }).eq('id', id)` plus the same stale check. Collect conflicts and return them; do not throw on per-row conflict.
-  - `pullChanges`: for each table, `supabase.from(table).select('*').eq('organization_id', orgId).gt('updated_at', cursor ?? '0001-01-01').order('updated_at').order('id').limit(BATCH)`; map rows to `CloudChange` (`op = deletedAt ? 'delete' : 'upsert'`). Return changes plus `nextCursors` = max `updated_at` per table (or unchanged when empty). Keep the BATCH constant (e.g. 500) and advance only per table.
+  - `push`: for each change, map to cloud row. For `upsert`, `client.from(table).upsert(row)`; then a conditional guard: read the row's current `updated_at` and, if it differs from `rev` and `rev` is non-null, treat as conflict (use the stub's `updateAffected`/currentRow contract in tests). For `delete`, `client.from(table).update({ deleted_at: now() }).eq('id', id)` plus the same stale check. Collect conflicts and return them; do not throw on per-row conflict.
+  - `pull`: for each table, `client.from(table).select('*').eq('organization_id', orgId).gt('updated_at', cursor ?? '0001-01-01').order('updated_at').order('id').limit(BATCH)`; map rows to `CloudChange` (`op = deletedAt ? 'delete' : 'upsert'`). Return changes plus `nextCursors` = max `updated_at` per table (or unchanged when empty). Keep `BATCH` constant (e.g. 500) and advance only per table.
 
-- [ ] **Step 4: Run test to verify it passes** — `vitest client/src/sync/__tests__/cloudAdapter.test.ts`. Expected: PASS.
+- [ ] **Step 4: Run test to verify it passes** — `vitest client/src/sync/__tests__/SupabaseSyncTransport.test.ts`. Expected: PASS.
 
-- [ ] **Step 5: Commit** — `git commit -m "feat(sync): supabase cloud adapter and version checks"`
+- [ ] **Step 5: Commit** — `git commit -m "feat(sync): SyncTransport interface and Supabase implementation"`
 
 ### Task 3: syncService orchestration and state
 
@@ -167,9 +179,9 @@ test('pushChanges reports a stale-revision conflict', async () => {
 - Test: `client/src/sync/__tests__/syncService.test.ts`
 
 **Interfaces:**
-- Consumes: `syncStore` (Task 1), `cloudAdapter` (Task 2), `getCurrentUserId`/`onAuthStateChange` from `client/src/api/auth.ts`, `supabase` via adapter.
+- Consumes: `syncStore` (Task 1), `SyncTransport` (Task 2), `getCurrentUserId`/`onAuthStateChange` from `client/src/api/auth.ts`.
 - Produces:
-  - `syncService.init(): void`
+  - `syncService.init(transport?: SyncTransport): void`
   - `syncService.start(): Promise<void>`
   - `syncService.syncNow(): Promise<SyncResult>`
   - `syncService.stop(): void`
@@ -180,16 +192,16 @@ test('pushChanges reports a stale-revision conflict', async () => {
 
 ```ts
 test('syncNow pushes pending local rows then applies pulled rows', async () => {
-  const adapter = fakeAdapter({ pushed: 2, pulled: 1 })
-  const result = await runSyncNow(adapter)
+  const transport = fakeTransport({ pushed: 2, pulled: 1 })
+  const result = await runSyncNow(transport)
   expect(result.pushed).toBe(2)
   expect(result.pulled).toBe(1)
   expect(result.conflicts).toHaveLength(0)
 })
 
-test('syncNow swallows adapter errors and reports them without throwing', async () => {
-  const adapter = fakeAdapter({ throwOn: 'push' })
-  const result = await runSyncNow(adapter)
+test('syncNow swallows transport errors and reports them without throwing', async () => {
+  const transport = fakeTransport({ throwOn: 'push' })
+  const result = await runSyncNow(transport)
   expect(result.error?.kind).toBe('unexpected')
 })
 ```
@@ -197,8 +209,9 @@ test('syncNow swallows adapter errors and reports them without throwing', async 
 - [ ] **Step 2: Run test to verify it fails** — `vitest client/src/sync/__tests__/syncService.test.ts`. Expected: FAIL.
 
 - [ ] **Step 3: Implement `syncService.ts`**
-  - Internal `currentOrgId: string | null`. `syncNow()` (org required): emit `phase:'pushing'`; `const pending = await getPendingChanges(orgId)`; `const { conflicts } = await pushChanges(pending, orgId)`; for each conflict `setMetaConflict`. Emit `phase:'pulling'`; `const { changes, nextCursors } = await pullChanges(orgId, cursors)`; `await applyRemoteChanges(changes, orgId)`; set cursors; for successful pushes `setMetaSynced`. Emit `phase:'ready'`, `lastSyncAt=now`. Every stage is wrapped so a thrown adapter error becomes `state.error` and `phase:'error'` rather than propagating.
-  - `start()`: if no session, return; `currentOrgId = await ensurePersonalOrganization()`; then `await syncNow()`. (First-merge is Task 4; for now `start` simply syncs; legacy rows are already captured by hooks in Task 1's init scan — see Task 4.)
+  - `init(transport = supabaseSyncTransport)` stores the injected `SyncTransport` (default production singleton); tests pass a `fakeTransport`. Then `attachSyncHooks()`.
+  - Internal `currentOrgId: string | null`. `syncNow()` (org required): emit `phase:'pushing'`; `const pending = await getPendingChanges(orgId)`; `const { conflicts } = await transport.push(pending, orgId)`; for each conflict `setMetaConflict`. Emit `phase:'pulling'`; `const { changes, nextCursors } = await transport.pull(orgId, cursors)`; `await applyRemoteChanges(changes, orgId)`; set cursors; for successful pushes `setMetaSynced`. Emit `phase:'ready'`, `lastSyncAt=now`. Every stage is wrapped so a thrown transport error becomes `state.error` and `phase:'error'` rather than propagating.
+  - `start()`: if no session, return; `currentOrgId = await transport.ensurePersonalOrganization()`; then `await syncNow()`. (First-merge is Task 4; for now `start` simply syncs; legacy rows are already captured by hooks in Task 1's init scan — see Task 4.)
   - `init()`: call `attachSyncHooks()`; subscribe to auth; on `signed_in` call `start()`, on `signed_out` call `stop()`; add `window` `online` listener → `syncNow()`; set a modest `setInterval` (e.g. 60s) while visible to re-sync; debounce local mutations by listening to `_sync_meta` changes. `stop()`: `currentOrgId=null`, clear interval.
   - `getState()`/`subscribe()`: a small in-memory store of `SyncState` (signedIn, phase, lastSyncAt, pendingCount from `readSyncState`, inFlight, error, conflicts). Recompute pendingCount/conflicts from `readSyncState(currentOrgId ?? '')` on each emit.
 
@@ -215,10 +228,10 @@ test('syncNow swallows adapter errors and reports them without throwing', async 
 - Test: `client/src/sync/__tests__/firstMerge.test.ts`
 
 **Interfaces:**
-- Consumes: `syncStore`, `cloudAdapter`, `sessionsCatalog`/`drillCatalog` from `client/src/data/catalog.ts`.
+- Consumes: `syncStore`, `SyncTransport` (Task 2), `sessionsCatalog`/`drillCatalog` from `client/src/data/catalog.ts`.
 - Produces:
-  - `syncService.previewFirstMerge(): Promise<FirstMergeSummary>`
-  - `syncService.confirmFirstMerge(): Promise<SyncResult>`
+  - `syncService.previewFirstMerge(transport?: SyncTransport): Promise<FirstMergeSummary>`
+  - `syncService.confirmFirstMerge(transport?: SyncTransport): Promise<SyncResult>`
   - Seed functions set `catalogKey` on starter sessions / builtin drills.
 
 - [ ] **Step 1: Write the failing test**
@@ -227,11 +240,11 @@ test('syncNow swallows adapter errors and reports them without throwing', async 
 test('first merge reconciles duplicate starter sessions by catalogKey into one cloud row', async () => {
   // both devices seeded "Distance Progression" locally with catalogKey 'cat-distance'
   await db.sessions.add({ id:'local-1', name:'Distance Progression', catalogKey:'cat-distance', notes:'', createdAt:'t', updatedAt:'t' })
-  const adapter = fakeAdapterWithCloud([{ id:'cloud-1', catalogKey:'cat-distance', name:'Distance Progression', updated_at:'tc' }])
-  const summary = await previewFirstMerge(adapter, 'org-A')
+  const transport = fakeTransportWithCloud([{ id:'cloud-1', catalogKey:'cat-distance', name:'Distance Progression', updated_at:'tc' }])
+  const summary = await previewFirstMerge(transport, 'org-A')
   expect(summary.catalogMatches).toBeGreaterThanOrEqual(1)
-  const result = await confirmFirstMerge(adapter, 'org-A')
-  const pushedCatalogRows = adapter.upserted.filter(r => r.catalog_key === 'cat-distance')
+  const result = await confirmFirstMerge(transport, 'org-A')
+  const pushedCatalogRows = transport.upserted.filter(r => r.catalog_key === 'cat-distance')
   expect(pushedCatalogRows).toHaveLength(1)
 })
 ```
@@ -241,8 +254,8 @@ test('first merge reconciles duplicate starter sessions by catalogKey into one c
 - [ ] **Step 3: Implement**
   - Migration SQL: `create function ensure_personal_organization() returns uuid … security definer set search_path=public` — select the user's existing org (single-member) or insert `organizations(created_by)` + `organization_memberships(user_id, organization_id, owner_role_id)` (reuse the owner role lookup from the existing migration), return `organization_id`. Add `catalog_key text` to `sessions` and `library_drills`; add partial unique indexes `…_org_catalog_key_uniq on <table>(organization_id, catalog_key) where catalog_key is not null`. Verify existing RLS already permits the owner (created_by=auth.uid() / organization:manage).
   - `dao.ts` seeds: in `seedDefaultSessions` set `catalogKey: catalog.name` (slug or exact name; must be stable & unique in catalog) on each created session; in `seedLibraryDrills`/`patchLibraryDrills` set `catalogKey: d.name` on builtin rows. Personal/non-builtin rows keep `catalogKey` undefined.
-  - `syncService.previewFirstMerge(orgId)`: pull cloud rows; build summary = counts of local-only, cloud-only, same-id, and catalog-key matches; flag ambiguous (no id match and no catalog match but same name) for review. `confirmFirstMerge`: enqueue local-only as pending, apply cloud-only via `applyRemoteChanges`, reconcile same-id by newer `updatedAt`, and reconcile catalog-key matches to the single cloud row (update that row's local id mapping / meta). Then call `syncNow()`. **The original local workspace is never cleared**; on failure the local rows and meta remain and the merge can be retried.
-  - `start()` now branches: if the org has never synced on this device (`_sync_cursor` empty for all tables) AND there are local rows, call `previewFirstMerge` flow (UI confirms) — otherwise `syncNow()`.
+  - `syncService.previewFirstMerge(transport = this.transport, orgId = this.currentOrgId)`: pull cloud rows; build summary = counts of local-only, cloud-only, same-id, and catalog-key matches; flag ambiguous (no id match and no catalog match but same name) for review. `confirmFirstMerge`: enqueue local-only as pending, apply cloud-only via `applyRemoteChanges`, reconcile same-id by newer `updatedAt`, and reconcile catalog-key matches to the single cloud row (update that row's local id mapping / meta). Then call `syncNow()`. **The original local workspace is never cleared**; on failure the local rows and meta remain and the merge can be retried.
+  - `start()` now branches: if the org has never synced on this device (`_sync_cursor` empty for all tables) AND there are local rows, surface the `previewFirstMerge` summary for UI confirmation — otherwise `syncNow()`.
 
 - [ ] **Step 4: Run test to verify it passes** — `vitest client/src/sync/__tests__/firstMerge.test.ts`. Expected: PASS. Also run `npm run test`.
 
@@ -271,9 +284,9 @@ test("resolve 'remote' applies the cloud version and clears the conflict", async
 
 test("resolve 'local' re-pushes the local version", async () => {
   await seedConflict('swimmers','s1', local={name:'Local'}, remote={name:'Server'}, localRev='old', remoteRev='new')
-  const adapter = fakeAdapter({ pushed: 1 })
-  await resolveConflict('org-A:swimmers:s1', 'local', adapter)
-  expect(adapter.upserted.some(r => r.name === 'Local')).toBe(true)
+  const transport = fakeTransport({ pushed: 1 })
+  await resolveConflict('org-A:swimmers:s1', 'local', transport)
+  expect(transport.upserted.some(r => r.name === 'Local')).toBe(true)
 })
 ```
 
@@ -303,19 +316,19 @@ test("resolve 'local' re-pushes the local version", async () => {
 ```ts
 test('pending rows for account A are not pushed when active org is B', async () => {
   await markDirty('swimmers','a1')               // device-local pending (no org yet)
-  const adapterB = fakeAdapter({ pushed: 0 })
-  await syncNowAs('org-B', adapterB)             // active org switched to B
-  expect(adapterB.upserted).toHaveLength(0)
-  const adapterA = fakeAdapter({ pushed: 1 })
-  await syncNowAs('org-A', adapterA)             // returning to A
-  expect(adapterA.upserted.some(r => r.id === 'a1')).toBe(true)
+  const transportB = fakeTransport({ pushed: 0 })
+  await syncNowAs('org-B', transportB)             // active org switched to B
+  expect(transportB.upserted).toHaveLength(0)
+  const transportA = fakeTransport({ pushed: 1 })
+  await syncNowAs('org-A', transportA)             // returning to A
+  expect(transportA.upserted.some(r => r.id === 'a1')).toBe(true)
 })
 ```
 
 - [ ] **Step 2: Run test to verify it fails** — `vitest client/src/sync/__tests__/accountIsolation.test.ts`. Expected: FAIL.
 
 - [ ] **Step 3: Implement**
-  - Ensure `getPendingChanges`, `readSyncState`, `getCursor`/`setCursor` are consistently scoped by `currentOrgId` (meta already stores `orgId`; pending rows created before any sign-in get their `orgId` stamped at push time, not at capture time — capture stays org-agnostic so pre-sign-in offline edits still sync, satisfying Review Focus #5). `pushChanges(changes, currentOrgId)` passes the active org; rows from another org are filtered out before the call.
+  - Ensure `getPendingChanges`, `readSyncState`, `getCursor`/`setCursor` are consistently scoped by `currentOrgId` (meta already stores `orgId`; pending rows created before any sign-in get their `orgId` stamped at push time, not at capture time — capture stays org-agnostic so pre-sign-in offline edits still sync, satisfying Review Focus #5). `transport.push(changes, currentOrgId)` passes the active org; rows from another org are filtered out before the call.
   - `AuthContext.tsx`: in the provider effect, call `syncService.init()` once; on user transitions `signed_out → signed_in` call `start()`, `signed_in → signed_out` call `stop()`. No awaits block render.
 
 - [ ] **Step 4: Run test to verify it passes** — `vitest client/src/sync/__tests__/accountIsolation.test.ts`. Expected: PASS.
@@ -357,14 +370,14 @@ test('signed-in account shows last sync and a Sync now button', async () => {
 - Test: `client/src/sync/__tests__/failureContainment.test.ts`
 
 **Interfaces:**
-- Consumes: `syncStore`/`cloudAdapter`; existing `createBackupPayload` from `client/src/db/schema.ts` for export.
+- Consumes: `syncStore`/`SyncTransport`; existing `createBackupPayload` from `client/src/db/schema.ts` for export.
 
 - [ ] **Step 1: Write the failing test**
 
 ```ts
 test('local swimmer save commits and stays usable when push throws', async () => {
-  const adapter = fakeAdapter({ throwOn: 'push' })
-  await saveSwimmerWhileSyncing(adapter)   // simulates page calling swimmerService.create + syncNow rejecting
+  const transport = fakeTransport({ throwOn: 'push' })
+  await saveSwimmerWhileSyncing(transport)   // simulates page calling swimmerService.create + syncNow rejecting
   expect(await db.swimmers.get('s1')).toBeTruthy()
   expect((await readSyncState('org-A')).pendingCount).toBeGreaterThanOrEqual(1)
 })
