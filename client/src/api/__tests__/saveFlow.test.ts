@@ -578,10 +578,10 @@ describe('CompleteRunLap construction (handleComplete-equivalent logic)', () => 
 
     for (const lap of laps) {
       await mockAddLap({
-        run_drill_id: lap.runDrillId,
-        swimmer_id: lap.swimmerId,
+        runDrillId: lap.runDrillId,
+        swimmerId: lap.swimmerId,
         time: lap.time / 1000,
-        stroke_count: lap.strokeCount,
+        strokeCount: lap.strokeCount,
         effort: '',
         notes: '',
       })
@@ -589,8 +589,8 @@ describe('CompleteRunLap construction (handleComplete-equivalent logic)', () => 
     await mockCompleteSessionRun('r1')
 
     expect(mockAddLap).toHaveBeenCalledTimes(2)
-    expect(mockAddLap).toHaveBeenNthCalledWith(1, expect.objectContaining({ time: 4, stroke_count: 14 }))
-    expect(mockAddLap).toHaveBeenNthCalledWith(2, expect.objectContaining({ time: 6, stroke_count: 16 }))
+    expect(mockAddLap).toHaveBeenNthCalledWith(1, expect.objectContaining({ time: 4, strokeCount: 14 }))
+    expect(mockAddLap).toHaveBeenNthCalledWith(2, expect.objectContaining({ time: 6, strokeCount: 16 }))
     expect(mockCompleteSessionRun).toHaveBeenCalledWith('r1')
   })
 
@@ -695,10 +695,10 @@ describe('collectSessionLaps — session completion sanitize', () => {
   function laneResult(runDrillId: string, swimmers: SavedSwimmerData[]): LaneDrillResult {
     return {
       id: `lr-${runDrillId}`,
-      run_id: RID,
-      group_id: GID,
+      runId: RID,
+      groupId: GID,
       lane: 1,
-      run_drill_id: runDrillId,
+      runDrillId,
       completed: true,
       data: JSON.stringify({ drillStart: 2000, drillEnd: 20000, sessionStartedAt: 0, poolLength: 25, swimmers }),
       updatedAt: '',

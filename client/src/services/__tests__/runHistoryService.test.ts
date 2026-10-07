@@ -20,15 +20,15 @@ const { getRunHistory, getRunById, deleteRun, exportRun } = await import('../run
 
 const makeRun = (overrides: Partial<SessionRun> = {}): SessionRun => ({
   id: 'r1',
-  session_id: 's1',
+  sessionId: 's1',
   date: '2024-06-01',
   poolName: 'Main Pool',
   poolLength: 25,
   notes: '',
   status: 'completed',
-  session_started_at: 0,
-  session_paused_at: null,
-  session_pause_duration: 0,
+  sessionStartedAt: 0,
+  sessionPausedAt: null,
+  sessionPauseDuration: 0,
   createdAt: '2024-06-01T10:00:00.000Z',
   updatedAt: '2024-06-01T10:00:00.000Z',
   ...overrides,
@@ -63,15 +63,15 @@ describe('runHistoryService', () => {
   it('builds a summary with real swimmers and blob timing', async () => {
     mockDao.getCompletedRuns.mockResolvedValue([makeRun()])
     mockDao.getRunDrillsForRun.mockResolvedValue([
-      { id: 'rd1', run_id: 'r1', name: 'Warmup', stroke: 'freestyle', distance: 200, order: 0, notes: '', createdAt: '', updatedAt: '' },
+      { id: 'rd1', runId: 'r1', name: 'Warmup', stroke: 'freestyle', distance: 200, order: 0, notes: '', createdAt: '', updatedAt: '' },
     ])
     mockDao.getRunSwimmersForRun.mockResolvedValue([
-      { id: 'rsw1', run_id: 'r1', swimmer_id: 'sw1', lane: 1, createdAt: '', updatedAt: '' },
+      { id: 'rsw1', runId: 'r1', swimmerId: 'sw1', lane: 1, createdAt: '', updatedAt: '' },
     ])
     mockDao.getSwimmersForRun.mockResolvedValue([makeSwimmer({})])
     mockDao.getLaneDrillResults.mockResolvedValue([
       {
-        id: 'lr1', run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: true, updatedAt: '',
+        id: 'lr1', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'rd1', completed: true, updatedAt: '',
         data: makeBlob([
           { dbId: 'sw1', name: 'Alice', startedAt: 1000, completedAt: 33000, laps: [{ time: 16000, strokeCount: 18 }, { time: 16500 }], completed: true },
         ]),
@@ -109,13 +109,13 @@ describe('runHistoryService', () => {
   it('includes virtual swimmers from blobs only', async () => {
     mockDao.getCompletedRuns.mockResolvedValue([makeRun()])
     mockDao.getRunDrillsForRun.mockResolvedValue([
-      { id: 'rd1', run_id: 'r1', name: 'Quick Time', stroke: 'freestyle', distance: 100, order: 0, notes: '', createdAt: '', updatedAt: '' },
+      { id: 'rd1', runId: 'r1', name: 'Quick Time', stroke: 'freestyle', distance: 100, order: 0, notes: '', createdAt: '', updatedAt: '' },
     ])
     mockDao.getRunSwimmersForRun.mockResolvedValue([])
     mockDao.getSwimmersForRun.mockResolvedValue([])
     mockDao.getLaneDrillResults.mockResolvedValue([
       {
-        id: 'lr1', run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: true, updatedAt: '',
+        id: 'lr1', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'rd1', completed: true, updatedAt: '',
         data: makeBlob([
           { dbId: 'quick-1', name: 'Mia', startedAt: 1000, completedAt: 11000, laps: [{ time: 10000 }], completed: true },
           { dbId: 'quick-2', name: 'Leo', startedAt: 1000, completedAt: 60000, laps: [], completed: true },
@@ -150,8 +150,8 @@ describe('runHistoryService', () => {
 
     mockDao.getRunSwimmersForRun.mockImplementation(async (runId: string) =>
       runId === 'r1'
-        ? [{ id: 'rsw1', run_id: 'r1', swimmer_id: 'sw1', lane: 1, createdAt: '', updatedAt: '' }]
-        : [{ id: 'rsw2', run_id: 'r2', swimmer_id: 'sw2', lane: 1, createdAt: '', updatedAt: '' }],
+        ? [{ id: 'rsw1', runId: 'r1', swimmerId: 'sw1', lane: 1, createdAt: '', updatedAt: '' }]
+        : [{ id: 'rsw2', runId: 'r2', swimmerId: 'sw2', lane: 1, createdAt: '', updatedAt: '' }],
     )
     mockDao.getSwimmersForRun.mockImplementation(async (runId: string) =>
       runId === 'r1'
@@ -178,11 +178,11 @@ describe('runHistoryService', () => {
     mockDao.getLaneDrillResults.mockImplementation(async (runId: string) =>
       runId === 'r1'
         ? [{
-            id: 'lr1', run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: true, updatedAt: '',
+            id: 'lr1', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'rd1', completed: true, updatedAt: '',
             data: makeBlob([{ dbId: 'quick-1', name: 'jane', startedAt: 1000, completedAt: 11000, laps: [{ time: 10000 }], completed: true }]),
           }]
         : [{
-            id: 'lr2', run_id: 'r2', group_id: 'g1', lane: 1, run_drill_id: 'rd2', completed: true, updatedAt: '',
+            id: 'lr2', runId: 'r2', groupId: 'g1', lane: 1, runDrillId: 'rd2', completed: true, updatedAt: '',
             data: makeBlob([{ dbId: 'quick-2', name: 'Mia', startedAt: 1000, completedAt: 11000, laps: [{ time: 10000 }], completed: true }]),
           }],
     )
@@ -223,15 +223,15 @@ describe('runHistoryService', () => {
   it('getRunById builds a single-run summary', async () => {
     mockDao.getSessionRun.mockResolvedValue(makeRun())
     mockDao.getRunDrillsForRun.mockResolvedValue([
-      { id: 'rd1', run_id: 'r1', name: 'Warmup', stroke: 'freestyle', distance: 200, order: 0, notes: '', createdAt: '', updatedAt: '' },
+      { id: 'rd1', runId: 'r1', name: 'Warmup', stroke: 'freestyle', distance: 200, order: 0, notes: '', createdAt: '', updatedAt: '' },
     ])
     mockDao.getRunSwimmersForRun.mockResolvedValue([
-      { id: 'rsw1', run_id: 'r1', swimmer_id: 'sw1', lane: 1, createdAt: '', updatedAt: '' },
+      { id: 'rsw1', runId: 'r1', swimmerId: 'sw1', lane: 1, createdAt: '', updatedAt: '' },
     ])
     mockDao.getSwimmersForRun.mockResolvedValue([makeSwimmer({})])
     mockDao.getLaneDrillResults.mockResolvedValue([
       {
-        id: 'lr1', run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: true, updatedAt: '',
+        id: 'lr1', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'rd1', completed: true, updatedAt: '',
         data: makeBlob([
           { dbId: 'sw1', name: 'Alice', startedAt: 1000, completedAt: 33000, laps: [{ time: 16000, strokeCount: 18 }, { time: 16500 }], completed: true },
         ]),
@@ -254,7 +254,7 @@ describe('runHistoryService', () => {
   it('exportRun builds a JSON blob with run, drills, and swimmers', async () => {
     mockDao.getSessionRun.mockResolvedValue(makeRun())
     mockDao.getRunDrillsForRun.mockResolvedValue([
-      { id: 'rd1', run_id: 'r1', name: 'Warmup', stroke: 'freestyle', distance: 200, order: 0, notes: '', createdAt: '', updatedAt: '' },
+      { id: 'rd1', runId: 'r1', name: 'Warmup', stroke: 'freestyle', distance: 200, order: 0, notes: '', createdAt: '', updatedAt: '' },
     ])
     mockDao.getRunSwimmersForRun.mockResolvedValue([])
     mockDao.getSwimmersForRun.mockResolvedValue([])

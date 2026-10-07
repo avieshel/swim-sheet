@@ -1,4 +1,6 @@
-export const strokeColors: Record<string, string> = {
+import type { Stroke } from '../types/swimming'
+
+export const strokeColors: Record<Stroke, string> = {
   freestyle: 'bg-blue-100 text-blue-700',
   backstroke: 'bg-emerald-100 text-emerald-700',
   breaststroke: 'bg-purple-100 text-purple-700',
@@ -6,7 +8,7 @@ export const strokeColors: Record<string, string> = {
   im: 'bg-amber-100 text-amber-700',
 }
 
-export const strokeColorsSolid: Record<string, string> = {
+export const strokeColorsSolid: Record<Stroke, string> = {
   freestyle: 'bg-blue-400',
   backstroke: 'bg-emerald-400',
   breaststroke: 'bg-purple-400',
@@ -20,7 +22,7 @@ export const strokeOptions = [
   { value: 'breaststroke', label: 'Breaststroke' },
   { value: 'butterfly', label: 'Butterfly' },
   { value: 'im', label: 'IM' },
-]
+] satisfies { value: Stroke; label: string }[]
 
 export const TECHNIQUE_LABELS = ['catch', 'kick', 'body position', 'rotation', 'rhythm', 'streamline', 'pullout', 'breathing']
 export const FITNESS_LABELS = ['speed', 'endurance', 'strength', 'anaerobic', 'aerobic', 'sprint', 'pacing']

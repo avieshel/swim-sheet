@@ -13,11 +13,12 @@ import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
 import { Events, analytics } from '../services/analyticsEvents'
+import type { Stroke } from '../types/swimming'
 
 interface SessionWithTotals extends Session {
   drillCount: number
   totalDistance: number
-  strokeBreakdown: { stroke: string; meters: number }[]
+  strokeBreakdown: { stroke: Stroke; meters: number }[]
   focusAreas: string[]
 }
 
@@ -122,7 +123,7 @@ export const SessionsList: React.FC = () => {
   }
 
   const handleStartLive = async (session: Session) => {
-    if (activeRun?.session_id === session.id) {
+    if (activeRun?.sessionId === session.id) {
       navigate('/live')
       return
     }
@@ -313,7 +314,7 @@ export const SessionsList: React.FC = () => {
         <>
         <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
           {visibleTemplates.map(s => {
-            const isLive = activeRun?.session_id === s.id
+            const isLive = activeRun?.sessionId === s.id
             return (
             <div
               key={s.id}

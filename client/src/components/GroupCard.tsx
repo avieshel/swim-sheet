@@ -384,7 +384,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
 
   const currentDrillIndex = runDrills.findIndex(d => d.id === liveGroup.currentRunDrillId)
   const baseDrill = runDrills.find(d => d.id === liveGroup.currentRunDrillId)
-  const laneResult = liveGroup.currentRunDrillId ? laneDrillResults.find(r => r.group_id === liveGroup.id && r.run_drill_id === liveGroup.currentRunDrillId) : null
+  const laneResult = liveGroup.currentRunDrillId ? laneDrillResults.find(r => r.groupId === liveGroup.id && r.runDrillId === liveGroup.currentRunDrillId) : null
   const isCompletedDrill = laneResult?.completed === true
   const savedData: SavedDrillData | null = isCompletedDrill && laneResult?.data ? JSON.parse(laneResult.data) : null
 

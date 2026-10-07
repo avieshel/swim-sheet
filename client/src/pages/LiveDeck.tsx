@@ -100,11 +100,11 @@ export const LiveDeck: React.FC = () => {
               laneMap.set(link.lane, g)
               groups.push(g)
             }
-            if (!g.swimmers.some(s => s.dbId === link.swimmer_id)) {
-              const sw = swimmerMap.get(link.swimmer_id)
+            if (!g.swimmers.some(s => s.dbId === link.swimmerId)) {
+              const sw = swimmerMap.get(link.swimmerId)
               g.swimmers.push({
                 id: Date.now() + Math.random(),
-                dbId: link.swimmer_id,
+                dbId: link.swimmerId,
                 name: sw?.name || 'Unknown',
                 completed: false,
                 lapStrokeCounts: {},
@@ -126,10 +126,10 @@ export const LiveDeck: React.FC = () => {
               lane: laneNum,
               name: `Lane ${laneNum}`,
               swimmers: laneLinks.map((link, idx) => {
-                const sw = swimmerMap.get(link.swimmer_id)
+                const sw = swimmerMap.get(link.swimmerId)
                 return {
                   id: Date.now() + idx + Math.random(),
-                  dbId: link.swimmer_id,
+                  dbId: link.swimmerId,
                   name: sw?.name || 'Unknown',
                   completed: false,
                   lapStrokeCounts: {},

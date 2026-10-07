@@ -1,11 +1,12 @@
 import drillCatalogJson from './drills.json'
 import sessionsCatalogJson from './sessions.json'
+import type { Stroke } from '../types/swimming'
 
 type CatalogFocus = 'technique' | 'fitness' | 'none'
 
 interface CatalogDrill {
   name: string
-  stroke: string
+  stroke: Stroke
   distance: number
   focus: CatalogFocus
   labels: string[]
@@ -14,7 +15,7 @@ interface CatalogDrill {
 
 interface CatalogDrillItem {
   distance: number
-  stroke: string
+  stroke: Stroke
   repeatCount: number
   intensity?: string
   interval?: string
@@ -24,7 +25,7 @@ interface CatalogDrillItem {
 interface CatalogSessionDrill {
   name: string
   order: number
-  stroke: string
+  stroke: Stroke
   distance: number
   items: CatalogDrillItem[]
   repeatCount: number

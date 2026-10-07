@@ -16,17 +16,17 @@ test.describe('Responsive Layout — lane card fits controls at every breakpoint
       });
 
       await db.drills.add({
-        id: crypto.randomUUID(), session_id: 'ignored', name: '100m Freestyle', stroke: 'freestyle',
+        id: crypto.randomUUID(), sessionId: 'ignored', name: '100m Freestyle', stroke: 'freestyle',
         distance: 100, order: 0, createdAt: now, updatedAt: now,
       });
 
       await db.sessionRuns.add({
-        id: runId, session_id: 'ignored', date: new Date().toISOString().split('T')[0],
+        id: runId, sessionId: 'ignored', date: new Date().toISOString().split('T')[0],
         poolName: 'Test Pool', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now,
       });
 
       await db.runDrills.add({
-        id: drillId, run_id: runId, name: '100m Freestyle', stroke: 'freestyle',
+        id: drillId, runId, name: '100m Freestyle', stroke: 'freestyle',
         distance: 100, order: 0, notes: '', createdAt: now, updatedAt: now,
       });
 
@@ -37,7 +37,7 @@ test.describe('Responsive Layout — lane card fits controls at every breakpoint
           id: swId, name: `Swimmer ${i}`, group: '', notes: '', createdAt: now, updatedAt: now,
         });
         await db.runSwimmers.add({
-          run_id: runId, swimmer_id: swId, lane: 1, createdAt: now, updatedAt: now,
+          runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now,
         });
       }
     });

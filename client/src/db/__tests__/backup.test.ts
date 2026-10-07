@@ -147,8 +147,8 @@ describe('granular data resets', () => {
   it('deleteAllSwimmers clears swimmers, their laps and links, but keeps sessions', async () => {
     await db.swimmers.add({ id: 'swim-1', name: 'Ada', group: '', notes: '', status: 'active', createdAt: now(), updatedAt: now() })
     await db.sessions.add({ id: 'sess-1', name: 'Distance Progression', notes: '', createdAt: now(), updatedAt: now() })
-    await db.runSwimmers.add({ id: 'rs-1', run_id: 'run-1', swimmer_id: 'swim-1', lane: 1, createdAt: now(), updatedAt: now() })
-    await db.laps.add({ id: 'lap-1', run_drill_id: 'rd-1', swimmer_id: 'swim-1', time: 30000, stroke_count: 0, effort: '', notes: '', createdAt: now(), updatedAt: now() })
+    await db.runSwimmers.add({ id: 'rs-1', runId: 'run-1', swimmerId: 'swim-1', lane: 1, createdAt: now(), updatedAt: now() })
+    await db.laps.add({ id: 'lap-1', runDrillId: 'rd-1', swimmerId: 'swim-1', time: 30000, strokeCount: 0, effort: '', notes: '', createdAt: now(), updatedAt: now() })
 
     await deleteAllSwimmers()
 
@@ -161,13 +161,13 @@ describe('granular data resets', () => {
   it('deleteAllSessions clears templates and their drills, but keeps completed runs', async () => {
     await db.sessions.add({ id: 'sess-1', name: 'Distance Progression', notes: '', createdAt: now(), updatedAt: now() })
     await db.drills.add({
-      id: 'drill-1', session_id: 'sess-1', name: '4x25 sprint', order: 1, items: [], repeatCount: 1,
+      id: 'drill-1', sessionId: 'sess-1', name: '4x25 sprint', order: 1, items: [], repeatCount: 1,
       timingMode: 'individual', focus: 'none', labels: [], description: '', stroke: 'freestyle', distance: 100,
       createdAt: now(), updatedAt: now(),
     })
     await db.sessionRuns.add({
-      id: 'run-1', session_id: 'sess-1', date: '2026-01-01', poolName: '', poolLength: 25, notes: '', status: 'completed',
-      session_started_at: null, session_paused_at: null, session_pause_duration: 0, createdAt: now(), updatedAt: now(),
+      id: 'run-1', sessionId: 'sess-1', date: '2026-01-01', poolName: '', poolLength: 25, notes: '', status: 'completed',
+      sessionStartedAt: null, sessionPausedAt: null, sessionPauseDuration: 0, createdAt: now(), updatedAt: now(),
     })
 
     await deleteAllSessions()

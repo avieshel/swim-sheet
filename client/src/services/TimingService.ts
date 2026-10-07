@@ -52,10 +52,10 @@ export const TimingService = {
     })
 
     await setLaneResult({
-      run_id: runId,
-      group_id: group.id,
+      runId,
+      groupId: group.id,
       lane: group.lane,
-      run_drill_id: drillId,
+      runDrillId: drillId,
       completed: true,
       data: JSON.stringify(timingData),
     })
@@ -88,11 +88,11 @@ export const TimingService = {
     advanceTo: string | null,
     dispatch: Dispatch<LiveSessionAction>
   ): Promise<LaneDrillResult[]> {
-    const existing = laneDrillResults.find(r => r.group_id === group.id && r.run_drill_id === runDrillId)
+    const existing = laneDrillResults.find(r => r.groupId === group.id && r.runDrillId === runDrillId)
     if (existing?.completed) {
-      await uncompleteLaneResult({ run_id: runId, group_id: group.id, run_drill_id: runDrillId, lane: group.lane })
+      await uncompleteLaneResult({ runId, groupId: group.id, runDrillId, lane: group.lane })
     } else {
-      await completeLaneResult({ run_id: runId, group_id: group.id, run_drill_id: runDrillId, lane: group.lane })
+      await completeLaneResult({ runId, groupId: group.id, runDrillId, lane: group.lane })
       if (group.currentRunDrillId === runDrillId) {
         store.clearDrill(runId, group.id, runDrillId)
         dispatch({ type: 'CLEAR_GROUP_SWIMMER_DATA', payload: { groupId: group.id } })

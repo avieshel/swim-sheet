@@ -255,7 +255,7 @@ export async function collectSessionLaps(
     } catch {
       continue
     }
-    persistedDrillIds.add(result.run_drill_id)
+    persistedDrillIds.add(result.runDrillId)
     for (const sw of data.swimmers) {
       if (!sw.dbId) continue
       if (sw.dbId.startsWith('quick-')) {
@@ -264,7 +264,7 @@ export async function collectSessionLaps(
       }
       for (const lap of sw.laps) {
         laps.push({
-          runDrillId: result.run_drill_id,
+          runDrillId: result.runDrillId,
           swimmerId: sw.dbId,
           time: lap.time,
           strokeCount: lap.strokeCount ?? 0,

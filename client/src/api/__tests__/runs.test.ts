@@ -189,7 +189,7 @@ describe('runs API', () => {
   })
 
   it('setLaneResult delegates to runService.setLaneResult', async () => {
-    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, completed: false, data: '' } as SafeLaneDrillResult
+    const data = { runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1, completed: false, data: '' } as SafeLaneDrillResult
     vi.mocked(runService.setLaneResult).mockResolvedValue('new-id')
     const result = await setLaneResult(data)
     expect(runService.setLaneResult).toHaveBeenCalledWith(data)
@@ -197,7 +197,7 @@ describe('runs API', () => {
   })
 
   it('startLaneResult delegates to runService.startLaneResult', async () => {
-    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 }
+    const data = { runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 }
     vi.mocked(runService.startLaneResult).mockResolvedValue('new-id')
     const result = await startLaneResult(data)
     expect(runService.startLaneResult).toHaveBeenCalledWith(data)
@@ -205,7 +205,7 @@ describe('runs API', () => {
   })
 
   it('completeLaneResult delegates to runService.completeLaneResult', async () => {
-    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 }
+    const data = { runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 }
     vi.mocked(runService.completeLaneResult).mockResolvedValue('new-id')
     const result = await completeLaneResult(data)
     expect(runService.completeLaneResult).toHaveBeenCalledWith(data)
@@ -213,7 +213,7 @@ describe('runs API', () => {
   })
 
   it('uncompleteLaneResult delegates to runService.uncompleteLaneResult', async () => {
-    const data = { run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 }
+    const data = { runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 }
     vi.mocked(runService.uncompleteLaneResult).mockResolvedValue('lr1')
     const result = await uncompleteLaneResult(data)
     expect(runService.uncompleteLaneResult).toHaveBeenCalledWith(data)
@@ -270,7 +270,7 @@ describe('runs API', () => {
   })
 
   it('addLap delegates to runService.addLap', async () => {
-    const data = { run_drill_id: 'rd1', swimmer_id: 'sw1', time: 32000, stroke_count: 0, effort: '', notes: '' } as SafeLap
+    const data = { runDrillId: 'rd1', swimmerId: 'sw1', time: 32000, strokeCount: 0, effort: '', notes: '' } as SafeLap
     vi.mocked(runService.addLap).mockResolvedValue('new-id')
     const result = await addLap(data)
     expect(runService.addLap).toHaveBeenCalledWith(data)

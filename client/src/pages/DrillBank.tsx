@@ -83,7 +83,7 @@ export const DrillBank: React.FC = () => {
     const existingDrills = await getSessionDrills(session.id)
     const nextOrder = existingDrills.length > 0 ? Math.max(...existingDrills.map(d => d.order)) + 1 : 0
     await createDrill({
-      session_id: session.id,
+      sessionId: session.id,
       name: detailDrill.name,
       order: nextOrder,
       items: detailDrill.items || [],

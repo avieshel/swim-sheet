@@ -20,7 +20,7 @@ test.describe('Drill Persistence', () => {
       });
 
       await db.drills.add({
-        id: crypto.randomUUID(), session_id: sessionId, name: '200m Freestyle', stroke: 'freestyle',
+        id: crypto.randomUUID(), sessionId, name: '200m Freestyle', stroke: 'freestyle',
         distance: 200, order: 0, createdAt: now, updatedAt: now,
       });
 
@@ -29,17 +29,17 @@ test.describe('Drill Persistence', () => {
       });
 
       await db.sessionRuns.add({
-        id: runId, session_id: sessionId, date: new Date().toISOString().split('T')[0],
+        id: runId, sessionId, date: new Date().toISOString().split('T')[0],
         poolName: 'Test Pool', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now,
       });
 
       await db.runDrills.add({
-        id: runDrillId, run_id: runId, name: '200m Freestyle', stroke: 'freestyle',
+        id: runDrillId, runId, name: '200m Freestyle', stroke: 'freestyle',
         distance: 200, order: 0, notes: '', createdAt: now, updatedAt: now,
       });
 
       await db.runSwimmers.add({
-        id: crypto.randomUUID(), run_id: runId, swimmer_id: swimmerId, lane: 1, createdAt: now, updatedAt: now,
+        id: crypto.randomUUID(), runId, swimmerId, lane: 1, createdAt: now, updatedAt: now,
       });
 
       return { runId, runDrillId, swimmerId };
@@ -79,18 +79,18 @@ test.describe('Drill Persistence', () => {
     // Wait for auto-save to write LaneDrillResult to IndexedDB
     await page.waitForFunction(async (runId: string) => {
       const db = (window as any).db;
-      const rows = await db.laneDrillResults.where('run_id').equals(runId).toArray();
+      const rows = await db.laneDrillResults.where('runId').equals(runId).toArray();
       return rows.length > 0;
     }, ids.runId, { timeout: 8000 });
 
     // Verify the persisted data
     const results = await page.evaluate(async ({ runId, runDrillId }) => {
       const db = (window as any).db;
-      const rows = await db.laneDrillResults.where('run_id').equals(runId).toArray();
+      const rows = await db.laneDrillResults.where('runId').equals(runId).toArray();
       return rows.map(r => ({
-        run_id: r.run_id,
-        group_id: r.group_id,
-        run_drill_id: r.run_drill_id,
+        runId: r.runId,
+        groupId: r.groupId,
+        runDrillId: r.runDrillId,
         completed: r.completed,
         data: JSON.parse(r.data),
       }));
@@ -99,10 +99,10 @@ test.describe('Drill Persistence', () => {
     expect(results.length).toBeGreaterThanOrEqual(1);
 
     const result = results[0];
-    expect(result.run_id).toBe(ids.runId);
-    expect(result.run_drill_id).toBe(ids.runDrillId);
+    expect(result.runId).toBe(ids.runId);
+    expect(result.runDrillId).toBe(ids.runDrillId);
     expect(result.completed).toBe(true);
-    expect(result.group_id).toBeTruthy();
+    expect(result.groupId).toBeTruthy();
 
     // Verify swimmer data inside the JSON blob
     expect(result.data.swimmers.length).toBeGreaterThanOrEqual(1);

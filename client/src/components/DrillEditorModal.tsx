@@ -6,11 +6,12 @@ import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, stro
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 import { emptyDrillForm } from '../utils/drillHelpers'
 import { Icon } from './Icon'
+import type { Stroke } from '../types/swimming'
 
 interface DrillItem {
   id: string
   distance: number
-  stroke: string
+  stroke: Stroke
   repeatCount: number
   intensity?: string
   interval?: string
@@ -27,9 +28,9 @@ export interface DrillFormData {
   description: string
   id?: string
   distance?: number
-  stroke?: string
+  stroke?: Stroke
   order?: number
-  session_id?: string
+  sessionId?: string
 }
 
 interface DrillEditorModalProps {
@@ -55,7 +56,7 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
       distance: initialData.distance,
       stroke: initialData.stroke,
       order: initialData.order,
-      session_id: initialData.session_id,
+      sessionId: initialData.sessionId,
     }
   }
   return {
@@ -296,7 +297,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                           options={strokeOptions}
                           onChange={(val) => {
                             const newItems = [...(form.items || [])]
-                            newItems[idx] = { ...item, stroke: val as string }
+                            newItems[idx] = { ...item, stroke: val as Stroke }
                             setForm({ ...form, items: newItems })
                           }}
                         />

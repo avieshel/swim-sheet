@@ -36,14 +36,14 @@ export function DrillsSection({
   const isDrillDone = (rdId: string) => {
     if (activeGroups.length === 0) return false
     return activeGroups.every(g =>
-      laneDrillResults.some(r => r.group_id === g.id && r.run_drill_id === rdId && r.completed)
+      laneDrillResults.some(r => r.groupId === g.id && r.runDrillId === rdId && r.completed)
     )
   }
 
   const handleToggle = (rdId: string) => {
     const done = isDrillDone(rdId)
     activeGroups.forEach(g => {
-      const isDoneForGroup = laneDrillResults.some(r => r.group_id === g.id && r.run_drill_id === rdId && r.completed)
+      const isDoneForGroup = laneDrillResults.some(r => r.groupId === g.id && r.runDrillId === rdId && r.completed)
       if (done === isDoneForGroup) {
         onToggleDrillDone(g.id, rdId, null)
       }

@@ -18,7 +18,7 @@ test.describe('Live indicator', () => {
       const session = all.find((x: any) => x.name === 'Distance Progression');
       const now = new Date().toISOString();
       await db.sessionRuns.add({
-        id: crypto.randomUUID(), session_id: session.id, date: now.split('T')[0], poolName: 'Live',
+        id: crypto.randomUUID(), sessionId: session.id, date: now.split('T')[0], poolName: 'Live',
         poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now,
       });
     });

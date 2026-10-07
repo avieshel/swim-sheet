@@ -128,7 +128,7 @@ export const Events = {
     name: 'session_reset',
     properties: { clear_swimmers: clearSwimmers },
   }),
-  DrillCreated: (source: DrillSource, stroke: string, distance: number): TrackedEvent => ({
+  DrillCreated: (source: DrillSource, stroke: Stroke | '', distance: number): TrackedEvent => ({
     name: 'drill_created',
     properties: { source, stroke, distance },
   }),
@@ -142,7 +142,7 @@ export const Events = {
   }),
   DrillAddedToSession: (
     source: DrillAddedSource,
-    stroke: string,
+    stroke: Stroke,
     distance: number
   ): TrackedEvent => ({
     name: 'drill_added_to_session',
@@ -152,7 +152,7 @@ export const Events = {
     lane: number,
     swimmerCount: number,
     distance: number,
-    stroke: string
+    stroke: RunDrillStroke
   ): TrackedEvent => ({
     name: 'drill_completed',
     properties: { lane, swimmer_count: swimmerCount, distance, stroke },
@@ -194,3 +194,4 @@ export const Events = {
 }
 
 export { analytics, isNewSession } from './analyticsService'
+import type { RunDrillStroke, Stroke } from '../types/swimming'

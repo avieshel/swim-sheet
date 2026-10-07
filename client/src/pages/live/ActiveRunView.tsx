@@ -43,14 +43,14 @@ function TimingModeHeader({ runDrills, timingDrillId, laneDrillResults, groups, 
   const activeGroups = groups.filter(g => g.swimmers.length > 0)
 
   const isDone = drill && activeGroups.length > 0 && activeGroups.every(g =>
-    laneDrillResults.some(r => r.group_id === g.id && r.run_drill_id === drill.id && r.completed)
+    laneDrillResults.some(r => r.groupId === g.id && r.runDrillId === drill.id && r.completed)
   )
 
   const handleToggle = () => {
     if (!drill) return
     const done = isDone
     activeGroups.forEach(g => {
-      const isDoneForGroup = laneDrillResults.some(r => r.group_id === g.id && r.run_drill_id === drill.id && r.completed)
+      const isDoneForGroup = laneDrillResults.some(r => r.groupId === g.id && r.runDrillId === drill.id && r.completed)
       if (done === isDoneForGroup) {
         onToggleDrillDone(g.id, drill.id, null)
       }
@@ -147,7 +147,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const totalDistance = runDrills.reduce((sum, d) => sum + (d.distance || 0), 0)
   const completedDistance = runDrills.reduce((sum, drill) => {
     const completed = activeGroups.some(lane =>
-      laneDrillResults.some(r => r.group_id === lane.id && r.run_drill_id === drill.id && r.completed)
+      laneDrillResults.some(r => r.groupId === lane.id && r.runDrillId === drill.id && r.completed)
     )
     return sum + (completed ? drill.distance : 0)
   }, 0)
@@ -198,9 +198,9 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       setDrillsLoaded(true)
     })
     getLaneResults(run.id).then(results => setLaneDrillResults(results))
-    getSession(run.session_id).then(s => setTemplateName(s?.name || 'Unknown'))
+    getSession(run.sessionId).then(s => setTemplateName(s?.name || 'Unknown'))
     listSwimmers().then(setRosterSwimmers)
-  }, [run.id, run.session_id, dispatch, run, activeGroups.length])
+  }, [run.id, run.sessionId, dispatch, run, activeGroups.length])
 
   const refreshRoster = () => {
     listSwimmers().then(setRosterSwimmers)
@@ -372,7 +372,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
          onComplete={handleComplete}
          onReset={() => setShowResetSessionConfirm(true)}
          onOpenLaneEditor={() => openLaneEditor()}
-         onEditSession={() => navigate(`/sessions/${run.session_id}`)}
+          onEditSession={() => navigate(`/sessions/${run.sessionId}`)}
          onCommitPoolLength={value => { updateRun(run.id, { poolLength: value }) }}
        />
 

@@ -1,4 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie'
+import type { RunDrillStroke, Stroke } from '../types/swimming'
+import { migrateLegacyRecord } from './recordMigration'
 
 export interface Swimmer {
   id: string
@@ -24,7 +26,7 @@ export interface Session {
 interface DrillItem {
   id: string
   distance: number
-  stroke: string
+  stroke: Stroke
   repeatCount: number
   intensity?: string
   interval?: string
@@ -34,15 +36,15 @@ interface DrillItem {
 
 interface DrillSegment {
   distance: number
-  stroke: string
+  stroke: Stroke
   name: string
 }
 
 export interface Drill {
   id: string
-  session_id: string
+  sessionId: string
   name: string
-  stroke: string
+  stroke: Stroke
   distance: number
   order: number
   items: DrillItem[]
@@ -57,25 +59,25 @@ export interface Drill {
 
 export interface SessionRun {
   id: string
-  session_id: string
+  sessionId: string
   date: string
   poolName: string
   poolLength: number
   notes: string
   status: 'active' | 'completed'
-  session_started_at: number | null
-  session_paused_at: number | null
-  session_pause_duration: number
+  sessionStartedAt: number | null
+  sessionPausedAt: number | null
+  sessionPauseDuration: number
   createdAt: string
   updatedAt: string
 }
 
 export interface RunDrill {
   id: string
-  run_id: string
-  parent_drill_id?: string
+  runId: string
+  parentDrillId?: string
   name: string
-  stroke: string
+  stroke: RunDrillStroke
   distance: number
   order: number
   notes: string
@@ -88,8 +90,8 @@ export interface RunDrill {
 
 export interface RunSwimmer {
   id: string
-  run_id: string
-  swimmer_id: string
+  runId: string
+  swimmerId: string
   lane: number
   createdAt: string
   updatedAt: string
@@ -97,10 +99,10 @@ export interface RunSwimmer {
 
 export interface LaneDrillResult {
   id: string
-  run_id: string
-  group_id: string
+  runId: string
+  groupId: string
   lane: number
-  run_drill_id: string
+  runDrillId: string
   // The progress marker — a lane-group can be marked "done" without any timing.
   completed: boolean
   // Optional timing detail blob (SavedDrillData). null means this lane was
@@ -141,7 +143,7 @@ interface DbMeta {
 export interface LibraryDrill {
   id: string
   name: string
-  stroke: string
+  stroke: Stroke
   distance: number
   items?: DrillItem[]
   repeatCount?: number
@@ -157,10 +159,10 @@ export interface LibraryDrill {
 
 export interface Lap {
   id: string
-  run_drill_id: string
-  swimmer_id: string
+  runDrillId: string
+  swimmerId: string
   time: number
-  stroke_count: number
+  strokeCount: number
   effort: string
   notes: string
   createdAt: string
@@ -265,10 +267,30 @@ class SwimSheetDB extends Dexie {
       libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
       _meta: 'key',
     })
+
+    this.version(6).stores({
+      swimmers: 'id, &name, status, updatedAt',
+      sessions: 'id, createdAt, updatedAt',
+      drills: 'id, sessionId, focus, updatedAt',
+      sessionRuns: 'id, sessionId, status, date, updatedAt',
+      runDrills: 'id, runId, parentDrillId, updatedAt',
+      runSwimmers: 'id, runId, swimmerId',
+      laps: 'id, runDrillId, swimmerId, createdAt',
+      laneDrillResults: 'id, runId, groupId, lane, runDrillId, [runId+groupId+runDrillId], updatedAt',
+      libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+      _meta: 'key',
+    }).upgrade(async tx => {
+      const tables = ['drills', 'sessionRuns', 'runDrills', 'runSwimmers', 'laneDrillResults', 'laps']
+      for (const tableName of tables) {
+        await tx.table(tableName).toCollection().modify(record => {
+          migrateLegacyRecord(tableName, record as unknown as Record<string, unknown>)
+        })
+      }
+    })
   }
 }
 
-export const DB_SCHEMA_VERSION = 5
+export const DB_SCHEMA_VERSION = 6
 const BACKUP_KEY = 'swimsheet_db_backup'
 export const BACKUP_FORMAT_VERSION = 1
 

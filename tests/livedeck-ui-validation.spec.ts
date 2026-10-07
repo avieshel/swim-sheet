@@ -74,21 +74,21 @@ test.describe('LiveDeck — UI/UX validation', () => {
         id: crypto.randomUUID(), name: 'Validation Session', poolLength: 25, notes: '', createdAt: now, updatedAt: now,
       });
       await db.drills.add({
-        id: crypto.randomUUID(), session_id: 'ignored', name: '100m Freestyle', stroke: 'freestyle',
+        id: crypto.randomUUID(), sessionId: 'ignored', name: '100m Freestyle', stroke: 'freestyle',
         distance: 100, order: 0, createdAt: now, updatedAt: now,
       });
       await db.sessionRuns.add({
-        id: runId, session_id: 'ignored', date: new Date().toISOString().split('T')[0],
+        id: runId, sessionId: 'ignored', date: new Date().toISOString().split('T')[0],
         poolName: 'Test Pool', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now,
       });
       await db.runDrills.add({
-        id: drillId, run_id: runId, name: '100m Freestyle', stroke: 'freestyle',
+        id: drillId, runId, name: '100m Freestyle', stroke: 'freestyle',
         distance: 100, order: 0, notes: '', createdAt: now, updatedAt: now,
       });
       for (let i = 1; i <= 2; i++) {
         const swId = crypto.randomUUID();
         await db.swimmers.add({ id: swId, name: `Swimmer ${i}`, group: '', notes: '', createdAt: now, updatedAt: now });
-        await db.runSwimmers.add({ run_id: runId, swimmer_id: swId, lane: 1, createdAt: now, updatedAt: now });
+        await db.runSwimmers.add({ runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now });
       }
     });
     await page.goto('/live');
@@ -180,12 +180,12 @@ test.describe('LiveDeck — UI/UX validation', () => {
       const runId = crypto.randomUUID();
       const drillId = crypto.randomUUID();
       await db.sessions.add({ id: crypto.randomUUID(), name: 'Done Session', poolLength: 25, notes: '', createdAt: now, updatedAt: now });
-      await db.drills.add({ id: crypto.randomUUID(), session_id: 'ignored', name: '50m Free', stroke: 'freestyle', distance: 50, order: 0, createdAt: now, updatedAt: now });
-      await db.sessionRuns.add({ id: runId, session_id: 'ignored', date: now.split('T')[0], poolName: 'Test', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now });
-      await db.runDrills.add({ id: drillId, run_id: runId, name: '50m Free', stroke: 'freestyle', distance: 50, order: 0, notes: '', createdAt: now, updatedAt: now });
+      await db.drills.add({ id: crypto.randomUUID(), sessionId: 'ignored', name: '50m Free', stroke: 'freestyle', distance: 50, order: 0, createdAt: now, updatedAt: now });
+      await db.sessionRuns.add({ id: runId, sessionId: 'ignored', date: now.split('T')[0], poolName: 'Test', poolLength: 25, notes: '', status: 'active', createdAt: now, updatedAt: now });
+      await db.runDrills.add({ id: drillId, runId, name: '50m Free', stroke: 'freestyle', distance: 50, order: 0, notes: '', createdAt: now, updatedAt: now });
       const swId = crypto.randomUUID();
       await db.swimmers.add({ id: swId, name: 'DoneSwimmer', group: '', notes: '', createdAt: now, updatedAt: now });
-      await db.runSwimmers.add({ run_id: runId, swimmer_id: swId, lane: 1, createdAt: now, updatedAt: now });
+      await db.runSwimmers.add({ runId, swimmerId: swId, lane: 1, createdAt: now, updatedAt: now });
     });
     await page.reload();
     await page.waitForSelector('.rounded-2xl', { timeout: 5000 });

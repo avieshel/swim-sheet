@@ -43,7 +43,7 @@ describe('drillService', () => {
     })
 
     it('create calls addDrill with data', async () => {
-      const data: SafeDrill = { session_id: 's1', name: 'New Drill', stroke: 'freestyle', distance: 100, order: 0, items: [], repeatCount: 0, timingMode: 'individual', focus: 'none', labels: [], description: '' }
+      const data: SafeDrill = { sessionId: 's1', name: 'New Drill', stroke: 'freestyle', distance: 100, order: 0, items: [], repeatCount: 0, timingMode: 'individual', focus: 'none', labels: [], description: '' }
       mockDao.addDrill.mockResolvedValue('new-id')
       const result = await drillService.create(data)
       expect(mockDao.addDrill).toHaveBeenCalledExactlyOnceWith(data)

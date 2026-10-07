@@ -127,7 +127,7 @@ export const SessionDetail: React.FC = () => {
 
   const handleStartLive = async () => {
     if (!session) return
-    if (activeRun?.session_id === session.id) {
+    if (activeRun?.sessionId === session.id) {
       navigate('/live')
       return
     }
@@ -150,7 +150,7 @@ export const SessionDetail: React.FC = () => {
     if (!id) return
     const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
     await createDrill({
-      session_id: id,
+      sessionId: id,
       name: libDrill.name,
       stroke: libDrill.stroke,
       distance: libDrill.distance,
@@ -392,8 +392,8 @@ export const SessionDetail: React.FC = () => {
                 className="flex items-center gap-1.5 h-11 min-w-[44px] px-4 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
                 title={drills.length === 0 ? 'Add at least one drill before starting this session' : undefined}
               >
-                <Icon name={activeRun?.session_id === session.id ? 'visibility' : 'play_arrow'} size="sm" />
-                {activeRun?.session_id === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
+                <Icon name={activeRun?.sessionId === session.id ? 'visibility' : 'play_arrow'} size="sm" />
+                {activeRun?.sessionId === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
               </button>
               <button
                 onClick={() => { setEditingMeta(true); setEditNotes(session.notes || '') }}
@@ -471,7 +471,7 @@ export const SessionDetail: React.FC = () => {
             }
             if (!id || !data.name?.trim()) return
             const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
-            const drillData = { ...data, session_id: id, order: data.id ? (richDrill.order ?? nextOrder) : nextOrder }
+            const drillData = { ...data, sessionId: id, order: data.id ? (richDrill.order ?? nextOrder) : nextOrder }
             if (data.id) {
               await updateDrill(data.id, drillData as unknown as Partial<SafeDrill>)
               analytics.track(Events.DrillUpdated('session'))

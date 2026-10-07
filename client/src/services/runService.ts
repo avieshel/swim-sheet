@@ -22,7 +22,7 @@ function buildMarkerData(startedAt?: number, poolLength = 25): string | null {
 }
 
 async function upsertLaneDrillResult(data: SafeLaneDrillResult): Promise<string> {
-  const existing = await db.laneDrillResults.where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id }).first()
+  const existing = await db.laneDrillResults.where({ runId: data.runId, groupId: data.groupId, runDrillId: data.runDrillId }).first()
   const now = new Date().toISOString()
   if (existing) {
     await db.laneDrillResults.update(existing.id!, { ...data, updatedAt: now })
@@ -55,17 +55,17 @@ export interface CompleteRunLap {
 // LaneDrillResult.completed is the progress marker, `data` stays null unless a
 // timed drill later attaches SavedDrillData to the same row.
 export interface StartLaneMarker {
-  run_id: string
-  group_id: string
-  run_drill_id: string
+  runId: string
+  groupId: string
+  runDrillId: string
   lane: number
   startedAt?: number
 }
 
 export interface CompleteLaneMarker {
-  run_id: string
-  group_id: string
-  run_drill_id: string
+  runId: string
+  groupId: string
+  runDrillId: string
   lane: number
 }
 
@@ -98,7 +98,7 @@ export const runService = {
   getLaneResults: (runId: string) => getLaneDrillResults(runId),
   getLaneResult: (runId: string, groupId: string, runDrillId: string) => getLaneDrillResult(runId, groupId, runDrillId),
   setLaneResult: async (data: SafeLaneDrillResult): Promise<string> => {
-    const existing = await db.laneDrillResults.where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id }).first()
+    const existing = await db.laneDrillResults.where({ runId: data.runId, groupId: data.groupId, runDrillId: data.runDrillId }).first()
     const now = new Date().toISOString()
     if (existing) {
       await db.laneDrillResults.update(existing.id!, { ...data, updatedAt: now })
@@ -111,10 +111,10 @@ export const runService = {
   },
   startLaneResult: async (data: StartLaneMarker): Promise<string> => {
     const existing = await db.laneDrillResults
-      .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
+      .where({ runId: data.runId, groupId: data.groupId, runDrillId: data.runDrillId })
       .first()
     const now = new Date().toISOString()
-    const run = await getSessionRun(data.run_id)
+    const run = await getSessionRun(data.runId)
     const poolLength = run?.poolLength ?? 25
     if (existing) {
       await db.laneDrillResults.update(existing.id!, {
@@ -126,9 +126,9 @@ export const runService = {
     }
     const id = crypto.randomUUID()
     await db.laneDrillResults.add({
-      run_id: data.run_id,
-      group_id: data.group_id,
-      run_drill_id: data.run_drill_id,
+      runId: data.runId,
+      groupId: data.groupId,
+      runDrillId: data.runDrillId,
       lane: data.lane,
       completed: false,
       data: buildMarkerData(data.startedAt, poolLength),
@@ -139,7 +139,7 @@ export const runService = {
   },
   completeLaneResult: async (data: CompleteLaneMarker): Promise<string> => {
     const existing = await db.laneDrillResults
-      .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
+      .where({ runId: data.runId, groupId: data.groupId, runDrillId: data.runDrillId })
       .first()
     const now = new Date().toISOString()
     if (existing) {
@@ -148,9 +148,9 @@ export const runService = {
     }
     const id = crypto.randomUUID()
     await db.laneDrillResults.add({
-      run_id: data.run_id,
-      group_id: data.group_id,
-      run_drill_id: data.run_drill_id,
+      runId: data.runId,
+      groupId: data.groupId,
+      runDrillId: data.runDrillId,
       lane: data.lane,
       completed: true,
       data: null,
@@ -161,7 +161,7 @@ export const runService = {
   },
   uncompleteLaneResult: async (data: CompleteLaneMarker): Promise<string> => {
     const existing = await db.laneDrillResults
-      .where({ run_id: data.run_id, group_id: data.group_id, run_drill_id: data.run_drill_id })
+      .where({ runId: data.runId, groupId: data.groupId, runDrillId: data.runDrillId })
       .first()
     if (!existing) return ''
     await db.laneDrillResults.update(existing.id!, { completed: false, updatedAt: new Date().toISOString() })
@@ -174,7 +174,7 @@ export const runService = {
     deleteLaneDrillResultsForDrills(runId, groupId, runDrillIds),
   deleteLapsForDrills: (runDrillIds: string[]) => deleteLapsForDrills(runDrillIds),
   deleteSwimmerFromLaneResult: async (runId: string, groupId: string, runDrillId: string, swimmerDbId: string): Promise<void> => {
-    const result = await db.laneDrillResults.where({ run_id: runId, group_id: groupId, run_drill_id: runDrillId }).first()
+    const result = await db.laneDrillResults.where({ runId, groupId, runDrillId }).first()
     if (!result?.data) return
     const data = JSON.parse(result.data)
     data.swimmers = data.swimmers.filter((s: { dbId: string }) => s.dbId !== swimmerDbId)
@@ -188,10 +188,10 @@ export const runService = {
   completeRunWithLaps: async (runId: string, laps: CompleteRunLap[]): Promise<void> => {
     for (const lap of laps) {
       await addLap({
-        run_drill_id: lap.runDrillId,
-        swimmer_id: lap.swimmerId,
+        runDrillId: lap.runDrillId,
+        swimmerId: lap.swimmerId,
         time: lap.time / 1000,
-        stroke_count: lap.strokeCount,
+        strokeCount: lap.strokeCount,
         effort: '',
         notes: '',
       })
@@ -229,15 +229,15 @@ export const runService = {
     drills.sort((a, b) => a.order - b.order)
 
     const runId = await addSessionRun({
-      session_id: sessionId,
+      sessionId,
       date: runData.date,
       poolName: runData.poolName,
       poolLength,
       notes: runData.notes || '',
       status: 'active',
-      session_started_at: Date.now(),
-      session_paused_at: null,
-      session_pause_duration: 0,
+      sessionStartedAt: Date.now(),
+      sessionPausedAt: null,
+      sessionPauseDuration: 0,
     })
 
     let runDrillOrder = 0
@@ -260,14 +260,14 @@ export const runService = {
         }
 
         await addRunDrill({
-          run_id: runId,
+          runId,
           name: drill.name,
           stroke: items[0].stroke || 'mixed',
           distance: totalDistance,
           order: runDrillOrder++,
           instructions: instructionLines.join('\n'),
           equipment: Array.from(equipmentSet),
-          parent_drill_id: drill.id,
+          parentDrillId: drill.id,
           notes: drill.description || '',
         })
       } else {
@@ -278,7 +278,7 @@ export const runService = {
               const repLabel = item.repeatCount > 1 ? `[${ir + 1}/${item.repeatCount}]` : ''
 
               await addRunDrill({
-                run_id: runId,
+                runId,
                 name: `${setLabel}${drill.name}`,
                 stroke: item.stroke,
                 distance: item.distance,
@@ -286,7 +286,7 @@ export const runService = {
                 instructions: repLabel || item.intensity || '',
                 interval: item.interval,
                 equipment: item.equipment,
-                parent_drill_id: drill.id,
+                parentDrillId: drill.id,
                 notes: drill.description || '',
               })
             }
@@ -312,7 +312,7 @@ export const runService = {
         notes: '',
       })
       await addDrill({
-        session_id: sessionId,
+        sessionId,
         name: '100m Freestyle',
         order: 0,
         items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
@@ -377,10 +377,10 @@ export const runService = {
       if (swimmerEntry.laps.length > 0) {
         for (const lap of swimmerEntry.laps) {
           await addLap({
-            run_drill_id: result.run_drill_id,
-            swimmer_id: realDbId,
+            runDrillId: result.runDrillId,
+            swimmerId: realDbId,
             time: lap.time / 1000,
-            stroke_count: lap.strokeCount ?? 0,
+            strokeCount: lap.strokeCount ?? 0,
             effort: '',
             notes: '',
           })

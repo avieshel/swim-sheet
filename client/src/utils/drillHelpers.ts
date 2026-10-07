@@ -1,3 +1,5 @@
+import type { Stroke } from '../types/swimming'
+
 export function getDrillTotalDistance(d: { items?: { distance: number; repeatCount: number }[]; distance?: number; repeatCount?: number }): number {
   if (!d.items || d.items.length === 0) return (d.distance || 0) * (d.repeatCount || 1)
   return d.items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * (d.repeatCount || 1)
@@ -5,7 +7,7 @@ export function getDrillTotalDistance(d: { items?: { distance: number; repeatCou
 
 export interface EmptyDrillForm {
   name: string
-  items: { id: string; distance: number; stroke: string; repeatCount: number }[]
+  items: { id: string; distance: number; stroke: Stroke; repeatCount: number }[]
   repeatCount: number
   timingMode: 'individual' | 'continuous'
   focus: 'technique' | 'fitness' | 'none'
@@ -25,8 +27,8 @@ export function emptyDrillForm(): EmptyDrillForm {
   }
 }
 
-export function aggregateByStroke(drills: { stroke?: string; distance?: number; repeatCount?: number; items?: { stroke?: string; distance: number; repeatCount: number }[] }[]): { stroke: string; meters: number }[] {
-  const map = new Map<string, number>()
+export function aggregateByStroke(drills: { stroke?: Stroke; distance?: number; repeatCount?: number; items?: { stroke?: Stroke; distance: number; repeatCount: number }[] }[]): { stroke: Stroke; meters: number }[] {
+  const map = new Map<Stroke, number>()
   for (const d of drills) {
     if (d.items && d.items.length > 0) {
       for (const item of d.items) {
@@ -66,14 +68,14 @@ export function levenshteinRatio(a: string, b: string): number {
 }
 
 export interface SimilarDrill {
-  drill: { id: string; name: string; stroke?: string; distance?: number; focus?: string; labels?: string[] }
+  drill: { id: string; name: string; stroke?: Stroke; distance?: number; focus?: string; labels?: string[] }
   score: number
   matches: string[]
 }
 
 export function findSimilarDrills(
-  target: { name: string; stroke?: string; distance?: number; focus?: string; labels?: string[] },
-  existing: { id: string; name: string; stroke?: string; distance?: number; focus?: string; labels?: string[] }[],
+  target: { name: string; stroke?: Stroke; distance?: number; focus?: string; labels?: string[] },
+  existing: { id: string; name: string; stroke?: Stroke; distance?: number; focus?: string; labels?: string[] }[],
   threshold = 0.5
 ): SimilarDrill[] {
   const results: SimilarDrill[] = []
@@ -108,7 +110,7 @@ export function findSimilarDrills(
   return results.sort((a, b) => b.score - a.score)
 }
 
-export function detectFocus(drills: { stroke?: string; distance?: number; repeatCount?: number; items?: { stroke?: string; distance: number; repeatCount: number }[] }[]): string[] {
+export function detectFocus(drills: { stroke?: Stroke; distance?: number; repeatCount?: number; items?: { stroke?: Stroke; distance: number; repeatCount: number }[] }[]): string[] {
   const focus: string[] = []
   const totalDistance = drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0)
   if (totalDistance === 0) return focus

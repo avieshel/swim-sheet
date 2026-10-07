@@ -26,7 +26,7 @@ export const CoachDashboard: React.FC = () => {
       let totalDistance = 0
       for (const lap of laps) {
         try {
-          const runDrill = await getRunDrill(lap.run_drill_id)
+          const runDrill = await getRunDrill(lap.runDrillId)
           if (runDrill) totalDistance += runDrill.distance
         } catch {
           // lap may have no matching run drill

@@ -3,7 +3,7 @@ import { groupDrillRows, stripRepPrefix, computeSessionProgress } from '../sessi
 import type { RunDrill, LaneDrillResult } from '../../api/runs'
 
 const drill = (id: string, name: string, parent?: string, order = 0): RunDrill =>
-  ({ id, name, stroke: 'freestyle', distance: 50, order, parent_drill_id: parent }) as RunDrill
+  ({ id, name, stroke: 'freestyle', distance: 50, order, parentDrillId: parent }) as RunDrill
 
 const lane = (id: string, laneNo: number) => ({
   id, lane: laneNo, name: `Lane ${laneNo}`, swimmers: [{ id: 1, dbId: 's', name: 'A', completed: false, lapStrokeCounts: {} }],
@@ -43,8 +43,8 @@ describe('computeSessionProgress', () => {
 
   it('a lane is only done when all its repetitions complete', () => {
     const laneResults = [
-      { group_id: 'g1', run_drill_id: 'r1', completed: true },
-      { group_id: 'g1', run_drill_id: 'r2', completed: true },
+      { groupId: 'g1', runDrillId: 'r1', completed: true },
+      { groupId: 'g1', runDrillId: 'r2', completed: true },
     ] as unknown as LaneDrillResult[]
     const res = computeSessionProgress(runDrills, laneResults, lanes)
     expect(res.done).toBe(1)

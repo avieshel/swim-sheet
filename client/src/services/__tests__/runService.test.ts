@@ -77,7 +77,7 @@ describe('runService', () => {
     })
 
     it('create calls addSessionRun with data', async () => {
-      const data = { session_id: 's1', date: '2024-01-01', poolName: 'Pool', poolLength: 25, notes: '', status: 'active' as const }
+      const data = { sessionId: 's1', date: '2024-01-01', poolName: 'Pool', poolLength: 25, notes: '', status: 'active' as const }
       mockDao.addSessionRun.mockResolvedValue('new-id')
       const result = await runService.create(data)
       expect(mockDao.addSessionRun).toHaveBeenCalledExactlyOnceWith(data)
@@ -100,7 +100,7 @@ describe('runService', () => {
 
   describe('run drills', () => {
     it('getDrills calls getRunDrillsForRun with runId', async () => {
-      const expected = [{ id: 'rd1', run_id: 'r1' }]
+      const expected = [{ id: 'rd1', runId: 'r1' }]
       mockDao.getRunDrillsForRun.mockResolvedValue(expected)
       const result = await runService.getDrills('r1')
       expect(mockDao.getRunDrillsForRun).toHaveBeenCalledExactlyOnceWith('r1')
@@ -139,7 +139,7 @@ describe('runService', () => {
     })
 
     it('getRunSwimmers calls getRunSwimmersForRun with runId', async () => {
-      const expected = [{ run_id: 'r1', swimmer_id: 'sw1', lane: 1 }]
+      const expected = [{ runId: 'r1', swimmerId: 'sw1', lane: 1 }]
       mockDao.getRunSwimmersForRun.mockResolvedValue(expected)
       const result = await runService.getRunSwimmers('r1')
       expect(mockDao.getRunSwimmersForRun).toHaveBeenCalledExactlyOnceWith('r1')
@@ -169,7 +169,7 @@ describe('runService', () => {
 
   describe('lane results', () => {
     it('getLaneResults calls getLaneDrillResults with runId', async () => {
-      const expected = [{ id: 'lr1', run_id: 'r1' }]
+      const expected = [{ id: 'lr1', runId: 'r1' }]
       mockDao.getLaneDrillResults.mockResolvedValue(expected)
       const result = await runService.getLaneResults('r1')
       expect(mockDao.getLaneDrillResults).toHaveBeenCalledExactlyOnceWith('r1')
@@ -193,10 +193,10 @@ describe('runService', () => {
       mockDb.laneDrillResults.add = mockAdd
 
       const result = await runService.startLaneResult({
-        run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1,
+        runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1,
       })
 
-      expect(mockDb.laneDrillResults.where).toHaveBeenCalledWith({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1' })
+      expect(mockDb.laneDrillResults.where).toHaveBeenCalledWith({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1' })
       expect(result).toMatch(/^[0-9a-f-]{36}$/)
       expect(mockAdd).toHaveBeenCalledOnce()
       const added = mockAdd.mock.calls[0][0]
@@ -213,7 +213,7 @@ describe('runService', () => {
       mockDb.laneDrillResults.add = mockAdd
 
       await runService.startLaneResult({
-        run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, startedAt: 5000,
+        runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1, startedAt: 5000,
       })
 
       const added = mockAdd.mock.calls[0][0]
@@ -235,7 +235,7 @@ describe('runService', () => {
       mockDb.laneDrillResults.update = mockUpdate
 
       const result = await runService.startLaneResult({
-        run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1,
+        runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1,
       })
 
       expect(result).toBe('lr1')
@@ -252,7 +252,7 @@ describe('runService', () => {
       const mockAdd = vi.fn().mockResolvedValue(undefined)
       mockDb.laneDrillResults.add = mockAdd
 
-      await runService.completeLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+      await runService.completeLaneResult({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 })
 
       const added = mockAdd.mock.calls[0][0]
       expect(added.completed).toBe(true)
@@ -267,7 +267,7 @@ describe('runService', () => {
       const mockUpdate = vi.fn().mockResolvedValue(undefined)
       mockDb.laneDrillResults.update = mockUpdate
 
-      await runService.completeLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+      await runService.completeLaneResult({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 })
 
       expect(mockUpdate).toHaveBeenCalledOnce()
       expect(mockUpdate.mock.calls[0][1].completed).toBe(true)
@@ -281,7 +281,7 @@ describe('runService', () => {
       const mockUpdate = vi.fn().mockResolvedValue(undefined)
       mockDb.laneDrillResults.update = mockUpdate
 
-      await runService.uncompleteLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+      await runService.uncompleteLaneResult({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 })
 
       expect(mockUpdate).toHaveBeenCalledOnce()
       expect(mockUpdate.mock.calls[0][1].completed).toBe(false)
@@ -293,14 +293,14 @@ describe('runService', () => {
       const mockUpdate = vi.fn()
       mockDb.laneDrillResults.update = mockUpdate
 
-      const result = await runService.uncompleteLaneResult({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1 })
+      const result = await runService.uncompleteLaneResult({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1 })
 
       expect(result).toBe('')
       expect(mockUpdate).not.toHaveBeenCalled()
     })
 
     it('setLaneResult upserts via db', async () => {
-      const data = { run_id: 'r1', group_id: 'g1', lane: 1, run_drill_id: 'rd1', completed: false, data: '{}' }
+      const data = { runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'rd1', completed: false, data: '{}' }
       const mockChain = {
         first: vi.fn().mockResolvedValue(undefined),
       }
@@ -309,7 +309,7 @@ describe('runService', () => {
       mockDb.laneDrillResults.add = mockAdd
 
       const result = await runService.setLaneResult(data)
-      expect(mockDb.laneDrillResults.where).toHaveBeenCalledWith({ run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1' })
+      expect(mockDb.laneDrillResults.where).toHaveBeenCalledWith({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1' })
       expect(result).toMatch(/^[0-9a-f-]{36}$/)
       expect(mockAdd).toHaveBeenCalledOnce()
     })
@@ -367,7 +367,7 @@ describe('runService', () => {
 
     it('updateLaneResultSwimmer patches the matching swimmer and persists', async () => {
       mockDao.getLaneDrillResult.mockResolvedValue({
-        id: 'lr1', run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 2, completed: true,
+        id: 'lr1', runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 2, completed: true,
         data: JSON.stringify({ swimmers: [{ dbId: 'sw1', name: 'Old', laps: [] }] }),
       })
       const mockUpdate = vi.fn().mockResolvedValue(undefined)
@@ -383,7 +383,7 @@ describe('runService', () => {
 
   describe('laps', () => {
     it('getLapsForRunDrill calls getLapsForRunDrill with runDrillId', async () => {
-      const expected = [{ id: 'lp1', run_drill_id: 'rd1' }]
+      const expected = [{ id: 'lp1', runDrillId: 'rd1' }]
       mockDao.getLapsForRunDrill.mockResolvedValue(expected)
       const result = await runService.getLapsForRunDrill('rd1')
       expect(mockDao.getLapsForRunDrill).toHaveBeenCalledExactlyOnceWith('rd1')
@@ -391,7 +391,7 @@ describe('runService', () => {
     })
 
     it('getLapsForSwimmer calls getLapsForSwimmerInRun with runId, swimmerId', async () => {
-      const expected = [{ id: 'lp1', swimmer_id: 'sw1' }]
+      const expected = [{ id: 'lp1', swimmerId: 'sw1' }]
       mockDao.getLapsForSwimmerInRun.mockResolvedValue(expected)
       const result = await runService.getLapsForSwimmer('r1', 'sw1')
       expect(mockDao.getLapsForSwimmerInRun).toHaveBeenCalledExactlyOnceWith('r1', 'sw1')
@@ -399,7 +399,7 @@ describe('runService', () => {
     })
 
     it('addLap calls addLap with data', async () => {
-      const data = { run_drill_id: 'rd1', swimmer_id: 'sw1', time: 32000, stroke_count: 0, effort: '', notes: '' }
+      const data = { runDrillId: 'rd1', swimmerId: 'sw1', time: 32000, strokeCount: 0, effort: '', notes: '' }
       mockDao.addLap.mockResolvedValue('lap-id')
       const result = await runService.addLap(data)
       expect(mockDao.addLap).toHaveBeenCalledExactlyOnceWith(data)
@@ -432,10 +432,10 @@ describe('runService', () => {
       expect(mockDao.getSession).toHaveBeenCalledExactlyOnceWith('s1')
       expect(mockDao.getDrillsForSession).toHaveBeenCalledExactlyOnceWith('s1')
       expect(mockDao.addSessionRun).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ session_id: 's1', status: 'active' })
+        expect.objectContaining({ sessionId: 's1', status: 'active' })
       )
       expect(mockDao.addRunDrill).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ run_id: 'new-run-id', name: 'Endurance Set', distance: 200, stroke: 'freestyle' })
+        expect.objectContaining({ runId: 'new-run-id', name: 'Endurance Set', distance: 200, stroke: 'freestyle' })
       )
       expect(result).toBe('new-run-id')
     })
@@ -503,10 +503,10 @@ describe('runService', () => {
 
       expect(mockDao.addLap).toHaveBeenCalledTimes(2)
       expect(mockDao.addLap).toHaveBeenNthCalledWith(1, {
-        run_drill_id: 'rd1', swimmer_id: 'sw1', time: 32, stroke_count: 18, effort: '', notes: '',
+        runDrillId: 'rd1', swimmerId: 'sw1', time: 32, strokeCount: 18, effort: '', notes: '',
       })
       expect(mockDao.addLap).toHaveBeenNthCalledWith(2, {
-        run_drill_id: 'rd1', swimmer_id: 'sw2', time: 65, stroke_count: 22, effort: '', notes: '',
+        runDrillId: 'rd1', swimmerId: 'sw2', time: 65, strokeCount: 22, effort: '', notes: '',
       })
       expect(mockDao.completeSessionRun).toHaveBeenCalledWith('r1')
     })
@@ -537,7 +537,7 @@ describe('runService', () => {
       expect(mockDao.getAllSessions).toHaveBeenCalledOnce()
       expect(mockDao.addSession).not.toHaveBeenCalled()
       expect(mockDao.addSessionRun).toHaveBeenCalledWith(
-        expect.objectContaining({ session_id: 'sys1', status: 'active' })
+        expect.objectContaining({ sessionId: 'sys1', status: 'active' })
       )
       expect(result).toEqual({ runId: 'run1', drillId: 'rd1' })
     })
@@ -560,7 +560,7 @@ describe('runService', () => {
         expect.objectContaining({ name: 'Quick 100m freestyle (default)', notes: '' })
       )
       expect(mockDao.addDrill).toHaveBeenCalledWith(
-        expect.objectContaining({ session_id: 'sys1', name: '100m Freestyle' })
+        expect.objectContaining({ sessionId: 'sys1', name: '100m Freestyle' })
       )
       expect(result).toEqual({ runId: 'run1', drillId: 'rd1' })
     })
@@ -596,7 +596,7 @@ describe('runService', () => {
       mockDao.addSwimmer.mockResolvedValue('real1')
       mockDao.getLaneDrillResults.mockResolvedValue([
         {
-          id: 'lr1', run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, completed: true,
+          id: 'lr1', runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1, completed: true,
           data: JSON.stringify({ swimmers: [{ dbId: 'synth1', name: 'Alice', laps: [{ time: 32000, strokeCount: 18 }], startedAt: 1000, completedAt: 33000, completed: true }] }),
         },
       ])
@@ -615,7 +615,7 @@ describe('runService', () => {
       expect(saved.swimmers[0].dbId).toBe('real1')
       expect(mockDao.addLap).toHaveBeenCalledOnce()
       expect(mockDao.addLap).toHaveBeenCalledWith(
-        expect.objectContaining({ swimmer_id: 'real1', time: 32 })
+        expect.objectContaining({ swimmerId: 'real1', time: 32 })
       )
     })
 
@@ -624,7 +624,7 @@ describe('runService', () => {
       mockDao.addSwimmer.mockResolvedValue('real2')
       mockDao.getLaneDrillResults.mockResolvedValue([
         {
-          id: 'lr1', run_id: 'r1', group_id: 'g1', run_drill_id: 'rd1', lane: 1, completed: true,
+          id: 'lr1', runId: 'r1', groupId: 'g1', runDrillId: 'rd1', lane: 1, completed: true,
           data: JSON.stringify({ swimmers: [{ dbId: 'synth1', name: 'Old Name', laps: [], startedAt: 1000, completedAt: 5000, completed: true }] }),
         },
       ])

@@ -98,7 +98,7 @@ function toSummary(acc: SwimmerAccum, runDrillIds: Set<string>, runDrillOrder: M
 
 async function buildRunSummary(run: SessionRun, targetName: string | null): Promise<RunSummary> {
   const [session, runDrills, links, runSwimmers, laneResults, laps] = await Promise.all([
-    getSession(run.session_id),
+    getSession(run.sessionId),
     getRunDrillsForRun(run.id),
     getRunSwimmersForRun(run.id),
     getSwimmersForRun(run.id),
@@ -117,10 +117,10 @@ async function buildRunSummary(run: SessionRun, targetName: string | null): Prom
 
   const swimmerNameOf = new Map(runSwimmers.map(s => [s.id, s.name]))
   for (const link of links) {
-    const name = swimmerNameOf.get(link.swimmer_id) ?? 'Unknown Swimmer'
+    const name = swimmerNameOf.get(link.swimmerId) ?? 'Unknown Swimmer'
     realNames.add(name.toLowerCase())
-    const acc: SwimmerAccum = { swimmerId: link.swimmer_id, name, isVirtual: false, matchedByName: false, entries: new Map() }
-    byId.set(link.swimmer_id, acc)
+    const acc: SwimmerAccum = { swimmerId: link.swimmerId, name, isVirtual: false, matchedByName: false, entries: new Map() }
+    byId.set(link.swimmerId, acc)
     byName.set(name.toLowerCase(), acc)
     order.push(acc)
   }
@@ -146,7 +146,7 @@ async function buildRunSummary(run: SessionRun, targetName: string | null): Prom
       }
     })()
     if (!saved) continue
-    const drillId = result.run_drill_id
+    const drillId = result.runDrillId
     const label = labelOf.get(drillId) ?? 'Drill'
     for (const sw of saved.swimmers) {
       const name = sw.name || 'Unnamed Swimmer'
@@ -177,17 +177,17 @@ async function buildRunSummary(run: SessionRun, targetName: string | null): Prom
   if (fallbackToLaps && laps.length > 0) {
     for (const acc of order) {
       if (!acc.swimmerId || acc.entries.size > 0) continue
-      const accLaps = laps.filter(l => l.swimmer_id === acc.swimmerId)
+      const accLaps = laps.filter(l => l.swimmerId === acc.swimmerId)
       if (accLaps.length === 0) continue
       const byDrill = new Map<string, { totalMs: number; count: number }>()
       for (const lap of accLaps) {
         const ms = lap.time * 1000
-        const b = byDrill.get(lap.run_drill_id)
+        const b = byDrill.get(lap.runDrillId)
         if (b) {
           b.totalMs += ms
           b.count += 1
         } else {
-          byDrill.set(lap.run_drill_id, { totalMs: ms, count: 1 })
+          byDrill.set(lap.runDrillId, { totalMs: ms, count: 1 })
         }
       }
       for (const [drillId, b] of byDrill) {
@@ -208,10 +208,10 @@ async function buildRunSummary(run: SessionRun, targetName: string | null): Prom
 
   return {
     runId: run.id,
-    sessionId: run.session_id,
+    sessionId: run.sessionId,
     templateName: session?.name ?? 'Deleted template',
     date: run.date,
-    startedAtMs: run.session_started_at,
+    startedAtMs: run.sessionStartedAt,
     poolName: run.poolName,
     poolLength: run.poolLength,
     status: run.status,
@@ -230,8 +230,8 @@ export async function getRunHistory(swimmerId?: string): Promise<RunHistoryData>
   runs.sort((a, b) => {
     const byDate = b.date.localeCompare(a.date)
     if (byDate !== 0) return byDate
-    const aStart = a.session_started_at ?? Number.MAX_SAFE_INTEGER
-    const bStart = b.session_started_at ?? Number.MAX_SAFE_INTEGER
+    const aStart = a.sessionStartedAt ?? Number.MAX_SAFE_INTEGER
+    const bStart = b.sessionStartedAt ?? Number.MAX_SAFE_INTEGER
     if (aStart !== bStart) return aStart - bStart
     return b.createdAt.localeCompare(a.createdAt)
   })
@@ -275,7 +275,7 @@ export async function exportRun(runId: string): Promise<Blob> {
     appVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown',
     run: {
       id: run.id,
-      sessionId: run.session_id,
+      sessionId: run.sessionId,
       date: run.date,
       poolName: run.poolName,
       poolLength: run.poolLength,

@@ -1,4 +1,5 @@
 import { addSession, addDrill, getAllSessions } from '../db/dao'
+import type { Stroke } from '../types/swimming'
 
 type CatalogFocus = 'technique' | 'fitness' | 'none'
 
@@ -19,7 +20,7 @@ export interface CatalogIndex {
 
 interface CatalogDrillItem {
   distance: number
-  stroke: string
+  stroke: Stroke
   repeatCount: number
   intensity?: string
   interval?: string
@@ -29,7 +30,7 @@ interface CatalogDrillItem {
 interface CatalogSessionDrill {
   name: string
   order: number
-  stroke: string
+  stroke: Stroke
   distance: number
   items: CatalogDrillItem[]
   repeatCount: number
@@ -68,7 +69,7 @@ export async function importSession(session: CatalogSessionData): Promise<string
 
   for (const d of session.drills) {
     await addDrill({
-      session_id: sessionId,
+      sessionId,
       name: d.name,
       order: d.order,
       stroke: d.stroke,

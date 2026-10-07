@@ -32,7 +32,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function migrateLegacyRecord(tableName: string, record: Record<string, unknown>): void {
+export function migrateLegacyRecord(tableName: string, record: Record<string, unknown>): void {
   const renames = legacyFieldRenames[tableName]
   if (!renames) return
 
