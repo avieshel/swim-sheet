@@ -5,6 +5,19 @@ const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDril
 const BATCH = 500
 const MIN_CURSOR = '0001-01-01T00:00:00.000Z'
 
+// Local Dexie name -> Postgres table name. The transport calls .from() with the
+// local name unless it is translated here, and PostgREST 404s on a name that
+// does not exist: querying "libraryDrills" returned PGRST205 on both local and
+// hosted, so library drills never synced and the error was silently discarded
+// (pull ignores `error`). Only libraryDrills differs; the rest match exactly.
+// utils/check-cloud-table-names.mjs asserts this stays in sync with SYNC_TABLES.
+const CLOUD_TABLE: Record<SyncTable, string> = {
+  swimmers: 'swimmers',
+  sessions: 'sessions',
+  drills: 'drills',
+  libraryDrills: 'library_drills',
+}
+
 export interface BuilderResult {
   data?: unknown
   error?: unknown
@@ -227,10 +240,11 @@ export class SupabaseSyncTransport implements SyncTransport {
     userId: string,
   ): Promise<{ conflict: SyncConflict | null; updatedAt: string | null }> {
     const mapped = toCloudRow(change.table, change, orgId, userId)
+    const cloud = this.client.from(CLOUD_TABLE[change.table])
 
     if (change.op === 'delete') {
       if (change.rev === null) {
-        await this.client.from(change.table).delete().eq('id', change.id)
+        await cloud.delete().eq('id', change.id)
         return { conflict: null, updatedAt: null }
       }
       const res = await this.client
@@ -299,7 +313,7 @@ export class SupabaseSyncTransport implements SyncTransport {
     table: SyncTable,
     id: string,
   ): Promise<Row | null> {
-    const { data, error } = await this.client.from(table).select('*').eq('id', id).single()
+    const { data, error } = await this.client.from(CLOUD_TABLE[table]).select('*').eq('id', id).single()
     // A transport-level failure (offline, RLS denial) is NOT an empty result.
     // Swallowing it would let the caller treat "could not check" as "no remote
     // row", which records a bogus conflict with remoteRev '' that the user then
@@ -335,14 +349,23 @@ export class SupabaseSyncTransport implements SyncTransport {
     }
     for (const table of SYNC_TABLES) {
       const cursor = nextCursors[table]
-      const { data } = await this.client
-        .from(table)
+      const { data, error } = await this.client
+        .from(CLOUD_TABLE[table])
         .select('*')
         .eq('organization_id', orgId)
         .gt('updated_at', cursor)
         .order('updated_at')
         .order('id')
         .limit(BATCH)
+      // Do not swallow this: a wrong table name (or a transient outage) would
+      // otherwise look like "nothing to pull" and leave the cursor unmoved, so
+      // the table would never sync and the failure would be invisible.
+      if (error) {
+        throw Object.assign(
+          new Error(`failed to pull ${CLOUD_TABLE[table]}`),
+          { kind: 'network', cause: error },
+        )
+      }
       const rows = (data as Row[] | null) ?? []
       for (const row of rows) {
         const deleted = !!row.deleted_at
