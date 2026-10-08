@@ -10,7 +10,7 @@ The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-fir
 - All CRUD operates against local IndexedDB via Dexie
 - The app works fully offline — the server is only needed for sync and first-time load
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
-- Schema versioning: current version is 5 (tenant/share fields may appear as optional columns ahead of a formal v6 claim migration)
+- Schema versioning: current version is 6 (camelCase field migration); tenant/share fields may appear as optional data ahead of a future formal claim migration.
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
 
 ### Flexible identity model (confirmed product cases)
@@ -28,6 +28,14 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 
 **RLS:** domain rows always scoped by `organization_id` + membership. Session SELECT allows `visibility = 'organization'` OR creator OR `assigned_to` OR `organization:manage`. Deletes remain owner-only.
 
+**Supabase security baseline** (hosted project `pcdmtsafwmlqdwjxbajc`, `supabase/migrations/20261005001000_initial_schema.sql`):
+
+- Every `public` table has RLS enabled and at least one policy (17 tables, 48 policies). Asserted by `supabase/tests/rls_hardening_check.sql`, which also checks pinned `search_path`, no anon table access, and no anon-executable `SECURITY DEFINER` RPC.
+- Table grants are written explicitly in the migration: `anon` may only insert into `analytics_events`; `authenticated` and `service_role` get full CRUD. Supabase's default privileges differ between local and hosted, so the baseline never inherits them (this also fixed a latent bug where hosted `authenticated` had no `SELECT` grant, which would have broken PostgREST reads during sync).
+- All `SECURITY DEFINER` functions pin `set search_path = public`, and `EXECUTE` is revoked from `PUBLIC`/`anon` — the GDPR/maintenance helpers are `service_role` only. Without this, anyone holding only the anon key could call `/rest/v1/rpc/anonymize_swimmer` and archive any row, because the function runs as the table owner (BYPASSRLS).
+- The baseline migration is the single source of truth and fully idempotent (`drop policy if exists` guards on all 48 policies), so a partially applied schema is always healed by re-running the file.
+- Hosted database was rebuilt from this baseline on 2026-10-07: `public` dropped and replayed, `auth` users/OAuth config/API keys/project ref untouched.
+
 ### Session → SessionRun (Template/Instance) Pattern
 - `Session` is a reusable template with drills
 - `SessionRun` snapshots drills into `RunDrill` records when a session starts
@@ -36,8 +44,8 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 
 ### Timed Groups persist in LaneDrillResult
 - Timing data is stored as a JSON blob in the `LaneDrillResult` table
-- Keyed by `group_id` (UUID) — supports multiple groups per physical lane
-- All timestamps are session-relative (sessionElapsed = Date.now() - session_started_at - paused_duration)
+- Keyed by `groupId` (UUID) — supports multiple groups per physical lane
+- All timestamps are session-relative (sessionElapsed = Date.now() - sessionStartedAt - sessionPauseDuration)
 - Timing data is stored as a flat key-value map in an in-memory `TimestampStore` (backed by `Map<string, number>`) for live editing; keys use a hierarchical scheme enabling prefix-delete for clear operations
 - LaneDrillResult persists a **snapshot** (JSON blob of `drillStart`/`drillEnd`/`sessionStartedAt`/`swimmers[]`) only at save/complete time
 - This is a client-only table (not mirrored on server)
@@ -53,17 +61,18 @@ Drills have evolved beyond simple name/stroke/distance:
 - All data lives on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). There is no server — the sync engine was removed and the client makes no `/api` calls.
 - **Persistent storage**: `navigator.storage.persist()` is requested once at startup (best-effort) to opt the origin out of automatic eviction. Status is surfaced in Settings, where the grant state shows a green check mark and an info ("i") icon opens a modal explaining what storage protection means and how it interacts with the automatic backup.
 - **Automatic backup**: every mutation schedules a debounced (3s) write of the full DB snapshot to `localStorage` (`swimsheet_db_backup`), wired via Dexie table hooks (`creating`/`updating`/`deleting`) plus a startup save. Empty snapshots are never written (so a fresh install or a fully-wiped DB doesn't create a restorable empty backup).
-- **Backup format**: `{ formatVersion: 1, schemaVersion: 5, savedAt, tables }`. `restoreAllTables()` wipes + bulk-loads inside one transaction.
+- **Backup format**: `{ formatVersion: 1, schemaVersion: 6, savedAt, tables }`. `restoreAllTables()` wipes + bulk-loads inside one transaction. Restore/import normalizes pre-v6 snake_case Dexie properties to camelCase; v6 exports are camelCase.
 - **Restore policy**: `ensureDbOpen()` restores from the backup **only** when (a) the DB opens but is empty, or (b) opening fails. It never restores a backup that is empty, is from an unsupported format, or was written by a newer schema (version guard). The backup is cleared after a successful restore. The previous behavior — restoring whenever a backup existed, and `db.delete()` on any open failure — was replaced.
 - **Manual export/import**: Settings → "Back up to file" downloads the same snapshot JSON; "Restore from file" validates and restores it after a confirm dialog. This is the only copy that survives device change / clear-site-data.
 - **Intentional wipes clear the backup** (`clearBackup()` runs in `deleteAllSwimmers` / `deleteAllSessions`) so an explicit reset isn't undone by an auto-restore.
 
 ### Naming Convention
-- Client: camelCase (`groupId`, `poolLength`, `updatedAt`)
+- Client Dexie records (schema v6): camelCase for all properties, including foreign keys and timer fields (`sessionId`, `groupId`, `sessionStartedAt`, `poolLength`, `updatedAt`)
 - Server: snake_case (`group_id`, `pool_length`, `updated_at`)
+- The future cloud adapter owns conversion between those store-specific conventions; analytics and other server wire payloads retain their existing formats.
 
 ### Column order
-Tables and TypeScript interfaces follow: `id` → FKs → ownership → domain attributes → status/flags → `created_at`, `updated_at`, `deleted_at`. Keep that audit trailer together, with `deleted_at` last.
+Client TypeScript interfaces follow: `id` → FKs → ownership → domain attributes → status/flags → `createdAt`, `updatedAt`. Server tables follow the equivalent SQL order and audit trailer: `created_at`, `updated_at`, `deleted_at`, with `deleted_at` last.
 
 ---
 
@@ -129,9 +138,9 @@ A single exercise within a Session template.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
-| `session_id` | `session_id` | string/TEXT | FK → Session |
+| `sessionId` | `session_id` | string/TEXT | FK → Session |
 | `name` | `name` | string/TEXT | Required |
-| `stroke` | `stroke` | string/TEXT | freestyle/backstroke/breaststroke/butterfly/im |
+| `stroke` | `stroke` | `Stroke`/TEXT | freestyle/backstroke/breaststroke/butterfly/im |
 | `distance` | `distance` | number/INTEGER | Total distance in meters |
 | `order` | `drill_order` | number/INTEGER | Position in drill list |
 | `items` | — | `DrillItem[]` | Client-only: rich set components |
@@ -149,7 +158,7 @@ A single execution of a Session template.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
-| `session_id` | `session_id` | string/TEXT | FK → Session |
+| `sessionId` | `session_id` | string/TEXT | FK → Session |
 | `date` | `date` | string/TEXT | Run date |
 | `poolName` | `pool_name` | string/TEXT | Pool name/location |
 | `poolLength` | `pool_length` | number/INTEGER | Overridable from template |
@@ -167,10 +176,10 @@ Snapshot of a Drill at the time a SessionRun starts.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
-| `run_id` | `run_id` | string/TEXT | FK → SessionRun |
-| `parent_drill_id` | `parent_drill_id` | string/TEXT | Optional FK → source drill for repeated reps |
+| `runId` | `run_id` | string/TEXT | FK → SessionRun |
+| `parentDrillId` | `parent_drill_id` | string/TEXT | Optional FK → source drill for repeated reps |
 | `name` | `name` | string/TEXT | Snapshot of drill name |
-| `stroke` | `stroke` | string/TEXT | Snapshot of drill stroke |
+| `stroke` | `stroke` | `RunDrillStroke`/TEXT | Snapshot of drill stroke |
 | `distance` | `distance` | number/INTEGER | Snapshot of drill distance |
 | `order` | `drill_order` | number/INTEGER | Position in run drill list |
 | `notes` | `notes` | string/TEXT | Optional |
@@ -183,13 +192,13 @@ Links a swimmer to a SessionRun.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/number (AUTOINC) PK | UUID / auto-increment |
-| `run_id` | `run_id` | string/TEXT | FK → SessionRun |
-| `swimmer_id` | `swimmer_id` | string/TEXT | FK → Swimmer |
+| `runId` | `run_id` | string/TEXT | FK → SessionRun |
+| `swimmerId` | `swimmer_id` | string/TEXT | FK → Swimmer |
 | `lane` | `lane` | number/INTEGER | Lane assignment |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
-**Uniqueness constraint:** a `swimmer_id` may be linked to a `run_id` at most once (one lane per run). `addSwimmerToRun` *moves* the swimmer to the requested lane if a `(run_id, swimmer_id)` link already exists (it updates the lane rather than inserting a duplicate). In the live view, re-pointing a temp/"wanna be" swimmer to an already-allocated real swimmer triggers a confirmation dialog that *moves* them (removes the old lane's live allocation + saved `LaneDrillResult` entry, then re-points), never creating a duplicate.
+**Uniqueness constraint:** a `swimmerId` may be linked to a `runId` at most once (one lane per run). `addSwimmerToRun` *moves* the swimmer to the requested lane if a `(runId, swimmerId)` link already exists (it updates the lane rather than inserting a duplicate). In the live view, re-pointing a temp/"wanna be" swimmer to an already-allocated real swimmer triggers a confirmation dialog that *moves* them (removes the old lane's live allocation + saved `LaneDrillResult` entry, then re-points), never creating a duplicate.
 
 ### LiveSessionContext.Swimmer (In-memory reducer state)
 Represents a swimmer during an active session. Stroke counts are stored per-lap (1-indexed) in a sparse Record. Timestamps live in the TimestampStore; this state holds non-timing metadata.
@@ -210,10 +219,10 @@ A recorded lap time.
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
-| `run_drill_id` | `run_drill_id` | string/TEXT | FK → RunDrill |
-| `swimmer_id` | `swimmer_id` | string/TEXT | FK → Swimmer |
+| `runDrillId` | `run_drill_id` | string/TEXT | FK → RunDrill |
+| `swimmerId` | `swimmer_id` | string/TEXT | FK → Swimmer |
 | `time` | `time` | number/REAL | Time in seconds |
-| `stroke_count` | `stroke_count` | number/INTEGER | Stroke count for the lap |
+| `strokeCount` | `stroke_count` | number/INTEGER | Stroke count for the lap |
 | `effort` | `effort` | string/TEXT | easy/moderate/hard/max |
 | `notes` | `notes` | string/TEXT | Optional |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
@@ -225,10 +234,10 @@ JSON blob storage for timed group timing data.
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string PK | UUID |
-| `run_id` | string | FK → SessionRun |
-| `group_id` | string | Timed group UUID |
+| `runId` | string | FK → SessionRun |
+| `groupId` | string | Timed group UUID |
 | `lane` | number | Physical lane number |
-| `run_drill_id` | string | FK → RunDrill |
+| `runDrillId` | string | FK → RunDrill |
 | `completed` | boolean | Drill completion **marker** — can be set without any timing (progress/overview "done") |
 | `data` | string \| null | JSON blob with timing detail; `null` = completed via marker only, never timed |
 | `updatedAt` | string | ISO 8601 |
@@ -302,7 +311,7 @@ Global drill library with builtin defaults and user customizations.
 |-------|------|-------|
 | `id` | string PK | UUID |
 | `name` | string | Drill name |
-| `stroke` | string | Stroke type |
+| `stroke` | `Stroke` | freestyle/backstroke/breaststroke/butterfly/im |
 | `distance` | number | Total distance |
 | `items` | DrillItem[] | Rich set components |
 | `repeatCount` | number | Set repeats |
@@ -337,6 +346,24 @@ App-wide configuration (both client and server).
 
 ## Indexes
 
+### Dexie secondary indexes (schema v6)
+
+| Table | Indexed properties |
+|-------|--------------------|
+| `swimmers` | unique `name`, `status`, `updatedAt` |
+| `sessions` | `createdAt`, `updatedAt` |
+| `drills` | `sessionId`, `focus`, `updatedAt` |
+| `sessionRuns` | `sessionId`, `status`, `date`, `updatedAt` |
+| `runDrills` | `runId`, `parentDrillId`, `updatedAt` |
+| `runSwimmers` | `runId`, `swimmerId` |
+| `laps` | `runDrillId`, `swimmerId`, `createdAt` |
+| `laneDrillResults` | `runId`, `groupId`, `lane`, `runDrillId`, compound `[runId+groupId+runDrillId]`, `updatedAt` |
+| `libraryDrills` | `name`, `stroke`, `focus`, `popularity`, `updatedAt` |
+
+All tables also have their primary `id` key path; `_meta` uses `key` as its primary key.
+
+### Server/SQLite indexes (snake_case)
+
 | Table | Index | Columns |
 |-------|-------|---------|
 | drills | idx_drills_session_id | session_id |
@@ -345,4 +372,3 @@ App-wide configuration (both client and server).
 | run_swimmers | idx_run_swimmers_run_id | run_id |
 | run_swimmers | idx_run_swimmers_swimmer_id | swimmer_id |
 | laps | idx_laps_run_drill_id | run_drill_id |
-| laneDrillResults | — | run_id, group_id, run_drill_id + composite [run_id+group_id+run_drill_id] |
