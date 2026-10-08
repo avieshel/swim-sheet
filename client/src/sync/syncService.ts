@@ -319,8 +319,17 @@ class SyncService {
     const markerKey = `sync:completed-history-backfill:v1:${orgId}`
     if (await db._meta.get(markerKey)) return
 
-    const remote = await this.transport.pull(orgId, emptyCursors(), HISTORY_TABLES)
-    const remoteByKey = new Map(remote.changes.map(change => [`${change.table}:${change.id}`, change]))
+    let historyCursors = emptyCursors()
+    const remoteChanges: CloudChange[] = []
+    while (true) {
+      const page = await this.transport.pull(orgId, historyCursors, HISTORY_TABLES)
+      remoteChanges.push(...page.changes)
+      const cursorAdvanced = HISTORY_TABLES.some(table => page.nextCursors[table] !== historyCursors[table])
+      historyCursors = page.nextCursors
+      if (page.changes.length === 0) break
+      if (!cursorAdvanced) throw new Error('completed-history backfill cursor did not advance')
+    }
+    const remoteByKey = new Map(remoteChanges.map(change => [`${change.table}:${change.id}`, change]))
     const localKeys = new Set<string>()
 
     for (const table of HISTORY_TABLES) {
@@ -350,7 +359,7 @@ class SyncService {
       }
     }
 
-    for (const change of remote.changes) {
+    for (const change of remoteChanges) {
       const key = `${change.table}:${change.id}`
       if (localKeys.has(key)) continue
       const existing = await db._sync_meta.get(key)
@@ -370,7 +379,8 @@ class SyncService {
     }
 
     for (const table of HISTORY_TABLES) {
-      await setCursor(orgId, table, remote.nextCursors[table])
+      const cursor = historyCursors[table]
+      if (cursor !== null) await setCursor(orgId, table, cursor)
     }
     await db._meta.put({ key: markerKey, value: new Date().toISOString() })
   }

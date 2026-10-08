@@ -22,7 +22,7 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 | Shared organization / head coach distributing work | `organizations` + `organization_memberships` + roles. Head coach = `owner` (full + distribute). Coaches = `coach`. |
 | Share or withhold a session | `sessions.visibility`: `private` (default; creator + owner only) \| `organization` (all organization members can view/use). |
 | Distribute weekly sessions to a coach | `sessions.assigned_to` (profile id). Assignment implies visibility for that coach. |
-| Track weekly load / student totals | `session_runs.organization_id` (+ per-swimmer links) once results sync ships; aggregates are organization-scoped. |
+| Track weekly load / student totals | `session_runs.organization_id` (+ per-swimmer links) for completed runs that sync; aggregates are organization-scoped. |
 
 **Local-first:** PWA keeps working with no account. A default local organization is created for tagging; login **claims** local organizations into Supabase (same UUID). Sync/collab only for claimed organizations.
 

@@ -39,7 +39,7 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
         throw new Error('pull failed')
       }
       pulledTables.push(tables)
-      const changes: CloudChange[] = (opts.cloudChanges ?? []).filter((change) => !tables || tables.includes(change.table))
+      const changes: CloudChange[] = [...(opts.cloudChanges ?? [])]
       const n = opts.pulled ?? 0
       for (let i = 0; i < n && (!tables || tables.includes('swimmers')); i++) {
         const id = `pulled-${i}`
@@ -54,7 +54,7 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
         })
       }
       const nextCursors = {
-        swimmers: 't-pull',
+        swimmers: cursors.swimmers ?? '0001',
         sessions: cursors.sessions ?? '0001',
         drills: cursors.drills ?? '0001',
         libraryDrills: cursors.libraryDrills ?? '0001',
@@ -64,7 +64,20 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
         laps: cursors.laps ?? '0001',
         laneDrillResults: cursors.laneDrillResults ?? '0001',
       }
-      return { changes, nextCursors }
+      const requestedTables = tables ?? [
+        'swimmers', 'sessions', 'drills', 'libraryDrills', 'sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults',
+      ]
+      const page: CloudChange[] = []
+      for (const table of requestedTables) {
+        const cursor = cursors[table] ?? '0001'
+        const rows = changes
+          .filter((change) => change.table === table && change.updatedAt > cursor)
+          .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id))
+          .slice(0, 500)
+        page.push(...rows)
+        if (rows.length > 0) nextCursors[table] = rows[rows.length - 1].updatedAt
+      }
+      return { changes: page, nextCursors }
     },
   }
   return transport
@@ -212,6 +225,52 @@ describe('syncService', () => {
 
     expect(transport.upserted.some((change) => change.id === 'run-shared')).toBe(false)
     expect((await db.sessionRuns.get('run-shared'))?.notes).toBe('newer cloud edit')
+  })
+
+  test('does not treat same-ID rows beyond the first history page as local-only', async () => {
+    const cloudChanges: CloudChange[] = Array.from({ length: 500 }, (_, index) => {
+      const id = `run-cloud-${index}`
+      const updatedAt = `2026-10-08T10:00:00.${String(index).padStart(3, '0')}Z`
+      return {
+        table: 'sessionRuns', id, op: 'upsert',
+        payload: {
+          id, sessionId: 'session-1', date: '2026-10-08', poolName: 'Cloud', poolLength: 25,
+          notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null,
+          sessionPauseDuration: 0, createdAt: 'created', updatedAt,
+        },
+        updatedAt, deletedAt: null,
+      }
+    })
+    cloudChanges.push({
+      table: 'sessionRuns', id: 'run-after-page', op: 'upsert',
+      payload: {
+        id: 'run-after-page', sessionId: 'session-1', date: '2026-10-08', poolName: 'Cloud', poolLength: 25,
+        notes: 'newer cloud row', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null,
+        sessionPauseDuration: 0, createdAt: 'created', updatedAt: '2026-10-08T11:00:00.000Z',
+      },
+      updatedAt: '2026-10-08T11:00:00.000Z', deletedAt: null,
+    })
+    await db.sessionRuns.add({
+      id: 'run-after-page', sessionId: 'session-1', date: '2026-10-08', poolName: 'Local', poolLength: 25,
+      notes: 'older local row', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null,
+      sessionPauseDuration: 0, createdAt: 'created', updatedAt: '2026-10-08T10:30:00.000Z',
+    })
+    await markDirty('sessionRuns', 'run-after-page')
+    await db._sync_meta.update('sessionRuns:run-after-page', { orgId: 'org-A' })
+    const transport = fakeTransport({ cloudChanges })
+    syncService.init(transport, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+
+    await syncService.syncNow()
+
+    expect(transport.upserted.some((change) => change.id === 'run-after-page')).toBe(false)
+    expect((await db.sessionRuns.get('run-after-page'))?.notes).toBe('newer cloud row')
+    expect(await db.sessionRuns.count()).toBe(501)
+    expect(transport.pulledTables.slice(0, 3)).toEqual([
+      ['sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults'],
+      ['sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults'],
+      ['sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults'],
+    ])
   })
 
   test('counts only completed history in first-merge summary', async () => {

@@ -66,7 +66,7 @@ export function toCloudRow(
   orgId: string,
   userId: string,
 ): Row {
-  const base: Row = { id: change.id, organization_id: orgId, created_by: userId }
+  const base: Row = { id: change.id, organization_id: orgId, created_by: userId, deleted_at: null }
   if (change.op === 'delete') {
     return { ...base, deleted_at: new Date().toISOString() }
   }

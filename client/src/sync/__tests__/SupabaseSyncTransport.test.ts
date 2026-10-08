@@ -279,6 +279,26 @@ describe('SupabaseSyncTransport.push', () => {
     expect(result.applied).toEqual([{ table: 'runDrills', id: 'run-drill-new', updatedAt: 'server-rev' }])
   })
 
+  test('clears a tombstone when a newer local history row is restored', async () => {
+    const stub = makeSupabaseStub({ updateAffected: 1 })
+    const transport = new SupabaseSyncTransport(stub)
+    const change: LocalChange = {
+      table: asSyncTable('sessionRuns'),
+      id: 'run-restored',
+      op: 'upsert',
+      payload: {
+        id: 'run-restored', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+        notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+        createdAt: 'created', updatedAt: 'local-newer',
+      },
+      rev: 'cloud-tombstone-rev',
+    }
+
+    await transport.push([change], 'org-A')
+
+    expect(stub.queries[0].updateRow?.deleted_at).toBeNull()
+  })
+
   test('does not label an organization RPC failure as a signed-out error', async () => {
     const transport = new SupabaseSyncTransport(makeSupabaseStub({ rpcError: { message: 'request failed' } }))
 
