@@ -98,7 +98,7 @@ export interface SyncTransport {
     conflicts: SyncConflict[]
     applied: { table: SyncTable; id: string; updatedAt: string }[]
   }>
-  pull(orgId: string, cursors: Record<SyncTable, string | null>): Promise<{
+  pull(orgId: string, cursors: Record<SyncTable, string | null>, tables?: SyncTable[]): Promise<{
     changes: CloudChange[]
     nextCursors: Record<SyncTable, string>
   }>

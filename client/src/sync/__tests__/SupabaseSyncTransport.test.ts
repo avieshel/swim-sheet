@@ -7,9 +7,32 @@ import {
   type BuilderResult,
   type SyncQueryBuilder,
 } from '../SupabaseSyncTransport'
+import { HISTORY_TABLES } from '../types'
 import type { LocalChange, SyncTable, SyncTransport } from '../types'
 
 const asSyncTable = (table: string): SyncTable => table as unknown as SyncTable
+
+interface QueryTrace {
+  table: string
+  columns?: string
+  filters: Array<[string, unknown]>
+}
+
+type StubSupabase = SupabaseLike & { queries: QueryTrace[] }
+
+function emptyCursors(): Record<SyncTable, string | null> {
+  return {
+    swimmers: null,
+    sessions: null,
+    drills: null,
+    libraryDrills: null,
+    sessionRuns: null,
+    runDrills: null,
+    runSwimmers: null,
+    laps: null,
+    laneDrillResults: null,
+  }
+}
 
 const mockAuth = vi.hoisted(() => ({ userId: 'u1' as string | null }))
 
@@ -29,7 +52,7 @@ function makeSupabaseStub(opts: {
   upsertAffected?: number
   upsertUpdatedAt?: string
   rpcError?: unknown
-} = {}): SupabaseLike {
+} = {}): StubSupabase {
   const updateAffected = opts.updateAffected
   const currentRow = opts.currentRow ?? null
   const rows = opts.rows ?? []
@@ -39,6 +62,8 @@ function makeSupabaseStub(opts: {
     count: updateAffected ?? (Array.isArray(data) ? data.length : data ? 1 : 0),
   })
   const upsertAffected = opts.upsertAffected ?? 1
+  const queries: QueryTrace[] = []
+  let activeQuery: QueryTrace | undefined
   // The stub builder is thenable and chainable, so remember whether the chain
   // started with update() or upsert() to answer with the right shape.
   let mode: 'none' | 'update' | 'upsert' = 'none'
@@ -67,11 +92,17 @@ function makeSupabaseStub(opts: {
     return result(currentRow)
   }
   const b: SyncQueryBuilder = {
-    eq: () => b,
+    eq: (column, value) => {
+      activeQuery?.filters.push([column, value])
+      return b
+    },
     gt: () => b,
     gte: () => b,
     order: () => b,
-    select: () => b,
+    select: (columns) => {
+      if (activeQuery && columns !== undefined) activeQuery.columns = columns
+      return b
+    },
     update: () => { mode = 'update'; return b },
     delete: () => b,
     upsert: () => { mode = 'upsert'; return b },
@@ -80,7 +111,12 @@ function makeSupabaseStub(opts: {
     then: (onFulfilled?: (value: BuilderResult) => unknown) => Promise.resolve(resolve()).then(onFulfilled),
   }
   return {
-    from: () => b,
+    queries,
+    from: (table) => {
+      activeQuery = { table, filters: [] }
+      queries.push(activeQuery)
+      return b
+    },
     rpc: () => Promise.resolve({ data: 'org-x', error: opts.rpcError ?? null }),
   }
 }
@@ -256,5 +292,62 @@ describe('SupabaseSyncTransport.push', () => {
     }], 'org-A')
     expect(conflicts).toHaveLength(0)
     expect(applied).toEqual([{ table: 'swimmers', id: 's1', updatedAt: 'created-rev' }])
+  })
+})
+
+describe('SupabaseSyncTransport.pull history', () => {
+  test('pulls only completed session runs', async () => {
+    const stub = makeSupabaseStub()
+    const transport = new SupabaseSyncTransport(stub)
+
+    await transport.pull('org-A', emptyCursors(), ['sessionRuns'])
+
+    expect(stub.queries).toHaveLength(1)
+    expect(stub.queries[0]).toMatchObject({ table: 'session_runs', filters: [['organization_id', 'org-A'], ['status', 'completed']] })
+  })
+
+  test('filters dependent history through completed parent runs', async () => {
+    const stub = makeSupabaseStub()
+    const transport = new SupabaseSyncTransport(stub)
+
+    await transport.pull('org-A', emptyCursors(), HISTORY_TABLES)
+
+    const queryFor = (table: string) => stub.queries.find((query) => query.table === table)
+    expect(queryFor('run_drills')).toMatchObject({
+      columns: '*,session_runs!inner(status)',
+      filters: expect.arrayContaining([['session_runs.status', 'completed']]),
+    })
+    expect(queryFor('run_swimmers')).toMatchObject({
+      columns: '*,session_runs!inner(status)',
+      filters: expect.arrayContaining([['session_runs.status', 'completed']]),
+    })
+    expect(queryFor('laps')).toMatchObject({
+      columns: '*,run_drills!inner(session_runs!inner(status))',
+      filters: expect.arrayContaining([['run_drills.session_runs.status', 'completed']]),
+    })
+    expect(queryFor('lane_drill_results')).toMatchObject({
+      columns: '*,session_runs!inner(status)',
+      filters: expect.arrayContaining([['session_runs.status', 'completed']]),
+    })
+  })
+
+  test('pulls only requested tables during history backfill', async () => {
+    const stub = makeSupabaseStub()
+    const transport = new SupabaseSyncTransport(stub)
+    const cursors = { ...emptyCursors(), sessions: 'session-cursor' }
+
+    const result = await transport.pull('org-A', cursors, ['sessionRuns'])
+
+    expect(stub.queries.map((query) => query.table)).toEqual(['session_runs'])
+    expect(result.nextCursors.sessions).toBe('session-cursor')
+  })
+
+  test('round-trips history tombstones', async () => {
+    const stub = makeSupabaseStub({ rows: [{ id: 'run-1', status: 'completed', updated_at: 'rev-2', deleted_at: 'deleted' }] })
+    const transport = new SupabaseSyncTransport(stub)
+
+    const result = await transport.pull('org-A', emptyCursors(), ['sessionRuns'])
+
+    expect(result.changes).toMatchObject([{ table: 'sessionRuns', id: 'run-1', op: 'delete', updatedAt: 'rev-2', deletedAt: 'deleted' }])
   })
 })

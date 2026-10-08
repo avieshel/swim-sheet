@@ -1,16 +1,12 @@
 import { getCurrentUserId, supabase } from '../api/supabase'
+import { HISTORY_TABLES } from './types'
 import type { LocalChange, CloudChange, SyncConflict, SyncTable, SyncTransport } from './types'
 
-const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
+const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills', ...HISTORY_TABLES]
 const BATCH = 500
 const MIN_CURSOR = '0001-01-01T00:00:00.000Z'
 
-// Local Dexie name -> Postgres table name. The transport calls .from() with the
-// local name unless it is translated here, and PostgREST 404s on a name that
-// does not exist: querying "libraryDrills" returned PGRST205 on both local and
-// hosted, so library drills never synced and the error was silently discarded
-// (pull ignores `error`). Only libraryDrills differs; the rest match exactly.
-// utils/check-cloud-table-names.mjs asserts this stays in sync with SYNC_TABLES.
+// Local Dexie name -> Postgres table name.
 const CLOUD_TABLE: Record<SyncTable, string> = {
   swimmers: 'swimmers',
   sessions: 'sessions',
@@ -479,6 +475,7 @@ export class SupabaseSyncTransport implements SyncTransport {
   async pull(
     orgId: string,
     cursors: Record<SyncTable, string | null>,
+    tables: SyncTable[] = SYNC_TABLES,
   ): Promise<{ changes: CloudChange[]; nextCursors: Record<SyncTable, string> }> {
     const changes: CloudChange[] = []
     const nextCursors: Record<SyncTable, string> = {
@@ -492,13 +489,23 @@ export class SupabaseSyncTransport implements SyncTransport {
       laps: cursors.laps ?? MIN_CURSOR,
       laneDrillResults: cursors.laneDrillResults ?? MIN_CURSOR,
     }
-    for (const table of SYNC_TABLES) {
+    for (const table of tables) {
       const cursor = nextCursors[table]
-      const { data, error } = await this.client
+      const columns = table === 'laps'
+        ? '*,run_drills!inner(session_runs!inner(status))'
+        : HISTORY_TABLES.includes(table) && table !== 'sessionRuns'
+          ? '*,session_runs!inner(status)'
+          : '*'
+      let query = this.client
         .from(CLOUD_TABLE[table])
-        .select('*')
+        .select(columns)
         .eq('organization_id', orgId)
         .gt('updated_at', cursor)
+      if (table === 'sessionRuns') query = query.eq('status', 'completed')
+      else if (table === 'laps') query = query.eq('run_drills.session_runs.status', 'completed')
+      else if (HISTORY_TABLES.includes(table)) query = query.eq('session_runs.status', 'completed')
+
+      const { data, error } = await query
         .order('updated_at')
         .order('id')
         .limit(BATCH)
