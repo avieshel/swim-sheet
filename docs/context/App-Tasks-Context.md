@@ -7,9 +7,11 @@ Remaining application-level work items. These should be converted to GitHub issu
 ## Known Issues
 
 - **Cross-device sync is still unverified against hosted Supabase.** The client
-  now includes completed run history (including timing snapshots), but
-  `20261008000001_completed_history_sync.sql` must be applied to hosted before
-  deploying this code. Hosted has one Google-authenticated user and no
+  includes completed run history (including timing snapshots), and
+  `20261008000001_completed_history_sync.sql` **is** now applied to hosted — but
+  the client deployed first, so every history pull failed with
+  `PGRST205: Could not find the table 'public.lane_drill_results'` until the
+  migration was pushed. Hosted has one Google-authenticated user and no
   password-grant test user, so `tests/sync-cross-device.spec.ts` cannot run there
   yet. Treat cross-device sync as unproven in production until hosted two-device
   verification passes.
