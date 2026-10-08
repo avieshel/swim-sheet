@@ -33,7 +33,7 @@ Offline-first PWA for swim coaches to track lap times, stroke counts, and athlet
 | Offline DB | Dexie.js 4 | IndexedDB wrapper — typed, queryable |
 | API | Custom `api/` wrappers | Consistent interface over Dexie + HTTP |
 | Services | Domain services | Business logic (runService, swimmerService, etc.) |
-| Sync | Custom sync engine | Push-only backup to server (never pulls data into the device) |
+| Sync | Custom Supabase sync engine | Bidirectional sync for selected tables; push local edits, pull remote changes, and surface conflicts |
 | Install | PWA manifest + SW | Add to home screen, full offline |
 | Tests | Vitest (unit), Playwright (e2e) | Testing stack |
 | Static analysis | ESLint + tsc + knip | Lint, typecheck, dead-code detection (`npm run check`) |
@@ -51,7 +51,7 @@ Offline-first PWA for swim coaches to track lap times, stroke counts, and athlet
 
 ### Offline-First PWA
 - The app works fully offline using IndexedDB (Dexie)
-- The server is optional — needed for first-time load and as a push-only backup target
+- Supabase is optional — needed only for account-based cloud sync; core app data remains available offline
 - PWA manifest enables "Add to Home Screen" on mobile
 - Service worker caches static assets only (never API responses)
 - **First run is always clean**: the client seeds only builtin templates (drill library, session catalog); it never contains or downloads previous/completed-session data. All coach session data is stored on the device.

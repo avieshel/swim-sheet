@@ -207,7 +207,9 @@ export class SupabaseSyncTransport implements SyncTransport {
     }
     const { data, error } = await this.client.rpc('ensure_personal_organization')
     if (error) {
-      throw Object.assign(new Error('failed to ensure personal organization'), { kind: 'auth', cause: error })
+      const details = error as { code?: string; status?: number }
+      const kind = details.status === 401 || details.code === 'PGRST301' ? 'auth' : 'network'
+      throw Object.assign(new Error('failed to ensure personal organization'), { kind, cause: error })
     }
     if (typeof data !== 'string' || data.length === 0) {
       throw new Error('ensure_personal_organization returned no organization')

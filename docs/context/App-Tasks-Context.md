@@ -918,6 +918,26 @@ Adopted from platform practices: single typed tracking plan (Segment/Amplitude s
 
 **Logged-out delivery verified**: RLS insert policy is `with check (true)` for all roles (`20260925000001:19-21`) + `grant insert to anon` (`20260925000003:4`); `user_id` is a nullable FK, so anon inserts with `user_id: null` are valid. Client authenticates with the anon key only (no session dependency) and uses `Prefer: return=minimal` (blocked SELECT policies don't matter). Live smoke test: anon POST with `user_id: null` → HTTP 201. Migration `20261004000002` was applied to the hosted DB via `npm run db:push` during verification (before that, all inserts would have failed with `PGRST204` on the missing `event_id` column). Regression-locked by a unit test asserting `user_id: null` + anon-only auth headers.
 
+---
+
+## A-053: Sync readiness and recoverable failure UI ✅
+
+**Source**: User report — sync still fails and the failed-sync report cannot be cleared; follow-up requested readiness hints before sync actions and a dismiss/reset path.
+
+**Changes**:
+- Settings → Account now distinguishes missing Supabase configuration, signed-out, offline, initializing, ready, and failed states. Sync/login actions are disabled when configuration or connectivity is unavailable.
+- Retry runs sync initialization again. A sync attempt without an active organization also initializes before attempting the push/pull.
+- Dismiss clears the sync error and returns the UI to a retryable state without clearing pending local changes or conflicts. A later failed attempt can show a new error.
+- Merge and conflict-resolution failures now enter the same visible error state instead of becoming unhandled rejections. Transport causes are retained in the displayed error detail.
+- Pending cloud writes are ordered parent-first (`sessions` before `drills`) to satisfy the `drills.session_id` foreign key. Organization setup RPC failures are no longer automatically mislabeled as authentication failures; only an unauthenticated session or an explicit invalid-token response is classified as auth.
+
+**Verification boundary**: component/service/transport tests cover readiness, retry, error dismissal, and pending-data preservation. Hosted cross-device sync remains unverified in this environment because Supabase E2E credentials are unavailable; the existing known offline-edit propagation E2E failure remains open.
+
+**Files modified**: `client/src/components/AccountSection.tsx`, `client/src/sync/syncService.ts`, `client/src/sync/syncStore.ts`, `client/src/sync/SupabaseSyncTransport.ts`, related tests, and the App/DB/UI context docs.
+
+**Priority**: High
+**Status**: Done — full project check and production build pass; hosted cross-device sync remains unverified.
+
 **Known follow-up**: identify-on-login (`user_id` is captured per event from the Supabase session but is always null until the login screen lands — wire anonymous→identified merge then).
 
 **Priority**: High

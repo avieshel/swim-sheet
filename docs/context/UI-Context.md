@@ -58,7 +58,7 @@ Lap-row destructive icons use `bg-error/10 text-error` with strong-error hover; 
 ### Icons
 All icons use the `<Icon>` component from `components/Icon.tsx`. Never use raw `<span className="material-symbols-outlined">` directly.
 
-Settings begins with an Account section. Signed-out users can choose device persistence and start Google or development test login; it explains that existing data remains local until cloud sync is enabled. Signed-in users see their avatar or initials, account identity, unchanged-local-data copy, and a secondary sign-out action. Authentication controls handle offline Google login and inline failures without changing Coach Profile state.
+Settings begins with an Account section. Signed-out users can choose device persistence and start Google or development test login; it explains that existing data remains local until cloud sync is enabled. The account section reports whether sync is configured, needs sign-in, is offline, is initializing, or is ready; sign-in is disabled if Supabase configuration is missing. Signed-in users see their avatar or initials, account identity, unchanged-local-data copy, and a secondary sign-out action. Sync failures show a detailed message with Retry and Dismiss actions; Retry reruns sync initialization, while Dismiss clears only the sync error state and preserves pending data/conflicts. Authentication controls handle offline Google login and inline failures without changing Coach Profile state.
 
 The desktop header shows a compact signed-in account indicator linking to Settings, using the profile avatar when available or a single initial fallback. It is omitted while auth is loading, when signed out, and from the mobile bottom navigation.
 
@@ -373,7 +373,7 @@ App preferences.
 - Defaults: pool length, distance units
 - Preferences: theme, font size, auto-save
 - Data management: export, import, reset
-- Sync: last sync, manual sync trigger
+- Sync: readiness status (configuration, sign-in, connectivity, initialization, and sync phase), last sync, manual sync trigger, and recoverable errors with Retry/Dismiss actions
 - Data Management → Storage Protection: shows a green check mark + "Protected from automatic eviction" when persistent storage is granted, an info ("i") icon opens an InfoDialog explaining eviction protection, and a "Request protection" button when not granted.
 
 ---

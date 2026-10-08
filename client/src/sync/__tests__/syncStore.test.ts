@@ -6,8 +6,11 @@ import { markDirty, getPendingChanges, applyRemoteChanges, getCursor, setCursor 
 describe('syncStore', () => {
   beforeEach(async () => {
     await db.open()
-    await db.transaction('rw', db.swimmers, db._sync_meta, async () => {
+    await db.transaction('rw', [db.swimmers, db.sessions, db.drills, db.libraryDrills, db._sync_meta], async () => {
       await db.swimmers.clear()
+      await db.sessions.clear()
+      await db.drills.clear()
+      await db.libraryDrills.clear()
       await db._sync_meta.clear()
     })
   })
@@ -18,6 +21,40 @@ describe('syncStore', () => {
     const pending = await getPendingChanges('org-A')
     expect(pending).toHaveLength(1)
     expect(pending[0]).toMatchObject({ table: 'swimmers', id: 's1', op: 'upsert' })
+  })
+
+  test('returns parent sessions before dependent drills', async () => {
+    await db.sessions.add({
+      id: 'session-1',
+      name: 'Session',
+      poolLength: 25,
+      notes: '',
+      visibility: 'private',
+      createdAt: 't',
+      updatedAt: 't',
+    })
+    await db.drills.add({
+      id: 'drill-1',
+      sessionId: 'session-1',
+      name: 'Drill',
+      stroke: 'freestyle',
+      distance: 50,
+      order: 0,
+      items: [],
+      repeatCount: 1,
+      timingMode: 'individual',
+      focus: 'technique',
+      labels: [],
+      description: '',
+      createdAt: 't',
+      updatedAt: 't',
+    })
+    await markDirty('drills', 'drill-1')
+    await markDirty('sessions', 'session-1')
+
+    const pending = await getPendingChanges('org-A')
+
+    expect(pending.map((change) => change.table)).toEqual(['sessions', 'drills'])
   })
 
   test('applyRemote does not re-enqueue a change', async () => {

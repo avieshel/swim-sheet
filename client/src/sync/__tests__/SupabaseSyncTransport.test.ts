@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, vi } from 'vitest'
 import {
   toCloudRow,
   fromCloudRow,
@@ -8,6 +8,13 @@ import {
   type SyncQueryBuilder,
 } from '../SupabaseSyncTransport'
 import type { LocalChange, SyncTransport } from '../types'
+
+const mockAuth = vi.hoisted(() => ({ userId: 'u1' as string | null }))
+
+vi.mock('../../api/supabase', () => ({
+  getCurrentUserId: () => mockAuth.userId,
+  supabase: {},
+}))
 
 // The stub is thenable, so an awaited builder resolves to `currentRow` — which
 // is what the guarded update path inspects. `updateAffected` therefore models the
@@ -19,6 +26,7 @@ function makeSupabaseStub(opts: {
   rows?: unknown[]
   upsertAffected?: number
   upsertUpdatedAt?: string
+  rpcError?: unknown
 } = {}): SupabaseLike {
   const updateAffected = opts.updateAffected
   const currentRow = opts.currentRow ?? null
@@ -71,7 +79,7 @@ function makeSupabaseStub(opts: {
   }
   return {
     from: () => b,
-    rpc: () => Promise.resolve(result('org-x')),
+    rpc: () => Promise.resolve({ data: 'org-x', error: opts.rpcError ?? null }),
   }
 }
 
@@ -115,6 +123,12 @@ describe('fromCloudRow', () => {
 })
 
 describe('SupabaseSyncTransport.push', () => {
+  test('does not label an organization RPC failure as a signed-out error', async () => {
+    const transport = new SupabaseSyncTransport(makeSupabaseStub({ rpcError: { message: 'request failed' } }))
+
+    await expect(transport.ensurePersonalOrganization()).rejects.toMatchObject({ kind: 'network' })
+  })
+
   test('reports a stale-revision conflict', async () => {
     const stub = makeSupabaseStub({ updateAffected: 0, currentRow: { id: 's1', name: 'Server', updated_at: 'newer', deleted_at: null } })
     const transport: SyncTransport = new SupabaseSyncTransport(stub)

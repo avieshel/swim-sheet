@@ -28,7 +28,59 @@ const mockAnalytics = vi.hoisted(() => ({
   },
 }))
 
+const mockConfig = vi.hoisted(() => ({
+  url: 'https://example.supabase.co',
+  key: 'test-anon-key',
+}))
+
+const mockSync = vi.hoisted(() => {
+  type State = {
+    signedIn: boolean
+    phase: 'idle' | 'initializing' | 'pushing' | 'pulling' | 'ready' | 'error' | 'needs_first_merge'
+    lastSyncAt: string | null
+    pendingCount: number
+    inFlight: boolean
+    error: { kind: 'offline' | 'auth' | 'conflict' | 'validation' | 'unexpected'; message: string } | null
+    conflicts: []
+    firstMergeSummary: null
+  }
+  let state: State = {
+    signedIn: false,
+    phase: 'idle',
+    lastSyncAt: null,
+    pendingCount: 0,
+    inFlight: false,
+    error: null,
+    conflicts: [],
+    firstMergeSummary: null,
+  }
+  const listeners = new Set<(next: State) => void>()
+  return {
+    getState: () => state,
+    setState: (next: State) => { state = next },
+    init: vi.fn(),
+    start: vi.fn(),
+    syncNow: vi.fn(),
+    dismissError: vi.fn(() => {
+      state = { ...state, error: null, phase: 'idle' }
+      for (const listener of listeners) listener(state)
+    }),
+    subscribe: vi.fn((listener: (next: State) => void) => {
+      listeners.add(listener)
+      listener(state)
+      return () => listeners.delete(listener)
+    }),
+  }
+})
+
 vi.mock('../../services/analyticsEvents', () => mockAnalytics)
+vi.mock('../../config', () => ({
+  config: {
+    getSupabaseUrl: () => mockConfig.url,
+    getSupabaseAnonKey: () => mockConfig.key,
+  },
+}))
+vi.mock('../../sync/syncService', () => ({ syncService: mockSync }))
 
 vi.mock('../../api/auth', () => mockAuth)
 vi.mock('../../api/authStorage', () => ({
@@ -60,6 +112,23 @@ describe('AccountSection', () => {
     mockAuth.signInWithGoogle.mockResolvedValue(undefined)
     mockAuth.signInAsTestUser.mockResolvedValue(undefined)
     mockAuth.signOut.mockResolvedValue(undefined)
+    mockConfig.url = 'https://example.supabase.co'
+    mockConfig.key = 'test-anon-key'
+    mockSync.setState({
+      signedIn: false,
+      phase: 'idle',
+      lastSyncAt: null,
+      pendingCount: 0,
+      inFlight: false,
+      error: null,
+      conflicts: [],
+      firstMergeSummary: null,
+    })
+    mockSync.subscribe.mockClear()
+    mockSync.init.mockClear()
+    mockSync.start.mockClear()
+    mockSync.syncNow.mockClear()
+    mockSync.dismissError.mockClear()
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
   })
 
@@ -70,6 +139,76 @@ describe('AccountSection', () => {
     expect(await screen.findByRole('button', { name: /Continue with Google/i })).toBeTruthy()
     expect(screen.getByLabelText('Keep me signed in on this device')).toHaveProperty('checked', true)
     expect(screen.getByText(/stays on this device/i)).toBeTruthy()
+    expect(screen.getByText(/sign in to enable cloud sync/i)).toBeTruthy()
+  })
+
+  it('explains that cloud sync is unavailable when this build has no Supabase config', async () => {
+    mockConfig.url = ''
+    mockConfig.key = ''
+    renderAccount()
+    await screen.findByRole('button', { name: /Continue with Google/i })
+    expect(screen.getByText(/cloud sync isn't configured for this app/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Continue with Google/i })).toHaveProperty('disabled', true)
+  })
+
+  it('keeps local backup export available when cloud sync is not configured', async () => {
+    mockConfig.url = ''
+    mockConfig.key = ''
+    mockAuth.restoreSession.mockResolvedValue({
+      id: 'u1',
+      email: 'coach@gmail.com',
+      user_metadata: { full_name: 'Coach' },
+    })
+    renderAccount()
+
+    await screen.findByText('coach@gmail.com')
+    expect(screen.getByRole('button', { name: 'Export backup' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /sync now/i })).toBeNull()
+  })
+
+  it('shows the underlying reason alongside an actionable authentication error', async () => {
+    mockAuth.restoreSession.mockResolvedValue({
+      id: 'u1',
+      email: 'coach@gmail.com',
+      user_metadata: { full_name: 'Coach' },
+    })
+    mockSync.setState({
+      signedIn: true,
+      phase: 'error',
+      lastSyncAt: null,
+      pendingCount: 0,
+      inFlight: false,
+      error: { kind: 'auth', message: 'failed to ensure personal organization (PGRST301: JWT validation failed)' },
+      conflicts: [],
+      firstMergeSummary: null,
+    })
+    renderAccount()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('Sign out and sign in again')
+    expect(alert.textContent).toContain('PGRST301: JWT validation failed')
+  })
+
+  it('disables manual sync while cloud organization setup is still initializing', async () => {
+    mockAuth.restoreSession.mockResolvedValue({
+      id: 'u1',
+      email: 'coach@gmail.com',
+      user_metadata: { full_name: 'Coach' },
+    })
+    mockSync.setState({
+      signedIn: true,
+      phase: 'initializing',
+      lastSyncAt: null,
+      pendingCount: 0,
+      inFlight: false,
+      error: null,
+      conflicts: [],
+      firstMergeSummary: null,
+    })
+    renderAccount()
+
+    const syncButton = await screen.findByRole('button', { name: /sync now/i })
+    expect(syncButton).toHaveProperty('disabled', true)
   })
 
   it('disables Google sign-in while offline', async () => {
@@ -174,5 +313,34 @@ describe('AccountSection', () => {
       screen.getByRole('button', { name: /sync now/i })
     })
     expect(screen.getByText(/last synced/i)).toBeTruthy()
+  })
+
+  it('retries a sync error through initialization and dismisses only the sync error', async () => {
+    mockAuth.restoreSession.mockResolvedValue({
+      id: 'u1',
+      email: 'coach@gmail.com',
+      user_metadata: { full_name: 'Coach' },
+    })
+    mockSync.setState({
+      signedIn: true,
+      phase: 'error',
+      lastSyncAt: null,
+      pendingCount: 2,
+      inFlight: false,
+      error: { kind: 'unexpected', message: 'failed to pull swimmers' },
+      conflicts: [],
+      firstMergeSummary: null,
+    })
+    renderAccount()
+
+    expect(await screen.findByText(/failed to pull swimmers/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(mockSync.start).toHaveBeenCalledOnce()
+    expect(mockSync.syncNow).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss sync error' }))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+    expect(mockSync.dismissError).toHaveBeenCalledOnce()
+    expect(screen.getByText(/2 pending/i)).toBeTruthy()
   })
 })

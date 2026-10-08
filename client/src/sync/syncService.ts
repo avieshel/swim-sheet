@@ -30,10 +30,27 @@ const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDril
 const POLL_INTERVAL_MS = 60000
 const DEBOUNCE_MS = 1000
 
+function errorMessage(e: unknown): string {
+  const err = e as { message?: string; cause?: unknown } | null
+  const message = err?.message ?? String(e)
+  const cause = err?.cause as { code?: string; message?: string } | null
+  if (!cause?.message || message.includes(cause.message)) return message
+  const code = cause.code ? `${cause.code}: ` : ''
+  return `${message} (${code}${cause.message})`
+}
+
 function classifyError(e: unknown): SyncError {
-  const err = e as { kind?: string; message?: string } | null
-  if (err?.kind === 'auth') return { kind: 'auth', message: err.message ?? 'auth error' }
-  return { kind: 'unexpected', message: err?.message ?? String(e) }
+  const err = e as { kind?: string } | null
+  const message = errorMessage(e)
+  if (err?.kind === 'auth') return { kind: 'auth', message }
+  const networkFailure = err?.kind === 'network' || e instanceof TypeError
+  if (
+    err?.kind === 'offline' ||
+    (networkFailure && typeof navigator !== 'undefined' && !navigator.onLine)
+  ) {
+    return { kind: 'offline', message }
+  }
+  return { kind: 'unexpected', message }
 }
 
 function localTable(table: SyncTable): Table<Record<string, unknown>, string> {
@@ -117,12 +134,12 @@ class SyncService {
   async start(): Promise<void> {
     const userId = getCurrentUserId()
     if (!userId) return
+    this.state = { ...this.state, phase: 'initializing', error: null }
+    this.notify()
     try {
       this.currentOrgId = await this.transport.ensurePersonalOrganization()
     } catch (e) {
-      const error = classifyError(e)
-      this.state = { ...this.state, error, phase: 'error' }
-      this.notify()
+      this.recordError(e)
       return
     }
     const cursors = await this.readCursors(this.currentOrgId)
@@ -185,8 +202,18 @@ class SyncService {
     orgId: string | null = this.currentOrgId,
   ): Promise<SyncResult> {
     if (!orgId) {
-      return { pushed: 0, pulled: 0, conflicts: [], error: { kind: 'auth', message: 'not signed in' } }
+      const error = this.recordError(Object.assign(new Error('not signed in'), { kind: 'auth' }))
+      return { pushed: 0, pulled: 0, conflicts: [], error }
     }
+    try {
+      return await this.performFirstMerge(transport, orgId)
+    } catch (e) {
+      const error = this.recordError(e)
+      return { pushed: 0, pulled: 0, conflicts: this.state.conflicts, error }
+    }
+  }
+
+  private async performFirstMerge(transport: SyncTransport, orgId: string): Promise<SyncResult> {
     const cloud = await transport.pull(orgId, emptyCursors())
     const changes = cloud.changes
     const byId = new Map(changes.map((c) => [c.id, c]))
@@ -292,6 +319,18 @@ class SyncService {
     resolution: 'local' | 'remote',
     transport: SyncTransport = this.transport,
   ): Promise<void> {
+    try {
+      await this.performConflictResolution(conflictId, resolution, transport)
+    } catch (e) {
+      this.recordError(e)
+    }
+  }
+
+  private async performConflictResolution(
+    conflictId: string,
+    resolution: 'local' | 'remote',
+    transport: SyncTransport,
+  ): Promise<void> {
     const parts = conflictId.split(':')
     let orgId: string | null
     let table: SyncTable
@@ -353,9 +392,19 @@ class SyncService {
 
   async syncNow(): Promise<SyncResult> {
     if (!this.currentOrgId) {
+      if (getCurrentUserId()) {
+        await this.start()
+        if (this.state.phase === 'ready' && this.lastResult) return this.lastResult
+        const error = this.state.error
+        return {
+          pushed: 0,
+          pulled: 0,
+          conflicts: this.state.conflicts,
+          ...(error ? { error } : {}),
+        }
+      }
       const error: SyncError = { kind: 'auth', message: 'not signed in' }
-      this.state = { ...this.state, error, phase: 'error' }
-      this.notify()
+      this.recordError(error)
       return { pushed: 0, pulled: 0, conflicts: [], error }
     }
     if (this.state.inFlight) {
@@ -411,9 +460,7 @@ class SyncService {
       await this.refresh()
       return result
     } catch (e) {
-      const error = classifyError(e)
-      this.state = { ...this.state, error, phase: 'error' }
-      this.notify()
+      const error = this.recordError(e)
       const result: SyncResult = { pushed, pulled: 0, conflicts, error }
       this.lastResult = result
       return result
@@ -454,6 +501,16 @@ class SyncService {
     return this.lastResult
   }
 
+  dismissError(): void {
+    if (!this.state.error) return
+    this.state = {
+      ...this.state,
+      error: null,
+      phase: this.state.phase === 'error' ? 'idle' : this.state.phase,
+    }
+    this.notify()
+  }
+
   subscribe(cb: (s: SyncState) => void): () => void {
     this.listeners.add(cb)
     cb(this.state)
@@ -485,6 +542,13 @@ class SyncService {
 
   private notify(): void {
     for (const l of this.listeners) l(this.state)
+  }
+
+  private recordError(e: unknown): SyncError {
+    const error = classifyError(e)
+    this.state = { ...this.state, error, phase: 'error' }
+    this.notify()
+    return error
   }
 
   private async readCursors(orgId: string): Promise<Record<SyncTable, string | null>> {

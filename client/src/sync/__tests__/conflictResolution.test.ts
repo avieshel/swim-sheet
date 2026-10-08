@@ -87,4 +87,18 @@ describe('conflict resolution', () => {
     await resolveConflict('org-A:swimmers:s1', 'local', transport)
     expect(transport.upserted.some((r) => r.name === 'Local')).toBe(true)
   })
+
+  test('reports a failed local conflict resolution in sync state', async () => {
+    await seedConflict('swimmers', 's1', { name: 'Local' }, { name: 'Server' }, 'old', 'new')
+    const transport: SyncTransport = {
+      ensurePersonalOrganization: async () => 'org-A',
+      push: async () => { throw new Error('conflict retry failed') },
+      pull: async () => ({ changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' } }),
+    }
+
+    await resolveConflict('org-A:swimmers:s1', 'local', transport)
+
+    expect(syncService.getState().error?.message).toBe('conflict retry failed')
+    expect(syncService.getState().phase).toBe('error')
+  })
 })

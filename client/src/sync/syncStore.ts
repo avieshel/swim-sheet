@@ -8,6 +8,12 @@ import type {
 } from './types'
 
 const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
+const SYNC_ORDER: Record<SyncTable, number> = {
+  swimmers: 0,
+  sessions: 1,
+  drills: 2,
+  libraryDrills: 3,
+}
 
 // Guard so that writing rows we just pulled from the cloud does not re-enqueue
 // them as local changes.
@@ -115,6 +121,7 @@ export async function getPendingChanges(orgId: string): Promise<LocalChange[]> {
       rev: m.rev,
     })
   }
+  changes.sort((a, b) => SYNC_ORDER[a.table] - SYNC_ORDER[b.table])
   return changes
 }
 

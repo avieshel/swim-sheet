@@ -2,7 +2,7 @@
 
 ## Overview
 
-The app uses dual databases: **Dexie (IndexedDB)** on the client for offline-first operation and **better-sqlite3** on the server for persistence and sync. The schemas are mirrored with naming convention differences (camelCase client, snake_case server).
+The client uses **Dexie (IndexedDB)** as its primary offline-first store and optionally syncs selected tables with **Supabase Postgres**. The Express/**better-sqlite3** server remains for legacy API features; it is not the cloud-sync transport. The Supabase schema mirrors synced client data with naming-convention differences (camelCase client, snake_case cloud).
 
 ## Design Decisions
 
@@ -25,6 +25,8 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 | Track weekly load / student totals | `session_runs.organization_id` (+ per-swimmer links) once results sync ships; aggregates are organization-scoped. |
 
 **Local-first:** PWA keeps working with no account. A default local organization is created for tagging; login **claims** local organizations into Supabase (same UUID). Sync/collab only for claimed organizations.
+
+**Sync dependency order:** Pending cloud writes are ordered with parent rows before dependents. In particular, `sessions` must be pushed before `drills` because `drills.session_id` references `sessions.id`; pending metadata key order is not a valid dependency order.
 
 **RLS:** domain rows always scoped by `organization_id` + membership. Session SELECT allows `visibility = 'organization'` OR creator OR `assigned_to` OR `organization:manage`. Deletes remain owner-only.
 
@@ -61,8 +63,8 @@ Drills have evolved beyond simple name/stroke/distance:
 - `repeatCount`, `timingMode`, `focus`, `labels` for drill classification
 - `LibraryDrill` is the global drill bank (builtin + personal + customized)
 
-### Data Persistence & Backup (Local-Only)
-- All data lives on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). There is no server — the sync engine was removed and the client makes no `/api` calls.
+### Data Persistence & Backup
+- Domain CRUD persists on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). Supabase is an optional cloud-sync target for configured, signed-in users; the app remains usable offline and does not rely on the legacy `/api` routes for domain data.
 - **Persistent storage**: `navigator.storage.persist()` is requested once at startup (best-effort) to opt the origin out of automatic eviction. Status is surfaced in Settings, where the grant state shows a green check mark and an info ("i") icon opens a modal explaining what storage protection means and how it interacts with the automatic backup.
 - **Automatic backup**: every mutation schedules a debounced (3s) write of the full DB snapshot to `localStorage` (`swimsheet_db_backup`), wired via Dexie table hooks (`creating`/`updating`/`deleting`) plus a startup save. Empty snapshots are never written (so a fresh install or a fully-wiped DB doesn't create a restorable empty backup).
 - **Backup format**: `{ formatVersion: 1, schemaVersion: 6, savedAt, tables }`. `restoreAllTables()` wipes + bulk-loads inside one transaction. Restore/import normalizes pre-v6 snake_case Dexie properties to camelCase; v6 exports are camelCase.
@@ -73,7 +75,7 @@ Drills have evolved beyond simple name/stroke/distance:
 ### Naming Convention
 - Client Dexie records (schema v6): camelCase for all properties, including foreign keys and timer fields (`sessionId`, `groupId`, `sessionStartedAt`, `poolLength`, `updatedAt`)
 - Server: snake_case (`group_id`, `pool_length`, `updated_at`)
-- The future cloud adapter owns conversion between those store-specific conventions; analytics and other server wire payloads retain their existing formats.
+- `SupabaseSyncTransport` owns conversion between those store-specific conventions; analytics and other server wire payloads retain their existing formats.
 
 ### Column order
 Client TypeScript interfaces follow: `id` → FKs → ownership → domain attributes → status/flags → `createdAt`, `updatedAt`. Server tables follow the equivalent SQL order and audit trailer: `created_at`, `updated_at`, `deleted_at`, with `deleted_at` last.

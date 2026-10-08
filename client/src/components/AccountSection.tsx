@@ -5,6 +5,7 @@ import { Events, analytics } from '../services/analyticsEvents'
 import { Icon } from './Icon'
 import { syncService } from '../sync/syncService'
 import { createBackupPayload } from '../api/backup'
+import { config } from '../config'
 import type { SyncState, SyncConflict, SyncError } from '../sync/types'
 
 function initials(name: string | undefined, email: string | undefined): string {
@@ -40,7 +41,7 @@ function formatLastSync(iso: string): string {
 function describeSyncError(error: SyncError): string {
   switch (error.kind) {
     case 'auth':
-      return "You're signed out. Sign in to sync."
+      return 'Your sign-in may have expired. Sign out and sign in again to sync.'
     case 'offline':
       return "You're offline — we'll sync when you reconnect."
     case 'conflict':
@@ -50,6 +51,16 @@ function describeSyncError(error: SyncError): string {
     default:
       return "Sync couldn't finish. Please try again."
   }
+}
+
+function describeSyncStatus(state: SyncState, online: boolean): string {
+  if (!online) return "You're offline. Sync will resume when you reconnect."
+  if (state.inFlight || state.phase === 'pushing' || state.phase === 'pulling') return 'Syncing your data…'
+  if (state.phase === 'initializing') return 'Connecting to cloud sync…'
+  if (state.phase === 'needs_first_merge') return 'Review your local and cloud data to start syncing.'
+  if (state.phase === 'error') return 'Sync needs attention. See the error below.'
+  if (state.phase === 'ready') return 'Cloud sync is ready.'
+  return 'Cloud sync is ready to check.'
 }
 
 async function downloadBackup(): Promise<void> {
@@ -71,6 +82,7 @@ export function AccountSection() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [syncState, setSyncState] = useState<SyncState>(() => syncService.getState())
+  const syncConfigured = !!config.getSupabaseUrl() && !!config.getSupabaseAnonKey()
 
   useEffect(() => {
     const unsubscribe = syncService.subscribe(setSyncState)
@@ -147,6 +159,16 @@ export function AccountSection() {
               Sign out
             </button>
           </div>
+          {!syncConfigured && (
+            <p role="status" className="text-sm text-on-surface-variant mt-3">
+              Cloud sync isn't configured for this app. Your data remains on this device.
+            </p>
+          )}
+          {syncConfigured && (
+            <p role="status" aria-live="polite" className="text-sm text-on-surface-variant mt-3">
+              {describeSyncStatus(syncState, online)}
+            </p>
+          )}
           {syncState.conflicts.length > 0 && (
             <div className="mt-4 border border-error/40 rounded-xl p-3">
               <p className="font-bold text-error mb-2">Sync conflicts ({syncState.conflicts.length})</p>
@@ -221,14 +243,16 @@ export function AccountSection() {
                 Last synced: {syncState.lastSyncAt ? formatLastSync(syncState.lastSyncAt) : 'never'}
                 {syncState.pendingCount > 0 ? ` • ${syncState.pendingCount} pending` : ''}
               </span>
-              <button
-                type="button"
-                onClick={() => void syncService.syncNow()}
-                disabled={syncState.inFlight}
-                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
-              >
-                {syncState.inFlight ? 'Syncing…' : 'Sync now'}
-              </button>
+              {syncConfigured && (
+                <button
+                  type="button"
+                  onClick={() => void syncService.syncNow()}
+                  disabled={syncState.inFlight || phase === 'initializing' || !online}
+                  className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+                >
+                  {syncState.inFlight ? 'Syncing…' : 'Sync now'}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => void downloadBackup()}
@@ -240,22 +264,37 @@ export function AccountSection() {
           )}
 
           {!!user && syncState.error && (
-            <div className="mt-4 border border-error/40 rounded-xl p-3">
+            <div role="alert" className="mt-4 border border-error/40 rounded-xl p-3">
               <p className="text-sm text-error mb-2">{describeSyncError(syncState.error)}</p>
-              <button
-                type="button"
-                onClick={() => void syncService.syncNow()}
-                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
-              >
-                Retry
-              </button>
+              {syncState.error.message && (
+                <p className="text-xs text-on-surface-variant mb-3">{syncState.error.message}</p>
+              )}
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => void syncService.start()}
+                  disabled={!syncConfigured || !online || syncState.inFlight || phase === 'initializing'}
+                  className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => syncService.dismissError()}
+                  className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+                >
+                  Dismiss sync error
+                </button>
+              </div>
             </div>
           )}
           </>
         ) : (
           <div className="space-y-4">
-            <p className="text-on-surface-variant">
-              Sign in to use the same account on your other devices. Your data stays on this device — cloud sync isn't enabled yet.
+            <p role="status" className="text-on-surface-variant">
+              {syncConfigured
+                ? 'Sign in to enable cloud sync across your devices. Your data stays on this device until you sign in.'
+                : "Cloud sync isn't configured for this app. Your data stays on this device."}
             </p>
             <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
               <input
@@ -275,7 +314,7 @@ export function AccountSection() {
                     analytics.track(Events.AppSettings('sign_in', { method: 'google' }))
                   )
                 }
-                disabled={busy || !online}
+                disabled={busy || !online || !syncConfigured}
                 className="flex-1 h-11 bg-primary text-on-primary font-bold px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none"
               >
                 <span className="inline-flex items-center justify-center gap-2"><Icon name="login" size="sm" />Continue with Google</span>
@@ -288,7 +327,7 @@ export function AccountSection() {
                       analytics.track(Events.AppSettings('sign_in', { method: 'test' }))
                     )
                   }
-                  disabled={busy}
+                  disabled={busy || !online || !syncConfigured}
                   className="h-11 bg-surface-variant text-on-surface-variant font-bold px-4 rounded-xl hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none"
                 >
                   Sign in as test user
