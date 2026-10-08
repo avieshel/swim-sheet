@@ -26,7 +26,9 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 
 **Local-first:** PWA keeps working with no account. A default local organization is created for tagging; login **claims** local organizations into Supabase (same UUID). Sync/collab only for claimed organizations.
 
-**Sync dependency order:** Pending cloud writes are ordered with parent rows before dependents. In particular, `sessions` must be pushed before `drills` because `drills.session_id` references `sessions.id`; pending metadata key order is not a valid dependency order.
+**Sync dependency order:** Pending cloud writes are ordered with parent rows before dependents. `sessions` precede template `drills`; completed `session_runs` precede `run_drills`/`run_swimmers`, which precede `laps`/`lane_drill_results`. Pending metadata key order is not a valid dependency order.
+
+**Completed-history sync:** Swimmers, reusable session content, and completed run history sync through the authenticated Supabase personal organization. A run and its history graph stay local while `SessionRun.status` is `active`; completion makes the run, drill snapshots, swimmer links, laps, and timing snapshots eligible. The original UUIDs are retained and upserted so retries update the same records. `LaneDrillResult` remains the local JSON snapshot model, mirrored by `public.lane_drill_results`; in-memory live timer state is never synced. Existing local completed history is reconciled by ID on first rollout. Run history deletion uses tombstones, and deleting a session template does not physically delete its separate completed run snapshot.
 
 **RLS:** domain rows always scoped by `organization_id` + membership. Session SELECT allows `visibility = 'organization'` OR creator OR `assigned_to` OR `organization:manage`. Deletes remain owner-only.
 
@@ -39,6 +41,7 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 - The baseline migration is the single source of truth and fully idempotent (`drop policy if exists` guards on all 48 policies), so a partially applied schema is always healed by re-running the file.
 - Hosted database was rebuilt from this baseline on 2026-10-07: `public` dropped and replayed, `auth` users/OAuth config/API keys/project ref untouched.
 - `20261007000000_sync_foundation.sql` was applied to hosted on 2026-10-08 via `supabase db push --linked`, so `schema_migrations` records **2** entries. It is additive and idempotent (`add column if not exists`, `create unique index if not exists`, `create or replace function`) and changed neither the 17-table nor the 48-policy count.
+- `20261008000001_completed_history_sync.sql` adds the RLS-protected `lane_drill_results` cloud table and is applied to local Supabase. It has not been applied to hosted; apply it before deploying the client code that uses it. Hosted two-device verification remains outstanding.
 - **Migration ordering rule:** apply schema *before* merging the code that needs it, because `main` merges trigger the Cloudflare Pages deploy. Nothing in CI runs migrations, so an unapplied migration is otherwise only discovered at runtime.
 - **Never edit an applied migration to make hosted match.** `20261005001000` is already in hosted's `schema_migrations`, so `db push` skips it — the hardened baseline reached hosted by the 2026-10-07 manual replay, not by recorded history. This divergence is permanent and deliberate: the file is the source of truth for *fresh* environments (local `db reset`, new projects), while hosted reached the same state out-of-band.
 
@@ -54,7 +57,7 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 - All timestamps are session-relative (sessionElapsed = Date.now() - sessionStartedAt - sessionPauseDuration)
 - Timing data is stored as a flat key-value map in an in-memory `TimestampStore` (backed by `Map<string, number>`) for live editing; keys use a hierarchical scheme enabling prefix-delete for clear operations
 - LaneDrillResult persists a **snapshot** (JSON blob of `drillStart`/`drillEnd`/`sessionStartedAt`/`swimmers[]`) only at save/complete time
-- This is a client-only table (not mirrored on server)
+- `lane_drill_results` mirrors completed-run snapshots to Supabase; active-run snapshots and in-memory timing state remain device-local.
 
 ### Rich Drills (DrillItem[])
 Drills have evolved beyond simple name/stroke/distance:
@@ -234,19 +237,19 @@ A recorded lap time.
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
-### LaneDrillResult (Client Only)
+### LaneDrillResult
 JSON blob storage for timed group timing data.
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `id` | string PK | UUID |
+| `id` | UUID/string PK | UUID; mirrored to Supabase `lane_drill_results` for completed runs |
 | `runId` | string | FK → SessionRun |
 | `groupId` | string | Timed group UUID |
 | `lane` | number | Physical lane number |
 | `runDrillId` | string | FK → RunDrill |
 | `completed` | boolean | Drill completion **marker** — can be set without any timing (progress/overview "done") |
-| `data` | string \| null | JSON blob with timing detail; `null` = completed via marker only, never timed |
-| `updatedAt` | string | ISO 8601 |
+| `data` | string \| null | Local JSON string; stored as JSONB in Supabase. `null` = completed via marker only, never timed |
+| `updatedAt` | string | ISO 8601; cloud insert timestamps are server-assigned |
 
 **Single-model rule (markers + optional timing):** `completed` is the always-present per-lane progress marker. Timing is an *optional* attachment to the same row: when a drill is timed, `data` carries the `SavedDrillData` blob (start/lap/finish + stroke counts); when a lane is just marked done in the overview, `data` stays `null`. The API surface is one set of lane-result endpoints — the difference is purely how much of the payload is filled. Progress bars/`OverviewView` read `completed`; timing views additionally read `data`.
 

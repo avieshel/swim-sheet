@@ -6,16 +6,21 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ## Known Issues
 
-- **Sync is verified only against local Docker, never against hosted** — the
-  gap that let `libraryDrills` ship broken (PostgREST 404 for the camelCase name
-  while local tests stayed green). Hosted has one Google-authenticated user and no
+- **Cross-device sync is still unverified against hosted Supabase.** The client
+  now includes completed run history (including timing snapshots), but
+  `20261008000001_completed_history_sync.sql` must be applied to hosted before
+  deploying this code. Hosted has one Google-authenticated user and no
   password-grant test user, so `tests/sync-cross-device.spec.ts` cannot run there
-  yet. Until a hosted two-device run passes, treat cross-device sync as unproven
-  in production and do not rely on it for real coaching data.
+  yet. Treat cross-device sync as unproven in production until hosted two-device
+  verification passes.
 
 - **`tests/sync-cross-device.spec.ts` still fails, later than it used to** — the
   first-merge, download, propagation and stale-edit-conflict scenarios pass; the
   remaining failure is at the offline-edit propagation assertion.
+
+- **Completed-history two-device E2E coverage is deferred** to
+  [issue #12](https://github.com/avieshel/swim-sheet/issues/12). Do not repair or
+  change the E2E configuration as part of the completed-history sync work.
 
 ---
 
