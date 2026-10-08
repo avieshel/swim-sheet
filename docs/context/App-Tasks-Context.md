@@ -4,6 +4,18 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ---
 
+## Known Issues
+
+- **Offline edit recorded as a conflict on reconnect** — [#11](https://github.com/avieshel/dev/swim-sheet/issues/11).
+  An edit made offline is recorded as a `conflict` instead of being pushed once
+  connectivity returns, so the cloud never receives it and the user is asked to
+  resolve a conflict that never happened. Every other scenario in
+  `tests/sync-cross-device.spec.ts` passes. Narrowed to
+  `SupabaseSyncTransport.pushOne()` misclassifying an aborted write as a rejected
+  one; the issue carries the evidence and the ruled-out causes.
+
+---
+
 ## A-044: Extract builtin drill/session data into external JSON catalog ✅
 
 **Source**: User request — "export the drill / session data (initial data) out of the core application, it aligns with our future goals" (import/export + all data types follow same pattern)
