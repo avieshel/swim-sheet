@@ -1,0 +1,8 @@
+npx --no-install commitlint --edit "$1" || {
+  echo ""
+  echo "❌ Commit blocked: message does not follow Conventional Commits."
+  echo "   Expected: <type>(<scope>): <subject>"
+  echo "   Types: feat, fix, docs, test, chore, refactor, perf, build, ci, style, revert"
+  echo ""
+  exit 1
+}

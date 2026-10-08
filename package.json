@@ -2,9 +2,12 @@
   "private": true,
   "scripts": {
     "prepare": "husky",
+    "commitlint": "commitlint --edit",
     "db:push": "supabase db push"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "husky": "^9.1.7"
   }
 }
