@@ -234,6 +234,12 @@ export class SupabaseSyncTransport implements SyncTransport {
 
   // Returns the server-assigned updatedAt on success (null when the row could not
   // be read back), or a SyncConflict when the optimistic guard rejected the write.
+  //
+  // A network failure must NOT be reported as a conflict. `res.error` is true for
+  // both "PostgREST rejected this" and "the request never arrived", and only the
+  // first is a genuine concurrency conflict — treating the second as one leaves a
+  // row permanently stuck in `conflict` demanding manual resolution for what was
+  // only a connectivity blip (see issue #11).
   private async pushOne(
     change: LocalChange,
     orgId: string,
@@ -242,19 +248,19 @@ export class SupabaseSyncTransport implements SyncTransport {
     const mapped = toCloudRow(change.table, change, orgId, userId)
     const cloud = this.client.from(CLOUD_TABLE[change.table])
 
-    if (change.op === 'delete') {
-      if (change.rev === null) {
-        await cloud.delete().eq('id', change.id)
-        return { conflict: null, updatedAt: null }
+    // Distinguish "the row moved under us" (a real conflict) from "we could not
+    // talk to the server" (retry later). Only the former produces a conflict.
+    const guarded = async (
+      res: BuilderResult,
+    ): Promise<{ conflict: SyncConflict | null; updatedAt: string | null }> => {
+      if (res.error) {
+        throw Object.assign(new Error(`failed to push ${CLOUD_TABLE[change.table]}`), {
+          kind: 'network',
+          cause: res.error,
+        })
       }
-      const res = await this.client
-        .from(change.table)
-        .update({ ...mapped, deleted_at: new Date().toISOString() })
-        .eq('id', change.id)
-        .eq('updated_at', change.rev)
-        .select('updated_at')
       const rows = Array.isArray(res.data) ? res.data : []
-      if (res.error || rows.length === 0) {
+      if (rows.length === 0) {
         return {
           conflict: this.buildConflict(change, await this.fetchCurrent(change.table, change.id)),
           updatedAt: null,
@@ -263,24 +269,32 @@ export class SupabaseSyncTransport implements SyncTransport {
       return { conflict: null, updatedAt: rows[0].updated_at as string }
     }
 
+    if (change.op === 'delete') {
+      if (change.rev === null) {
+        const res = await cloud.delete().eq('id', change.id)
+        if (res.error) {
+          throw Object.assign(new Error(`failed to delete ${CLOUD_TABLE[change.table]}`), {
+            kind: 'network',
+            cause: res.error,
+          })
+        }
+        return { conflict: null, updatedAt: null }
+      }
+      return guarded(
+        await cloud
+          .update({ ...mapped, deleted_at: new Date().toISOString() })
+          .eq('id', change.id)
+          .eq('updated_at', change.rev)
+          .select('updated_at'),
+      )
+    }
+
     if (change.rev === null) {
       // Insert path: no guard. Read the server-assigned updated_at back so the
       // next write is guarded against the real rev.
-      const upserted = await this.client
-        .from(change.table)
-        .upsert(mapped, { onConflict: 'id' })
-        .select('updated_at')
-      if (upserted.error) {
-        return {
-          conflict: this.buildConflict(change, await this.fetchCurrent(change.table, change.id)),
-          updatedAt: null,
-        }
-      }
-      const rows = Array.isArray(upserted.data) ? upserted.data : []
-      return {
-        conflict: null,
-        updatedAt: rows.length > 0 ? (rows[0].updated_at as string) : null,
-      }
+      return guarded(
+        await cloud.upsert(mapped, { onConflict: 'id' }).select('updated_at'),
+      )
     }
 
     // Optimistic-concurrency guard. Two things matter:
@@ -293,20 +307,13 @@ export class SupabaseSyncTransport implements SyncTransport {
     // 2. Select updated_at, because the set_updated_at trigger overwrites the value
     //    we just sent. Keeping our own timestamp guarantees the next guarded write
     //    never matches, turning every subsequent edit into a false conflict.
-    const res = await this.client
-      .from(change.table)
-      .update(mapped)
-      .eq('id', change.id)
-      .eq('updated_at', change.rev)
-      .select('updated_at')
-    const rows = Array.isArray(res.data) ? res.data : []
-    if (res.error || rows.length === 0) {
-      return {
-        conflict: this.buildConflict(change, await this.fetchCurrent(change.table, change.id)),
-        updatedAt: null,
-      }
-    }
-    return { conflict: null, updatedAt: rows[0].updated_at as string }
+    return guarded(
+      await cloud
+        .update(mapped)
+        .eq('id', change.id)
+        .eq('updated_at', change.rev)
+        .select('updated_at'),
+    )
   }
 
   private async fetchCurrent(

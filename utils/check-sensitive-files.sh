@@ -17,8 +17,9 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Paths that may legitimately hold credentials and are handled by CI secrets.
-# Migrations and SQL test fixtures are plain schema/assertion files, never dumps.
-ALLOW_REGEX='^supabase/migrations/|^supabase/tests/|^client/src/.*/fixtures/'
+# Migrations, archived migrations, seed data and SQL test fixtures are plain
+# schema/assertion files, never pg_dump output.
+ALLOW_REGEX='^supabase/migrations/|^supabase/migrations_archive/|^supabase/tests/|^supabase/seed\.sql$|^client/src/.*/fixtures/'
 
 # name-pattern -> reason. Order matters; first match wins.
 declare -a RULES=(
@@ -75,9 +76,14 @@ check_one() {
   return 0
 }
 
+files=()
 if [[ "${1:-}" == "--staged" ]]; then
-  # -z: report paths with no content change too (renames).
-  mapfile -t files < <(git -C "$REPO_ROOT" diff --cached --name-only --diff-filter=ACMR)
+  # --diff-filter=ACMR: added, copied, modified, renamed. Deletions cannot leak.
+  # Read via a while-read loop rather than mapfile, which is a bash 4 builtin and
+  # absent from the bash 3.2 that ships with macOS.
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && files+=("$line")
+  done < <(git -C "$REPO_ROOT" diff --cached --name-only --diff-filter=ACMR)
 else
   files=("$@")
 fi
