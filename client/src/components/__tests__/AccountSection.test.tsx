@@ -162,4 +162,17 @@ describe('AccountSection', () => {
     await screen.findByText(/couldn't sign in/i)
     expect(mockAnalytics.analytics.track).not.toHaveBeenCalled()
   })
+
+  it('signed-in account shows last sync and a Sync now button', async () => {
+    mockAuth.restoreSession.mockResolvedValue({
+      id: 'u1',
+      email: 'coach@gmail.com',
+      user_metadata: { full_name: 'Coach' },
+    })
+    renderAccount()
+    await waitFor(() => {
+      screen.getByRole('button', { name: /sync now/i })
+    })
+    expect(screen.getByText(/last synced/i)).toBeTruthy()
+  })
 })

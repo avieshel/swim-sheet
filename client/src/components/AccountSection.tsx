@@ -3,6 +3,9 @@ import { canUseTestLogin } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { Events, analytics } from '../services/analyticsEvents'
 import { Icon } from './Icon'
+import { syncService } from '../sync/syncService'
+import { createBackupPayload } from '../api/backup'
+import type { SyncState, SyncConflict, SyncError } from '../sync/types'
 
 function initials(name: string | undefined, email: string | undefined): string {
   const source = name?.trim() || email?.trim() || '?'
@@ -11,11 +14,68 @@ function initials(name: string | undefined, email: string | undefined): string {
   return source.slice(0, 2).toUpperCase()
 }
 
+const DIFF_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'created_at', 'updated_at'])
+
+function conflictSummary(c: SyncConflict): string {
+  const local = (c.local ?? {}) as Record<string, unknown>
+  const remote = (c.remote ?? {}) as Record<string, unknown>
+  const diffs: string[] = []
+  for (const key of Object.keys({ ...local, ...remote })) {
+    if (DIFF_SKIP.has(key)) continue
+    const left = local[key]
+    const right = remote[key]
+    if (left !== right) diffs.push(`${key}: ${JSON.stringify(left)} → ${JSON.stringify(right)}`)
+    if (diffs.length >= 3) break
+  }
+  const detail = diffs.length > 0 ? ` — ${diffs.join(', ')}` : ''
+  return `${c.table} ${c.rowId}${detail}`
+}
+
+function formatLastSync(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return 'unknown'
+  return d.toLocaleString()
+}
+
+function describeSyncError(error: SyncError): string {
+  switch (error.kind) {
+    case 'auth':
+      return "You're signed out. Sign in to sync."
+    case 'offline':
+      return "You're offline — we'll sync when you reconnect."
+    case 'conflict':
+      return 'Some items need your review above.'
+    case 'validation':
+      return 'Some of your data could not be synced. Try again.'
+    default:
+      return "Sync couldn't finish. Please try again."
+  }
+}
+
+async function downloadBackup(): Promise<void> {
+  const payload = await createBackupPayload()
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `swimsheet-backup-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export function AccountSection() {
   const { user, status, persist, setPersist, signInWithGoogle, signInAsTestUser, signOut } = useAuth()
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [syncState, setSyncState] = useState<SyncState>(() => syncService.getState())
+
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe(setSyncState)
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     const setOnlineState = () => setOnline(navigator.onLine)
@@ -48,6 +108,11 @@ export function AccountSection() {
   const email = user?.email ?? ''
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
 
+  const [dismissedFirstMerge, setDismissedFirstMerge] = useState(false)
+  const phase = syncState.phase
+  const summary = syncState.firstMergeSummary
+  const showFirstMerge = !!user && phase === 'needs_first_merge' && !!summary && !dismissedFirstMerge
+
   return (
     <section>
       <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Account</h2>
@@ -55,6 +120,7 @@ export function AccountSection() {
         {status === 'loading' ? (
           <p className="text-on-surface-variant">Checking account...</p>
         ) : user ? (
+          <>
           <div className="flex items-center gap-3">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full object-cover" />
@@ -81,6 +147,111 @@ export function AccountSection() {
               Sign out
             </button>
           </div>
+          {syncState.conflicts.length > 0 && (
+            <div className="mt-4 border border-error/40 rounded-xl p-3">
+              <p className="font-bold text-error mb-2">Sync conflicts ({syncState.conflicts.length})</p>
+              <ul className="space-y-3">
+                {syncState.conflicts.map((c) => (
+                  <li key={c.id}>
+                    <p className="text-sm text-on-surface-variant">{conflictSummary(c)}</p>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => void syncService.resolveConflict(c.id, 'remote')}
+                        className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+                      >
+                        Use cloud
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void syncService.resolveConflict(c.id, 'local')}
+                        className="bg-primary-container text-on-primary-container font-bold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all cursor-pointer border-none text-sm"
+                      >
+                        Keep mine
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {showFirstMerge && (
+            <div className="mt-4 border border-primary/40 rounded-xl p-3">
+              <p className="font-bold text-on-surface mb-1">Review &amp; merge your data</p>
+              <p className="text-sm text-on-surface-variant mb-2">
+                {summary.localCount} local item(s), {summary.cloudCount} cloud item(s)
+                {summary.catalogMatches > 0 ? `, ${summary.catalogMatches} match(es) by catalog` : ''}. We'll
+                merge your existing local data with the cloud rather than overwriting it.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void syncService.confirmFirstMerge()}
+                  className="bg-primary text-on-primary font-bold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all cursor-pointer border-none text-sm"
+                >
+                  Merge &amp; Sync
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDismissedFirstMerge(true)}
+                  className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!!user && phase === 'needs_first_merge' && !!summary && dismissedFirstMerge && (
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => setDismissedFirstMerge(false)}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+              >
+                Review &amp; merge
+              </button>
+            </div>
+          )}
+
+          {!!user && phase !== 'needs_first_merge' && (
+            <div className="mt-4 flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-on-surface-variant">
+                Last synced: {syncState.lastSyncAt ? formatLastSync(syncState.lastSyncAt) : 'never'}
+                {syncState.pendingCount > 0 ? ` • ${syncState.pendingCount} pending` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={() => void syncService.syncNow()}
+                disabled={syncState.inFlight}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+              >
+                {syncState.inFlight ? 'Syncing…' : 'Sync now'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void downloadBackup()}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+              >
+                Export backup
+              </button>
+            </div>
+          )}
+
+          {!!user && syncState.error && (
+            <div className="mt-4 border border-error/40 rounded-xl p-3">
+              <p className="text-sm text-error mb-2">{describeSyncError(syncState.error)}</p>
+              <button
+                type="button"
+                onClick={() => void syncService.syncNow()}
+                className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          </>
         ) : (
           <div className="space-y-4">
             <p className="text-on-surface-variant">

@@ -4,6 +4,7 @@ Date: 2026-10-07
 
 ## Purpose
 
+
 Enable one coach to use the same SwimSheet data on desktop and mobile while preserving the app's local-first behavior. A coach may start without an account and later sign in to merge that device's data, or sign in on a new device and download existing account data.
 
 Sync is a reliability feature, not a prerequisite for coaching. Coaches must be able to create and edit sessions, run sessions, and record times while signed out, offline, or experiencing a sync or merge failure.
@@ -13,7 +14,7 @@ Sync is a reliability feature, not a prerequisite for coaching. Coaches must be 
 - The app works locally through Dexie/IndexedDB; data CRUD does not currently use Supabase.
 - Supabase Auth is implemented. Auth identifies a user but does not move or partition domain data.
 - The active Supabase schema includes organization-scoped `swimmers`, `sessions`, `drills`, and `library_drills` tables with RLS. It also has `session_runs`, `run_drills`, `run_swimmers`, and `laps` tables. There is no sync coordinator, local outbox, cloud-change cursor, or client DTO mapping.
-- Server tables have `updated_at` and `deleted_at` fields; Dexie records use camelCase in some places and snake_case in others. Rich drill data is stored as JSON.
+- Server tables have `updated_at` and `deleted_at` fields; Dexie records use camelCase consistently (schema v6). Rich drill data is stored as JSON.
 - Builtin drill-library entries and starter sessions are seeded locally. Builtin drill IDs and starter session/drill IDs are generated locally, so two devices do not currently share a stable identity for catalog entries.
 - `LaneDrillResult` and live timing state are client-only. Session history can be represented in the Supabase `session_runs`/`run_drills`/`run_swimmers`/`laps` graph, but that graph is not currently synchronized.
 - The existing organization policies make swimmers visible to all organization members. Membership must not be enabled as a shortcut for session sharing until roster access is redesigned.

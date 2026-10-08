@@ -19,6 +19,7 @@ export interface Session {
   name: string
   notes: string
   visibility?: 'private' | 'organization'
+  catalogKey?: string
   createdAt: string
   updatedAt: string
 }
@@ -152,8 +153,30 @@ export interface LibraryDrill {
   labels?: string[]
   description?: string
   source?: 'builtin' | 'personal' | 'customized'
+  catalogKey?: string
   popularity?: number
   createdAt: string
+  updatedAt: string
+}
+
+export interface SyncMetaRow {
+  key: string
+  orgId: string
+  table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills'
+  rowId: string
+  catalogKey?: string
+  rev: string | null
+  status: 'pending' | 'pending_delete' | 'synced' | 'conflict'
+  deleted: 0 | 1
+  localRev?: string | null
+  localJson?: string
+  remoteJson?: string
+}
+
+export interface SyncCursorRow {
+  key: string
+  orgId: string
+  table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills'
   updatedAt: string
 }
 
@@ -189,6 +212,8 @@ class SwimSheetDB extends Dexie {
   laneDrillResults!: EntityTable<LaneDrillResult, 'id'>
   libraryDrills!: EntityTable<LibraryDrill, 'id'>
   _meta!: EntityTable<DbMeta, 'key'>
+  _sync_meta!: EntityTable<SyncMetaRow, 'key'>
+  _sync_cursor!: EntityTable<SyncCursorRow, 'key'>
 
   constructor() {
     super('SwimSheetDB')
@@ -287,10 +312,25 @@ class SwimSheetDB extends Dexie {
         })
       }
     })
+
+    this.version(7).stores({
+      swimmers: 'id, &name, status, updatedAt',
+      sessions: 'id, createdAt, updatedAt',
+      drills: 'id, sessionId, focus, updatedAt',
+      sessionRuns: 'id, sessionId, status, date, updatedAt',
+      runDrills: 'id, runId, parentDrillId, updatedAt',
+      runSwimmers: 'id, runId, swimmerId',
+      laps: 'id, runDrillId, swimmerId, createdAt',
+      laneDrillResults: 'id, runId, groupId, lane, runDrillId, [runId+groupId+runDrillId], updatedAt',
+      libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+      _meta: 'key',
+      _sync_meta: 'key, orgId, table, status, rowId',
+      _sync_cursor: 'key, orgId, table',
+    })
   }
 }
 
-export const DB_SCHEMA_VERSION = 6
+export const DB_SCHEMA_VERSION = 7
 const BACKUP_KEY = 'swimsheet_db_backup'
 export const BACKUP_FORMAT_VERSION = 1
 

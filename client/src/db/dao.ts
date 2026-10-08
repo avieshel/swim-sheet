@@ -409,7 +409,7 @@ export async function patchLibraryDrills(): Promise<void> {
   for (const d of drillCatalog) {
     const existing = await db.libraryDrills.where('name').equals(d.name).first()
     if (!existing) {
-      await addLibraryDrill({ ...d, source: 'builtin' })
+      await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
       continue
     }
     if (!existing.description || existing.labels?.length === 0 || existing.focus === 'none' || !existing.source) {
@@ -418,6 +418,7 @@ export async function patchLibraryDrills(): Promise<void> {
         labels: d.labels,
         description: d.description,
         source: 'builtin',
+        catalogKey: d.name,
         updatedAt: new Date().toISOString()
       })
     }
@@ -473,7 +474,7 @@ export async function seedLibraryDrills(): Promise<void> {
   if (count > 0) return
 
   for (const d of drillCatalog) {
-    await addLibraryDrill({ ...d, source: 'builtin' })
+    await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
   }
 }
 
@@ -497,6 +498,7 @@ async function seedDefaultSessionsOnce(): Promise<void> {
     const sessionId = await addSession({
       name: catalog.name,
       notes: catalog.notes,
+      catalogKey: catalog.name,
     })
 
     for (const d of catalog.drills) {

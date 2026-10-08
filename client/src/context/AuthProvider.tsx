@@ -11,6 +11,7 @@ import {
 } from '../api/auth'
 import { isPersistEnabled, setPersistEnabled } from '../api/authStorage'
 import { AuthContext } from './AuthContext'
+import { syncService } from '../sync/syncService'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -41,6 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true
       unsubscribe()
     }
+  }, [])
+
+  useEffect(() => {
+    syncService.init()
   }, [])
 
   const updatePersist = useCallback((value: boolean) => {

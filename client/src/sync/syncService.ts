@@ -1,0 +1,500 @@
+import { db } from '../db/schema'
+import type { Table } from 'dexie'
+import { getCurrentUserId, onAuthStateChange } from '../api/supabase'
+import { supabaseSyncTransport } from './SupabaseSyncTransport'
+import {
+  attachSyncHooks,
+  getPendingChanges,
+  applyRemoteChanges,
+  setMetaSynced,
+  setMetaConflict,
+  adoptServerRev,
+  markDirty,
+  getCursor,
+  setCursor,
+  readSyncState,
+} from './syncStore'
+import type {
+  SyncTable,
+  SyncTransport,
+  SyncState,
+  SyncPhase,
+  SyncError,
+  SyncConflict,
+  SyncResult,
+  FirstMergeSummary,
+  CloudChange,
+} from './types'
+
+const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
+const POLL_INTERVAL_MS = 60000
+const DEBOUNCE_MS = 1000
+
+function classifyError(e: unknown): SyncError {
+  const err = e as { kind?: string; message?: string } | null
+  if (err?.kind === 'auth') return { kind: 'auth', message: err.message ?? 'auth error' }
+  return { kind: 'unexpected', message: err?.message ?? String(e) }
+}
+
+function localTable(table: SyncTable): Table<Record<string, unknown>, string> {
+  return db[table] as unknown as Table<Record<string, unknown>, string>
+}
+
+function emptyCursors(): Record<SyncTable, string | null> {
+  return { swimmers: null, sessions: null, drills: null, libraryDrills: null }
+}
+
+class SyncService {
+  private transport: SyncTransport = supabaseSyncTransport
+  private currentOrgId: string | null = null
+  private homeOrgId: string | null = null
+  private lastResult: SyncResult | null = null
+  private lastSyncAt: string | null = null
+  private hooksAttached = false
+  private metaHookAttached = false
+  private unsubAuth: (() => void) | null = null
+  private intervalId: ReturnType<typeof setInterval> | null = null
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null
+  private listeners = new Set<(s: SyncState) => void>()
+  private firstMergeSummary: FirstMergeSummary | null = null
+
+  private state: SyncState = {
+    signedIn: false,
+    phase: 'idle',
+    lastSyncAt: null,
+    pendingCount: 0,
+    inFlight: false,
+    error: null,
+    conflicts: [],
+    firstMergeSummary: null,
+  }
+
+  init(
+    transport: SyncTransport = supabaseSyncTransport,
+    options: { autoSync?: boolean } = {},
+  ): void {
+    this.transport = transport
+    if (!this.hooksAttached) {
+      attachSyncHooks()
+      this.hooksAttached = true
+    }
+    const autoSync = options.autoSync !== false
+    if (autoSync && typeof window !== 'undefined') {
+      if (!this.unsubAuth) {
+        this.unsubAuth = onAuthStateChange((session) => {
+          if (session) void this.start()
+          else this.stop()
+        })
+      }
+      window.addEventListener('online', this.handleOnline)
+      if (!this.intervalId) {
+        this.intervalId = setInterval(() => {
+          if (typeof document === 'undefined' || !document.hidden) void this.syncNow()
+        }, POLL_INTERVAL_MS)
+      }
+      if (!this.metaHookAttached) {
+        db._sync_meta.hook('creating', () => { this.scheduleSync() })
+        db._sync_meta.hook('updating', () => { this.scheduleSync() })
+        this.metaHookAttached = true
+      }
+    }
+    void this.refresh()
+  }
+
+  private handleOnline = (): void => {
+    void this.syncNow()
+  }
+
+  private scheduleSync(): void {
+    if (!this.currentOrgId || this.state.inFlight) return
+    if (this.debounceTimer) clearTimeout(this.debounceTimer)
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null
+      void this.syncNow()
+    }, DEBOUNCE_MS)
+  }
+
+  async start(): Promise<void> {
+    const userId = getCurrentUserId()
+    if (!userId) return
+    try {
+      this.currentOrgId = await this.transport.ensurePersonalOrganization()
+    } catch (e) {
+      const error = classifyError(e)
+      this.state = { ...this.state, error, phase: 'error' }
+      this.notify()
+      return
+    }
+    const cursors = await this.readCursors(this.currentOrgId)
+    const firstSync = SYNC_TABLES.every((t) => cursors[t] === null)
+    const hasLocal = await this.hasLocalRows()
+    if (firstSync && hasLocal) {
+      try {
+        this.firstMergeSummary = await this.previewFirstMerge(this.transport, this.currentOrgId)
+        this.state = { ...this.state, firstMergeSummary: this.firstMergeSummary, phase: 'needs_first_merge' }
+        this.notify()
+      } catch {
+        this.firstMergeSummary = null
+        await this.syncNow()
+      }
+      return
+    }
+    await this.syncNow()
+  }
+
+  async previewFirstMerge(
+    transport: SyncTransport = this.transport,
+    orgId: string | null = this.currentOrgId,
+  ): Promise<FirstMergeSummary> {
+    if (!orgId) {
+      return { localCount: 0, cloudCount: 0, catalogMatches: 0, ambiguous: 0 }
+    }
+    const cloud = await transport.pull(orgId, emptyCursors())
+    const cloudRows = cloud.changes
+    const byCatalog = new Map<string, CloudChange>()
+    for (const c of cloudRows) {
+      if (c.catalogKey) byCatalog.set(c.catalogKey, c)
+    }
+    let localCount = 0
+    let catalogMatches = 0
+    let ambiguous = 0
+    for (const table of SYNC_TABLES) {
+      const rows = await localTable(table).toArray()
+      for (const row of rows) {
+        const id = String(row.id)
+        const meta = await db._sync_meta.get(`${table}:${id}`)
+        if (meta && meta.orgId !== '' && meta.orgId !== orgId) continue
+        if (meta && meta.status === 'synced') continue
+        localCount++
+        const catalogKey = row.catalogKey as string | undefined
+        if (catalogKey && byCatalog.has(catalogKey)) {
+          catalogMatches++
+          continue
+        }
+        const name = row.name as string | undefined
+        if (name && cloudRows.some((c) => (c.payload.name as string | undefined) === name)) {
+          ambiguous++
+        }
+      }
+    }
+    return { localCount, cloudCount: cloudRows.length, catalogMatches, ambiguous }
+  }
+
+  async confirmFirstMerge(
+    transport: SyncTransport = this.transport,
+    orgId: string | null = this.currentOrgId,
+  ): Promise<SyncResult> {
+    if (!orgId) {
+      return { pushed: 0, pulled: 0, conflicts: [], error: { kind: 'auth', message: 'not signed in' } }
+    }
+    const cloud = await transport.pull(orgId, emptyCursors())
+    const changes = cloud.changes
+    const byId = new Map(changes.map((c) => [c.id, c]))
+    const byCatalog = new Map<string, CloudChange>()
+    for (const c of changes) {
+      if (c.catalogKey) byCatalog.set(c.catalogKey, c)
+    }
+
+    for (const table of SYNC_TABLES) {
+      const rows = await localTable(table).toArray()
+      for (const row of rows) {
+        const id = String(row.id)
+        const meta = await db._sync_meta.get(`${table}:${id}`)
+        if (meta && meta.orgId !== '' && meta.orgId !== orgId) continue
+        if (meta && meta.status === 'synced') continue
+        if (byId.has(id)) {
+          // Same-id match: keep the newer side; reconcile by updatedAt.
+          const localRev = (row.updatedAt as string) ?? ''
+          const cloudRev = byId.get(id)!.updatedAt
+          if (localRev >= cloudRev) await markDirty(table, id, meta?.catalogKey)
+          continue
+        }
+        const catalogKey = row.catalogKey as string | undefined
+        if (catalogKey && byCatalog.has(catalogKey)) {
+          // Catalog-key match: this is the same starter as a cloud row. Push the
+          // local content to the existing cloud row's id, then remap the local
+          // row so future edits target that cloud row (no duplicate created).
+          const k = byCatalog.get(catalogKey)!
+          const pushed = await transport.push(
+            [{ table, id: k.id, op: 'upsert', payload: { ...row, id: k.id }, catalogKey, rev: k.updatedAt }],
+            orgId,
+          )
+          // Adopt the server-assigned rev; the set_updated_at trigger rewrites
+          // updated_at, so k.updatedAt is stale the moment the push lands.
+          const assigned = pushed.applied[0]?.updatedAt ?? k.updatedAt
+          await this.remapLocalRow(table, id, k.id, orgId, assigned)
+          continue
+        }
+        await markDirty(table, id, catalogKey)
+      }
+    }
+
+    await applyRemoteChanges(changes, orgId)
+    for (const table of SYNC_TABLES) await setCursor(orgId, table, cloud.nextCursors[table])
+
+    this.firstMergeSummary = null
+    this.state = { ...this.state, firstMergeSummary: null }
+    return this.syncNow()
+  }
+
+  private async remapLocalRow(
+    table: SyncTable,
+    fromId: string,
+    toId: string,
+    orgId: string,
+    rev: string,
+  ): Promise<void> {
+    const t = localTable(table)
+    const row = await t.get(fromId)
+    if (!row) return
+    const rest = { ...row } as Record<string, unknown>
+    delete rest.id
+    await db.transaction('rw', [t as unknown as Table, db._sync_meta, ...(table === 'sessions' ? [db.drills] : [])], async () => {
+      await t.add({ ...rest, id: toId })
+      await t.delete(fromId)
+      if (table === 'sessions') {
+        await db.drills.where('sessionId').equals(fromId).modify({ sessionId: toId })
+      }
+      await db._sync_meta.delete(`${table}:${fromId}`)
+      await setMetaSynced(table, toId, orgId, rev, false)
+    })
+  }
+
+  private async hasLocalRows(): Promise<boolean> {
+    for (const table of SYNC_TABLES) {
+      if ((await localTable(table).count()) > 0) return true
+    }
+    return false
+  }
+
+  // The user's canonical single-member org (from ensurePersonalOrganization).
+  // Pre-sign-in (unclaimed) rows are claimed to this org, never to a foreign
+  // org, so syncing against a different account never leaks local data.
+  private async resolveHomeOrg(orgId: string): Promise<string> {
+    if (this.homeOrgId) return this.homeOrgId
+    try {
+      return await this.transport.ensurePersonalOrganization()
+    } catch {
+      return orgId
+    }
+  }
+
+  private async claimUnclaimed(homeOrg: string): Promise<void> {
+    if (homeOrg === '') return
+    const unclaimed = await db._sync_meta.where('orgId').equals('').toArray()
+    for (const m of unclaimed) {
+      await db._sync_meta.put({ ...m, orgId: homeOrg })
+    }
+  }
+
+  async resolveConflict(
+    conflictId: string,
+    resolution: 'local' | 'remote',
+    transport: SyncTransport = this.transport,
+  ): Promise<void> {
+    const parts = conflictId.split(':')
+    let orgId: string | null
+    let table: SyncTable
+    let rowId: string
+    if (parts.length >= 3) {
+      orgId = parts[0]
+      table = parts[1] as SyncTable
+      rowId = parts.slice(2).join(':')
+    } else {
+      orgId = this.currentOrgId
+      table = parts[0] as SyncTable
+      rowId = parts[1]
+    }
+    if (!orgId) throw new Error('no active organization for conflict resolution')
+    const key = `${table}:${rowId}`
+    const meta = await db._sync_meta.get(key)
+    if (!meta || meta.status !== 'conflict') return
+
+    if (resolution === 'remote') {
+      const remote = (meta.remoteJson ? JSON.parse(meta.remoteJson) : {}) as Record<string, unknown>
+      await applyRemoteChanges(
+        [{ table, id: rowId, op: 'upsert', payload: remote, catalogKey: meta.catalogKey, updatedAt: meta.rev ?? '', deletedAt: null }],
+        orgId,
+      )
+      await setMetaSynced(table, rowId, orgId, meta.rev ?? '', false)
+      return
+    }
+
+    const local = (meta.localJson ? JSON.parse(meta.localJson) : {}) as Record<string, unknown>
+    const res = await transport.push(
+      [{ table, id: rowId, op: 'upsert', payload: local, catalogKey: meta.catalogKey, rev: meta.localRev ?? null }],
+      orgId,
+    )
+    if (res.conflicts.length > 0) {
+      await setMetaConflict({
+        id: conflictId,
+        table,
+        rowId,
+        local,
+        remote: (meta.remoteJson ? JSON.parse(meta.remoteJson) : {}) as Record<string, unknown>,
+        localRev: meta.localRev ?? null,
+        remoteRev: meta.rev ?? '',
+      })
+      return
+    }
+    // Adopt the rev the server assigned; the set_updated_at trigger rewrites
+    // updated_at, so meta.localRev no longer matches the stored row.
+    const assigned = res.applied[0]?.updatedAt
+    await setMetaSynced(table, rowId, orgId, assigned ?? meta.localRev ?? '', false)
+    if (assigned) {
+      await adoptServerRev(table, rowId, assigned)
+    }
+  }
+
+  setActiveOrg(orgId: string): void {
+    this.currentOrgId = orgId
+    void this.refresh()
+  }
+
+  async syncNow(): Promise<SyncResult> {
+    if (!this.currentOrgId) {
+      const error: SyncError = { kind: 'auth', message: 'not signed in' }
+      this.state = { ...this.state, error, phase: 'error' }
+      this.notify()
+      return { pushed: 0, pulled: 0, conflicts: [], error }
+    }
+    if (this.state.inFlight) {
+      return this.lastResult ?? { pushed: 0, pulled: 0, conflicts: [] }
+    }
+    this.state = { ...this.state, inFlight: true }
+    const orgId = this.currentOrgId
+    let pushed = 0
+    let conflicts: SyncConflict[] = []
+    try {
+      this.setPhase('pushing')
+      const homeOrg = await this.resolveHomeOrg(orgId)
+      this.homeOrgId = homeOrg
+      await this.claimUnclaimed(homeOrg)
+      const pending = await getPendingChanges(orgId)
+      const res = await this.transport.push(pending, orgId)
+      conflicts = res.conflicts
+      pushed = pending.length - conflicts.length
+      for (const c of conflicts) await setMetaConflict(c)
+      // Record the rev the SERVER assigned, not the one we sent. The
+      // set_updated_at trigger rewrites updated_at on every write, so our own
+      // timestamp is already stale by the time it lands; keeping it makes the
+      // next guarded write fail and reports a false conflict.
+      const serverRev = new Map(res.applied.map((a) => [`${a.table}:${a.id}`, a.updatedAt]))
+      for (const change of pending) {
+        const isConflict = conflicts.some(c => c.rowId === change.id && c.table === change.table)
+        if (isConflict) continue
+        const key = `${change.table}:${change.id}`
+        const assigned = serverRev.get(key)
+        await setMetaSynced(
+          change.table,
+          change.id,
+          orgId,
+          assigned ?? change.rev ?? '',
+          change.op === 'delete',
+        )
+        if (assigned !== undefined && change.op !== 'delete') {
+          // Keep the local row's updatedAt aligned with the cloud so the next
+          // edit is guarded against the rev the server actually stored.
+          await adoptServerRev(change.table, change.id, assigned)
+        }
+      }
+      this.setPhase('pulling')
+      const cursors = await this.readCursors(orgId)
+      const pullRes = await this.transport.pull(orgId, cursors)
+      await applyRemoteChanges(pullRes.changes, orgId)
+      for (const table of SYNC_TABLES) await setCursor(orgId, table, pullRes.nextCursors[table])
+      this.lastSyncAt = new Date().toISOString()
+      this.state = { ...this.state, lastSyncAt: this.lastSyncAt, error: null }
+      this.setPhase('ready')
+      const result: SyncResult = { pushed, pulled: pullRes.changes.length, conflicts }
+      this.lastResult = result
+      await this.refresh()
+      return result
+    } catch (e) {
+      const error = classifyError(e)
+      this.state = { ...this.state, error, phase: 'error' }
+      this.notify()
+      const result: SyncResult = { pushed, pulled: 0, conflicts, error }
+      this.lastResult = result
+      return result
+    } finally {
+      this.state = { ...this.state, inFlight: false }
+      // The refresh() above notified while inFlight was still true, so without
+      // this the UI keeps rendering "Syncing…" and never re-enables the button.
+      this.notify()
+    }
+  }
+
+  stop(): void {
+    this.currentOrgId = null
+    if (this.intervalId) {
+      clearInterval(this.intervalId)
+      this.intervalId = null
+    }
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+    }
+    if (this.unsubAuth) {
+      this.unsubAuth()
+      this.unsubAuth = null
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleOnline)
+    }
+    this.state = { ...this.state, phase: 'idle', inFlight: false }
+    this.notify()
+  }
+
+  getState(): SyncState {
+    return this.state
+  }
+
+  getLastResult(): SyncResult | null {
+    return this.lastResult
+  }
+
+  subscribe(cb: (s: SyncState) => void): () => void {
+    this.listeners.add(cb)
+    cb(this.state)
+    return () => {
+      this.listeners.delete(cb)
+    }
+  }
+
+  private setPhase(phase: SyncPhase): void {
+    this.state = { ...this.state, phase }
+    this.notify()
+  }
+
+  private async refresh(): Promise<void> {
+    try {
+      const signedIn = !!getCurrentUserId()
+      const org = this.currentOrgId
+      if (org) {
+        const snapshot = await readSyncState(org)
+        this.state = { ...this.state, signedIn, pendingCount: snapshot.pendingCount, conflicts: snapshot.conflicts }
+      } else {
+        this.state = { ...this.state, signedIn, pendingCount: 0, conflicts: [] }
+      }
+    } catch {
+      // best-effort status refresh; must never surface to a caller
+    }
+    this.notify()
+  }
+
+  private notify(): void {
+    for (const l of this.listeners) l(this.state)
+  }
+
+  private async readCursors(orgId: string): Promise<Record<SyncTable, string | null>> {
+    return {
+      swimmers: await getCursor(orgId, 'swimmers'),
+      sessions: await getCursor(orgId, 'sessions'),
+      drills: await getCursor(orgId, 'drills'),
+      libraryDrills: await getCursor(orgId, 'libraryDrills'),
+    }
+  }
+}
+
+export const syncService = new SyncService()

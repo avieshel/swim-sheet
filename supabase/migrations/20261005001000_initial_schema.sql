@@ -384,6 +384,7 @@ create or replace function anonymize_swimmer(p_swimmer_id uuid)
 returns void
 language sql
 security definer
+set search_path = public
 as $$
   update swimmers
   set name = 'Anonymous Athlete',
@@ -398,6 +399,7 @@ create or replace function cleanup_old_analytics_events()
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 begin
   delete from analytics_events
@@ -651,6 +653,23 @@ grant execute on function create_organization_invite(uuid, text, integer) to aut
 grant execute on function is_organization_member(uuid) to authenticated;
 grant execute on function user_has_permission(uuid, uuid, text) to authenticated;
 
+-- Postgres grants EXECUTE to PUBLIC on every new function by default. Strip it
+-- so RPCs are reachable only by the roles granted above: a SECURITY DEFINER
+-- body runs as the table owner (BYPASSRLS), so a PUBLIC grant would let anyone
+-- holding only the anon key invoke it through /rest/v1/rpc/* and bypass RLS.
+revoke execute on function create_organization(text) from public, anon;
+revoke execute on function join_organization(text, text) from public, anon;
+revoke execute on function create_organization_invite(uuid, text, integer) from public, anon;
+revoke execute on function is_organization_member(uuid) from public, anon;
+revoke execute on function user_has_permission(uuid, uuid, text) from public, anon;
+
+-- Maintenance/GDPR helpers: service-role only. Nothing in the app calls them.
+revoke execute on function anonymize_swimmer(uuid) from public, anon, authenticated;
+grant execute on function anonymize_swimmer(uuid) to service_role;
+
+revoke execute on function cleanup_old_analytics_events() from public, anon, authenticated;
+grant execute on function cleanup_old_analytics_events() to service_role;
+
 -- ── 13. Enable RLS ──────────────────────────────────────────────────────
 alter table profiles enable row level security;
 alter table organizations enable row level security;
@@ -673,32 +692,39 @@ alter table analytics_events enable row level security;
 -- ── 14. RLS policies ────────────────────────────────────────────────────
 
 -- profiles: self only
+drop policy if exists profiles_select on profiles;
 create policy profiles_select on profiles
   for select to authenticated
   using (auth.uid() = id);
 
+drop policy if exists profiles_insert on profiles;
 create policy profiles_insert on profiles
   for insert to authenticated
   with check (auth.uid() = id);
 
+drop policy if exists profiles_update on profiles;
 create policy profiles_update on profiles
   for update to authenticated
   using (auth.uid() = id)
   with check (auth.uid() = id);
 
 -- catalogs: readable when authenticated (no PII)
+drop policy if exists permissions_select on permissions;
 create policy permissions_select on permissions
   for select to authenticated
   using (true);
 
+drop policy if exists organizations_select on organizations;
 create policy organizations_select on organizations
   for select to authenticated
   using (is_organization_member(id));
 
+drop policy if exists organization_roles_select on organization_roles;
 create policy organization_roles_select on organization_roles
   for select to authenticated
   using (is_organization_member(organization_id));
 
+drop policy if exists role_permissions_select on role_permissions;
 create policy role_permissions_select on role_permissions
   for select to authenticated
   using (
@@ -710,10 +736,12 @@ create policy role_permissions_select on role_permissions
   );
 
 -- organization_memberships
+drop policy if exists organization_memberships_select on organization_memberships;
 create policy organization_memberships_select on organization_memberships
   for select to authenticated
   using (user_id = auth.uid() or is_organization_member(organization_id));
 
+drop policy if exists organization_memberships_manage on organization_memberships;
 create policy organization_memberships_manage on organization_memberships
   for all to authenticated
   using (
@@ -726,10 +754,12 @@ create policy organization_memberships_manage on organization_memberships
   );
 
 -- swimmers
+drop policy if exists swimmers_select on swimmers;
 create policy swimmers_select on swimmers
   for select to authenticated
   using (organization_id is not null and is_organization_member(organization_id));
 
+drop policy if exists swimmers_insert on swimmers;
 create policy swimmers_insert on swimmers
   for insert to authenticated
   with check (
@@ -738,6 +768,7 @@ create policy swimmers_insert on swimmers
     and user_has_permission(auth.uid(), organization_id, 'swimmer:create')
   );
 
+drop policy if exists swimmers_update on swimmers;
 create policy swimmers_update on swimmers
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -747,6 +778,7 @@ create policy swimmers_update on swimmers
     and user_has_permission(auth.uid(), organization_id, 'swimmer:edit')
   );
 
+drop policy if exists swimmers_delete on swimmers;
 create policy swimmers_delete on swimmers
   for delete to authenticated
   using (
@@ -756,6 +788,7 @@ create policy swimmers_delete on swimmers
   );
 
 -- sessions
+drop policy if exists sessions_select on sessions;
 create policy sessions_select on sessions
   for select to authenticated
   using (
@@ -769,6 +802,7 @@ create policy sessions_select on sessions
     )
   );
 
+drop policy if exists sessions_insert on sessions;
 create policy sessions_insert on sessions
   for insert to authenticated
   with check (
@@ -779,6 +813,7 @@ create policy sessions_insert on sessions
     and visibility in ('private', 'organization')
   );
 
+drop policy if exists sessions_update on sessions;
 create policy sessions_update on sessions
   for update to authenticated
   using (
@@ -809,6 +844,7 @@ create policy sessions_update on sessions
     )
   );
 
+drop policy if exists sessions_delete on sessions;
 create policy sessions_delete on sessions
   for delete to authenticated
   using (
@@ -818,10 +854,12 @@ create policy sessions_delete on sessions
   );
 
 -- drills
+drop policy if exists drills_select on drills;
 create policy drills_select on drills
   for select to authenticated
   using (organization_id is not null and is_organization_member(organization_id));
 
+drop policy if exists drills_insert on drills;
 create policy drills_insert on drills
   for insert to authenticated
   with check (
@@ -831,6 +869,7 @@ create policy drills_insert on drills
     and user_has_permission(auth.uid(), organization_id, 'drill:create')
   );
 
+drop policy if exists drills_update on drills;
 create policy drills_update on drills
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -840,6 +879,7 @@ create policy drills_update on drills
     and user_has_permission(auth.uid(), organization_id, 'drill:edit')
   );
 
+drop policy if exists drills_delete on drills;
 create policy drills_delete on drills
   for delete to authenticated
   using (
@@ -849,10 +889,12 @@ create policy drills_delete on drills
   );
 
 -- library_drills (null organization_id = shared builtin, read-only)
+drop policy if exists library_drills_select on library_drills;
 create policy library_drills_select on library_drills
   for select to authenticated
   using (organization_id is null or is_organization_member(organization_id));
 
+drop policy if exists library_drills_insert on library_drills;
 create policy library_drills_insert on library_drills
   for insert to authenticated
   with check (
@@ -862,6 +904,7 @@ create policy library_drills_insert on library_drills
     and user_has_permission(auth.uid(), organization_id, 'library:manage')
   );
 
+drop policy if exists library_drills_update on library_drills;
 create policy library_drills_update on library_drills
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -871,6 +914,7 @@ create policy library_drills_update on library_drills
     and user_has_permission(auth.uid(), organization_id, 'library:manage')
   );
 
+drop policy if exists library_drills_delete on library_drills;
 create policy library_drills_delete on library_drills
   for delete to authenticated
   using (
@@ -880,10 +924,12 @@ create policy library_drills_delete on library_drills
   );
 
 -- session_runs / run_drills / run_swimmers / laps
+drop policy if exists session_runs_select on session_runs;
 create policy session_runs_select on session_runs
   for select to authenticated
   using (organization_id is not null and is_organization_member(organization_id));
 
+drop policy if exists session_runs_insert on session_runs;
 create policy session_runs_insert on session_runs
   for insert to authenticated
   with check (
@@ -892,6 +938,7 @@ create policy session_runs_insert on session_runs
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists session_runs_update on session_runs;
 create policy session_runs_update on session_runs
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -901,6 +948,7 @@ create policy session_runs_update on session_runs
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists session_runs_delete on session_runs;
 create policy session_runs_delete on session_runs
   for delete to authenticated
   using (
@@ -909,10 +957,12 @@ create policy session_runs_delete on session_runs
     and user_has_permission(auth.uid(), organization_id, 'organization:manage')
   );
 
+drop policy if exists run_drills_select on run_drills;
 create policy run_drills_select on run_drills
   for select to authenticated
   using (organization_id is not null and is_organization_member(organization_id));
 
+drop policy if exists run_drills_insert on run_drills;
 create policy run_drills_insert on run_drills
   for insert to authenticated
   with check (
@@ -921,6 +971,7 @@ create policy run_drills_insert on run_drills
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists run_drills_update on run_drills;
 create policy run_drills_update on run_drills
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -930,6 +981,7 @@ create policy run_drills_update on run_drills
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists run_drills_delete on run_drills;
 create policy run_drills_delete on run_drills
   for delete to authenticated
   using (
@@ -938,10 +990,12 @@ create policy run_drills_delete on run_drills
     and user_has_permission(auth.uid(), organization_id, 'organization:manage')
   );
 
+drop policy if exists run_swimmers_select on run_swimmers;
 create policy run_swimmers_select on run_swimmers
   for select to authenticated
   using (organization_id is not null and is_organization_member(organization_id));
 
+drop policy if exists run_swimmers_insert on run_swimmers;
 create policy run_swimmers_insert on run_swimmers
   for insert to authenticated
   with check (
@@ -950,6 +1004,7 @@ create policy run_swimmers_insert on run_swimmers
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists run_swimmers_update on run_swimmers;
 create policy run_swimmers_update on run_swimmers
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -959,6 +1014,7 @@ create policy run_swimmers_update on run_swimmers
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists run_swimmers_delete on run_swimmers;
 create policy run_swimmers_delete on run_swimmers
   for delete to authenticated
   using (
@@ -967,10 +1023,12 @@ create policy run_swimmers_delete on run_swimmers
     and user_has_permission(auth.uid(), organization_id, 'organization:manage')
   );
 
+drop policy if exists laps_select on laps;
 create policy laps_select on laps
   for select to authenticated
   using (organization_id is not null and is_organization_member(organization_id));
 
+drop policy if exists laps_insert on laps;
 create policy laps_insert on laps
   for insert to authenticated
   with check (
@@ -979,6 +1037,7 @@ create policy laps_insert on laps
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists laps_update on laps;
 create policy laps_update on laps
   for update to authenticated
   using (organization_id is not null and is_organization_member(organization_id))
@@ -988,6 +1047,7 @@ create policy laps_update on laps
     and user_has_permission(auth.uid(), organization_id, 'sync:use')
   );
 
+drop policy if exists laps_delete on laps;
 create policy laps_delete on laps
   for delete to authenticated
   using (
@@ -997,10 +1057,12 @@ create policy laps_delete on laps
   );
 
 -- feature_toggles: members read; owner (organization:manage) writes
+drop policy if exists feature_toggles_select on feature_toggles;
 create policy feature_toggles_select on feature_toggles
   for select to authenticated
   using (is_organization_member(organization_id));
 
+drop policy if exists feature_toggles_update on feature_toggles;
 create policy feature_toggles_update on feature_toggles
   for update to authenticated
   using (
@@ -1013,6 +1075,7 @@ create policy feature_toggles_update on feature_toggles
   );
 
 -- organization_invites
+drop policy if exists organization_invites_select on organization_invites;
 create policy organization_invites_select on organization_invites
   for select to authenticated
   using (
@@ -1020,6 +1083,7 @@ create policy organization_invites_select on organization_invites
     and user_has_permission(auth.uid(), organization_id, 'organization:invite')
   );
 
+drop policy if exists organization_invites_insert on organization_invites;
 create policy organization_invites_insert on organization_invites
   for insert to authenticated
   with check (
@@ -1030,17 +1094,34 @@ create policy organization_invites_insert on organization_invites
 
 -- analytics_events: any client may insert telemetry; only service_role reads;
 -- authenticated users may read only their own rows.
+drop policy if exists "Allow insert telemetry for all" on analytics_events;
 create policy "Allow insert telemetry for all"
   on analytics_events for insert
   with check (true);
 
+drop policy if exists "Restrict analytics read to service role" on analytics_events;
 create policy "Restrict analytics read to service role"
   on analytics_events for select
   using (false);
 
+drop policy if exists analytics_events_select_own on analytics_events;
 create policy analytics_events_select_own on analytics_events
   for select to authenticated
   using (user_id = auth.uid());
 
 -- ── 15. Analytics insert grants ─────────────────────────────────────────
 grant insert on analytics_events to anon, authenticated;
+
+-- ── 16. Explicit table grants ─────────────────────────────────────────────
+-- Supabase's default privileges differ between local and hosted (hosted does
+-- not grant SELECT to anon/authenticated; local grants everything), so state
+-- the intended grants here instead of inheriting whatever the environment
+-- happens to do. RLS is the access control; grants decide who may reach the
+-- policy at all. anon gets nothing but the telemetry insert.
+
+grant usage on schema public to anon, authenticated, service_role;
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated, service_role;
+grant usage, select on all sequences in schema public to authenticated, service_role;
+grant insert on analytics_events to anon;
