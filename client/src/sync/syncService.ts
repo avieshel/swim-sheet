@@ -10,6 +10,7 @@ import {
   setMetaConflict,
   adoptServerRev,
   markDirty,
+  isCompletedHistoryChange,
   getCursor,
   setCursor,
   readSyncState,
@@ -27,7 +28,8 @@ import type {
   CloudChange,
 } from './types'
 
-const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills', ...HISTORY_TABLES]
+const CORE_SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
+const SYNC_TABLES: SyncTable[] = [...CORE_SYNC_TABLES, ...HISTORY_TABLES]
 const POLL_INTERVAL_MS = 60000
 const DEBOUNCE_MS = 1000
 
@@ -85,6 +87,7 @@ class SyncService {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
   private listeners = new Set<(s: SyncState) => void>()
   private firstMergeSummary: FirstMergeSummary | null = null
+  private needsFirstMergeConfirmation = false
 
   private state: SyncState = {
     signedIn: false,
@@ -156,14 +159,15 @@ class SyncService {
     const cursors = await this.readCursors(this.currentOrgId)
     const firstSync = SYNC_TABLES.every((t) => cursors[t] === null)
     const hasLocal = await this.hasLocalRows()
-    if (firstSync && hasLocal) {
+    this.needsFirstMergeConfirmation = firstSync && hasLocal
+    if (this.needsFirstMergeConfirmation) {
       try {
         this.firstMergeSummary = await this.previewFirstMerge(this.transport, this.currentOrgId)
         this.state = { ...this.state, firstMergeSummary: this.firstMergeSummary, phase: 'needs_first_merge' }
         this.notify()
-      } catch {
+      } catch (e) {
         this.firstMergeSummary = null
-        await this.syncNow()
+        this.recordError(e)
       }
       return
     }
@@ -190,10 +194,12 @@ class SyncService {
       const rows = await localTable(table).toArray()
       for (const row of rows) {
         const id = String(row.id)
+        if (HISTORY_TABLES.includes(table) && !(await isCompletedHistoryChange(table, id))) continue
         const meta = await db._sync_meta.get(`${table}:${id}`)
         if (meta && meta.orgId !== '' && meta.orgId !== orgId) continue
         if (meta && meta.status === 'synced') continue
         localCount++
+        if (HISTORY_TABLES.includes(table)) continue
         const catalogKey = row.catalogKey as string | undefined
         if (catalogKey && byCatalog.has(catalogKey)) {
           catalogMatches++
@@ -225,25 +231,26 @@ class SyncService {
   }
 
   private async performFirstMerge(transport: SyncTransport, orgId: string): Promise<SyncResult> {
-    const cloud = await transport.pull(orgId, emptyCursors())
+    const cloud = await transport.pull(orgId, emptyCursors(), CORE_SYNC_TABLES)
     const changes = cloud.changes
-    const byId = new Map(changes.map((c) => [c.id, c]))
+    const byId = new Map(changes.map((c) => [`${c.table}:${c.id}`, c]))
     const byCatalog = new Map<string, CloudChange>()
     for (const c of changes) {
       if (c.catalogKey) byCatalog.set(c.catalogKey, c)
     }
 
-    for (const table of SYNC_TABLES) {
+    for (const table of CORE_SYNC_TABLES) {
       const rows = await localTable(table).toArray()
       for (const row of rows) {
         const id = String(row.id)
         const meta = await db._sync_meta.get(`${table}:${id}`)
         if (meta && meta.orgId !== '' && meta.orgId !== orgId) continue
         if (meta && meta.status === 'synced') continue
-        if (byId.has(id)) {
+        const cloudRow = byId.get(`${table}:${id}`)
+        if (cloudRow) {
           // Same-id match: keep the newer side; reconcile by updatedAt.
           const localRev = (row.updatedAt as string) ?? ''
-          const cloudRev = byId.get(id)!.updatedAt
+          const cloudRev = cloudRow.updatedAt
           if (localRev >= cloudRev) await markDirty(table, id, meta?.catalogKey)
           continue
         }
@@ -268,10 +275,11 @@ class SyncService {
     }
 
     await applyRemoteChanges(changes, orgId)
-    for (const table of SYNC_TABLES) await setCursor(orgId, table, cloud.nextCursors[table])
+    for (const table of CORE_SYNC_TABLES) await setCursor(orgId, table, cloud.nextCursors[table])
 
+    this.needsFirstMergeConfirmation = false
     this.firstMergeSummary = null
-    this.state = { ...this.state, firstMergeSummary: null }
+    this.state = { ...this.state, firstMergeSummary: null, phase: 'idle' }
     return this.syncNow()
   }
 
@@ -299,10 +307,102 @@ class SyncService {
   }
 
   private async hasLocalRows(): Promise<boolean> {
-    for (const table of SYNC_TABLES) {
+    for (const table of CORE_SYNC_TABLES) {
       if ((await localTable(table).count()) > 0) return true
     }
-    return false
+    if ((await db.sessionRuns.where('status').equals('completed').count()) > 0) return true
+    const deletedHistory = await db._sync_meta.where('status').equals('pending_delete').toArray()
+    return deletedHistory.some(meta => HISTORY_TABLES.includes(meta.table) && meta.rev !== null)
+  }
+
+  private async backfillCompletedHistory(orgId: string): Promise<void> {
+    const markerKey = `sync:completed-history-backfill:v1:${orgId}`
+    if (await db._meta.get(markerKey)) return
+
+    const remote = await this.transport.pull(orgId, emptyCursors(), HISTORY_TABLES)
+    const remoteByKey = new Map(remote.changes.map(change => [`${change.table}:${change.id}`, change]))
+    const localKeys = new Set<string>()
+
+    for (const table of HISTORY_TABLES) {
+      const rows = await localTable(table).toArray()
+      for (const row of rows) {
+        const id = String(row.id)
+        const key = `${table}:${id}`
+        const meta = await db._sync_meta.get(key)
+        if (meta && meta.orgId !== '' && meta.orgId !== orgId) continue
+        if (!(await isCompletedHistoryChange(table, id))) continue
+        localKeys.add(key)
+        if (meta?.status === 'conflict') continue
+
+        const cloud = remoteByKey.get(key)
+        if (!cloud) {
+          await markDirty(table, id, meta?.catalogKey)
+          continue
+        }
+
+        const localRev = (row.updatedAt as string) ?? ''
+        if (localRev >= cloud.updatedAt) {
+          await setMetaSynced(table, id, orgId, cloud.updatedAt, !!cloud.deletedAt)
+          await markDirty(table, id, meta?.catalogKey)
+        } else {
+          await applyRemoteChanges([cloud], orgId)
+        }
+      }
+    }
+
+    for (const change of remote.changes) {
+      const key = `${change.table}:${change.id}`
+      if (localKeys.has(key)) continue
+      const existing = await db._sync_meta.get(key)
+      if (existing?.orgId && existing.orgId !== orgId) continue
+      if (existing?.status === 'conflict') continue
+      const local = await localTable(change.table).get(change.id)
+      if (local) continue
+      if (existing?.status === 'pending_delete') {
+        if (change.op === 'delete' || change.deletedAt) {
+          await setMetaSynced(change.table, change.id, orgId, change.updatedAt, true)
+        } else {
+          await db._sync_meta.put({ ...existing, orgId, rev: change.updatedAt })
+        }
+        continue
+      }
+      await applyRemoteChanges([change], orgId)
+    }
+
+    for (const table of HISTORY_TABLES) {
+      await setCursor(orgId, table, remote.nextCursors[table])
+    }
+    await db._meta.put({ key: markerKey, value: new Date().toISOString() })
+  }
+
+  private async enqueueCompletedRunChildren(orgId: string): Promise<void> {
+    const runMetas = await db._sync_meta.where('table').equals('sessionRuns').toArray()
+    for (const meta of runMetas) {
+      if (meta.status !== 'pending' || (meta.orgId !== '' && meta.orgId !== orgId)) continue
+      const run = await db.sessionRuns.get(meta.rowId)
+      if (run?.status !== 'completed') continue
+
+      const runDrills = await db.runDrills.where('runId').equals(run.id).toArray()
+      const runDrillIds = runDrills.map(drill => drill.id)
+      const runSwimmers = await db.runSwimmers.where('runId').equals(run.id).toArray()
+      const laneResults = await db.laneDrillResults.where('runId').equals(run.id).toArray()
+      const laps = runDrillIds.length > 0
+        ? await db.laps.where('runDrillId').anyOf(runDrillIds).toArray()
+        : []
+      const children: Array<{ table: SyncTable; id: string }> = [
+        ...runDrills.map(drill => ({ table: 'runDrills' as const, id: drill.id })),
+        ...runSwimmers.map(swimmer => ({ table: 'runSwimmers' as const, id: swimmer.id })),
+        ...laps.map(lap => ({ table: 'laps' as const, id: lap.id })),
+        ...laneResults.map(result => ({ table: 'laneDrillResults' as const, id: result.id })),
+      ]
+
+      for (const child of children) {
+        const key = `${child.table}:${child.id}`
+        if (await db._sync_meta.get(key)) continue
+        await markDirty(child.table, child.id)
+        await db._sync_meta.update(key, { orgId })
+      }
+    }
   }
 
   // The user's canonical single-member org (from ensurePersonalOrganization).
@@ -370,9 +470,13 @@ class SyncService {
       return
     }
 
+    const isDelete = meta.deleted === 1
     const local = (meta.localJson ? JSON.parse(meta.localJson) : {}) as Record<string, unknown>
+    const localChange = isDelete
+      ? { table, id: rowId, op: 'delete' as const, catalogKey: meta.catalogKey, rev: meta.rev }
+      : { table, id: rowId, op: 'upsert' as const, payload: local, catalogKey: meta.catalogKey, rev: meta.localRev ?? null }
     const res = await transport.push(
-      [{ table, id: rowId, op: 'upsert', payload: local, catalogKey: meta.catalogKey, rev: meta.localRev ?? null }],
+      [localChange],
       orgId,
     )
     if (res.conflicts.length > 0) {
@@ -380,7 +484,7 @@ class SyncService {
         id: conflictId,
         table,
         rowId,
-        local,
+        local: isDelete ? null : local,
         remote: (meta.remoteJson ? JSON.parse(meta.remoteJson) : {}) as Record<string, unknown>,
         localRev: meta.localRev ?? null,
         remoteRev: meta.rev ?? '',
@@ -390,8 +494,8 @@ class SyncService {
     // Adopt the rev the server assigned; the set_updated_at trigger rewrites
     // updated_at, so meta.localRev no longer matches the stored row.
     const assigned = res.applied[0]?.updatedAt
-    await setMetaSynced(table, rowId, orgId, assigned ?? meta.localRev ?? '', false)
-    if (assigned) {
+    await setMetaSynced(table, rowId, orgId, assigned ?? meta.rev ?? meta.localRev ?? '', isDelete)
+    if (assigned && !isDelete) {
       await adoptServerRev(table, rowId, assigned)
     }
   }
@@ -418,6 +522,9 @@ class SyncService {
       this.recordError(error)
       return { pushed: 0, pulled: 0, conflicts: [], error }
     }
+    if (this.needsFirstMergeConfirmation || this.state.phase === 'needs_first_merge') {
+      return { pushed: 0, pulled: 0, conflicts: this.state.conflicts }
+    }
     if (this.state.inFlight) {
       return this.lastResult ?? { pushed: 0, pulled: 0, conflicts: [] }
     }
@@ -430,6 +537,8 @@ class SyncService {
       const homeOrg = await this.resolveHomeOrg(orgId)
       this.homeOrgId = homeOrg
       await this.claimUnclaimed(homeOrg)
+      await this.backfillCompletedHistory(orgId)
+      await this.enqueueCompletedRunChildren(orgId)
       const pending = await getPendingChanges(orgId)
       const res = await this.transport.push(pending, orgId)
       conflicts = res.conflicts
@@ -485,6 +594,8 @@ class SyncService {
 
   stop(): void {
     this.currentOrgId = null
+    this.needsFirstMergeConfirmation = false
+    this.firstMergeSummary = null
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null

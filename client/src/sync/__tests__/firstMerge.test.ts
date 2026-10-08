@@ -32,7 +32,7 @@ function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: A
         })),
       }
     },
-    pull: async () => {
+    pull: async (_orgId, _cursors, tables) => {
       const changes: CloudChange[] = rows.map((r) => ({
         table: 'sessions',
         id: r.id,
@@ -60,7 +60,7 @@ function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: A
         laps: 'tc',
         laneDrillResults: 'tc',
       }
-      return { changes, nextCursors }
+      return { changes: changes.filter((change) => !tables || tables.includes(change.table)), nextCursors }
     },
   }
   return transport

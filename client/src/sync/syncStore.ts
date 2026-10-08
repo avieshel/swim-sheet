@@ -33,7 +33,7 @@ function syncTable(table: SyncTable): Table<Record<string, unknown>, string> {
   return db[table] as unknown as Table<Record<string, unknown>, string>
 }
 
-async function isCompletedHistoryChange(table: SyncTable, id: string): Promise<boolean> {
+export async function isCompletedHistoryChange(table: SyncTable, id: string): Promise<boolean> {
   const row = await syncTable(table).get(id)
   if (!row) return false
   if (table === 'sessionRuns') return row.status === 'completed'

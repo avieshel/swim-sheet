@@ -1,18 +1,27 @@
 import 'fake-indexeddb/auto'
-import { describe, beforeEach, afterEach, test, expect } from 'vitest'
+import { describe, beforeEach, afterEach, test, expect, vi } from 'vitest'
 import { db } from '../../db/schema'
 import { markDirty } from '../syncStore'
 import { syncService } from '../syncService'
 import type { SyncTransport, LocalChange, CloudChange, SyncTable, SyncResult } from '../types'
 
-function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push' | 'pull' } = {}): SyncTransport & { upserted: Array<Record<string, unknown>> } {
-  const upserted: Array<Record<string, unknown>> = []
-  const transport: SyncTransport & { upserted: Array<Record<string, unknown>> } = {
+vi.mock('../../api/supabase', () => ({
+  getCurrentUserId: () => 'user-1',
+  onAuthStateChange: () => () => {},
+  supabase: {},
+}))
+
+function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push' | 'pull'; pullFailures?: number; cloudChanges?: CloudChange[] } = {}): SyncTransport & { upserted: LocalChange[]; pulledTables: Array<SyncTable[] | undefined> } {
+  const upserted: LocalChange[] = []
+  const pulledTables: Array<SyncTable[] | undefined> = []
+  let pullFailuresRemaining = opts.pullFailures ?? 0
+  const transport: SyncTransport & { upserted: LocalChange[]; pulledTables: Array<SyncTable[] | undefined> } = {
     upserted,
+    pulledTables,
     ensurePersonalOrganization: async () => 'org-A',
     push: async (changes: LocalChange[]) => {
       if (opts.throwOn === 'push') throw new Error('push failed')
-      for (const c of changes) upserted.push({ id: c.id, ...(c.payload ?? {}) })
+      upserted.push(...changes)
       // Echo back a server-assigned rev so syncService stores the rev the
       // cloud would really hold (the real transport reads it from the row).
       return {
@@ -24,11 +33,15 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
         })),
       }
     },
-    pull: async (_orgId: string, cursors: Record<SyncTable, string | null>) => {
-      if (opts.throwOn === 'pull') throw new Error('pull failed')
-      const changes: CloudChange[] = []
+    pull: async (_orgId: string, cursors: Record<SyncTable, string | null>, tables?: SyncTable[]) => {
+      if (opts.throwOn === 'pull' || pullFailuresRemaining > 0) {
+        pullFailuresRemaining--
+        throw new Error('pull failed')
+      }
+      pulledTables.push(tables)
+      const changes: CloudChange[] = (opts.cloudChanges ?? []).filter((change) => !tables || tables.includes(change.table))
       const n = opts.pulled ?? 0
-      for (let i = 0; i < n; i++) {
+      for (let i = 0; i < n && (!tables || tables.includes('swimmers')); i++) {
         const id = `pulled-${i}`
         changes.push({
           table: 'swimmers',
@@ -77,8 +90,17 @@ async function runSyncNow(transport: SyncTransport): Promise<SyncResult> {
 describe('syncService', () => {
   beforeEach(async () => {
     await db.open()
-    await db.transaction('rw', db.swimmers, db._sync_meta, db._sync_cursor, async () => {
+    await db.transaction('rw', [db.swimmers, db.sessions, db.drills, db.runDrills, db.runSwimmers, db.sessionRuns, db.laps, db.laneDrillResults, db.libraryDrills, db._meta, db._sync_meta, db._sync_cursor], async () => {
       await db.swimmers.clear()
+      await db.sessions.clear()
+      await db.drills.clear()
+      await db.sessionRuns.clear()
+      await db.runDrills.clear()
+      await db.runSwimmers.clear()
+      await db.laps.clear()
+      await db.laneDrillResults.clear()
+      await db.libraryDrills.clear()
+      await db._meta.clear()
       await db._sync_meta.clear()
       await db._sync_cursor.clear()
     })
@@ -86,6 +108,178 @@ describe('syncService', () => {
 
   afterEach(() => {
     syncService.stop()
+  })
+
+  test('queues preexisting run children when the active run completes', async () => {
+    await db.sessionRuns.add({
+      id: 'run-transition', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+      notes: '', status: 'active', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: '2026-10-08T10:00:00.000Z',
+    })
+    await db.runDrills.add({
+      id: 'run-drill-transition', runId: 'run-transition', name: 'Warmup', stroke: 'freestyle', distance: 100,
+      order: 0, notes: '', createdAt: 'created', updatedAt: '2026-10-08T10:00:00.000Z',
+    })
+    await db.runSwimmers.add({
+      id: 'run-swimmer-transition', runId: 'run-transition', swimmerId: 'swimmer-1', lane: 1,
+      createdAt: 'created', updatedAt: '2026-10-08T10:00:00.000Z',
+    })
+    await db.laps.add({
+      id: 'lap-transition', runDrillId: 'run-drill-transition', swimmerId: 'swimmer-1', time: 30,
+      strokeCount: 18, effort: '', notes: '', createdAt: 'created', updatedAt: '2026-10-08T10:00:00.000Z',
+    })
+    await db.laneDrillResults.add({
+      id: 'lane-result-transition', runId: 'run-transition', groupId: 'group-1', lane: 1,
+      runDrillId: 'run-drill-transition', completed: true, data: null, updatedAt: '2026-10-08T10:00:00.000Z',
+    })
+    await db._meta.put({ key: 'sync:completed-history-backfill:v1:org-A', value: 'done' })
+    await db.sessionRuns.update('run-transition', { status: 'completed', updatedAt: '2026-10-08T11:00:00.000Z' })
+    await markDirty('sessionRuns', 'run-transition')
+    await db._sync_meta.update('sessionRuns:run-transition', { orgId: 'org-A' })
+    const transport = fakeTransport()
+    syncService.init(transport, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+
+    await syncService.syncNow()
+
+    expect(transport.upserted.map(({ table }) => table)).toEqual([
+      'sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults',
+    ])
+  })
+
+  test('backfills local-only completed history with existing IDs', async () => {
+    await db.sessionRuns.add({
+      id: 'run-local', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+      notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: 'updated',
+    })
+    await db.runDrills.add({
+      id: 'run-drill-local', runId: 'run-local', name: 'Warmup', stroke: 'freestyle', distance: 100,
+      order: 0, notes: '', createdAt: 'created', updatedAt: 'updated',
+    })
+    await db.runSwimmers.add({
+      id: 'run-swimmer-local', runId: 'run-local', swimmerId: 'swimmer-1', lane: 1,
+      createdAt: 'created', updatedAt: 'updated',
+    })
+    await db.laps.add({
+      id: 'lap-local', runDrillId: 'run-drill-local', swimmerId: 'swimmer-1', time: 30,
+      strokeCount: 18, effort: '', notes: '', createdAt: 'created', updatedAt: 'updated',
+    })
+    await db.laneDrillResults.add({
+      id: 'lane-result-local', runId: 'run-local', groupId: 'group-1', lane: 1,
+      runDrillId: 'run-drill-local', completed: true, data: null, updatedAt: 'updated',
+    })
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    await db._sync_meta.clear()
+    const transport = fakeTransport()
+    syncService.init(transport, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+
+    await syncService.syncNow()
+
+    expect(transport.pulledTables[0]).toEqual(['sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults'])
+    expect(transport.upserted.map(({ table, id }) => [table, id])).toEqual([
+      ['sessionRuns', 'run-local'],
+      ['runDrills', 'run-drill-local'],
+      ['runSwimmers', 'run-swimmer-local'],
+      ['laps', 'lap-local'],
+      ['laneDrillResults', 'lane-result-local'],
+    ])
+  })
+
+  test('reconciles a newer cloud record before uploading a same-ID pending record', async () => {
+    await db.sessionRuns.add({
+      id: 'run-shared', sessionId: 'session-1', date: '2026-10-08', poolName: 'Local', poolLength: 25,
+      notes: 'local edit', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: '2026-10-08T10:00:00.000Z',
+    })
+    const cloud: CloudChange = {
+      table: 'sessionRuns', id: 'run-shared', op: 'upsert',
+      payload: {
+        id: 'run-shared', sessionId: 'session-1', date: '2026-10-08', poolName: 'Cloud', poolLength: 25,
+        notes: 'newer cloud edit', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null,
+        sessionPauseDuration: 0, createdAt: 'created', updatedAt: '2026-10-08T11:00:00.000Z',
+      },
+      updatedAt: '2026-10-08T11:00:00.000Z', deletedAt: null,
+    }
+    await markDirty('sessionRuns', 'run-shared')
+    await db._sync_meta.update('sessionRuns:run-shared', { orgId: 'org-A' })
+    const transport = fakeTransport({ cloudChanges: [cloud] })
+    syncService.init(transport, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+
+    await syncService.syncNow()
+
+    expect(transport.upserted.some((change) => change.id === 'run-shared')).toBe(false)
+    expect((await db.sessionRuns.get('run-shared'))?.notes).toBe('newer cloud edit')
+  })
+
+  test('counts only completed history in first-merge summary', async () => {
+    await db.sessionRuns.add({
+      id: 'run-active', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+      notes: '', status: 'active', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: 'updated',
+    })
+    await db.runDrills.add({
+      id: 'run-drill-active', runId: 'run-active', name: 'Warmup', stroke: 'freestyle', distance: 100,
+      order: 0, notes: '', createdAt: 'created', updatedAt: 'updated',
+    })
+    const transport = fakeTransport()
+
+    const summary = await syncService.previewFirstMerge(transport, 'org-A')
+
+    expect(summary.localCount).toBe(0)
+  })
+
+  test('does not sync history while first merge awaits confirmation', async () => {
+    await db.sessionRuns.add({
+      id: 'run-awaiting-merge', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+      notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: 'updated',
+    })
+    await markDirty('sessionRuns', 'run-awaiting-merge')
+    const transport = fakeTransport()
+    syncService.init(transport, { autoSync: false })
+
+    await syncService.start()
+    expect(syncService.getState().phase).toBe('needs_first_merge')
+
+    await syncService.syncNow()
+
+    expect(transport.upserted).toHaveLength(0)
+  })
+
+  test('uploads completed history after first merge is confirmed', async () => {
+    await db.sessionRuns.add({
+      id: 'run-confirmed-merge', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+      notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: 'updated',
+    })
+    const transport = fakeTransport()
+    syncService.init(transport, { autoSync: false })
+
+    await syncService.start()
+    expect(syncService.getState().phase).toBe('needs_first_merge')
+    await syncService.confirmFirstMerge()
+
+    expect(transport.upserted.map(({ table, id }) => [table, id])).toContainEqual(['sessionRuns', 'run-confirmed-merge'])
+  })
+
+  test('does not upload after a first-merge preview fails', async () => {
+    await db.sessionRuns.add({
+      id: 'run-preview-failed', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+      notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+      createdAt: 'created', updatedAt: 'updated',
+    })
+    await markDirty('sessionRuns', 'run-preview-failed')
+    const transport = fakeTransport({ pullFailures: 1 })
+    syncService.init(transport, { autoSync: false })
+
+    await syncService.start()
+    await syncService.syncNow()
+
+    expect(transport.upserted).toHaveLength(0)
+    expect(syncService.getState().phase).toBe('error')
   })
 
   test('syncNow pushes pending local rows then applies pulled rows', async () => {

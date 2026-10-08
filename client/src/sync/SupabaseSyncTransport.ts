@@ -421,8 +421,10 @@ export class SupabaseSyncTransport implements SyncTransport {
     if (change.rev === null) {
       // Insert path: no guard. Read the server-assigned updated_at back so the
       // next write is guarded against the real rev.
+      const insert = { ...mapped }
+      delete insert.updated_at
       return guarded(
-        await cloud.upsert(mapped, { onConflict: 'id' }).select('updated_at'),
+        await cloud.upsert(insert, { onConflict: 'id' }).select('updated_at'),
       )
     }
 

@@ -16,6 +16,8 @@ interface QueryTrace {
   table: string
   columns?: string
   filters: Array<[string, unknown]>
+  upsertRow?: Record<string, unknown>
+  updateRow?: Record<string, unknown>
 }
 
 type StubSupabase = SupabaseLike & { queries: QueryTrace[] }
@@ -103,9 +105,17 @@ function makeSupabaseStub(opts: {
       if (activeQuery && columns !== undefined) activeQuery.columns = columns
       return b
     },
-    update: () => { mode = 'update'; return b },
+    update: (row) => {
+      if (activeQuery) activeQuery.updateRow = row
+      mode = 'update'
+      return b
+    },
     delete: () => b,
-    upsert: () => { mode = 'upsert'; return b },
+    upsert: (row) => {
+      if (activeQuery) activeQuery.upsertRow = row
+      mode = 'upsert'
+      return b
+    },
     limit: () => Promise.resolve(result(rows)),
     single: () => Promise.resolve(result(currentRow)),
     then: (onFulfilled?: (value: BuilderResult) => unknown) => Promise.resolve(resolve()).then(onFulfilled),
@@ -248,6 +258,27 @@ describe('completed history mapping', () => {
 })
 
 describe('SupabaseSyncTransport.push', () => {
+  test('uses the server timestamp for a new history insert', async () => {
+    const stub = makeSupabaseStub({ upsertUpdatedAt: 'server-rev' })
+    const transport = new SupabaseSyncTransport(stub)
+    const change: LocalChange = {
+      table: asSyncTable('runDrills'),
+      id: 'run-drill-new',
+      op: 'upsert',
+      payload: {
+        id: 'run-drill-new', runId: 'run-1', name: 'Warmup', stroke: 'freestyle', distance: 100,
+        order: 0, notes: '', createdAt: 'created', updatedAt: 'device-time',
+      },
+      rev: null,
+    }
+
+    const result = await transport.push([change], 'org-A')
+
+    expect(stub.queries[0].table).toBe('run_drills')
+    expect(stub.queries[0].upsertRow).not.toHaveProperty('updated_at')
+    expect(result.applied).toEqual([{ table: 'runDrills', id: 'run-drill-new', updatedAt: 'server-rev' }])
+  })
+
   test('does not label an organization RPC failure as a signed-out error', async () => {
     const transport = new SupabaseSyncTransport(makeSupabaseStub({ rpcError: { message: 'request failed' } }))
 
