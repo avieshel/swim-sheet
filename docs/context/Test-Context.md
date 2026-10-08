@@ -4,8 +4,24 @@
 
 | Type | Tool | Location | Command |
 |------|------|----------|---------|
-| Unit / Integration | Vitest | `client/src/**/*.test.ts` (co-located) | `npm run test` |
-| E2E | Playwright | `tests/` at project root | `npm run test:e2e` |
+| Unit / Integration | Vitest | `client/src/**/*.test.ts` (co-located) | `npm run test` (from `client/`) |
+| E2E | Playwright | `tests/` at project root | `npm run test:e2e` (from root) |
+
+**Playwright runs from the project root, but `@playwright/test` is installed in
+`client/node_modules`.** Node resolves a module relative to the file that imports
+it, and `playwright.config.ts` sits at the root — so the config's own
+`import { defineConfig } from '@playwright/test'` cannot resolve without a
+`NODE_PATH` pointing at `client/node_modules`. The root `test:e2e` script sets it.
+Do not "simplify" that script back to a bare `playwright test` — it will fail with
+`MODULE_NOT_FOUND`, and `npx playwright` is worse: it silently downloads a
+different Playwright version into the npx cache instead of using the pinned one.
+
+Vite's dev server runs in `development` mode (`npm run dev` → `vite`), so it
+reads `.env`, `.env.local`, `.env.development`, `.env.development.local` — and
+**not** `.env.production.local`. Because `client/vite.config.ts` sets
+`envDir: '..'`, env files must live at the project root. To serve hosted Supabase
+values locally, start the dev server in production mode explicitly:
+`cd client && npx vite --mode production`.
 
 ## Test Philosophy
 
@@ -90,9 +106,28 @@ test.beforeEach(async ({ page }) => {
 | History/review | E2E | Not implemented yet |
 
 ## Known Flaky Tests
-E2E tests that seed Dexie via `page.evaluate` may fail if Dexie hasn't finished opening. Mitigation:
+E2E tests that seed Dexie via `page.evaluate` may fail if Dexie hasn't finished opened. Mitigation:
 - Always use `waitForFunction(() => (window as any).db?.isOpen?.())` before evaluate
 - Retry logic within evaluate as fallback
+
+## Playwright API Gotchas
+
+The cross-device sync spec was written against a different test runner and had
+never executed, so it used APIs that do not exist in Playwright. Check these
+before trusting a spec that has not run recently:
+
+| Looks like | Reality in Playwright |
+|------------|-----------------------|
+| `test.describe.skipIf(cond)` | **Vitest-only.** Use `test.skip(cond, reason)` inside the describe body |
+| `test.context().browser()` | No such thing. Use the `browser` fixture in the test signature |
+| `expect.poll(fn).resolves.toBe(x)` | `expect.poll` does not support `resolves`. Unwrap the promise in the callback |
+| `res.count` on an update | Stays `null` without `Prefer: count=exact`. Use the returned row array length |
+| `getByText(...)` on a route that doesn't render it | Assert against IndexedDB via `page.evaluate` instead |
+
+Two devices in one spec are separate `browser.newContext()` calls. Do **not**
+seed rows before injecting the auth session: `syncService.start()` runs on boot,
+consumes the first-sync cursor, and will skip the first-merge prompt. Seed, then
+sign in.
 
 ## Conventions
 - Test files use `.spec.ts` for Playwright, `.test.ts` for Vitest

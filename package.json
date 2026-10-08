@@ -3,7 +3,8 @@
   "scripts": {
     "prepare": "husky",
     "commitlint": "commitlint --edit",
-    "db:push": "supabase db push"
+    "db:push": "supabase db push",
+    "test:e2e": "NODE_PATH=./client/node_modules ./client/node_modules/.bin/playwright test"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
