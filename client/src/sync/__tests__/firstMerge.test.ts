@@ -21,7 +21,16 @@ function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: A
     ensurePersonalOrganization: async () => 'org-A',
     push: async (changes: LocalChange[]) => {
       for (const c of changes) upserted.push(toCloudRow(c.table, c, 'org-A', 'u-test'))
-      return { conflicts: [] }
+      // Echo back a server-assigned rev so syncService stores the rev the
+      // cloud would really hold (the real transport reads it from the row).
+      return {
+        conflicts: [],
+        applied: changes.map((c) => ({
+          table: c.table,
+          id: c.id,
+          updatedAt: `srv-${c.table}-${c.id}`,
+        })),
+      }
     },
     pull: async () => {
       const changes: CloudChange[] = rows.map((r) => ({

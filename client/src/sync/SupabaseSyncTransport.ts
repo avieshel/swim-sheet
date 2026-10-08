@@ -18,7 +18,10 @@ export interface SyncQueryBuilder extends PromiseLike<BuilderResult> {
   order: (column: string) => SyncQueryBuilder
   select: (columns?: string) => SyncQueryBuilder
   update: (row: Record<string, unknown>) => SyncQueryBuilder
-  upsert: (row: Record<string, unknown>, options?: { onConflict?: string }) => Promise<BuilderResult>
+  upsert: (
+    row: Record<string, unknown>,
+    options?: { onConflict?: string },
+  ) => SyncQueryBuilder
   delete: () => SyncQueryBuilder
   limit: (n: number) => Promise<BuilderResult>
   single: () => Promise<BuilderResult>
@@ -202,57 +205,108 @@ export class SupabaseSyncTransport implements SyncTransport {
   async push(
     changes: LocalChange[],
     orgId: string,
-  ): Promise<{ conflicts: SyncConflict[] }> {
+  ): Promise<{ conflicts: SyncConflict[]; applied: { table: SyncTable; id: string; updatedAt: string }[] }> {
     const userId = getCurrentUserId() ?? ''
     const conflicts: SyncConflict[] = []
+    const applied: { table: SyncTable; id: string; updatedAt: string }[] = []
     for (const change of changes) {
-      const conflict = await this.pushOne(change, orgId, userId)
-      if (conflict) conflicts.push(conflict)
+      const result = await this.pushOne(change, orgId, userId)
+      if (result.conflict) conflicts.push(result.conflict)
+      if (result.updatedAt !== null) {
+        applied.push({ table: change.table, id: change.id, updatedAt: result.updatedAt })
+      }
     }
-    return { conflicts }
+    return { conflicts, applied }
   }
 
+  // Returns the server-assigned updatedAt on success (null when the row could not
+  // be read back), or a SyncConflict when the optimistic guard rejected the write.
   private async pushOne(
     change: LocalChange,
     orgId: string,
     userId: string,
-  ): Promise<SyncConflict | null> {
+  ): Promise<{ conflict: SyncConflict | null; updatedAt: string | null }> {
     const mapped = toCloudRow(change.table, change, orgId, userId)
+
     if (change.op === 'delete') {
       if (change.rev === null) {
         await this.client.from(change.table).delete().eq('id', change.id)
-        return null
+        return { conflict: null, updatedAt: null }
       }
       const res = await this.client
         .from(change.table)
         .update({ ...mapped, deleted_at: new Date().toISOString() })
         .eq('id', change.id)
         .eq('updated_at', change.rev)
-      if ((res.count ?? 0) === 0) {
-        return this.buildConflict(change, await this.fetchCurrent(change.table, change.id))
+        .select('updated_at')
+      const rows = Array.isArray(res.data) ? res.data : []
+      if (res.error || rows.length === 0) {
+        return {
+          conflict: this.buildConflict(change, await this.fetchCurrent(change.table, change.id)),
+          updatedAt: null,
+        }
       }
-      return null
+      return { conflict: null, updatedAt: rows[0].updated_at as string }
     }
+
     if (change.rev === null) {
-      await this.client.from(change.table).upsert(mapped, { onConflict: 'id' })
-      return null
+      // Insert path: no guard. Read the server-assigned updated_at back so the
+      // next write is guarded against the real rev.
+      const upserted = await this.client
+        .from(change.table)
+        .upsert(mapped, { onConflict: 'id' })
+        .select('updated_at')
+      if (upserted.error) {
+        return {
+          conflict: this.buildConflict(change, await this.fetchCurrent(change.table, change.id)),
+          updatedAt: null,
+        }
+      }
+      const rows = Array.isArray(upserted.data) ? upserted.data : []
+      return {
+        conflict: null,
+        updatedAt: rows.length > 0 ? (rows[0].updated_at as string) : null,
+      }
     }
+
+    // Optimistic-concurrency guard. Two things matter:
+    //
+    // 1. .select(...) is required so PostgREST returns the affected rows; an empty
+    //    result is how a stale write is detected. res.count is NOT usable --
+    //    supabase-js leaves it null unless the request carries Prefer: count=exact
+    //    (verified against local Docker: a stale and a fresh guarded update both
+    //    report count=null, so a count check rejects legitimate writes too).
+    // 2. Select updated_at, because the set_updated_at trigger overwrites the value
+    //    we just sent. Keeping our own timestamp guarantees the next guarded write
+    //    never matches, turning every subsequent edit into a false conflict.
     const res = await this.client
       .from(change.table)
       .update(mapped)
       .eq('id', change.id)
       .eq('updated_at', change.rev)
-    if ((res.count ?? 0) === 0) {
-      return this.buildConflict(change, await this.fetchCurrent(change.table, change.id))
+      .select('updated_at')
+    const rows = Array.isArray(res.data) ? res.data : []
+    if (res.error || rows.length === 0) {
+      return {
+        conflict: this.buildConflict(change, await this.fetchCurrent(change.table, change.id)),
+        updatedAt: null,
+      }
     }
-    return null
+    return { conflict: null, updatedAt: rows[0].updated_at as string }
   }
 
   private async fetchCurrent(
     table: SyncTable,
     id: string,
   ): Promise<Row | null> {
-    const { data } = await this.client.from(table).select('*').eq('id', id).single()
+    const { data, error } = await this.client.from(table).select('*').eq('id', id).single()
+    // A transport-level failure (offline, RLS denial) is NOT an empty result.
+    // Swallowing it would let the caller treat "could not check" as "no remote
+    // row", which records a bogus conflict with remoteRev '' that the user then
+    // has to resolve by hand.
+    if (error) {
+      throw Object.assign(new Error(`failed to fetch current ${table}/${id}`), { kind: 'network', cause: error })
+    }
     return (data as Row | null) ?? null
   }
 

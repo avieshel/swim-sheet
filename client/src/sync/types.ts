@@ -74,7 +74,13 @@ export interface FirstMergeSummary {
 
 export interface SyncTransport {
   ensurePersonalOrganization(): Promise<string>
-  push(changes: LocalChange[], orgId: string): Promise<{ conflicts: SyncConflict[] }>
+  // applied carries the server-assigned updated_at per pushed row. The cloud
+  // sets updated_at with now() via trigger, so the client's own timestamp is
+  // never the rev it must guard its next write with.
+  push(changes: LocalChange[], orgId: string): Promise<{
+    conflicts: SyncConflict[]
+    applied: { table: SyncTable; id: string; updatedAt: string }[]
+  }>
   pull(orgId: string, cursors: Record<SyncTable, string | null>): Promise<{
     changes: CloudChange[]
     nextCursors: Record<SyncTable, string>

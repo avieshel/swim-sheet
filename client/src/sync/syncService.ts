@@ -8,6 +8,7 @@ import {
   applyRemoteChanges,
   setMetaSynced,
   setMetaConflict,
+  adoptServerRev,
   markDirty,
   getCursor,
   setCursor,
@@ -214,11 +215,14 @@ class SyncService {
           // local content to the existing cloud row's id, then remap the local
           // row so future edits target that cloud row (no duplicate created).
           const k = byCatalog.get(catalogKey)!
-          await transport.push(
+          const pushed = await transport.push(
             [{ table, id: k.id, op: 'upsert', payload: { ...row, id: k.id }, catalogKey, rev: k.updatedAt }],
             orgId,
           )
-          await this.remapLocalRow(table, id, k.id, orgId, k.updatedAt)
+          // Adopt the server-assigned rev; the set_updated_at trigger rewrites
+          // updated_at, so k.updatedAt is stale the moment the push lands.
+          const assigned = pushed.applied[0]?.updatedAt ?? k.updatedAt
+          await this.remapLocalRow(table, id, k.id, orgId, assigned)
           continue
         }
         await markDirty(table, id, catalogKey)
@@ -333,7 +337,13 @@ class SyncService {
       })
       return
     }
-    await setMetaSynced(table, rowId, orgId, meta.localRev ?? '', false)
+    // Adopt the rev the server assigned; the set_updated_at trigger rewrites
+    // updated_at, so meta.localRev no longer matches the stored row.
+    const assigned = res.applied[0]?.updatedAt
+    await setMetaSynced(table, rowId, orgId, assigned ?? meta.localRev ?? '', false)
+    if (assigned) {
+      await adoptServerRev(table, rowId, assigned)
+    }
   }
 
   setActiveOrg(orgId: string): void {
@@ -365,10 +375,27 @@ class SyncService {
       conflicts = res.conflicts
       pushed = pending.length - conflicts.length
       for (const c of conflicts) await setMetaConflict(c)
+      // Record the rev the SERVER assigned, not the one we sent. The
+      // set_updated_at trigger rewrites updated_at on every write, so our own
+      // timestamp is already stale by the time it lands; keeping it makes the
+      // next guarded write fail and reports a false conflict.
+      const serverRev = new Map(res.applied.map((a) => [`${a.table}:${a.id}`, a.updatedAt]))
       for (const change of pending) {
         const isConflict = conflicts.some(c => c.rowId === change.id && c.table === change.table)
-        if (!isConflict) {
-          await setMetaSynced(change.table, change.id, orgId, change.rev ?? '', change.op === 'delete')
+        if (isConflict) continue
+        const key = `${change.table}:${change.id}`
+        const assigned = serverRev.get(key)
+        await setMetaSynced(
+          change.table,
+          change.id,
+          orgId,
+          assigned ?? change.rev ?? '',
+          change.op === 'delete',
+        )
+        if (assigned !== undefined && change.op !== 'delete') {
+          // Keep the local row's updatedAt aligned with the cloud so the next
+          // edit is guarded against the rev the server actually stored.
+          await adoptServerRev(change.table, change.id, assigned)
         }
       }
       this.setPhase('pulling')
@@ -392,6 +419,9 @@ class SyncService {
       return result
     } finally {
       this.state = { ...this.state, inFlight: false }
+      // The refresh() above notified while inFlight was still true, so without
+      // this the UI keeps rendering "Syncing…" and never re-enables the button.
+      this.notify()
     }
   }
 

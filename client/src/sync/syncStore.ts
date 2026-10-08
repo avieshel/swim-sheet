@@ -21,21 +21,33 @@ function syncTable(table: SyncTable): Table<Record<string, unknown>, string> {
   return db[table] as unknown as Table<Record<string, unknown>, string>
 }
 
+// A Dexie write hook runs inside the transaction that triggered it, scoped to
+// that transaction's tables only. Touching db._sync_meta from there throws
+// NotFoundError ("object store was not found"), because _sync_meta is not in
+// the transaction scope — so the mark has to be deferred to a later task, where
+// it opens its own transaction. Deferring also keeps the write off the critical
+// path of the caller's transaction.
+function deferCapture(fn: () => Promise<void>): void {
+  setTimeout(() => {
+    void fn().catch(() => {})
+  }, 0)
+}
+
 export function attachSyncHooks(): void {
   for (const table of SYNC_TABLES) {
     const t = db[table]
     t.hook('creating', (_primKey, obj) => {
       if (isApplyingRemote) return
       const id = obj.id
-      if (id) void markDirty(table, id).catch(() => {})
+      if (id) deferCapture(() => markDirty(table, id))
     })
     t.hook('updating', (_modifications, primKey) => {
       if (isApplyingRemote) return
-      void markDirty(table, String(primKey)).catch(() => {})
+      deferCapture(() => markDirty(table, String(primKey)))
     })
     t.hook('deleting', (primKey) => {
       if (isApplyingRemote) return
-      void markDirtyDelete(table, String(primKey)).catch(() => {})
+      deferCapture(() => markDirtyDelete(table, String(primKey)))
     })
   }
 }
@@ -121,6 +133,22 @@ export async function applyRemoteChanges(changes: CloudChange[], orgId: string):
         }
       }
     })
+  } finally {
+    isApplyingRemote = false
+  }
+}
+
+// Adopt the rev the cloud assigned (its set_updated_at trigger rewrites
+// updated_at). Must not re-enqueue the row: a plain table update would trip the
+// 'updating' capture hook and mark the row pending again, so the guard is
+// flipped for the duration of the write.
+export async function adoptServerRev(table: SyncTable, id: string, updatedAt: string): Promise<void> {
+  const t = syncTable(table)
+  const row = await t.get(id)
+  if (!row || row.updatedAt === updatedAt) return
+  isApplyingRemote = true
+  try {
+    await t.update(id, { updatedAt })
   } finally {
     isApplyingRemote = false
   }

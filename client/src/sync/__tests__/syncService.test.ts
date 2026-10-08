@@ -13,7 +13,16 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
     push: async (changes: LocalChange[]) => {
       if (opts.throwOn === 'push') throw new Error('push failed')
       for (const c of changes) upserted.push({ id: c.id, ...(c.payload ?? {}) })
-      return { conflicts: [] }
+      // Echo back a server-assigned rev so syncService stores the rev the
+      // cloud would really hold (the real transport reads it from the row).
+      return {
+        conflicts: [],
+        applied: changes.map((c) => ({
+          table: c.table,
+          id: c.id,
+          updatedAt: `srv-${c.table}-${c.id}`,
+        })),
+      }
     },
     pull: async (_orgId: string, cursors: Record<SyncTable, string | null>) => {
       if (opts.throwOn === 'pull') throw new Error('pull failed')
