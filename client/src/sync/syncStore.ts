@@ -6,8 +6,9 @@ import type {
   CloudChange,
   SyncConflict,
 } from './types'
+import { HISTORY_TABLES } from './types'
 
-const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
+const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills', ...HISTORY_TABLES]
 const SYNC_ORDER: Record<SyncTable, number> = {
   swimmers: 0,
   sessions: 1,
@@ -30,6 +31,36 @@ function metaKey(table: SyncTable, rowId: string): string {
 
 function syncTable(table: SyncTable): Table<Record<string, unknown>, string> {
   return db[table] as unknown as Table<Record<string, unknown>, string>
+}
+
+async function isCompletedHistoryChange(table: SyncTable, id: string): Promise<boolean> {
+  const row = await syncTable(table).get(id)
+  if (!row) return false
+  if (table === 'sessionRuns') return row.status === 'completed'
+
+  let runId: string | undefined
+  switch (table) {
+    case 'runDrills':
+    case 'runSwimmers':
+    case 'laneDrillResults':
+      runId = row.runId as string | undefined
+      break
+    case 'laps': {
+      const runDrill = await db.runDrills.get(String(row.runDrillId))
+      runId = runDrill?.runId
+      break
+    }
+    default:
+      return true
+  }
+  if (!runId) return false
+  return (await db.sessionRuns.get(runId))?.status === 'completed'
+}
+
+async function isEligiblePending(meta: SyncMetaRow): Promise<boolean> {
+  if (!HISTORY_TABLES.includes(meta.table)) return true
+  if (meta.status === 'pending_delete') return meta.rev !== null
+  return isCompletedHistoryChange(meta.table, meta.rowId)
 }
 
 // A Dexie write hook runs inside the transaction that triggered it, scoped to
@@ -106,6 +137,7 @@ export async function getPendingChanges(orgId: string): Promise<LocalChange[]> {
     // before sign-in (orgId === '') are claimable by the active org.
     if (m.orgId !== '' && m.orgId !== orgId) continue
     if (m.status === 'pending_delete') {
+      if (HISTORY_TABLES.includes(m.table) && m.rev === null) continue
       changes.push({
         table: m.table,
         id: m.rowId,
@@ -115,6 +147,7 @@ export async function getPendingChanges(orgId: string): Promise<LocalChange[]> {
       })
       continue
     }
+    if (HISTORY_TABLES.includes(m.table) && !(await isCompletedHistoryChange(m.table, m.rowId))) continue
     const row = await syncTable(m.table).get(m.rowId)
     if (!row) continue
     changes.push({
@@ -199,7 +232,7 @@ export async function setMetaConflict(conflict: SyncConflict): Promise<void> {
     catalogKey: existing?.catalogKey,
     rev: conflict.remoteRev,
     status: 'conflict',
-    deleted: 0,
+    deleted: existing?.deleted ?? 0,
     localRev: conflict.localRev,
     localJson: JSON.stringify(conflict.local),
     remoteJson: JSON.stringify(conflict.remote),
@@ -221,9 +254,11 @@ export async function readSyncState(
   orgId: string,
 ): Promise<{ pendingCount: number; conflicts: SyncConflict[] }> {
   const metas = await db._sync_meta.where('orgId').equals(orgId).toArray()
-  const pendingCount = metas.filter(
-    m => m.status === 'pending' || m.status === 'pending_delete',
-  ).length
+  let pendingCount = 0
+  for (const meta of metas) {
+    if (meta.status !== 'pending' && meta.status !== 'pending_delete') continue
+    if (await isEligiblePending(meta)) pendingCount++
+  }
   const conflicts: SyncConflict[] = metas
     .filter(m => m.status === 'conflict')
     .map(m => ({
