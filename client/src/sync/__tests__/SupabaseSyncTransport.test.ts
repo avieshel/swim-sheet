@@ -7,7 +7,9 @@ import {
   type BuilderResult,
   type SyncQueryBuilder,
 } from '../SupabaseSyncTransport'
-import type { LocalChange, SyncTransport } from '../types'
+import type { LocalChange, SyncTable, SyncTransport } from '../types'
+
+const asSyncTable = (table: string): SyncTable => table as unknown as SyncTable
 
 const mockAuth = vi.hoisted(() => ({ userId: 'u1' as string | null }))
 
@@ -119,6 +121,93 @@ describe('fromCloudRow', () => {
       created_at: 't', updated_at: 't', deleted_at: null,
     })
     expect(out).toMatchObject({ id: 's1', name: 'A', group: 'U17', status: 'active' })
+  })
+})
+
+describe('completed history mapping', () => {
+  test('maps completed-history rows to cloud columns', () => {
+    const cases: Array<{ table: SyncTable; payload: Record<string, unknown>; expected: Record<string, unknown> }> = [
+      {
+        table: asSyncTable('sessionRuns'),
+        payload: {
+          id: 'run-1', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+          notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null,
+          sessionPauseDuration: 0, createdAt: 'created', updatedAt: 'updated',
+        },
+        expected: {
+          id: 'run-1', session_id: 'session-1', date: '2026-10-08', pool_name: 'North', pool_length: 25,
+          status: 'completed', session_started_at: 100, session_paused_at: null,
+          session_pause_duration: 0, created_at: 'created', updated_at: 'updated',
+        },
+      },
+      {
+        table: asSyncTable('runDrills'),
+        payload: {
+          id: 'run-drill-1', runId: 'run-1', parentDrillId: 'drill-1', name: 'Warmup', stroke: 'freestyle',
+          distance: 100, order: 2, notes: '', instructions: 'Easy', interval: '2:00', equipment: ['fins'],
+          createdAt: 'created', updatedAt: 'updated',
+        },
+        expected: {
+          id: 'run-drill-1', run_id: 'run-1', parent_drill_id: 'drill-1', name: 'Warmup', stroke: 'freestyle',
+          distance: 100, drill_order: 2, notes: '', instructions: 'Easy', interval: '2:00', equipment: '["fins"]',
+          created_at: 'created', updated_at: 'updated',
+        },
+      },
+      {
+        table: asSyncTable('runSwimmers'),
+        payload: { id: 'run-swimmer-1', runId: 'run-1', swimmerId: 'swimmer-1', lane: 3, createdAt: 'created', updatedAt: 'updated' },
+        expected: { id: 'run-swimmer-1', run_id: 'run-1', swimmer_id: 'swimmer-1', lane: 3, created_at: 'created', updated_at: 'updated' },
+      },
+      {
+        table: asSyncTable('laps'),
+        payload: {
+          id: 'lap-1', runDrillId: 'run-drill-1', swimmerId: 'swimmer-1', time: 31.5,
+          strokeCount: 20, effort: 'hard', notes: '', createdAt: 'created', updatedAt: 'updated',
+        },
+        expected: {
+          id: 'lap-1', run_drill_id: 'run-drill-1', swimmer_id: 'swimmer-1', time: 31.5,
+          stroke_count: 20, effort: 'hard', notes: '', created_at: 'created', updated_at: 'updated',
+        },
+      },
+      {
+        table: asSyncTable('laneDrillResults'),
+        payload: {
+          id: 'lane-result-1', runId: 'run-1', groupId: 'group-1', lane: 3, runDrillId: 'run-drill-1',
+          completed: true, data: null, updatedAt: 'updated',
+        },
+        expected: {
+          id: 'lane-result-1', run_id: 'run-1', group_id: 'group-1', lane: 3, run_drill_id: 'run-drill-1',
+          completed: true, data: null, updated_at: 'updated',
+        },
+      },
+    ]
+
+    for (const { table, payload, expected } of cases) {
+      const change: LocalChange = { table, id: String(payload.id), op: 'upsert', payload, rev: null }
+      expect(toCloudRow(table, change, 'org-A', 'u1')).toMatchObject({
+        ...expected,
+        organization_id: 'org-A',
+        created_by: 'u1',
+      })
+    }
+  })
+
+  test('round-trips lane timing snapshot JSON', () => {
+    const table = asSyncTable('laneDrillResults')
+    const data = '{"drillStart":0,"drillEnd":120000,"swimmers":[]}'
+    const change: LocalChange = {
+      table,
+      id: 'lane-result-1',
+      op: 'upsert',
+      payload: { id: 'lane-result-1', runId: 'run-1', groupId: 'group-1', lane: 2, runDrillId: 'rd-1', completed: true, data, updatedAt: 'updated' },
+      rev: null,
+    }
+
+    const cloud = toCloudRow(table, change, 'org-A', 'u1')
+    const local = fromCloudRow(table, { ...cloud, data: JSON.parse(data) as Record<string, unknown> })
+
+    expect(cloud.data).toEqual({ drillStart: 0, drillEnd: 120000, swimmers: [] })
+    expect(local).toMatchObject({ id: 'lane-result-1', data })
   })
 })
 

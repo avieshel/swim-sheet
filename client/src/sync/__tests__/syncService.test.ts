@@ -45,6 +45,11 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
         sessions: cursors.sessions ?? '0001',
         drills: cursors.drills ?? '0001',
         libraryDrills: cursors.libraryDrills ?? '0001',
+        sessionRuns: cursors.sessionRuns ?? '0001',
+        runDrills: cursors.runDrills ?? '0001',
+        runSwimmers: cursors.runSwimmers ?? '0001',
+        laps: cursors.laps ?? '0001',
+        laneDrillResults: cursors.laneDrillResults ?? '0001',
       }
       return { changes, nextCursors }
     },

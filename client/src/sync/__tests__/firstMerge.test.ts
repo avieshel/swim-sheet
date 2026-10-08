@@ -54,6 +54,11 @@ function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: A
         sessions: 'tc',
         drills: 'tc',
         libraryDrills: 'tc',
+        sessionRuns: 'tc',
+        runDrills: 'tc',
+        runSwimmers: 'tc',
+        laps: 'tc',
+        laneDrillResults: 'tc',
       }
       return { changes, nextCursors }
     },

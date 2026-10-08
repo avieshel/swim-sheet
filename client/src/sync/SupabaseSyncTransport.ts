@@ -16,6 +16,11 @@ const CLOUD_TABLE: Record<SyncTable, string> = {
   sessions: 'sessions',
   drills: 'drills',
   libraryDrills: 'library_drills',
+  sessionRuns: 'session_runs',
+  runDrills: 'run_drills',
+  runSwimmers: 'run_swimmers',
+  laps: 'laps',
+  laneDrillResults: 'lane_drill_results',
 }
 
 export interface BuilderResult {
@@ -128,6 +133,69 @@ export function toCloudRow(
         created_at: p.createdAt,
         updated_at: p.updatedAt,
       }
+    case 'sessionRuns':
+      return {
+        ...base,
+        session_id: p.sessionId,
+        date: p.date,
+        pool_name: p.poolName,
+        pool_length: p.poolLength,
+        notes: p.notes,
+        status: p.status,
+        session_started_at: p.sessionStartedAt,
+        session_paused_at: p.sessionPausedAt,
+        session_pause_duration: p.sessionPauseDuration,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
+      }
+    case 'runDrills':
+      return {
+        ...base,
+        run_id: p.runId,
+        parent_drill_id: p.parentDrillId ?? null,
+        name: p.name,
+        stroke: p.stroke,
+        distance: p.distance,
+        drill_order: p.order,
+        notes: p.notes,
+        instructions: p.instructions ?? null,
+        interval: p.interval ?? null,
+        equipment: p.equipment === undefined ? null : JSON.stringify(p.equipment),
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
+      }
+    case 'runSwimmers':
+      return {
+        ...base,
+        run_id: p.runId,
+        swimmer_id: p.swimmerId,
+        lane: p.lane,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
+      }
+    case 'laps':
+      return {
+        ...base,
+        run_drill_id: p.runDrillId,
+        swimmer_id: p.swimmerId,
+        time: p.time,
+        stroke_count: p.strokeCount,
+        effort: p.effort,
+        notes: p.notes,
+        created_at: p.createdAt,
+        updated_at: p.updatedAt,
+      }
+    case 'laneDrillResults':
+      return {
+        ...base,
+        run_id: p.runId,
+        group_id: p.groupId,
+        lane: p.lane,
+        run_drill_id: p.runDrillId,
+        completed: p.completed,
+        data: safeJson(p.data, null),
+        updated_at: p.updatedAt,
+      }
   }
 }
 
@@ -188,6 +256,69 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
         catalogKey: (row.catalog_key as string) ?? undefined,
         popularity: row.popularity,
         createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    case 'sessionRuns':
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        date: row.date,
+        poolName: row.pool_name,
+        poolLength: row.pool_length,
+        notes: row.notes,
+        status: row.status,
+        sessionStartedAt: row.session_started_at,
+        sessionPausedAt: row.session_paused_at,
+        sessionPauseDuration: row.session_pause_duration,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    case 'runDrills':
+      return {
+        id: row.id,
+        runId: row.run_id,
+        parentDrillId: (row.parent_drill_id as string | null) ?? undefined,
+        name: row.name,
+        stroke: row.stroke,
+        distance: row.distance,
+        order: row.drill_order,
+        notes: row.notes,
+        instructions: (row.instructions as string | null) ?? undefined,
+        interval: (row.interval as string | null) ?? undefined,
+        equipment: row.equipment == null ? undefined : safeJson(row.equipment, []),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    case 'runSwimmers':
+      return {
+        id: row.id,
+        runId: row.run_id,
+        swimmerId: row.swimmer_id,
+        lane: row.lane,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    case 'laps':
+      return {
+        id: row.id,
+        runDrillId: row.run_drill_id,
+        swimmerId: row.swimmer_id,
+        time: row.time,
+        strokeCount: row.stroke_count,
+        effort: row.effort,
+        notes: row.notes,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }
+    case 'laneDrillResults':
+      return {
+        id: row.id,
+        runId: row.run_id,
+        groupId: row.group_id,
+        lane: row.lane,
+        runDrillId: row.run_drill_id,
+        completed: row.completed,
+        data: row.data == null ? null : JSON.stringify(row.data),
         updatedAt: row.updated_at,
       }
   }
@@ -355,6 +486,11 @@ export class SupabaseSyncTransport implements SyncTransport {
       sessions: cursors.sessions ?? MIN_CURSOR,
       drills: cursors.drills ?? MIN_CURSOR,
       libraryDrills: cursors.libraryDrills ?? MIN_CURSOR,
+      sessionRuns: cursors.sessionRuns ?? MIN_CURSOR,
+      runDrills: cursors.runDrills ?? MIN_CURSOR,
+      runSwimmers: cursors.runSwimmers ?? MIN_CURSOR,
+      laps: cursors.laps ?? MIN_CURSOR,
+      laneDrillResults: cursors.laneDrillResults ?? MIN_CURSOR,
     }
     for (const table of SYNC_TABLES) {
       const cursor = nextCursors[table]

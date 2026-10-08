@@ -14,6 +14,8 @@ import { readFileSync } from 'node:fs'
 
 const SRC = new URL('../client/src/sync/SupabaseSyncTransport.ts', import.meta.url)
 const src = readFileSync(SRC, 'utf8')
+const TYPES = new URL('../client/src/sync/types.ts', import.meta.url)
+const types = readFileSync(TYPES, 'utf8')
 
 const fail = (msg) => {
   console.error(`❌ ${msg}`)
@@ -23,23 +25,29 @@ const fail = (msg) => {
 const declared = src.match(/const SYNC_TABLES: SyncTable\[\] = \[([^\]]+)\]/)
 if (!declared) fail('could not find SYNC_TABLES in SupabaseSyncTransport.ts')
 
+const historyDeclared = types.match(/export const HISTORY_TABLES: SyncTable\[\] = \[([^\]]+)\]/)
+if (!historyDeclared) fail('could not find HISTORY_TABLES in sync/types.ts')
+
 const mappedBlock = src.match(/const CLOUD_TABLE: Record<SyncTable, string> = \{([^}]+)\}/)
 if (!mappedBlock) fail('could not find CLOUD_TABLE mapping in SupabaseSyncTransport.ts')
 
 const tables = [...declared[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+const historyTables = [...historyDeclared[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+const expectedTables = [...new Set([...tables, ...historyTables])]
 const mapped = Object.fromEntries(
   [...mappedBlock[1].matchAll(/(\w+):\s*'([^']+)'/g)].map((m) => [m[1], m[2]]),
 )
 
 console.log(`SYNC_TABLES: ${tables.join(', ')}`)
+console.log(`HISTORY_TABLES: ${historyTables.join(', ')}`)
 
 // 1. every declared table is mapped
-for (const t of tables) {
+for (const t of expectedTables) {
   if (!(t in mapped)) fail(`table '${t}' has no entry in CLOUD_TABLE`)
 }
 // 2. no stale entries
 for (const k of Object.keys(mapped)) {
-  if (!tables.includes(k)) fail(`CLOUD_TABLE has '${k}' but SYNC_TABLES does not`)
+  if (!expectedTables.includes(k)) fail(`CLOUD_TABLE has stale entry '${k}'`)
 }
 // 3. a name that equals the local name is fine; a difference must be snake_case
 //    (Postgres convention) so an accidental mismatch is obvious.
@@ -52,8 +60,8 @@ for (const [local, cloud] of Object.entries(mapped)) {
 if (process.exitCode === 1) process.exit(1)
 
 console.log(
-  `✅ CLOUD_TABLE covers all ${tables.length} table(s): ` +
-    tables.map((t) => `${t}→${mapped[t]}`).join('  '),
+  `✅ CLOUD_TABLE covers all ${expectedTables.length} table(s): ` +
+    expectedTables.map((t) => `${t}→${mapped[t]}`).join('  '),
 )
 
 // 4. optional: verify each mapped name exists in a real database

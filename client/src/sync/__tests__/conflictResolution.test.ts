@@ -24,7 +24,7 @@ function fakeTransport(opts: { pushed?: number } = {}): SyncTransport & { upsert
         })),
       }
     },
-    pull: async () => ({ changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' } }),
+    pull: async () => ({ changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' } }),
   }
   void opts
   return transport
@@ -93,7 +93,7 @@ describe('conflict resolution', () => {
     const transport: SyncTransport = {
       ensurePersonalOrganization: async () => 'org-A',
       push: async () => { throw new Error('conflict retry failed') },
-      pull: async () => ({ changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' } }),
+      pull: async () => ({ changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' } }),
     }
 
     await resolveConflict('org-A:swimmers:s1', 'local', transport)

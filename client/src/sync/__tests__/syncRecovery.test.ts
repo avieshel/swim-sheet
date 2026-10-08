@@ -24,7 +24,7 @@ function retryingTransport(): SyncTransport {
     push: async () => ({ conflicts: [], applied: [] }),
     pull: async () => ({
       changes: [],
-      nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' },
+      nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' },
     }),
   }
 }
@@ -65,7 +65,7 @@ describe('sync recovery', () => {
       push: async () => ({ conflicts: [], applied: [] }),
       pull: async () => ({
         changes: [],
-        nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' },
+        nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' },
       }),
     }
     syncService.init(transport, { autoSync: false })
@@ -87,7 +87,7 @@ describe('sync recovery', () => {
       push: async () => ({ conflicts: [], applied: [] }),
       pull: async () => ({
         changes: [],
-        nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' },
+        nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' },
       }),
     }
     syncService.init(transport, { autoSync: false })

@@ -162,7 +162,7 @@ export interface LibraryDrill {
 export interface SyncMetaRow {
   key: string
   orgId: string
-  table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills'
+  table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills' | 'sessionRuns' | 'runDrills' | 'runSwimmers' | 'laps' | 'laneDrillResults'
   rowId: string
   catalogKey?: string
   rev: string | null
@@ -176,7 +176,7 @@ export interface SyncMetaRow {
 export interface SyncCursorRow {
   key: string
   orgId: string
-  table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills'
+  table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills' | 'sessionRuns' | 'runDrills' | 'runSwimmers' | 'laps' | 'laneDrillResults'
   updatedAt: string
 }
 

@@ -13,6 +13,11 @@ const SYNC_ORDER: Record<SyncTable, number> = {
   sessions: 1,
   drills: 2,
   libraryDrills: 3,
+  sessionRuns: 4,
+  runDrills: 5,
+  runSwimmers: 6,
+  laps: 7,
+  laneDrillResults: 8,
 }
 
 // Guard so that writing rows we just pulled from the cloud does not re-enqueue

@@ -14,6 +14,7 @@ import {
   setCursor,
   readSyncState,
 } from './syncStore'
+import { HISTORY_TABLES } from './types'
 import type {
   SyncTable,
   SyncTransport,
@@ -26,7 +27,7 @@ import type {
   CloudChange,
 } from './types'
 
-const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
+const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills', ...HISTORY_TABLES]
 const POLL_INTERVAL_MS = 60000
 const DEBOUNCE_MS = 1000
 
@@ -58,7 +59,17 @@ function localTable(table: SyncTable): Table<Record<string, unknown>, string> {
 }
 
 function emptyCursors(): Record<SyncTable, string | null> {
-  return { swimmers: null, sessions: null, drills: null, libraryDrills: null }
+  return {
+    swimmers: null,
+    sessions: null,
+    drills: null,
+    libraryDrills: null,
+    sessionRuns: null,
+    runDrills: null,
+    runSwimmers: null,
+    laps: null,
+    laneDrillResults: null,
+  }
 }
 
 class SyncService {
@@ -557,6 +568,11 @@ class SyncService {
       sessions: await getCursor(orgId, 'sessions'),
       drills: await getCursor(orgId, 'drills'),
       libraryDrills: await getCursor(orgId, 'libraryDrills'),
+      sessionRuns: await getCursor(orgId, 'sessionRuns'),
+      runDrills: await getCursor(orgId, 'runDrills'),
+      runSwimmers: await getCursor(orgId, 'runSwimmers'),
+      laps: await getCursor(orgId, 'laps'),
+      laneDrillResults: await getCursor(orgId, 'laneDrillResults'),
     }
   }
 }

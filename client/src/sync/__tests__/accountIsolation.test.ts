@@ -26,7 +26,7 @@ function fakeTransport(opts: { pushed?: number } = {}): SyncTransport & { upsert
     },
     pull: async () => ({
       changes: [],
-      nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' },
+      nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' },
     }),
   } as SyncTransport & { upserted: Array<Record<string, unknown>> }
   void opts

@@ -27,7 +27,7 @@ function fakeTransport(opts: { throwOn?: 'push' | 'pull' } = {}): SyncTransport 
     },
     pull: async () => {
       if (opts.throwOn === 'pull') throw new Error('network down')
-      return { changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '' } }
+      return { changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' } }
     },
   } as SyncTransport & { upserted: Array<Record<string, unknown>> }
   return transport

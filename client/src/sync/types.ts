@@ -1,4 +1,21 @@
-export type SyncTable = 'swimmers' | 'sessions' | 'drills' | 'libraryDrills'
+export type SyncTable =
+  | 'swimmers'
+  | 'sessions'
+  | 'drills'
+  | 'libraryDrills'
+  | 'sessionRuns'
+  | 'runDrills'
+  | 'runSwimmers'
+  | 'laps'
+  | 'laneDrillResults'
+
+export const HISTORY_TABLES: SyncTable[] = [
+  'sessionRuns',
+  'runDrills',
+  'runSwimmers',
+  'laps',
+  'laneDrillResults',
+]
 
 type SyncOp = 'upsert' | 'delete'
 
