@@ -6,13 +6,16 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ## Known Issues
 
-- **Offline edit recorded as a conflict on reconnect** — [#11](https://github.com/avieshel/dev/swim-sheet/issues/11).
-  An edit made offline is recorded as a `conflict` instead of being pushed once
-  connectivity returns, so the cloud never receives it and the user is asked to
-  resolve a conflict that never happened. Every other scenario in
-  `tests/sync-cross-device.spec.ts` passes. Narrowed to
-  `SupabaseSyncTransport.pushOne()` misclassifying an aborted write as a rejected
-  one; the issue carries the evidence and the ruled-out causes.
+- **Sync is verified only against local Docker, never against hosted** — the
+  gap that let `libraryDrills` ship broken (PostgREST 404 for the camelCase name
+  while local tests stayed green). Hosted has one Google-authenticated user and no
+  password-grant test user, so `tests/sync-cross-device.spec.ts` cannot run there
+  yet. Until a hosted two-device run passes, treat cross-device sync as unproven
+  in production and do not rely on it for real coaching data.
+
+- **`tests/sync-cross-device.spec.ts` still fails, later than it used to** — the
+  first-merge, download, propagation and stale-edit-conflict scenarios pass; the
+  remaining failure is at the offline-edit propagation assertion.
 
 ---
 
