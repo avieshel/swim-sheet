@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { describe, beforeEach, afterEach, test, expect } from 'vitest'
+import { describe, beforeEach, afterEach, test, expect, vi } from 'vitest'
 import { db } from '../../db/schema'
 import { markDirty, readSyncState } from '../syncStore'
 import { syncService } from '../syncService'
@@ -52,6 +52,22 @@ async function saveSwimmerWhileSyncing(transport: SyncTransport): Promise<void> 
   await syncService.syncNow()
 }
 
+const mockTrack = vi.hoisted(() => vi.fn())
+
+vi.mock('../../services/analyticsEvents', () => ({
+  analytics: { track: mockTrack },
+  Events: {
+    SyncError: (stats: Record<string, unknown>) => ({ name: 'sync_error', properties: stats }),
+  },
+}))
+
+function syncErrorEvents(): Array<Record<string, unknown>> {
+  return mockTrack.mock.calls
+    .map(([event]) => event as { name: string; properties?: Record<string, unknown> })
+    .filter(event => event.name === 'sync_error')
+    .map(event => event.properties ?? {})
+}
+
 describe('failure containment', () => {
   beforeEach(async () => {
     await db.open()
@@ -59,6 +75,7 @@ describe('failure containment', () => {
       await db.swimmers.clear()
       await db._sync_meta.clear()
     })
+    mockTrack.mockClear()
   })
 
   afterEach(() => {
@@ -86,6 +103,32 @@ describe('failure containment', () => {
 
     expect(okTransport.upserted.some((r) => r.id === 's1')).toBe(true)
     expect((await readSyncState('org-A')).pendingCount).toBe(0)
+  })
+
+  test('reports a sync_error event once per failure, not once per retry', async () => {
+    const failing = fakeTransport({ throwOn: 'push' })
+    syncService.init(failing, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+
+    await syncService.syncNow()
+    expect(syncErrorEvents()).toHaveLength(1)
+
+    // A conflict never clears itself, so the 60s poll keeps failing. Without a
+    // transition guard each attempt would emit an identical event forever.
+    await syncService.syncNow()
+    await syncService.syncNow()
+    expect(syncErrorEvents()).toHaveLength(1)
+
+    const recovered = fakeTransport()
+    syncService.init(recovered, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+    await syncService.syncNow()
+    expect(syncService.getState().error).toBeNull()
+
+    syncService.init(failing, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+    await syncService.syncNow()
+    expect(syncErrorEvents()).toHaveLength(2)
   })
 
   test('pull failure does not corrupt local data and is resumable', async () => {

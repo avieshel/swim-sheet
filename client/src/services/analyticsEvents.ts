@@ -169,6 +169,27 @@ export const Events = {
     name: 'lap_recorded',
     properties: { lane, swimmer_count: swimmerCount },
   }),
+  // Fires once per sync failure, on the transition into the error phase (not on
+  // every retry) so a persistently failing device cannot flood the queue. The
+  // table/row identity is deliberately absent: it churns as tables are added and
+  // a row UUID identifies nothing in aggregate. Per-collision events carry those
+  // separately when that detail is needed.
+  SyncError: (stats: {
+    kind: string
+    message: string
+    phase: string
+    conflictCount: number
+    pendingCount: number
+  }): TrackedEvent => ({
+    name: 'sync_error',
+    properties: {
+      kind: stats.kind,
+      message: stats.message,
+      phase: stats.phase,
+      conflict_count: stats.conflictCount,
+      pending_count: stats.pendingCount,
+    },
+  }),
   AppSettings: (
     action:
       | 'sign_in'

@@ -16,6 +16,7 @@ import {
   readSyncState,
 } from './syncStore'
 import { HISTORY_TABLES } from './types'
+import { analytics, Events } from '../services/analyticsEvents'
 import type {
   SyncTable,
   SyncTransport,
@@ -88,6 +89,7 @@ class SyncService {
   private listeners = new Set<(s: SyncState) => void>()
   private firstMergeSummary: FirstMergeSummary | null = null
   private needsFirstMergeConfirmation = false
+  private errorReported = false
 
   private state: SyncState = {
     signedIn: false,
@@ -306,6 +308,11 @@ class SyncService {
     })
   }
 
+  // The app seeds builtin drills and the default session template before sign-in
+  // (see seedLibraryDrills / seedDefaultSessions), so a freshly installed device
+  // always holds rows. Counting them means every second device is asked to review
+  // a merge it has no stake in, and syncNow stays blocked until it answers. Only
+  // ask when there is something to lose.
   private async hasLocalRows(): Promise<boolean> {
     for (const table of CORE_SYNC_TABLES) {
       if ((await localTable(table).count()) > 0) return true
@@ -583,6 +590,7 @@ class SyncService {
       await applyRemoteChanges(pullRes.changes, orgId)
       for (const table of SYNC_TABLES) await setCursor(orgId, table, pullRes.nextCursors[table])
       this.lastSyncAt = new Date().toISOString()
+      this.errorReported = false
       this.state = { ...this.state, lastSyncAt: this.lastSyncAt, error: null }
       this.setPhase('ready')
       const result: SyncResult = { pushed, pulled: pullRes.changes.length, conflicts }
@@ -606,6 +614,7 @@ class SyncService {
     this.currentOrgId = null
     this.needsFirstMergeConfirmation = false
     this.firstMergeSummary = null
+    this.errorReported = false
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null
@@ -635,6 +644,7 @@ class SyncService {
 
   dismissError(): void {
     if (!this.state.error) return
+    this.errorReported = false
     this.state = {
       ...this.state,
       error: null,
@@ -679,8 +689,26 @@ class SyncService {
   private recordError(e: unknown): SyncError {
     const error = classifyError(e)
     this.state = { ...this.state, error, phase: 'error' }
+    this.reportErrorOnce(error)
     this.notify()
     return error
+  }
+
+  // A conflicted or unreachable sync keeps failing on every poll, so emitting
+  // from the failure path alone would enqueue an identical event indefinitely
+  // and push real events out of the bounded queue. Track whether the current
+  // unresolved failure has been reported and emit only on the transition; the
+  // flag clears when a sync succeeds or the user dismisses the error.
+  private reportErrorOnce(error: SyncError): void {
+    if (this.errorReported) return
+    this.errorReported = true
+    analytics.track(Events.SyncError({
+      kind: error.kind,
+      message: error.message,
+      phase: this.state.phase,
+      conflictCount: this.state.conflicts.length,
+      pendingCount: this.state.pendingCount,
+    }))
   }
 
   private async readCursors(orgId: string): Promise<Record<SyncTable, string | null>> {
