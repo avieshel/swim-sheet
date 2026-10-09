@@ -230,6 +230,7 @@ export const runService = {
 
     const runId = await addSessionRun({
       sessionId,
+      sessionName: session.name,
       date: runData.date,
       poolName: runData.poolName,
       poolLength,

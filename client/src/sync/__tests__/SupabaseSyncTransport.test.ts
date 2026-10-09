@@ -401,4 +401,34 @@ describe('SupabaseSyncTransport.pull history', () => {
 
     expect(result.changes).toMatchObject([{ table: 'sessionRuns', id: 'run-1', op: 'delete', updatedAt: 'rev-2', deletedAt: 'deleted' }])
   })
+
+  // A run renders its template name from a live lookup of `sessions`. That join
+  // is the reason history collapses to "Deleted template", and it is the only
+  // join left in the run read path.
+  test('preserves a session pool length across the round trip', () => {
+    const change: LocalChange = {
+      table: 'sessions', id: 's1', op: 'upsert', rev: null,
+      payload: {
+        id: 's1', name: 'Squad Plan', poolLength: 50, notes: '', visibility: 'private',
+        createdAt: 't', updatedAt: 't',
+      },
+    }
+    const row = toCloudRow('sessions', change, 'org-A', 'u1')
+    expect(row.pool_length).toBe(50)
+    expect(fromCloudRow('sessions', row)).toMatchObject({ poolLength: 50 })
+  })
+
+  test('round-trips the frozen template name a run carries', () => {
+    const change: LocalChange = {
+      table: 'sessionRuns', id: 'r1', op: 'upsert', rev: null,
+      payload: {
+        id: 'r1', sessionId: 's1', sessionName: 'Squad Plan', date: '2026-10-08',
+        poolName: 'North', poolLength: 25, notes: '', status: 'completed',
+        sessionStartedAt: 1, sessionPausedAt: null, sessionPauseDuration: 0,
+        createdAt: 't', updatedAt: 't',
+      },
+    }
+    const row = toCloudRow('sessionRuns', change, 'org-A', 'u1')
+    expect(fromCloudRow('sessionRuns', row)).toMatchObject({ sessionName: 'Squad Plan' })
+  })
 })

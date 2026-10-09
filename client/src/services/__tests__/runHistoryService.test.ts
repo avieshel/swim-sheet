@@ -60,6 +60,51 @@ describe('runHistoryService', () => {
     expect(result).toEqual({ runs: [], totalRuns: 0 })
   })
 
+  it('shows the frozen name after the template is deleted', async () => {
+    mockDao.getCompletedRuns.mockResolvedValue([makeRun({ sessionName: 'Tuesday Endurance' })])
+    mockDao.getRunDrillsForRun.mockResolvedValue([])
+    mockDao.getRunSwimmersForRun.mockResolvedValue([])
+    mockDao.getSwimmersForRun.mockResolvedValue([])
+    mockDao.getLaneDrillResults.mockResolvedValue([])
+    mockDao.getLapsForRun.mockResolvedValue([])
+    mockDao.getSession.mockResolvedValue(undefined)
+
+    const { runs } = await getRunHistory()
+
+    expect(runs[0].templateName).toBe('Tuesday Endurance')
+    // And it must not have touched the template table at all.
+    expect(mockDao.getSession).not.toHaveBeenCalled()
+  })
+
+  it('keeps the frozen name when the template is later renamed', async () => {
+    mockDao.getCompletedRuns.mockResolvedValue([makeRun({ sessionName: 'Tuesday Endurance' })])
+    mockDao.getRunDrillsForRun.mockResolvedValue([])
+    mockDao.getRunSwimmersForRun.mockResolvedValue([])
+    mockDao.getSwimmersForRun.mockResolvedValue([])
+    mockDao.getLaneDrillResults.mockResolvedValue([])
+    mockDao.getLapsForRun.mockResolvedValue([])
+    mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Renamed Plan', notes: '', createdAt: '', updatedAt: '' })
+
+    const { runs } = await getRunHistory()
+
+    expect(runs[0].templateName).toBe('Tuesday Endurance')
+  })
+
+  it('falls back to the live template for runs with no snapshot', async () => {
+    mockDao.getCompletedRuns.mockResolvedValue([makeRun()])
+    mockDao.getRunDrillsForRun.mockResolvedValue([])
+    mockDao.getRunSwimmersForRun.mockResolvedValue([])
+    mockDao.getSwimmersForRun.mockResolvedValue([])
+    mockDao.getLaneDrillResults.mockResolvedValue([])
+    mockDao.getLapsForRun.mockResolvedValue([])
+
+    const { runs } = await getRunHistory()
+
+    // Pre-snapshot history still renders, it just costs the one join.
+    expect(runs[0].templateName).toBe('Tuesday Endurance')
+    expect(mockDao.getSession).toHaveBeenCalledExactlyOnceWith('s1')
+  })
+
   it('builds a summary with real swimmers and blob timing', async () => {
     mockDao.getCompletedRuns.mockResolvedValue([makeRun()])
     mockDao.getRunDrillsForRun.mockResolvedValue([

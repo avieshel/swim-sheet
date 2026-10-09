@@ -97,8 +97,9 @@ function toSummary(acc: SwimmerAccum, runDrillIds: Set<string>, runDrillOrder: M
 }
 
 async function buildRunSummary(run: SessionRun, targetName: string | null): Promise<RunSummary> {
-  const [session, runDrills, links, runSwimmers, laneResults, laps] = await Promise.all([
-    getSession(run.sessionId),
+  // `session` is only consulted for pre-snapshot runs; new runs carry the name.
+  const session = run.sessionName ? undefined : await getSession(run.sessionId)
+  const [runDrills, links, runSwimmers, laneResults, laps] = await Promise.all([
     getRunDrillsForRun(run.id),
     getRunSwimmersForRun(run.id),
     getSwimmersForRun(run.id),
@@ -209,7 +210,9 @@ async function buildRunSummary(run: SessionRun, targetName: string | null): Prom
   return {
     runId: run.id,
     sessionId: run.sessionId,
-    templateName: session?.name ?? 'Deleted template',
+    // Prefer the frozen snapshot; fall back to the live template only for runs
+    // recorded before the snapshot existed.
+    templateName: run.sessionName ?? session?.name ?? 'Deleted template',
     date: run.date,
     startedAtMs: run.sessionStartedAt,
     poolName: run.poolName,

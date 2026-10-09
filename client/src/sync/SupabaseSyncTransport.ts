@@ -88,6 +88,7 @@ export function toCloudRow(
         ...base,
         assigned_to: p.assignedTo ?? null,
         name: p.name,
+        pool_length: p.poolLength,
         notes: p.notes,
         visibility: p.visibility,
         catalog_key: p.catalogKey ?? null,
@@ -133,6 +134,7 @@ export function toCloudRow(
       return {
         ...base,
         session_id: p.sessionId,
+        session_name: p.sessionName ?? null,
         date: p.date,
         pool_name: p.poolName,
         pool_length: p.poolLength,
@@ -213,6 +215,7 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
         id: row.id,
         assignedTo: row.assigned_to,
         name: row.name,
+        poolLength: row.pool_length,
         notes: row.notes,
         visibility: row.visibility,
         catalogKey: (row.catalog_key as string) ?? undefined,
@@ -258,6 +261,7 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
       return {
         id: row.id,
         sessionId: row.session_id,
+        sessionName: (row.session_name as string | null) ?? undefined,
         date: row.date,
         poolName: row.pool_name,
         poolLength: row.pool_length,

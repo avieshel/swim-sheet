@@ -61,6 +61,10 @@ export interface Drill {
 export interface SessionRun {
   id: string
   sessionId: string
+  // Frozen at run start, never refreshed. History must survive the template
+  // being renamed or deleted, so the run carries its own copy rather than
+  // joining to `sessions` at read time.
+  sessionName?: string
   date: string
   poolName: string
   poolLength: number

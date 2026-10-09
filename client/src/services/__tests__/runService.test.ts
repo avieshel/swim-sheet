@@ -415,6 +415,20 @@ describe('runService', () => {
       await expect(runService.createFromTemplate('s1', runData)).rejects.toThrow('Session template not found')
     })
 
+    it('freezes the template name onto the run', async () => {
+      mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Squad Plan' })
+      mockDao.getDrillsForSession.mockResolvedValue([])
+      mockDao.addSessionRun.mockResolvedValue('new-run-id')
+
+      await runService.createFromTemplate('s1', runData)
+
+      // Snapshot, not a reference: the template may be renamed or deleted later
+      // and history must keep showing what the coach actually ran.
+      expect(mockDao.addSessionRun).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ sessionId: 's1', sessionName: 'Squad Plan' })
+      )
+    })
+
     it('creates a run with continuous drill', async () => {
       mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Session' })
       mockDao.getDrillsForSession.mockResolvedValue([
