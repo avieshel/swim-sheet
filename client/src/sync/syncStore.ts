@@ -163,21 +163,40 @@ export async function getPendingChanges(orgId: string): Promise<LocalChange[]> {
   return changes
 }
 
+// Each table commits in its own transaction, so a row the local schema rejects
+// (a duplicate unique-index value, a malformed payload) discards only itself.
+// A single transaction spanning every table would roll back the whole pull and
+// leave unrelated data permanently unsynced behind one bad row.
 export async function applyRemoteChanges(changes: CloudChange[], orgId: string): Promise<void> {
   isApplyingRemote = true
   try {
-    const tables = Array.from(new Set(changes.map(c => c.table)))
-    await db.transaction('rw', [...tables, '_sync_meta'], async () => {
-      for (const c of changes) {
-        if (c.op === 'delete' || c.deletedAt) {
-          await syncTable(c.table).delete(c.id)
-          await setMetaSynced(c.table, c.id, orgId, c.updatedAt, true)
-        } else {
-          await syncTable(c.table).put({ ...c.payload, id: c.id })
-          await setMetaSynced(c.table, c.id, orgId, c.updatedAt, false)
-        }
+    const byTable = new Map<SyncTable, CloudChange[]>()
+    for (const change of changes) {
+      const existing = byTable.get(change.table)
+      if (existing) existing.push(change)
+      else byTable.set(change.table, [change])
+    }
+    const failures: unknown[] = []
+    for (const [table, tableChanges] of byTable) {
+      try {
+        await db.transaction('rw', [syncTable(table), db._sync_meta], async () => {
+          for (const c of tableChanges) {
+            if (c.op === 'delete' || c.deletedAt) {
+              await syncTable(c.table).delete(c.id)
+              await setMetaSynced(c.table, c.id, orgId, c.updatedAt, true)
+            } else {
+              await syncTable(c.table).put({ ...c.payload, id: c.id })
+              await setMetaSynced(c.table, c.id, orgId, c.updatedAt, false)
+            }
+          }
+        })
+      } catch (e) {
+        failures.push(e)
       }
-    })
+    }
+    // Surface the first failure so the caller still reports phase 'error' and the
+    // tables that did commit are not retried into a conflict on the next pass.
+    if (failures.length > 0) throw failures[0]
   } finally {
     isApplyingRemote = false
   }

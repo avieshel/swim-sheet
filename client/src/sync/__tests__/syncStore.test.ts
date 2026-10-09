@@ -170,6 +170,30 @@ describe('syncStore', () => {
     expect(await getPendingChanges('org-A')).toHaveLength(0)
   })
 
+  test('a rejected row does not roll back other tables in the same pull', async () => {
+    // swimmers carries a unique name index, so a remote row whose name already
+    // exists locally under a different id is rejected by IndexedDB.
+    await db.swimmers.add({ id: 'local-sam', name: 'Sam', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't' })
+
+    await expect(applyRemoteChanges([
+      {
+        table: 'swimmers', id: 'remote-sam', op: 'upsert',
+        payload: { id: 'remote-sam', name: 'Sam', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't2' },
+        updatedAt: 't2', deletedAt: null,
+      },
+      {
+        table: 'sessions', id: 'remote-session', op: 'upsert',
+        payload: { id: 'remote-session', name: 'Cloud Session', notes: '', visibility: 'private', createdAt: 't', updatedAt: 't2' },
+        updatedAt: 't2', deletedAt: null,
+      },
+    ], 'org-A')).rejects.toBeTruthy()
+
+    // The healthy table committed; only the rejected row was discarded.
+    expect((await db.sessions.get('remote-session'))?.name).toBe('Cloud Session')
+    expect(await db.swimmers.get('remote-sam')).toBeUndefined()
+    expect(await db.swimmers.get('local-sam')).toBeTruthy()
+  })
+
   test('applyRemote does not re-enqueue a change', async () => {
     const changes = [{
       table: 'swimmers' as const,
