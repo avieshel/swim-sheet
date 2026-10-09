@@ -42,6 +42,7 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 - Hosted database was rebuilt from this baseline on 2026-10-07: `public` dropped and replayed, `auth` users/OAuth config/API keys/project ref untouched.
 - `20261007000000_sync_foundation.sql` was applied to hosted on 2026-10-08 via `supabase db push --linked`, so `schema_migrations` records **2** entries. It is additive and idempotent (`add column if not exists`, `create unique index if not exists`, `create or replace function`) and changed neither the 17-table nor the 48-policy count.
 - `20261008000001_completed_history_sync.sql` adds the RLS-protected `lane_drill_results` cloud table and is applied to **both** local and hosted (`npm run db:push` on 2026-10-08), so hosted now has 18 tables / 52 policies / 4 recorded migrations and all `verify-hosted.sh` checks pass. Deploying this client *before* that push failed every pull with `PGRST205: Could not find the table 'public.lane_drill_results'` — the migration-ordering rule below is why the schema has to land first. Hosted two-device verification remains outstanding.
+- `20261009000000_run_template_name_snapshot.sql` adds `session_runs.session_name` and backfills from surviving templates. Applied to **both** local (`db reset`) and hosted (`supabase db push --linked`) on 2026-10-09 — hosted is now at 5 recorded migrations, still 18 tables / 52 policies, and `verify-hosted.sh` passes.
 - **Migration ordering rule:** apply schema *before* merging the code that needs it, because `main` merges trigger the Cloudflare Pages deploy. Nothing in CI runs migrations, so an unapplied migration is otherwise only discovered at runtime.
 - **Never edit an applied migration to make hosted match.** `20261005001000` is already in hosted's `schema_migrations`, so `db push` skips it — the hardened baseline reached hosted by the 2026-10-07 manual replay, not by recorded history. This divergence is permanent and deliberate: the file is the source of truth for *fresh* environments (local `db reset`, new projects), while hosted reached the same state out-of-band.
 
@@ -50,6 +51,27 @@ One tenant abstraction supports all three confirmed coaching patterns without a 
 - `SessionRun` snapshots drills into `RunDrill` records when a session starts
 - Historical runs are never corrupted by template edits
 - `RunSwimmer` links swimmers to a run (replaces the old `SessionSwimmer` join table)
+
+**Snapshot rule (no joins on big tables).** A run must render from its own
+columns, never by joining back to `sessions`. `SessionRun.sessionName` is frozen
+at run start and **never refreshed** — renaming a template does not rewrite
+history. This is why deleting a template no longer collapses historical runs to
+"Deleted template". `RunDrill` (name/stroke/distance) and
+`LaneDrillResult.data` (swimmer `dbId` + `name`) follow the same rule.
+
+Generalised as a project guideline: **joins are permitted only onto small,
+bounded tables** (equipment options, settings, permission catalogs). Any join in
+the read path onto a table that grows with usage — `sessions`, `session_runs`,
+`run_drills`, `laps`, `swimmers`, `lane_drill_results` — is a code smell and
+should be flagged in review. Denormalise into a frozen snapshot at write time
+instead. The only remaining join in the run read path is the legacy fallback in
+`buildRunSummary` for runs recorded before `sessionName` existed; it is skipped
+whenever the snapshot is present.
+
+Migration `20261009000000_run_template_name_snapshot.sql` adds
+`session_runs.session_name` and backfills existing rows from the template where
+it still exists. Runs whose template is already deleted stay `NULL` and keep the
+legacy fallback.
 
 ### Timed Groups persist in LaneDrillResult
 - Timing data is stored as a JSON blob in the `LaneDrillResult` table
@@ -168,6 +190,7 @@ A single execution of a Session template.
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
 | `sessionId` | `session_id` | string/TEXT | FK → Session |
+| `sessionName` | `session_name` | string/TEXT \| null | **Frozen** template name, written once at run start |
 | `date` | `date` | string/TEXT | Run date |
 | `poolName` | `pool_name` | string/TEXT | Pool name/location |
 | `poolLength` | `pool_length` | number/INTEGER | Overridable from template |

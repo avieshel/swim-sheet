@@ -6,6 +6,31 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ## Known Issues
 
+- **Cross-device pull has no trigger on an idle device — needs its own issue.**
+  `tests/sync-cross-device.spec.ts:197` fails, but it is *not* an offline-recovery
+  bug despite the old note saying so. Measured with a throwaway diagnostic against
+  local Supabase: device 1's offline edit *does* reach the cloud, while device 2's
+  `_sync_cursor` stays frozen at its boot value. Device 2 makes no local writes
+  (so no debounced sync), never goes offline (so no `online` event), and the only
+  passive trigger is `setInterval(POLL_INTERVAL_MS = 60000)` — which cannot fire
+  inside the test's 30s assertion window. Raising the timeout to 100s still fails.
+  Two separable pieces: (a) the E2E asserts a propagation latency the app never
+  promised and should click "Sync now" on device 2; (b) a genuine product gap —
+  the poll is gated on `!document.hidden`, so a **backgrounded tab never syncs at
+  all** (`syncService.ts:126`). A `visibilitychange` → `syncNow` trigger, matching
+  the existing `online` listener, would close it.
+
+- **Name collisions on `swimmers` are contained but not recoverable.** Same name
+  entered independently on two devices before either synced yields two UUIDs;
+  Postgres has **no** unique index on `swimmers.name` (the only
+  `unique (organization_id, name)` is on `organization_roles`), but Dexie has
+  `&name`, so the pull throws a `ConstraintError`. `applyRemoteChanges` now commits
+  **per table**, so the rejected row no longer rolls back sessions/drills/runs —
+  everything else syncs and one `sync_error` event is emitted. The duplicate row
+  itself stays pending forever and needs manual cleanup, or a future "Skip"
+  action. Note "Dan" / "dan" passes all three layers and produces a silent roster
+  duplicate.
+
 - **Cross-device sync is still unverified against hosted Supabase.** The client
   includes completed run history (including timing snapshots), and
   `20261008000001_completed_history_sync.sql` **is** now applied to hosted — but
@@ -13,12 +38,21 @@ Remaining application-level work items. These should be converted to GitHub issu
   `PGRST205: Could not find the table 'public.lane_drill_results'` until the
   migration was pushed. Hosted has one Google-authenticated user and no
   password-grant test user, so `tests/sync-cross-device.spec.ts` cannot run there
-  yet. Treat cross-device sync as unproven in production until hosted two-device
-  verification passes.
+  yet. It now passes through first-merge, clean-device download and edit
+  propagation against **local** Supabase, but treat hosted cross-device sync as
+  unproven until it is verified there too.
 
-- **`tests/sync-cross-device.spec.ts` still fails, later than it used to** — the
-  first-merge, download, propagation and stale-edit-conflict scenarios pass; the
-  remaining failure is at the offline-edit propagation assertion.
+- **`tests/sync-cross-device.spec.ts` still fails** — the first-merge, clean-device
+  download and cross-device edit-propagation scenarios pass against local Supabase;
+  the remaining failure is the idle-device assertion described above. Verified
+  unchanged before and after the first-sync gate fix and the run-snapshot work.
+
+- **`sync-cross-device.spec.ts` is not idempotent.** It reuses a fixed session id
+  and mutates names, so a second run finds leftover rows (`E2E Template v2` where
+  it expects `E2E Template`) and fails confusingly. Run `supabase db reset --local`
+  between attempts. Also, `npx playwright test` from the repo root fails with
+  `MODULE_NOT_FOUND`; use the root script `npm run test:e2e`, which sets
+  `NODE_PATH=./client/node_modules`.
 
 - **Completed-history two-device E2E coverage is deferred** to
   [issue #12](https://github.com/avieshel/swim-sheet/issues/12). Do not repair or
