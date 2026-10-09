@@ -68,8 +68,23 @@ export function getCurrentUser(): User | null {
   return cachedUser
 }
 
+function readPersistedUserId(): string | null {
+  try {
+    const raw = createAuthStorage().getItem(SESSION_STORAGE_KEY)
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return null
+    const user = (parsed as { user?: unknown }).user
+    if (typeof user !== 'object' || user === null) return null
+    const id = (user as { id?: unknown }).id
+    return typeof id === 'string' && id.length > 0 ? id : null
+  } catch {
+    return null
+  }
+}
+
 export function getCurrentUserId(): string | null {
-  return cachedUserId
+  return cachedUserId ?? readPersistedUserId()
 }
 
 export async function testSupabaseConnection(): Promise<boolean> {
