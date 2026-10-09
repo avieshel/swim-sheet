@@ -4,6 +4,8 @@ import { Layout } from './components/Layout'
 import { RouteMeta } from './components/RouteMeta'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { Landing } from './pages/Landing'
+import { Privacy } from './pages/Privacy'
+import { Terms } from './pages/Terms'
 import { SwimmersList } from './pages/SwimmersList'
 import { SwimmerDetail } from './pages/SwimmerDetail'
 import { SessionsList } from './pages/SessionsList'
@@ -34,6 +36,8 @@ function App() {
         <RouteMeta />
         <Routes>
         <Route path="/about" element={<Landing />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<Layout />}>
           <Route path="/" element={<LiveDeck />} />

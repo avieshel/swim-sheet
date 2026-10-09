@@ -5,6 +5,10 @@
 # Unknown paths (bot probes, typos) fall through to a real 404.
 /about  /index.html  200
 /about/*  /index.html  200
+/privacy  /index.html  200
+/privacy/*  /index.html  200
+/terms  /index.html  200
+/terms/*  /index.html  200
 /auth/callback  /index.html  200
 /auth/callback/*  /index.html  200
 /dashboard  /index.html  200

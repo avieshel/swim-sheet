@@ -63,6 +63,10 @@ const faqs = [
     a: 'Yes. Swim Sheet is an offline-first progressive web app. Your sessions, swimmers, and timing data are stored on your device, so you can run a practice even without a pool-side internet connection.',
   },
   {
+    q: 'Where is my coaching data stored?',
+    a: 'On your device, unless you choose to sign in. Without an account nothing is synced — a coach who never signs in has no roster or session data on our servers. Signing in is what enables cross-device sync and backup.',
+  },
+  {
     q: 'What devices does Swim Sheet support?',
     a: 'Swim Sheet runs in any modern browser on phones, tablets, and laptops, and can be installed as a progressive web app on Android and iOS. It is designed portrait-first for use on the pool deck.',
   },
@@ -71,8 +75,16 @@ const faqs = [
     a: 'Yes. The live deck shows an active lane per swimmer, so you can tap each swimmer as they finish a lap while the clock keeps running for everyone.',
   },
   {
+    q: 'Does Swim Sheet ask for swimmer ages or dates of birth?',
+    a: 'No. Swim Sheet never asks for a swimmer’s age or date of birth, and does not store either — the only swimmer fields it records are name, group, notes, and optional labels. Your roster stays on your device unless you sign in, and signing in is what sends your coaching data to our servers. Because we hold no dates of birth, we never determine a swimmer’s age.',
+  },
+  {
+    q: 'Does Swim Sheet replace my own coaching judgement?',
+    a: 'No. Swim Sheet is an optional record-keeping and timing tool. Every session, drill, and distance you enter or follow is your own decision, and you stay fully responsible for the safety and welfare of the swimmers you coach. Swim Sheet provides no coaching, training, or medical advice and takes no responsibility for the training actually conducted or for any injury arising from it.',
+  },
+  {
     q: 'How much does Swim Sheet cost?',
-    a: 'Swim Sheet is free to use. There are no paid tiers or in-app purchases.',
+    a: 'Swim Sheet is free to use today. Some parts of the App may later move behind a paid plan — if that happens you will be told what is charged and what it covers before anything is billed, and anything you already use for free will not be charged retroactively. See the Terms of Service for details.',
   },
 ]
 
@@ -214,6 +226,14 @@ export const Landing: React.FC = () => {
           <span className="text-on-surface-variant font-body-md text-body-md">
             Swim coaching session management &amp; timing
           </span>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-on-surface-variant font-body-md text-body-md">
+            <Link to="/terms" className="no-underline hover:underline">
+              Terms of Service
+            </Link>
+            <Link to="/privacy" className="no-underline hover:underline">
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

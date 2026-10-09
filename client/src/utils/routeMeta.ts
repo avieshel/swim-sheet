@@ -19,15 +19,24 @@ const appMeta = (title: string, description: string): RouteMeta => ({
 const landingMeta: RouteMeta = {
   title: 'Swim Sheet — Swim Coaching Session Management',
   description:
-    'Swim Sheet is a free swim coaching app for building practice plans, running live timing on deck, and tracking swimmers — works offline on any device.',
+    'Swim Sheet is an offline-first swim coaching app for building practice plans, running live timing on deck, and tracking swimmers — works on any device.',
   canonicalPath: '/about',
   index: true,
 }
+
+const legalMeta = (title: string, description: string): RouteMeta => ({
+  title: title + ' | Swim Sheet',
+  description,
+  canonicalPath: '',
+  index: true,
+})
 
 const staticRoutes: Record<string, RouteMeta> = {
   '/': appMeta('Live Deck', 'Live timing deck for running swim practices on deck, lap by lap.'),
   '/live': appMeta('Live Deck', 'Live timing deck for running swim practices on deck, lap by lap.'),
   '/about': landingMeta,
+  '/privacy': legalMeta('Privacy Policy', 'How Swim Sheet collects, uses, stores, and deletes your information.'),
+  '/terms': legalMeta('Terms of Service', 'The terms that govern your use of the Swim Sheet app.'),
   '/auth/callback': appMeta('Signing In', 'Completing sign-in.'),
   '/dashboard': appMeta('Coach Dashboard', 'Overview of recent sessions, runs, and roster activity.'),
   '/swimmers': appMeta('Swimmers', 'Manage your swimmer roster, groups, and notes.'),

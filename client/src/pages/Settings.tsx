@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { getSettings, updateSettings, resetSettings, getEquipmentOptions, setEquipmentOptions, estimateDbSize, cleanupOldData, exportDatabase, importDatabase, getBackupInfo, getStoragePersistence, requestStoragePersistence, DEFAULT_EQUIPMENT } from '../api/settings'
 import { getAppVersion } from '../utils/version'
 import { downloadBlob } from '../utils/downloadBlob'
@@ -848,6 +848,17 @@ export const Settings: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="font-label-sm text-on-surface">Built</span>
             <span className="font-body-md text-on-surface-variant">{getAppVersion().built.replace('T', ' ').replace(/\.\d+Z/, '')} UTC</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="font-label-sm text-on-surface">Legal</span>
+            <span className="font-body-md text-on-surface-variant flex flex-wrap justify-end gap-x-4 gap-y-1">
+              <Link to="/terms" className="text-primary no-underline hover:underline">
+                Terms of Service
+              </Link>
+              <Link to="/privacy" className="text-primary no-underline hover:underline">
+                Privacy Policy
+              </Link>
+            </span>
           </div>
         </div>
       </section>

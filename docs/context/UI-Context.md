@@ -119,6 +119,16 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 - Injects FAQ **JSON-LD** structured data (`FAQPage`) via an inline `<script type="application/ld+json">`.
 - Static copy only — no data-layer imports (pages here must not touch `db/`). Covered by `tests/landing.spec.ts`.
 
+### Privacy (`/privacy`) and Terms (`/terms`)
+- Public legal pages rendered outside `App Shell`, so they carry no app header or bottom navigation.
+- Share `client/src/components/LegalLayout.tsx`, which owns a minimal header (back link → `/about` + "Open app"), the document title, a "Last updated" line, numbered sections with optional bullet lists, and a footer linking to both legal pages. Each page (`client/src/pages/Privacy.tsx`, `client/src/pages/Terms.tsx`) only supplies a `LegalDocument` data object — no JSX.
+- Both are indexable, have canonical URLs of `/privacy` and `/terms`, and appear in `sitemap.xml` and `_redirects`.
+- Linked from the Landing footer and from Settings → App Info.
+- `LegalLayout` supports inline emphasis: `**text**` inside a paragraph or bullet renders as bold.
+- Terms §8 disclaims responsibility for the training actually conducted and for any resulting injury; §9 caps liability and adds an indemnity; §12 sets Israeli governing law and exclusive forum. Both documents identify the operator as an individual developer based in Israel and point to the GitHub repo for contact.
+- Privacy copy makes three claims that must stay true in code, each covered by `tests/landing.spec.ts`: (a) analytics events are recorded **whether or not the user is signed in** — `analyticsService.track()` has no auth gate and inserts with the Supabase anon key, so `user_id` is null but `device_id` and device context are still stored; (b) no swimmer age or DOB is collected or stored — the swimmer model is `name`, `group`, `notes`, `labels` only, and adding a DOB field would create a COPPA determination the app does not currently make; (c) coaching data stays on-device unless the user signs in — sync requires auth (`SupabaseSyncTransport` throws `not authenticated`).
+- Legal docs also have sequential-heading checks on both documents.
+
 ### Auth callback (`/auth/callback`)
 - OAuth handoff screen rendered outside `Layout`, so it has no app header or mobile bottom navigation.
 - Shows a quiet `Signing in…` loading state while auth restoration settles.
@@ -375,6 +385,7 @@ App preferences.
 - Data management: export, import, reset
 - Sync: readiness status (configuration, sign-in, connectivity, initialization, and sync phase), last sync, manual sync trigger, and recoverable errors with Retry/Dismiss actions
 - Data Management → Storage Protection: shows a green check mark + "Protected from automatic eviction" when persistent storage is granted, an info ("i") icon opens an InfoDialog explaining eviction protection, and a "Request protection" button when not granted.
+- App Info: version, commit, and build timestamp, plus a Legal row linking to `/terms` and `/privacy`.
 
 ---
 

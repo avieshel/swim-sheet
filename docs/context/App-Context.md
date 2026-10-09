@@ -122,6 +122,8 @@ SwimSheet/
 |------|------|-------------|
 | `/` | LiveDeck | App home — live picker (no auto-start): pinned "100m freestyle quick time" option + templates ranked by usage; resumes an active run. PWA `start_url` |
 | `/about` | Landing | Public marketing page (hero, features, how-it-works, FAQ + FAQ JSON-LD). Indexable — the only route in `sitemap.xml`. Rendered outside `Layout` |
+| `/privacy` | Privacy | Public Privacy Policy. Indexable. Rendered outside `Layout` |
+| `/terms` | Terms | Public Terms of Service. Indexable. Rendered outside `Layout` |
 | `/live` | LiveDeck | Live session screen (session flows `navigate('/live')` when starting a run); alias of `/` |
 | `/dashboard` | CoachDashboard | Home with hero, hub tiles, stats |
 | `/swimmers` | SwimmersList | Roster grid with search |
@@ -134,7 +136,7 @@ SwimSheet/
 | `/runs` | RunsHistory | Completed run history |
 | `/runs/:id` | RunDetail | Single run results |
 
-**SEO:** `client/src/utils/routeMeta.ts` (pure resolver + unit tests) maps each path to title, description, canonical, and indexability; `client/src/components/RouteMeta.tsx` applies it on navigation. The landing page (`/about`) is indexable; all app routes (including `/`) emit `<meta name="robots" content="noindex, nofollow">` so private screens stay out of search results. `client/public/robots.txt` allows crawling and points at `sitemap.xml` (landing only). Static head meta (description, Open Graph, Twitter, canonical) lives in `client/index.html` and points at `/about`. App routes are wrapped by `Layout` as a pathless layout route (Outlet); `/about` renders outside it. `/about` must be listed in `client/public/_redirects` or Cloudflare Pages returns a real 404.
+**SEO:** `client/src/utils/routeMeta.ts` (pure resolver + unit tests) maps each path to title, description, canonical, and indexability; `client/src/components/RouteMeta.tsx` applies it on navigation. The landing page (`/about`) and the two legal routes (`/privacy`, `/terms`) are indexable; all app routes (including `/`) emit `<meta name="robots" content="noindex, nofollow">` so private screens stay out of search results. `client/public/robots.txt` allows crawling and points at `sitemap.xml` (landing + legal). Static head meta (description, Open Graph, Twitter, canonical) lives in `client/index.html` and points at `/about`. App routes are wrapped by `Layout` as a pathless layout route (Outlet); `/about`, `/privacy`, and `/terms` render outside it. These three paths must be listed in `client/public/_redirects` or Cloudflare Pages returns a real 404.
 
 ## Deployment
 
