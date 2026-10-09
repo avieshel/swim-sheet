@@ -83,6 +83,14 @@ function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push
   return transport
 }
 
+function remoteSession(id: string): CloudChange {
+  return {
+    table: 'sessions', id, op: 'upsert',
+    payload: { id, name: 'Cloud Template', notes: '', visibility: 'private', createdAt: 't', updatedAt: '2026-01-01T00:00:00.000Z' },
+    updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null,
+  }
+}
+
 async function runSyncNow(transport: SyncTransport): Promise<SyncResult> {
   syncService.init(transport, { autoSync: false })
   const seed = async (id: string) => {
@@ -339,6 +347,148 @@ describe('syncService', () => {
 
     expect(transport.upserted).toHaveLength(0)
     expect(syncService.getState().phase).toBe('error')
+  })
+
+  // The first-sync gate asks "does this device hold data worth protecting?".
+  // Catalog-seeded rows (builtin drills, the default session template) are
+  // written by the app before sign-in, so counting them as local data blocks
+  // every second device behind a review prompt it has nothing to review.
+  describe('first-sync gate decision', () => {
+    // Rows seeded here must be removed before draining: the shared beforeEach
+    // clears these tables, and a non-empty clear() fires Dexie `deleting` hooks,
+    // whose deferred capture would otherwise mark tombstones pending inside the
+    // NEXT test and inflate its pushed count. Clear, drain, then drop the journal.
+    afterEach(async () => {
+      await db.transaction('rw', [db.swimmers, db.sessions, db.drills, db.libraryDrills], async () => {
+        await db.swimmers.clear()
+        await db.sessions.clear()
+        await db.drills.clear()
+        await db.libraryDrills.clear()
+      })
+      for (let i = 0; i < 5; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      }
+      await db._sync_meta.clear()
+    })
+
+    async function seedSeededOnly(): Promise<void> {
+      await db.libraryDrills.add({
+        id: 'builtin-1', name: 'Catch Up', stroke: 'freestyle', distance: 100, items: [],
+        repeatCount: 1, timingMode: 'individual', focus: 'technique', labels: [], description: 'd',
+        source: 'builtin', catalogKey: 'Catch Up', popularity: 0, createdAt: 't', updatedAt: 't',
+      })
+      await db.sessions.add({
+        id: 'seeded-session', name: 'Distance Progression', poolLength: 25, notes: '',
+        visibility: 'private', catalogKey: 'Distance Progression', createdAt: 't', updatedAt: 't',
+      })
+      // Real names from client/src/data/sessions.json: the seeded-drill check
+      // matches against the catalog, so a stand-in name would read as coach work.
+      for (const [index, name] of ['Easy Free', 'Kickboard'].entries()) {
+        await db.drills.add({
+          id: `seeded-drill-${index}`, sessionId: 'seeded-session', name, stroke: 'freestyle',
+          distance: 100, order: index, items: [], repeatCount: 1, timingMode: 'individual',
+          focus: 'technique', labels: [], description: '', createdAt: 't', updatedAt: 't',
+        })
+      }
+    }
+
+    test('an empty device pulls from the cloud without prompting', async () => {
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+
+      await syncService.start()
+
+      expect(syncService.getState().phase).toBe('ready')
+      expect((await db.sessions.get('cloud-session'))?.name).toBe('Cloud Template')
+    })
+
+    test('a device holding only catalog-seeded rows pulls without prompting', async () => {
+      await seedSeededOnly()
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+
+      await syncService.start()
+
+      expect(syncService.getState().phase).toBe('ready')
+      expect((await db.sessions.get('cloud-session'))?.name).toBe('Cloud Template')
+    })
+
+    test('a device holding a coach-created session prompts for review', async () => {
+      await db.sessions.add({
+        id: 'my-session', name: 'My Squad Plan', poolLength: 25, notes: '',
+        visibility: 'private', createdAt: 't', updatedAt: 't',
+      })
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+
+      await syncService.start()
+
+      expect(syncService.getState().phase).toBe('needs_first_merge')
+      expect(await db.sessions.get('cloud-session')).toBeUndefined()
+    })
+
+    test('a drill added to a seeded template still counts as coach-authored', async () => {
+      await seedSeededOnly()
+      await db.drills.add({
+        id: 'my-drill', sessionId: 'seeded-session', name: 'Race Pace 200', stroke: 'freestyle',
+        distance: 200, order: 99, items: [], repeatCount: 1, timingMode: 'individual',
+        focus: 'fitness', labels: [], description: '', createdAt: 't', updatedAt: 't',
+      })
+      await db.libraryDrills.add({
+        id: 'my-library-drill', name: 'Race Pace 200', stroke: 'freestyle', distance: 200, items: [],
+        repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: [], description: '',
+        source: 'personal', createdAt: 't', updatedAt: 't',
+      })
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+
+      await syncService.start()
+
+      // The drill itself has no catalogKey — it inherits "not mine" from the
+      // seeded session it hangs off. A flat per-table check would miss this and
+      // silently discard the coach's edit.
+      expect(syncService.getState().phase).toBe('needs_first_merge')
+    })
+
+    test('a device holding a coach-created swimmer prompts for review', async () => {
+      await db.swimmers.add({ id: 'my-swimmer', name: 'Dan', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't' })
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+
+      await syncService.start()
+
+      expect(syncService.getState().phase).toBe('needs_first_merge')
+      expect(await db.sessions.get('cloud-session')).toBeUndefined()
+    })
+
+    test('a device holding completed run history prompts for review', async () => {
+      await db.sessionRuns.add({
+        id: 'my-run', sessionId: 'my-session', date: '2026-10-08', poolName: 'North', poolLength: 25,
+        notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
+        createdAt: 't', updatedAt: 't',
+      })
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+
+      await syncService.start()
+
+      expect(syncService.getState().phase).toBe('needs_first_merge')
+    })
+
+    test('a synced device never re-prompts on a later sync', async () => {
+      await db.swimmers.add({ id: 'my-swimmer', name: 'Dan', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't' })
+      const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })
+      syncService.init(transport, { autoSync: false })
+      await syncService.start()
+      expect(syncService.getState().phase).toBe('needs_first_merge')
+
+      await syncService.confirmFirstMerge()
+      expect(syncService.getState().phase).toBe('ready')
+
+      await syncService.syncNow()
+
+      expect(syncService.getState().phase).toBe('ready')
+    })
   })
 
   test('syncNow pushes pending local rows then applies pulled rows', async () => {

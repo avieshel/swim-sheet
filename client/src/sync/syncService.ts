@@ -17,6 +17,7 @@ import {
 } from './syncStore'
 import { HISTORY_TABLES } from './types'
 import { analytics, Events } from '../services/analyticsEvents'
+import { sessionsCatalog } from '../data/catalog'
 import type {
   SyncTable,
   SyncTransport,
@@ -314,8 +315,21 @@ class SyncService {
   // a merge it has no stake in, and syncNow stays blocked until it answers. Only
   // ask when there is something to lose.
   private async hasLocalRows(): Promise<boolean> {
+    const seededSessionDrillNames = new Set(
+      sessionsCatalog.flatMap(session => session.drills.map(drill => drill.name)),
+    )
     for (const table of CORE_SYNC_TABLES) {
-      if ((await localTable(table).count()) > 0) return true
+      for (const row of await localTable(table).toArray()) {
+        if (table === 'drills') {
+          // Seeded drills carry no catalogKey (addDrill has no such column), so
+          // identity comes from the catalog itself: a session-template drill is
+          // named in sessionsCatalog. A drill the coach adds to a starter
+          // template is not, and must still count as their work.
+          if (seededSessionDrillNames.has(row.name as string)) continue
+          return true
+        }
+        if (!row.catalogKey) return true
+      }
     }
     if ((await db.sessionRuns.where('status').equals('completed').count()) > 0) return true
     const deletedHistory = await db._sync_meta.where('status').equals('pending_delete').toArray()
