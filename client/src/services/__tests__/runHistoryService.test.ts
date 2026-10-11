@@ -16,7 +16,7 @@ const mockDao = vi.hoisted(() => ({
 
 vi.mock('../../db/dao', () => mockDao)
 
-const { getRunHistory, getRunById, deleteRun, exportRun } = await import('../runHistoryService')
+const { getRunHistory, getRunById, deleteRun, exportRun, resolveRunDrills } = await import('../runHistoryService')
 
 const makeRun = (overrides: Partial<SessionRun> = {}): SessionRun => ({
   id: 'r1',
@@ -318,5 +318,132 @@ describe('runHistoryService', () => {
   it('exportRun throws when the run is missing', async () => {
     mockDao.getSessionRun.mockResolvedValue(undefined)
     await expect(exportRun('missing')).rejects.toThrow('Run not found')
+  })
+
+  describe('resolveRunDrills', () => {
+    const stored = [
+      { id: 'rd1', runId: 'r1', drillIndex: 0, name: 'Pull', stroke: 'backstroke',
+        distance: 999, order: 0, notes: 'stale', createdAt: '', updatedAt: '' },
+    ]
+
+    const snapshotWith = (drills: unknown[]): string =>
+      JSON.stringify({ version: 1, name: 'Squad AM', notes: 'hard', drills })
+
+    const snapshotDrill = {
+      name: 'Pull',
+      stroke: 'freestyle',
+      items: [{ id: 'i1', distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      repeatCount: 1,
+      timingMode: 'individual',
+      focus: 'fitness',
+      labels: [],
+      description: 'from snapshot',
+      metrics: {
+        totalDistance: 100,
+        setCount: 1,
+        dominantStroke: 'freestyle',
+        strokeMix: { freestyle: 100 },
+      },
+    }
+
+    it('prefers the snapshot for display fields when one exists', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: snapshotWith([snapshotDrill]) }), stored)
+      expect(result.source).toBe('snapshot')
+      expect(result.drills[0].name).toBe('Pull')
+      expect(result.drills[0].stroke).toBe('freestyle')
+      expect(result.drills[0].distance).toBe(100)
+      expect(result.drills[0].notes).toBe('from snapshot')
+    })
+
+    it('keeps each stored row id so laneDrillResults.runDrillId still resolves', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: snapshotWith([snapshotDrill]) }), stored)
+      expect(result.drills[0].id).toBe('rd1')
+      expect(result.drills[0].runId).toBe('r1')
+    })
+
+    it('leaves a stored row untouched when its drillIndex is out of range', () => {
+      const outOfRange = [{ ...stored[0], drillIndex: 7 }]
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: snapshotWith([snapshotDrill]) }), outOfRange)
+      expect(result.drills[0].distance).toBe(999)
+      expect(result.drills[0].notes).toBe('stale')
+    })
+
+    it('falls back to stored rows for a legacy run with no snapshot', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: undefined }), stored)
+      expect(result.source).toBe('legacy')
+      expect(result.drills).toEqual(stored)
+    })
+
+    it('falls back to stored rows when the snapshot is malformed JSON', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: '{not json' }), stored)
+      expect(result.source).toBe('legacy')
+      expect(result.drills).toEqual(stored)
+    })
+
+    it('falls back to stored rows when the snapshot has no drills', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: snapshotWith([]) }), stored)
+      expect(result.source).toBe('legacy')
+      expect(result.drills).toEqual(stored)
+    })
+
+    it('falls back to stored rows when the snapshot is not an object with drills', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: '"just a string"' }), stored)
+      expect(result.source).toBe('legacy')
+    })
+
+    it('falls back to stored rows when the snapshot is JSON null', () => {
+      const result = resolveRunDrills(makeRun({ sessionSnapshot: 'null' }), stored)
+      expect(result.source).toBe('legacy')
+      expect(result.drills).toEqual(stored)
+    })
+  })
+
+  it('history renders identically after the session and its drills are gone', async () => {
+    const snapshot = JSON.stringify({
+      version: 1,
+      name: 'Squad AM',
+      notes: '',
+      drills: [{
+        name: 'Pull',
+        stroke: 'freestyle',
+        items: [{ id: 'i1', distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+        repeatCount: 1,
+        timingMode: 'individual',
+        focus: 'none',
+        labels: [],
+        description: '',
+        metrics: {
+          totalDistance: 100,
+          setCount: 1,
+          dominantStroke: 'freestyle',
+          strokeMix: { freestyle: 100 },
+        },
+      }],
+    })
+    const run = makeRun({ sessionSnapshot: snapshot, sessionName: 'Squad AM' })
+    const storedRows = [
+      { id: 'rd1', runId: 'r1', drillIndex: 0, name: 'Pull', stroke: 'freestyle',
+        distance: 100, order: 0, notes: '', createdAt: '', updatedAt: '' },
+    ]
+
+    const setup = () => {
+      mockDao.getSessionRun.mockResolvedValue(run)
+      mockDao.getRunDrillsForRun.mockResolvedValue(storedRows)
+      mockDao.getRunSwimmersForRun.mockResolvedValue([])
+      mockDao.getSwimmersForRun.mockResolvedValue([])
+      mockDao.getLaneDrillResults.mockResolvedValue([])
+      mockDao.getLapsForRun.mockResolvedValue([])
+    }
+
+    setup()
+    const before = JSON.parse(await (await exportRun('r1')).text())
+
+    // The invariant: history must not depend on the session or its drills.
+    mockDao.getSession.mockResolvedValue(undefined)
+    setup()
+    const after = JSON.parse(await (await exportRun('r1')).text())
+
+    expect(after).toEqual(before)
+    expect((after.drills as { name: string }[])[0].name).toBe('Pull')
   })
 })
