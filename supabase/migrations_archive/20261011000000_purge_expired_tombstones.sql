@@ -1,3 +1,11 @@
+-- ARCHIVED — not part of the migration history. `supabase db push` ignores this
+-- directory. Written and verified against local Postgres on 2026-10-11, but
+-- deliberately not applied: parked while the frozen-history-snapshot work
+-- lands. See docs/context/App-Tasks-Context.md for the pickup note.
+--
+-- Migration: 20261011000000_purge_expired_tombstones.sql
+-- Purges soft-deleted tombstones older than a retention window, child-first.
+--
 -- ── Tombstone retention ─────────────────────────────────────────────────
 --
 -- Soft-deleted rows are kept as tombstones (deleted_at is not null) so other
@@ -124,10 +132,13 @@ grant execute on function public.purge_expired_tombstones(integer) to service_ro
 --
 -- A future retention pass should purge library drills that were created by a
 -- user and are no longer referenced by any session. This is NOT part of
--- purge_expired_tombstones() and is deliberately left unimplemented: it needs
--- the drills.library_drill_id provenance column from
--- docs/superpowers/specs/2026-10-11-frozen-history-snapshot-design.md, which
--- does not exist yet. Implement it in that work, not here.
+-- purge_expired_tombstones() and is deliberately left unimplemented.
+--
+-- Its dependency, drills.library_drill_id, is now created by
+-- 20261011000000_snapshot_columns.sql, so the column is available; what is
+-- still missing is the pass itself. Client-side drills also carry no libraryDrillId
+-- for pre-v8 rows (that migration does not backfill), so the "referenced by a
+-- session" check will under-count until those rows exist in the cloud.
 --
 -- When it is written, the guard conditions are:
 --

@@ -6,6 +6,27 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ## Known Issues
 
+- **Tombstone retention purge is written but parked in `migrations_archive/`.**
+  `supabase/migrations_archive/20261011000000_purge_expired_tombstones.sql` is
+  complete and was verified against local Postgres on 2026-10-11 (applies
+  idempotently, registers one `pg_cron` job, and a four-scenario test confirmed
+  its child-first guards refuse to purge a parent with live children), but it is
+  **deliberately not in the migration history**. It was archived so
+  `20261011000000_snapshot_columns.sql` could own that version — two files with
+  the same version prefix make `supabase db push` apply one and silently skip
+  the other. Nothing in `supabase/migrations/` has a duplicate version.
+  Pick-up work: move it back to `supabase/migrations/` under a **unique**
+  timestamp, then `npm run db:push`. It depends on nothing and reads none of the
+  three snapshot columns, so it can land in either order. Its guard is
+  **load-bearing, not defensive**: tombstoning is an `UPDATE`, but purging that
+  tombstone is a physical `DELETE`, and `session_runs.session_id` is
+  `on delete cascade` — without the `not exists (live child)` guard on
+  `sessions`, a purge would destroy completed run history. See the Cross-dependency
+  section of `docs/superpowers/specs/2026-10-11-frozen-history-snapshot-design.md`.
+  The file also carries a **second, unimplemented** pass for unused user-created
+  library drills; its `library_drill_id` dependency now exists, but pre-v8 client
+  rows have no `libraryDrillId`, so that pass will under-count until they do.
+
 - **Cross-device pull has no trigger on an idle device — needs its own issue.**
   `tests/sync-cross-device.spec.ts:197` fails, but it is *not* an offline-recovery
   bug despite the old note saying so. Measured with a throwaway diagnostic against
