@@ -14,6 +14,7 @@ import {
 import { db } from '../db/schema'
 import type { SafeSessionRun, SafeRunDrill, SafeLaneDrillResult, SafeLap, SavedDrillData } from '../db/schema'
 import { settingsService } from './settingsService'
+import { buildSessionSnapshot, computeDrillMetrics } from '../utils/sessionSnapshot'
 
 function buildMarkerData(startedAt?: number, poolLength = 25): string | null {
   return startedAt != null
@@ -228,9 +229,12 @@ export const runService = {
     const drills = await getDrillsForSession(sessionId)
     drills.sort((a, b) => a.order - b.order)
 
+    const snapshot = buildSessionSnapshot(session, drills)
+
     const runId = await addSessionRun({
       sessionId,
       sessionName: session.name,
+      sessionSnapshot: JSON.stringify(snapshot),
       date: runData.date,
       poolName: runData.poolName,
       poolLength,
@@ -242,9 +246,14 @@ export const runService = {
     })
 
     let runDrillOrder = 0
-    for (const drill of drills) {
+    // drillIndex must track the drill's position in the snapshot array, not a
+    // running count of emitted rows: a drill with no items is skipped but still
+    // occupies its index, and diverging would mis-attribute every later drill.
+    for (let drillIndex = 0; drillIndex < drills.length; drillIndex += 1) {
+      const drill = drills[drillIndex]
       const items = drill.items || []
       if (items.length === 0) continue
+      const metrics = computeDrillMetrics(drill)
 
       if (drill.timingMode === 'continuous') {
         const totalDistance = items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * drill.repeatCount
@@ -263,14 +272,13 @@ export const runService = {
         await addRunDrill({
           runId,
           name: drill.name,
-          stroke: items[0].stroke || 'mixed',
+          stroke: metrics.dominantStroke,
           distance: totalDistance,
           order: runDrillOrder++,
           instructions: instructionLines.join('\n'),
           equipment: Array.from(equipmentSet),
-          parentDrillId: drill.id,
           notes: drill.description || '',
-        })
+        }, drillIndex)
       } else {
         for (let r = 0; r < drill.repeatCount; r++) {
           for (const item of items) {
@@ -287,9 +295,8 @@ export const runService = {
                 instructions: repLabel || item.intensity || '',
                 interval: item.interval,
                 equipment: item.equipment,
-                parentDrillId: drill.id,
                 notes: drill.description || '',
-              })
+              }, drillIndex)
             }
           }
         }

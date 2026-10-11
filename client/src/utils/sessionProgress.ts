@@ -5,13 +5,23 @@ export function stripRepPrefix(name: string): string {
   return name.replace(/^\(\d+\/\d+\)\s*/, '')
 }
 
-// Consecutive RunDrills that share a parentDrillId are one logical drill
-// repeated N times (each rep is its own RunDrill row in the DB).
+// Consecutive RunDrills that share a drillIndex are one logical drill repeated
+// N times (each rep is its own RunDrill row in the DB). Rows with no drillIndex
+// are legacy: absent after Dexie migration, or null. They fall back to
+// parentDrillId grouping, and ungrouped legacy rows stay distinct rather than
+// collapsing into one.
 export function groupDrillRows(runDrills: RunDrill[]): RunDrill[][] {
   const groups: RunDrill[][] = []
   for (const d of runDrills) {
     const last = groups[groups.length - 1]
-    if (last && last[0].parentDrillId && d.parentDrillId === last[0].parentDrillId) {
+    const sharesDrill = (a: RunDrill, b: RunDrill): boolean => {
+      if (a.drillIndex != null && b.drillIndex != null) return a.drillIndex === b.drillIndex
+      if (a.drillIndex == null && b.drillIndex == null && a.parentDrillId && b.parentDrillId) {
+        return a.parentDrillId === b.parentDrillId
+      }
+      return false
+    }
+    if (last && sharesDrill(last[0], d)) {
       last.push(d)
     } else {
       groups.push([d])
