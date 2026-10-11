@@ -214,10 +214,13 @@ export async function getRunDrill(id: string): Promise<RunDrill | undefined> {
   return db.runDrills.get(id)
 }
 
-export async function addRunDrill(data: SafeRunDrill): Promise<string> {
+export async function addRunDrill(
+  data: SafeRunDrill,
+  drillIndex: number | null = null,
+): Promise<string> {
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
-  await db.runDrills.add({ ...data, id, createdAt: now, updatedAt: now })
+  await db.runDrills.add({ ...data, id, drillIndex, createdAt: now, updatedAt: now })
   return id
 }
 

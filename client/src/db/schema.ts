@@ -24,7 +24,7 @@ export interface Session {
   updatedAt: string
 }
 
-interface DrillItem {
+export interface DrillItem {
   id: string
   distance: number
   stroke: Stroke
@@ -44,6 +44,9 @@ interface DrillSegment {
 export interface Drill {
   id: string
   sessionId: string
+  // The libraryDrills entry this copy was created from. Soft reference: the
+  // library row may be deleted while this drill survives.
+  libraryDrillId?: string
   name: string
   stroke: Stroke
   distance: number
@@ -65,6 +68,9 @@ export interface SessionRun {
   // being renamed or deleted, so the run carries its own copy rather than
   // joining to `sessions` at read time.
   sessionName?: string
+  // Frozen at run start, never refreshed. Serialized SessionSnapshot. History
+  // renders from this alone and never reads back to `sessions` or `drills`.
+  sessionSnapshot?: string
   date: string
   poolName: string
   poolLength: number
@@ -80,6 +86,9 @@ export interface SessionRun {
 export interface RunDrill {
   id: string
   runId: string
+  // Position into SessionSnapshot.drills. Null on runs created before v8.
+  drillIndex: number | null
+  // Superseded by drillIndex; still carried on legacy rows.
   parentDrillId?: string
   name: string
   stroke: RunDrillStroke
@@ -200,10 +209,13 @@ export type SafeSwimmer = Omit<Swimmer, 'id' | 'createdAt' | 'updatedAt'>
 export type SafeSession = Omit<Session, 'id' | 'createdAt' | 'updatedAt'>
 export type SafeDrill = Omit<Drill, 'id' | 'createdAt' | 'updatedAt'>
 export type SafeSessionRun = Omit<SessionRun, 'id' | 'createdAt' | 'updatedAt'>
-export type SafeRunDrill = Omit<RunDrill, 'id' | 'createdAt' | 'updatedAt'>
+export type SafeRunDrill = Omit<RunDrill, 'id' | 'createdAt' | 'updatedAt' | 'drillIndex'>
 export type SafeLaneDrillResult = Omit<LaneDrillResult, 'id' | 'updatedAt'>
 export type SafeLap = Omit<Lap, 'id' | 'createdAt' | 'updatedAt'>
 export type SafeLibraryDrill = Omit<LibraryDrill, 'id' | 'createdAt' | 'updatedAt'>
+
+// Single import site for the frozen-document types.
+export type { SessionSnapshot, SnapshotDrill, DrillMetrics } from '../utils/sessionSnapshot'
 
 class SwimSheetDB extends Dexie {
   swimmers!: EntityTable<Swimmer, 'id'>
@@ -331,10 +343,28 @@ class SwimSheetDB extends Dexie {
       _sync_meta: 'key, orgId, table, status, rowId',
       _sync_cursor: 'key, orgId, table',
     })
+
+    // Frozen history snapshot. No upgrade(): existing runs keep drillIndex null
+    // and no snapshot, because the original authored detail is genuinely gone
+    // and cannot be honestly reconstructed.
+    this.version(8).stores({
+      swimmers: 'id, &name, status, updatedAt',
+      sessions: 'id, createdAt, updatedAt',
+      drills: 'id, sessionId, libraryDrillId, focus, updatedAt',
+      sessionRuns: 'id, sessionId, status, date, updatedAt',
+      runDrills: 'id, runId, drillIndex, updatedAt',
+      runSwimmers: 'id, runId, swimmerId',
+      laps: 'id, runDrillId, swimmerId, createdAt',
+      laneDrillResults: 'id, runId, groupId, lane, runDrillId, [runId+groupId+runDrillId], updatedAt',
+      libraryDrills: 'id, name, stroke, focus, popularity, updatedAt',
+      _meta: 'key',
+      _sync_meta: 'key, orgId, table, status, rowId',
+      _sync_cursor: 'key, orgId, table',
+    })
   }
 }
 
-export const DB_SCHEMA_VERSION = 7
+export const DB_SCHEMA_VERSION = 8
 const BACKUP_KEY = 'swimsheet_db_backup'
 export const BACKUP_FORMAT_VERSION = 1
 

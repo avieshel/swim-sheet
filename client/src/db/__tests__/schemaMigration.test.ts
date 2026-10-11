@@ -51,7 +51,7 @@ describe('Dexie schema migration (v5 to latest)', () => {
       deleteCurrentDb = () => db.delete()
       await db.open()
 
-      expect(db.verno).toBe(7)
+      expect(db.verno).toBe(8)
       expect(await db.drills.get('d1')).toMatchObject({ sessionId: 's1' })
       expect(await db.sessionRuns.get('r1')).toMatchObject({
         sessionId: 's1',
@@ -59,7 +59,13 @@ describe('Dexie schema migration (v5 to latest)', () => {
         sessionPausedAt: null,
         sessionPauseDuration: 5,
       })
+      // parentDrillId survives as a stored property but is no longer indexed or
+      // written; drillIndex is the replacement and is absent on legacy runs.
+      // Dexie migration leaves it undefined rather than null, so readers must
+      // treat both as "legacy".
       expect(await db.runDrills.get('rd1')).toMatchObject({ runId: 'r1', parentDrillId: 'd1' })
+      expect((await db.runDrills.get('rd1'))?.drillIndex ?? null).toBeNull()
+      expect((await db.sessionRuns.get('r1'))?.sessionSnapshot).toBeUndefined()
       expect(await db.runSwimmers.get('rs1')).toMatchObject({ runId: 'r1', swimmerId: 'sw1' })
       expect(await db.laneDrillResults.get('lr1')).toMatchObject({ runId: 'r1', groupId: 'g1', runDrillId: 'rd1' })
       expect(await db.laps.get('l1')).toMatchObject({ runDrillId: 'rd1', swimmerId: 'sw1', strokeCount: 14 })
