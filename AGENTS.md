@@ -39,6 +39,7 @@ These are NOT suggestions. They are enforced by build tooling and will fail CI i
 | No unused locals or parameters | `tsconfig.app.json` — `noUnusedLocals`, `noUnusedParameters` | `tsc -b` fails |
 | Pre-commit type check | `.husky/pre-commit` runs `tsc -b --noEmit` | Commit blocked |
 | Pre-commit lint | `.husky/pre-commit` runs `lint-staged` (eslint --fix) | Commit blocked |
+| No AI-assistant attribution trailers in commit messages | `.husky/commit-msg` rejects `Co-Authored-By` / `Signed-off-by` naming Claude or Anthropic | Commit blocked |
 
 ## Dev Commands
 
@@ -61,6 +62,9 @@ npm run test:e2e              # Playwright e2e tests
 3. **Follow existing patterns** — naming, imports, file structure, component conventions
 4. **Use existing libraries** — check `package.json` before adding new dependencies
 5. **No code comments** unless the task explicitly asks for them
+6. **No AI-assistant attribution in commit messages** — never add `Co-Authored-By:`,
+   `Signed-off-by:`, or `Generated with ...` trailers naming an AI assistant. This project
+   is not developed with Claude. Enforced by `.husky/commit-msg`, which blocks the commit.
 
 ## Hard Gate Override Policy
 

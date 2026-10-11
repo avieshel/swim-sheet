@@ -6,3 +6,13 @@ npx --no-install commitlint --edit "$1" || {
   echo ""
   exit 1
 }
+
+if grep -qiE '^(Co-Authored-By|Signed-off-by):.*(claude|anthropic|@anthropic\.com)|noreply@anthropic\.com|^Generated with .*claude' "$1"; then
+  echo ""
+  echo "❌ Commit blocked: AI-assistant attribution trailer in commit message."
+  echo "   This project is not developed with Claude, so Co-Authored-By /"
+  echo "   Signed-off-by trailers naming an AI assistant are not allowed."
+  echo "   Remove the trailer and try again."
+  echo ""
+  exit 1
+fi
