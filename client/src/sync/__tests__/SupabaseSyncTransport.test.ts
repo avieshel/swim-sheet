@@ -189,12 +189,12 @@ describe('completed history mapping', () => {
       {
         table: asSyncTable('runDrills'),
         payload: {
-          id: 'run-drill-1', runId: 'run-1', parentDrillId: 'drill-1', name: 'Warmup', stroke: 'freestyle',
+          id: 'run-drill-1', runId: 'run-1', drillIndex: 0, name: 'Warmup', stroke: 'freestyle',
           distance: 100, order: 2, notes: '', instructions: 'Easy', interval: '2:00', equipment: ['fins'],
           createdAt: 'created', updatedAt: 'updated',
         },
         expected: {
-          id: 'run-drill-1', run_id: 'run-1', parent_drill_id: 'drill-1', name: 'Warmup', stroke: 'freestyle',
+          id: 'run-drill-1', run_id: 'run-1', drill_index: 0, name: 'Warmup', stroke: 'freestyle',
           distance: 100, drill_order: 2, notes: '', instructions: 'Easy', interval: '2:00', equipment: '["fins"]',
           created_at: 'created', updated_at: 'updated',
         },
@@ -236,6 +236,87 @@ describe('completed history mapping', () => {
         created_by: 'u1',
       })
     }
+  })
+
+  test('round-trips the frozen session snapshot', () => {
+    const snapshot = JSON.stringify({ version: 1, name: 'Squad AM', notes: 'hard', drills: [] })
+    const change: LocalChange = {
+      table: asSyncTable('sessionRuns'),
+      id: 'run-1',
+      op: 'upsert',
+      payload: {
+        id: 'run-1', sessionId: 'session-1', date: '2026-10-08', poolName: 'North', poolLength: 25,
+        notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null,
+        sessionPauseDuration: 0, sessionSnapshot: snapshot, createdAt: 'created', updatedAt: 'updated',
+      },
+      rev: null,
+    }
+    expect(toCloudRow(asSyncTable('sessionRuns'), change, 'org-A', 'u1')).toMatchObject({
+      session_snapshot: snapshot,
+    })
+    expect(
+      fromCloudRow(asSyncTable('sessionRuns'), { session_snapshot: snapshot } as unknown as Record<string, unknown>),
+    ).toMatchObject({ sessionSnapshot: snapshot })
+  })
+
+  test('maps a missing session snapshot to undefined, not null', () => {
+    expect(
+      fromCloudRow(asSyncTable('sessionRuns'), { session_snapshot: null } as unknown as Record<string, unknown>),
+    ).toMatchObject({ sessionSnapshot: undefined })
+  })
+
+  test('round-trips drillIndex and preserves null', () => {
+    const change: LocalChange = {
+      table: asSyncTable('runDrills'),
+      id: 'run-drill-1',
+      op: 'upsert',
+      payload: {
+        id: 'run-drill-1', runId: 'run-1', drillIndex: 3, name: 'Warmup', stroke: 'freestyle',
+        distance: 100, order: 2, notes: '', createdAt: 'created', updatedAt: 'updated',
+      },
+      rev: null,
+    }
+    expect(toCloudRow(asSyncTable('runDrills'), change, 'org-A', 'u1')).toMatchObject({ drill_index: 3 })
+
+    // null must survive as null, not become undefined: groupDrillRows treats
+    // null/undefined as "legacy run" and null as "row had no index".
+    expect(
+      fromCloudRow(asSyncTable('runDrills'), { drill_index: null } as unknown as Record<string, unknown>),
+    ).toMatchObject({ drillIndex: null })
+  })
+
+  test('no longer writes or reads parent_drill_id', () => {
+    const change: LocalChange = {
+      table: asSyncTable('runDrills'),
+      id: 'run-drill-1',
+      op: 'upsert',
+      payload: {
+        id: 'run-drill-1', runId: 'run-1', parentDrillId: 'drill-1', drillIndex: 0, name: 'Warmup',
+        stroke: 'freestyle', distance: 100, order: 0, notes: '', createdAt: 'created', updatedAt: 'updated',
+      },
+      rev: null,
+    }
+    const row = toCloudRow(asSyncTable('runDrills'), change, 'org-A', 'u1')
+    expect(row).not.toHaveProperty('parent_drill_id')
+    expect(row).toMatchObject({ drill_index: 0 })
+  })
+
+  test('round-trips libraryDrillId and defaults it to null', () => {
+    const change: LocalChange = {
+      table: asSyncTable('drills'),
+      id: 'drill-1',
+      op: 'upsert',
+      payload: {
+        id: 'drill-1', sessionId: 'session-1', libraryDrillId: 'lib-1', name: 'Pull', stroke: 'freestyle',
+        distance: 100, order: 0, items: [], repeatCount: 1, timingMode: 'individual', focus: 'none',
+        labels: [], description: '', createdAt: 'created', updatedAt: 'updated',
+      },
+      rev: null,
+    }
+    expect(toCloudRow(asSyncTable('drills'), change, 'org-A', 'u1')).toMatchObject({ library_drill_id: 'lib-1' })
+
+    const absent: LocalChange = { ...change, payload: { ...change.payload, libraryDrillId: undefined } }
+    expect(toCloudRow(asSyncTable('drills'), absent, 'org-A', 'u1')).toMatchObject({ library_drill_id: null })
   })
 
   test('round-trips lane timing snapshot JSON', () => {
