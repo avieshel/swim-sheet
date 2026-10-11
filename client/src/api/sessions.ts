@@ -1,4 +1,5 @@
 import { sessionService } from '../services/sessionService'
+import type { DeleteSessionResult } from '../services/sessionService'
 import type { SafeSession, Session, SessionRun } from '../db/schema'
 
 export function listSessions(): Promise<Session[]> {
@@ -21,8 +22,12 @@ export function updateSession(id: string, data: Partial<SafeSession>): Promise<v
   return sessionService.update(id, data)
 }
 
-export function deleteSession(id: string): Promise<void> {
+export function deleteSession(id: string): Promise<DeleteSessionResult> {
   return sessionService.delete(id)
+}
+
+export function countCompletedRunsForSession(id: string): Promise<number> {
+  return sessionService.completedRunCount(id)
 }
 
 export function listCompletedRuns(): Promise<SessionRun[]> {

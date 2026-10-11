@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { listSessions, createSession, deleteSession } from '../api/sessions'
+import { listSessions, createSession, deleteSession, countCompletedRunsForSession } from '../api/sessions'
 import { getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
 import { getRunHistory, deleteRun } from '../api/runs'
@@ -42,6 +42,7 @@ export const SessionsList: React.FC = () => {
     open: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
     onConfirm: () => void;
   }>({
     open: false,
@@ -108,17 +109,41 @@ export const SessionsList: React.FC = () => {
     loadAll()
   }
 
+  const performDelete = async (id: string, name: string) => {
+    const result = await deleteSession(id)
+    if (!result.ok) {
+      setConfirmState({
+        open: true,
+        title: 'Cannot Delete Template',
+        message: `"${name}" is being delivered right now. Finish or cancel the active session before deleting it.`,
+        confirmLabel: 'Got it',
+        onConfirm: () => setConfirmState(prev => ({ ...prev, open: false })),
+      })
+      return
+    }
+    analytics.track(Events.SessionDeleted(sessions.length - 1))
+    await loadAll()
+    setConfirmState(prev => ({ ...prev, open: false }))
+  }
+
   const handleDelete = (id: string, name: string) => {
     setConfirmState({
       open: true,
       title: 'Delete Template',
       message: `Are you sure you want to permanently delete the template "${name}"?`,
       onConfirm: async () => {
-        await deleteSession(id)
-        analytics.track(Events.SessionDeleted(sessions.length - 1))
-        loadAll()
-        setConfirmState(prev => ({ ...prev, open: false }))
-      }
+        const completedCount = await countCompletedRunsForSession(id)
+        if (completedCount === 0) {
+          await performDelete(id, name)
+          return
+        }
+        setConfirmState({
+          open: true,
+          title: 'Delete Template',
+          message: `"${name}" was used in ${completedCount} recorded ${completedCount === 1 ? 'session' : 'sessions'}. Deleting it keeps that history — each run keeps its own snapshot of what was done.`,
+          onConfirm: () => { void performDelete(id, name) },
+        })
+      },
     })
   }
 
@@ -488,6 +513,7 @@ export const SessionsList: React.FC = () => {
         open={confirmState.open}
         title={confirmState.title}
         message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, open: false }))}
       />

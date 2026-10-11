@@ -140,6 +140,22 @@ export async function getActiveRun(): Promise<SessionRun | undefined> {
   return db.sessionRuns.where('status').equals('active').first()
 }
 
+export async function getActiveRunsForSession(sessionId: string): Promise<SessionRun[]> {
+  return db.sessionRuns
+    .where('sessionId')
+    .equals(sessionId)
+    .filter(r => r.status === 'active')
+    .toArray()
+}
+
+export async function getCompletedRunCountForSession(sessionId: string): Promise<number> {
+  return db.sessionRuns
+    .where('sessionId')
+    .equals(sessionId)
+    .filter(r => r.status === 'completed')
+    .count()
+}
+
 export async function getSessionRun(id: string): Promise<SessionRun | undefined> {
   return db.sessionRuns.get(id)
 }
