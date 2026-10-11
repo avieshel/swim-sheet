@@ -1,4 +1,5 @@
 import { drillService } from '../services/drillService'
+import type { SessionUsingLibraryDrill } from '../services/libraryRefService'
 import type { SafeDrill, Drill, SafeLibraryDrill, LibraryDrill } from '../db/schema'
 
 // ── Template Drills ──
@@ -39,6 +40,14 @@ export function updateLibraryDrill(id: string, data: Partial<SafeLibraryDrill>):
 
 export function deleteLibraryDrill(id: string): Promise<void> {
   return drillService.deleteLibrary(id)
+}
+
+export function sessionsUsingLibraryDrill(id: string): Promise<SessionUsingLibraryDrill[]> {
+  return drillService.sessionsUsingLibraryDrill(id)
+}
+
+export function deleteLibraryDrillInUse(id: string): Promise<void> {
+  return drillService.deleteLibraryInUse(id)
 }
 
 export function patchLibraryDrills(): Promise<void> {

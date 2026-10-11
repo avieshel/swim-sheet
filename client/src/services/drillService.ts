@@ -4,6 +4,13 @@ import {
   seedLibraryDrills, patchLibraryDrills, resetLibraryToDefaults, deduplicateLibraryDrills,
   bumpDrillPopularity, getPopularDrills,
 } from '../db/dao'
+import {
+  getSessionsUsingLibraryDrill,
+  removeLibraryDrillWithRefs,
+  getDanglingLibraryRefs,
+  repointLibraryRef,
+  clearLibraryRef,
+} from './libraryRefService'
 import type { SafeDrill, SafeLibraryDrill } from '../db/schema'
 
 export const drillService = {
@@ -17,6 +24,13 @@ export const drillService = {
   createLibrary: (data: SafeLibraryDrill) => addLibraryDrill(data),
   updateLibrary: (id: string, data: Partial<SafeLibraryDrill>) => updateLibraryDrill(id, data),
   deleteLibrary: (id: string) => deleteLibraryDrill(id),
+  // Reference-aware path: warns, then removes the entry and every session drill
+  // copied from it. Callers must show getSessionsUsingLibraryDrill first.
+  sessionsUsingLibraryDrill: (id: string) => getSessionsUsingLibraryDrill(id),
+  deleteLibraryInUse: (id: string) => removeLibraryDrillWithRefs(id),
+  danglingLibraryRefs: () => getDanglingLibraryRefs(),
+  repointLibraryRef: (drillId: string, libraryDrillId: string) => repointLibraryRef(drillId, libraryDrillId),
+  clearLibraryRef: (drillId: string) => clearLibraryRef(drillId),
 
   patchLibrary: () => patchLibraryDrills(),
   resetLibraryToDefaults: () => resetLibraryToDefaults(),
