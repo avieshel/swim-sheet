@@ -155,6 +155,14 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 ### Drill Bank
 - Core functionality: library of reusable drills, searchable, edit and save drills.
 - Visual test should ensure drill cards render, search/filter works, edit modal opens, and API calls for CRUD operations on drills are unit‑tested.
+- **Reference-aware delete.** A bank drill records which sessions copied from it (`Drill.libraryDrillId`). Deleting one that is unused gets the plain confirmation; deleting one that sessions still use opens a **"Still Used In Sessions"** dialog listing each session with its drill count:
+  > This drill was copied into:
+  > • Squad AM (2 drills)
+  > • Masters (1 drill)
+  >
+  > Deleting it removes it from the bank AND from those sessions. Recorded history is not affected.
+
+  Confirm button reads **"Delete everywhere"**; cancelling removes nothing. Reached from the list row, the editor, and the detail modal — all three route through one handler that checks usage first.
 
 ### Live View
 - Core functionality: real‑time session management, assign swimmers to lanes, control timers, and record lap times.
@@ -199,7 +207,9 @@ Template manager — grid of saved session templates.
 - Header with "Session Templates" + "New Template" button
 - Template cards: name, drill count, total distance, focus label
 - Click to navigate to editor (`/sessions/:id`)
-- Delete with confirmation
+- Delete flows through a two-step confirmation:
+  1. **Active run → refused.** "Cannot Delete Template — `<name>` is being delivered right now. Finish or cancel the active session before deleting it." (`Got it` dismisses.) This is a UX rule, not a data-safety one: the run's snapshot renders without the template.
+  2. **Completed runs → informed, then allowed.** "`<name>` was used in N recorded sessions. Deleting it keeps that history — each run keeps its own snapshot of what was done." A template with no runs gets the single plain confirmation.
 
 ### SessionDetail (`/sessions/:id`)
 Template editor.

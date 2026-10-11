@@ -99,6 +99,7 @@ export function toCloudRow(
       return {
         ...base,
         session_id: p.sessionId,
+        library_drill_id: p.libraryDrillId ?? null,
         name: p.name,
         stroke: p.stroke,
         distance: p.distance,
@@ -135,6 +136,7 @@ export function toCloudRow(
         ...base,
         session_id: p.sessionId,
         session_name: p.sessionName ?? null,
+        session_snapshot: p.sessionSnapshot ?? null,
         date: p.date,
         pool_name: p.poolName,
         pool_length: p.poolLength,
@@ -150,7 +152,7 @@ export function toCloudRow(
       return {
         ...base,
         run_id: p.runId,
-        parent_drill_id: p.parentDrillId ?? null,
+        drill_index: p.drillIndex ?? null,
         name: p.name,
         stroke: p.stroke,
         distance: p.distance,
@@ -226,6 +228,7 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
       return {
         id: row.id,
         sessionId: row.session_id,
+        libraryDrillId: (row.library_drill_id as string | null) ?? undefined,
         name: row.name,
         stroke: row.stroke,
         distance: row.distance,
@@ -262,6 +265,7 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
         id: row.id,
         sessionId: row.session_id,
         sessionName: (row.session_name as string | null) ?? undefined,
+        sessionSnapshot: (row.session_snapshot as string | null) ?? undefined,
         date: row.date,
         poolName: row.pool_name,
         poolLength: row.pool_length,
@@ -277,7 +281,7 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
       return {
         id: row.id,
         runId: row.run_id,
-        parentDrillId: (row.parent_drill_id as string | null) ?? undefined,
+        drillIndex: (row.drill_index as number | null) ?? null,
         name: row.name,
         stroke: row.stroke,
         distance: row.distance,

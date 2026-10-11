@@ -121,7 +121,11 @@ export async function addDrill(data: SafeDrill): Promise<string> {
     labels: drill.labels,
     description: drill.description,
   }
-  await addLibraryDrill(libDrill)
+  // Record which library entry this copy came from, so deleting that entry can
+  // warn about the sessions still using it. addLibraryDrill upserts by name, so
+  // this may resolve to an existing entry rather than a new one.
+  const libraryDrillId = await addLibraryDrill(libDrill)
+  await db.drills.update(id, { libraryDrillId })
 
   return id
 }
@@ -138,6 +142,22 @@ export async function deleteDrill(id: string): Promise<void> {
 
 export async function getActiveRun(): Promise<SessionRun | undefined> {
   return db.sessionRuns.where('status').equals('active').first()
+}
+
+export async function getActiveRunsForSession(sessionId: string): Promise<SessionRun[]> {
+  return db.sessionRuns
+    .where('sessionId')
+    .equals(sessionId)
+    .filter(r => r.status === 'active')
+    .toArray()
+}
+
+export async function getCompletedRunCountForSession(sessionId: string): Promise<number> {
+  return db.sessionRuns
+    .where('sessionId')
+    .equals(sessionId)
+    .filter(r => r.status === 'completed')
+    .count()
 }
 
 export async function getSessionRun(id: string): Promise<SessionRun | undefined> {
@@ -214,10 +234,13 @@ export async function getRunDrill(id: string): Promise<RunDrill | undefined> {
   return db.runDrills.get(id)
 }
 
-export async function addRunDrill(data: SafeRunDrill): Promise<string> {
+export async function addRunDrill(
+  data: SafeRunDrill,
+  drillIndex: number | null = null,
+): Promise<string> {
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
-  await db.runDrills.add({ ...data, id, createdAt: now, updatedAt: now })
+  await db.runDrills.add({ ...data, id, drillIndex, createdAt: now, updatedAt: now })
   return id
 }
 
@@ -389,6 +412,32 @@ export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
 
 export async function deleteLibraryDrill(id: string): Promise<void> {
   await db.libraryDrills.delete(id)
+}
+
+export async function getLibraryDrill(id: string): Promise<LibraryDrill | undefined> {
+  return db.libraryDrills.get(id)
+}
+
+export async function getDrillsByLibraryDrillId(libraryDrillId: string): Promise<Drill[]> {
+  return db.drills.where('libraryDrillId').equals(libraryDrillId).toArray()
+}
+
+// Dexie omits records from an index when the key is absent, so this returns
+// exactly the drills that carry a library reference.
+export async function getDrillsWithLibraryRef(): Promise<Drill[]> {
+  return db.drills.where('libraryDrillId').above('').toArray()
+}
+
+export async function deleteDrillsByIds(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  await db.drills.bulkDelete(ids)
+}
+
+export async function updateDrillLibraryRef(
+  drillId: string,
+  libraryDrillId: string | undefined,
+): Promise<void> {
+  await db.drills.update(drillId, { libraryDrillId, updatedAt: new Date().toISOString() })
 }
 
 export async function bumpDrillPopularity(id: string): Promise<void> {

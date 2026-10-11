@@ -1,15 +1,18 @@
 const legacyFieldRenames: Record<string, Record<string, string>> = {
   drills: {
     session_id: 'sessionId',
+    library_drill_id: 'libraryDrillId',
   },
   sessionRuns: {
     session_id: 'sessionId',
+    session_snapshot: 'sessionSnapshot',
     session_started_at: 'sessionStartedAt',
     session_paused_at: 'sessionPausedAt',
     session_pause_duration: 'sessionPauseDuration',
   },
   runDrills: {
     run_id: 'runId',
+    drill_index: 'drillIndex',
     parent_drill_id: 'parentDrillId',
   },
   runSwimmers: {

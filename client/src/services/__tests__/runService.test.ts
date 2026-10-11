@@ -449,7 +449,8 @@ describe('runService', () => {
         expect.objectContaining({ sessionId: 's1', status: 'active' })
       )
       expect(mockDao.addRunDrill).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({ runId: 'new-run-id', name: 'Endurance Set', distance: 200, stroke: 'freestyle' })
+        expect.objectContaining({ runId: 'new-run-id', name: 'Endurance Set', distance: 200, stroke: 'freestyle' }),
+        0,
       )
       expect(result).toBe('new-run-id')
     })
@@ -470,10 +471,10 @@ describe('runService', () => {
       // 2 repeats × 1 item × 2 item repeats = 4 run drills, plus set labels
       expect(mockDao.addRunDrill).toHaveBeenCalledTimes(4)
       expect(mockDao.addRunDrill).toHaveBeenNthCalledWith(1,
-        expect.objectContaining({ name: '(1/2) Sprint Set', stroke: 'freestyle', distance: 50, order: 0 })
+        expect.objectContaining({ name: '(1/2) Sprint Set', stroke: 'freestyle', distance: 50, order: 0 }), 0,
       )
       expect(mockDao.addRunDrill).toHaveBeenNthCalledWith(4,
-        expect.objectContaining({ name: '(2/2) Sprint Set', stroke: 'freestyle', distance: 50, order: 3 })
+        expect.objectContaining({ name: '(2/2) Sprint Set', stroke: 'freestyle', distance: 50, order: 3 }), 0,
       )
       expect(result).toBe('new-run-id')
     })
@@ -502,6 +503,116 @@ describe('runService', () => {
     it('propagates errors', async () => {
       mockDao.getSession.mockRejectedValue(new Error('DB error'))
       await expect(runService.createFromTemplate('s1', runData)).rejects.toThrow('DB error')
+    })
+
+    it('freezes a session snapshot onto the run', async () => {
+      mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Squad AM', notes: 'hard' })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        {
+          id: 'd1', name: 'Pull', stroke: 'freestyle', distance: 100, order: 0,
+          items: [{ id: 'i1', distance: 50, stroke: 'freestyle', repeatCount: 2 }],
+          repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: [], description: '',
+        },
+      ])
+      mockDao.addSessionRun.mockResolvedValue('new-run-id')
+
+      await runService.createFromTemplate('s1', runData)
+
+      const call = mockDao.addSessionRun.mock.calls[0][0]
+      const snap = JSON.parse(call.sessionSnapshot)
+      expect(snap.version).toBe(1)
+      expect(snap.name).toBe('Squad AM')
+      expect(snap.notes).toBe('hard')
+      expect(snap.drills).toHaveLength(1)
+      expect(snap.drills[0].name).toBe('Pull')
+      expect(snap.drills[0].focus).toBe('fitness')
+      expect(snap.drills[0].metrics.totalDistance).toBe(100)
+    })
+
+    it('a drill with no items does not consume a drillIndex', async () => {
+      mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Session', notes: '' })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        {
+          id: 'd1', name: 'Empty', stroke: 'freestyle', distance: 0, order: 0,
+          items: [], repeatCount: 1, timingMode: 'individual', focus: 'none', labels: [], description: '',
+        },
+        {
+          id: 'd2', name: 'Valid', stroke: 'freestyle', distance: 100, order: 1,
+          items: [{ id: 'i1', distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+          repeatCount: 1, timingMode: 'individual', focus: 'none', labels: [], description: '',
+        },
+      ])
+      mockDao.addSessionRun.mockResolvedValue('new-run-id')
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+
+      await runService.createFromTemplate('s1', runData)
+
+      // The empty drill occupies index 0 in the snapshot, so the valid drill is
+      // index 1. Skipping the index increment would silently mis-attribute it.
+      expect(mockDao.addRunDrill).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: 'Valid' }),
+        1,
+      )
+    })
+
+    it('stamps every unrolled rep of one drill with the same drillIndex', async () => {
+      mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Session', notes: '' })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        {
+          id: 'd1', name: 'Broken', stroke: 'freestyle', distance: 50, order: 0,
+          items: [{ id: 'i1', distance: 50, stroke: 'freestyle', repeatCount: 2 }],
+          repeatCount: 3, timingMode: 'individual', focus: 'none', labels: [], description: '',
+        },
+      ])
+      mockDao.addSessionRun.mockResolvedValue('new-run-id')
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+
+      await runService.createFromTemplate('s1', runData)
+
+      // 3 drill repeats x 2 item repeats = 6 rows, all one logical drill.
+      expect(mockDao.addRunDrill).toHaveBeenCalledTimes(6)
+      const indexes = mockDao.addRunDrill.mock.calls.map(c => c[1])
+      expect(new Set(indexes)).toEqual(new Set([0]))
+    })
+
+    it('uses the dominant stroke rather than the first item stroke', async () => {
+      mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Session', notes: '' })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        {
+          id: 'd1', name: 'Mixed', stroke: 'freestyle', distance: 125, order: 0,
+          items: [
+            { id: 'i1', distance: 25, stroke: 'freestyle', repeatCount: 1 },
+            { id: 'i2', distance: 100, stroke: 'backstroke', repeatCount: 1 },
+          ],
+          repeatCount: 1, timingMode: 'continuous', focus: 'none', labels: [], description: '',
+        },
+      ])
+      mockDao.addSessionRun.mockResolvedValue('new-run-id')
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+
+      await runService.createFromTemplate('s1', runData)
+
+      expect(mockDao.addRunDrill).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ name: 'Mixed', stroke: 'backstroke' }),
+        0,
+      )
+    })
+
+    it('does not write parentDrillId on new run drills', async () => {
+      mockDao.getSession.mockResolvedValue({ id: 's1', name: 'Session', notes: '' })
+      mockDao.getDrillsForSession.mockResolvedValue([
+        {
+          id: 'd1', name: 'Pull', stroke: 'freestyle', distance: 50, order: 0,
+          items: [{ id: 'i1', distance: 50, stroke: 'freestyle', repeatCount: 1 }],
+          repeatCount: 1, timingMode: 'individual', focus: 'none', labels: [], description: '',
+        },
+      ])
+      mockDao.addSessionRun.mockResolvedValue('new-run-id')
+      mockDao.addRunDrill.mockResolvedValue('rd1')
+
+      await runService.createFromTemplate('s1', runData)
+
+      expect(mockDao.addRunDrill.mock.calls[0][0]).not.toHaveProperty('parentDrillId')
     })
   })
 

@@ -9,6 +9,8 @@ const mockDao = vi.hoisted(() => ({
   getDrillsForSession: vi.fn(),
   getCompletedRuns: vi.fn(),
   getActiveRun: vi.fn(),
+  getActiveRunsForSession: vi.fn(),
+  getCompletedRunCountForSession: vi.fn(),
   getSessionRunUsage: vi.fn(),
   seedDefaultSessions: vi.fn(),
 }))
@@ -81,10 +83,52 @@ describe('sessionService', () => {
     expect(mockDao.updateSession).toHaveBeenCalledExactlyOnceWith('1', data)
   })
 
-  it('delete calls deleteSession with id', async () => {
+  it('delete calls deleteSession with id when no run is active', async () => {
+    mockDao.getActiveRunsForSession.mockResolvedValue([])
     mockDao.deleteSession.mockResolvedValue(undefined)
-    await sessionService.delete('1')
+    expect(await sessionService.delete('1')).toEqual({ ok: true })
     expect(mockDao.deleteSession).toHaveBeenCalledExactlyOnceWith('1')
+  })
+
+  describe('delete guards', () => {
+    const run = (over: Record<string, unknown> = {}) => ({ id: 'r1', sessionId: '1', status: 'active', ...over })
+
+    it('refuses and returns the run when an active run exists', async () => {
+      const active = run()
+      mockDao.getActiveRunsForSession.mockResolvedValue([active])
+      mockDao.getCompletedRunCountForSession.mockResolvedValue(0)
+
+      const result = await sessionService.delete('1')
+
+      expect(result).toEqual({ ok: false, reason: 'active_run', run: active })
+      expect(mockDao.deleteSession).not.toHaveBeenCalled()
+    })
+
+    it('does not count a completed run as a blocker', async () => {
+      mockDao.getActiveRunsForSession.mockResolvedValue([])
+      mockDao.getCompletedRunCountForSession.mockResolvedValue(12)
+
+      expect(await sessionService.delete('1')).toEqual({ ok: true })
+      expect(mockDao.deleteSession).toHaveBeenCalledExactlyOnceWith('1')
+    })
+
+    it('deletes a session that has never been run', async () => {
+      mockDao.getActiveRunsForSession.mockResolvedValue([])
+      mockDao.getCompletedRunCountForSession.mockResolvedValue(0)
+      expect(await sessionService.delete('1')).toEqual({ ok: true })
+    })
+
+    it('re-checks active runs rather than trusting the caller', async () => {
+      // The guard must run on every call: a run may have been started on
+      // another device that has not synced back yet.
+      mockDao.getActiveRunsForSession.mockResolvedValue([run({ id: 'r2' })])
+
+      const result = await sessionService.delete('1')
+
+      expect(mockDao.getActiveRunsForSession).toHaveBeenCalledExactlyOnceWith('1')
+      expect(result).toEqual({ ok: false, reason: 'active_run', run: expect.objectContaining({ id: 'r2' }) })
+      expect(mockDao.deleteSession).not.toHaveBeenCalled()
+    })
   })
 
   it('getDrills calls getDrillsForSession with sessionId', async () => {

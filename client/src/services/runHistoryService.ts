@@ -10,7 +10,7 @@ import {
   getSwimmer,
   deleteSessionRunCascade,
 } from '../db/dao'
-import type { SessionRun, SavedDrillData, SavedSwimmerData } from '../db/schema'
+import type { RunDrill, SessionRun, SavedDrillData, SavedSwimmerData, SessionSnapshot } from '../db/schema'
 
 export interface RunSwimmerSummary {
   swimmerId: string | null
@@ -264,14 +264,58 @@ export async function deleteRun(runId: string): Promise<void> {
   await deleteSessionRunCascade(runId)
 }
 
+// History must render with zero reads against `sessions` and `drills`. When the
+// run carries a snapshot, its drill display fields come from there and the
+// stored RunDrill rows supply only identity and ordering.
+//
+// Every fallback here is deliberate: a run created before the snapshot existed,
+// a blob truncated by a bad sync, or a snapshot shape from a future version must
+// degrade to the stored rows rather than throw. A coach looking at history
+// cannot be handed an exception.
+export function resolveRunDrills(
+  run: SessionRun,
+  storedRows: RunDrill[],
+): { drills: RunDrill[]; source: 'snapshot' | 'legacy' } {
+  if (!run.sessionSnapshot) return { drills: storedRows, source: 'legacy' }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(run.sessionSnapshot)
+  } catch {
+    return { drills: storedRows, source: 'legacy' }
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) return { drills: storedRows, source: 'legacy' }
+  const snapshot = parsed as SessionSnapshot
+  if (!Array.isArray(snapshot.drills) || snapshot.drills.length === 0) {
+    return { drills: storedRows, source: 'legacy' }
+  }
+
+  const drills = storedRows.map(row => {
+    const index = row.drillIndex
+    if (index == null) return row
+    const snapDrill = snapshot.drills[index]
+    if (!snapDrill || !snapDrill.metrics) return row
+    return {
+      ...row,
+      name: snapDrill.name,
+      stroke: snapDrill.metrics.dominantStroke,
+      distance: snapDrill.metrics.totalDistance,
+      notes: snapDrill.description,
+    }
+  })
+  return { drills, source: 'snapshot' }
+}
+
 export async function exportRun(runId: string): Promise<Blob> {
   const run = await getSessionRun(runId)
   if (!run) throw new Error('Run not found')
-  const [summary, runDrills, laps] = await Promise.all([
+  const [summary, storedDrills, laps] = await Promise.all([
     buildRunSummary(run, null),
     getRunDrillsForRun(run.id),
     getLapsForRun(run.id),
   ])
+  const { drills: runDrills } = resolveRunDrills(run, storedDrills)
 
   const payload = {
     exportedAt: new Date().toISOString(),

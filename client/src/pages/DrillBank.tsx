@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
-import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, createDrill, getSessionDrills, patchLibraryDrills, deduplicateLibraryDrills, bumpDrillPopularity } from '../api/drills'
+import { listLibraryDrills, createLibraryDrill, updateLibraryDrill, deleteLibraryDrill, deleteLibraryDrillInUse, sessionsUsingLibraryDrill, createDrill, getSessionDrills, patchLibraryDrills, deduplicateLibraryDrills, bumpDrillPopularity } from '../api/drills'
 import { listSessions } from '../api/sessions'
 import type { LibraryDrill, SafeLibraryDrill } from '../api/drills'
 import type { Session } from '../api/sessions'
@@ -37,6 +37,7 @@ export const DrillBank: React.FC = () => {
     open: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
     onConfirm: () => void;
   }>({
     open: false,
@@ -111,18 +112,41 @@ export const DrillBank: React.FC = () => {
     setShowEditor(true)
   }
 
+  // A bank drill can be the origin of copies sitting inside sessions a coach
+  // still works from. Deleting it therefore cascades into those sessions, so it
+  // has to be an explicit choice rather than a confirmation the coach clicks
+  // past without reading.
   const handleDelete = (id: string) => {
-    setConfirmState({
-      open: true,
-      title: 'Delete Bank Drill',
-      message: 'Are you sure you want to permanently remove this drill from the bank?',
-      onConfirm: async () => {
-        await deleteLibraryDrill(id)
-        analytics.track(Events.DrillDeleted('library'))
-        loadDrills()
-        setConfirmState(prev => ({ ...prev, open: false }))
+    void (async () => {
+      const inUse = await sessionsUsingLibraryDrill(id)
+      if (inUse.length === 0) {
+        setConfirmState({
+          open: true,
+          title: 'Delete Bank Drill',
+          message: 'Are you sure you want to permanently remove this drill from the bank?',
+          onConfirm: () => { void performDelete(id, false) },
+        })
+        return
       }
-    })
+      const lines = inUse
+        .map(s => `• ${s.sessionName} (${s.drillCount} ${s.drillCount === 1 ? 'drill' : 'drills'})`)
+        .join('\n')
+      setConfirmState({
+        open: true,
+        title: 'Still Used In Sessions',
+        message: `This drill was copied into:\n\n${lines}\n\nDeleting it removes it from the bank AND from those sessions. Recorded history is not affected.`,
+        confirmLabel: 'Delete everywhere',
+        onConfirm: () => { void performDelete(id, true) },
+      })
+    })()
+  }
+
+  const performDelete = async (id: string, inUse: boolean) => {
+    if (inUse) await deleteLibraryDrillInUse(id)
+    else await deleteLibraryDrill(id)
+    analytics.track(Events.DrillDeleted('library'))
+    setConfirmState(prev => ({ ...prev, open: false }))
+    loadDrills()
   }
 
   const filteredDrills = drills.filter(d => {
@@ -415,12 +439,7 @@ export const DrillBank: React.FC = () => {
             open: true,
             title: 'Delete Bank Drill',
             message: 'Are you sure you want to permanently remove this drill from the bank?',
-            onConfirm: async () => {
-              await deleteLibraryDrill(editingDrill.id!)
-              analytics.track(Events.DrillDeleted('library'))
-              loadDrills()
-              setConfirmState(prev => ({ ...prev, open: false }))
-            }
+            onConfirm: () => { void performDelete(editingDrill.id!, false) },
           })
         }) : undefined}
         onClose={() => setShowEditor(false)}
@@ -431,6 +450,7 @@ export const DrillBank: React.FC = () => {
         open={confirmState.open}
         title={confirmState.title}
         message={confirmState.message}
+        confirmLabel={confirmState.confirmLabel}
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState(prev => ({ ...prev, open: false }))}
       />
