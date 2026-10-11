@@ -18,6 +18,8 @@ export const Layout: React.FC = () => {
   const activeRun = useActiveRun();
 
   const isActive = (path: string) => location.pathname.startsWith(path);
+  const isLiveRoute = location.pathname === '/' || location.pathname === '/live';
+  const isLiveRun = isLiveRoute && activeRun !== null;
 
   useEffect(() => {
     settingsService.getSettings().then(data => {
@@ -35,7 +37,13 @@ export const Layout: React.FC = () => {
   }, [])
 
   return (
-    <div className="bg-surface text-on-surface min-h-screen flex flex-col">
+    <div
+      className={
+        isLiveRun
+          ? 'bg-surface text-on-surface h-[100dvh] flex flex-col overflow-hidden'
+          : 'bg-surface text-on-surface min-h-screen flex flex-col'
+      }
+    >
       {/* TopAppBar */}
       <header className="bg-surface border-b-2 border-outline-variant shadow-sm sticky top-0 z-40 w-full">
         <div className="r-container flex items-center justify-between py-3 md:py-4">
@@ -68,7 +76,13 @@ export const Layout: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 r-container py-stack-md md:py-stack-lg pb-28 md:pb-12 overflow-x-hidden">
+      <main
+        className={
+          isLiveRun
+            ? 'flex-1 min-h-0 r-container py-stack-md md:py-stack-lg pb-20 md:pb-12 overflow-x-hidden flex flex-col'
+            : 'flex-1 r-container py-stack-md md:py-stack-lg pb-28 md:pb-12 overflow-x-hidden'
+        }
+      >
         <Outlet />
       </main>
 

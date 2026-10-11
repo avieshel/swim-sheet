@@ -59,7 +59,7 @@ export function LiveSessionHeader({
   }
 
   return (
-    <div className="p-3 md:p-4">
+    <div className="shrink-0 p-3 md:p-4">
       {/* Collapsed high-level bar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -100,7 +100,7 @@ export function LiveSessionHeader({
 
       {/* Expanded details section */}
       {isExpanded && (
-        <div className="mt-4 pt-4 border-t border-outline-variant/20 animate-in fade-in duration-150 space-y-4">
+        <div className="mt-4 pt-4 border-t border-outline-variant/20 space-y-4 max-h-[45dvh] md:max-h-[60dvh] overflow-y-auto">
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleMainAction}

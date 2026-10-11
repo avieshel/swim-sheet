@@ -14,11 +14,17 @@ export function LaneSwimmersSection({ onManageSwimmers }: LaneSwimmersSectionPro
   const laneCounts = activeGroups.map(g => g.swimmers.length).join(' | ')
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden mt-4">
+    <div
+      className={
+        isExpanded
+          ? 'flex-1 min-h-0 flex flex-col rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden mt-4'
+          : 'shrink-0 rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden mt-4'
+      }
+    >
       {/* Collapsed high-level bar */}
       <button
         onClick={() => setIsExpanded(v => !v)}
-        className="w-full flex items-center justify-between gap-3 p-3.5 md:p-4 cursor-pointer hover:bg-surface-container-low transition-all"
+        className="w-full shrink-0 flex items-center justify-between gap-3 p-3.5 md:p-4 cursor-pointer hover:bg-surface-container-low transition-all"
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -32,35 +38,53 @@ export function LaneSwimmersSection({ onManageSwimmers }: LaneSwimmersSectionPro
               {laneCounts}
             </span>
           )}
-          <Icon name={isExpanded ? 'expand_less' : 'expand_more'} color="on-surface-variant" />
+          <Icon name={isExpanded ? 'expand_more' : 'chevron_right'} color="on-surface-variant" />
         </div>
       </button>
 
       {/* Expanded details view */}
       {isExpanded && (
-        <div className="px-4 pb-4 pt-1 bg-surface-container-low/40 border-t border-outline-variant/20 space-y-3">
-          <div className="space-y-2 pt-2">
-            {activeGroups.map(group => (
-              <div key={group.id} className="text-label-sm flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 py-1 border-b border-outline-variant/10 last:border-0">
-                <span className="font-bold text-on-surface shrink-0">Lane {group.lane}:</span>
-                <span className="text-on-surface-variant">
-                  {group.swimmers.length > 0
-                    ? group.swimmers.map(s => s.name).join(', ')
-                    : <span className="italic opacity-60">No swimmers assigned</span>}
-                </span>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-4 pt-1 bg-surface-container-low/40 border-t border-outline-variant/20 space-y-3">
+          {swimmerCount === 0 ? (
+            <div className="py-6 px-2 text-center">
+              <Icon name="groups" size="2xl" color="on-surface-variant" className="mb-2" />
+              <p className="text-label-sm text-on-surface-variant mb-3">
+                No swimmers assigned to lanes yet.
+              </p>
+              <button
+                onClick={() => onManageSwimmers()}
+                className="h-11 px-4 rounded-lg bg-primary text-on-primary hover:brightness-110 font-bold flex items-center gap-1.5 transition-all cursor-pointer text-label-sm mx-auto"
+              >
+                <Icon name="group_add" size="sm" />
+                Assign swimmers to lanes
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2 pt-2">
+                {activeGroups.map(group => (
+                  <div key={group.id} className="text-label-sm flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 py-1 border-b border-outline-variant/10 last:border-0">
+                    <span className="font-bold text-on-surface shrink-0">Lane {group.lane}:</span>
+                    <span className="text-on-surface-variant">
+                      {group.swimmers.length > 0
+                        ? group.swimmers.map(s => s.name).join(', ')
+                        : <span className="italic opacity-60">No swimmers assigned</span>}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="pt-2 flex justify-end">
-            <button
-              onClick={() => onManageSwimmers()}
-              className="h-9 px-4 rounded-lg bg-surface-variant/60 hover:bg-surface-variant text-on-surface font-medium flex items-center gap-1.5 transition-all cursor-pointer text-label-sm"
-            >
-              <Icon name="group_add" size="sm" />
-              Manage Lane Swimmers
-            </button>
-          </div>
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={() => onManageSwimmers()}
+                  className="h-9 px-4 rounded-lg bg-surface-variant/60 hover:bg-surface-variant text-on-surface font-medium flex items-center gap-1.5 transition-all cursor-pointer text-label-sm"
+                >
+                  <Icon name="group_add" size="sm" />
+                  Manage Lane Swimmers
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

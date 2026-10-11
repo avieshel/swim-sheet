@@ -165,7 +165,7 @@ export const LiveDeck: React.FC = () => {
 
   if (activeRun) {
     return (
-      <div>
+      <div className="flex-1 min-h-0 flex flex-col">
         <ActiveRunView run={activeRun} onComplete={() => { dispatch({ type: 'CLEAR' }); setActiveRun(null) }} />
         {showTempSwimmersNotice && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70] flex items-center justify-center p-4">

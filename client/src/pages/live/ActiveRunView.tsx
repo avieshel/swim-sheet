@@ -355,7 +355,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   }
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden">
       {/* Header */}
        <LiveSessionHeader
          templateName={templateName}
@@ -378,7 +378,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
       {/* Timing Mode or Drills/Lanes */}
       {timingDrillId ? (
-        <div className="p-3 md:p-4 border-t border-outline-variant/20">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 md:p-4 border-t border-outline-variant/20">
            <TimingModeHeader
              runDrills={runDrills}
              timingDrillId={timingDrillId}
@@ -424,7 +424,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
           )}
         </div>
       ) : (
-        <>
+        <div className="flex-1 min-h-0 flex flex-col">
           {/* Drills Section */}
           <DrillsSection
             runDrills={runDrills}
@@ -438,7 +438,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
           <LaneSwimmersSection
             onManageSwimmers={openLaneEditor}
           />
-        </>
+        </div>
       )}
 
       {/* Promotion Modal */}

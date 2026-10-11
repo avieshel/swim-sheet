@@ -51,10 +51,16 @@ export function DrillsSection({
   }
 
   return (
-    <div className="rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden mt-4">
+    <div
+      className={
+        collapsed
+          ? 'shrink-0 rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden mt-4'
+          : 'flex-1 min-h-0 flex flex-col rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-sm overflow-hidden mt-4'
+      }
+    >
       <button
         onClick={() => setCollapsed(v => !v)}
-        className="w-full flex items-center justify-between gap-3 p-3.5 md:p-4 cursor-pointer hover:bg-surface-container-low transition-all"
+        className="w-full shrink-0 flex items-center justify-between gap-3 p-3.5 md:p-4 cursor-pointer hover:bg-surface-container-low transition-all"
         aria-expanded={!collapsed}
       >
         <span className="flex items-center gap-2 min-w-0">
@@ -67,7 +73,7 @@ export function DrillsSection({
       </button>
 
       {!collapsed && hasDrills && (
-        <div className="divide-y divide-outline-variant/10 border-t border-outline-variant/20 max-h-[32vh] md:max-h-[38vh] overflow-y-auto">
+        <div className="flex-1 min-h-0 divide-y divide-outline-variant/10 border-t border-outline-variant/20 overflow-y-auto">
           {runDrills.map((rd, idx) => {
             const done = isDrillDone(rd.id)
             const isOpen = expandedDrills.has(rd.id)

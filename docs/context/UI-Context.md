@@ -108,7 +108,23 @@ Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
 - **Bottom Nav (mobile)**: 4 tabs — Home, Swimmers, Sessions, Live. Active tab highlighted with `bg-secondary-container` / filled icon.
 - **Main content**: `max-w-7xl mx-auto` container with responsive padding.
 - **Desktop**: TopAppBar nav replaces bottom nav.
+- **Full-height live shell.** When a run is active on `/` or `/live`, `Layout` switches the shell from `min-h-screen` to a fixed `h-[100dvh]` + `overflow-hidden`, and `<main>` becomes a `flex flex-col min-h-0` column with reduced bottom padding (`pb-20 md:pb-12`) so it clears the mobile bottom nav. This gives the live view a bounded box, so **the document, body, and `<main>` never scroll — inner elements scroll instead**. Every other route keeps normal page scrolling. Gated on `isLiveRoute && activeRun`, so the session picker (no active run) still scrolls normally.
 - **Scope**: `Layout` is a pathless layout route (renders `<Outlet />`) wrapping all app routes, including `/` (LiveDeck). The public landing page (`/about`) renders outside it with its own header/footer.
+
+### Live View Section Layout
+The Active Run View (`pages/live/ActiveRunView.tsx`) is a `flex-1 min-h-0 flex flex-col` column inside the full-height shell, so the three sections share the viewport between them rather than stacking in document flow.
+
+| Section | Component | Default | Height behavior |
+|---------|-----------|---------|-----------------|
+| Session details | `live/LiveSessionHeader.tsx` | **collapsed** | `shrink-0`. Expanded panel is capped at `max-h-[45dvh] md:max-h-[60dvh]` with internal scroll so it can't squeeze the sections below. |
+| Drills | `live/DrillsSection.tsx` | **expanded** | `flex-1 min-h-0`; the list is `flex-1 min-h-0 overflow-y-auto` (replaces the old `max-h-[32vh] md:max-h-[38vh]`). Takes all space down to the swimmers bar. |
+| Lane Swimmers | `live/LaneSwimmersSection.tsx` | **collapsed** | `shrink-0` (sits directly above the mobile bottom nav); `flex-1 min-h-0` with an internal `overflow-y-auto` body when expanded. |
+
+- **50/50 split**: when both Drills and Swimmers are expanded, both are `flex-1`, so they split the remaining height evenly (verified at a 1.000 ratio).
+- **Timing mode** replaces the two sections with the `GroupCard` grid in a `flex-1 min-h-0 overflow-y-auto` container, so it scrolls internally like the overview does.
+- **Empty-swimmer state**: when a run has no swimmers assigned, the expanded Swimmers section shows a "No swimmers assigned to lanes yet." message with an **"Assign swimmers to lanes"** CTA (primary, 44px) that opens the lane editor, instead of an empty lane list.
+- **Chevron convention (all three sections)**: collapsed → `chevron_right`, expanded → `expand_more`. Matches `GroupCard`. The per-drill detail row and the `SessionsList` "Show all (N)" toggles are separate controls and keep their own `expand_less`/`expand_more` pairs.
+- Collapse state is still component-local `useState` (no persistence); only the *defaults* are pinned (header and swimmers collapsed, drills expanded).
 
 ---
 
