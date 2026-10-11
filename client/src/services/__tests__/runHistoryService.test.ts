@@ -435,15 +435,24 @@ describe('runHistoryService', () => {
       mockDao.getLapsForRun.mockResolvedValue([])
     }
 
+    // exportedAt is a wall-clock stamp that legitimately differs between two
+    // calls milliseconds apart, so it is excluded from the comparison.
+    const withoutStamp = (p: Record<string, unknown>) => {
+      const rest = { ...p }
+      delete rest.exportedAt
+      return rest
+    }
+
     setup()
-    const before = JSON.parse(await (await exportRun('r1')).text())
+    const before = withoutStamp(JSON.parse(await (await exportRun('r1')).text()))
 
     // The invariant: history must not depend on the session or its drills.
     mockDao.getSession.mockResolvedValue(undefined)
     setup()
-    const after = JSON.parse(await (await exportRun('r1')).text())
+    const after = withoutStamp(JSON.parse(await (await exportRun('r1')).text()))
 
     expect(after).toEqual(before)
     expect((after.drills as { name: string }[])[0].name).toBe('Pull')
+    expect((after.drills as { distance: number }[])[0].distance).toBe(100)
   })
 })
