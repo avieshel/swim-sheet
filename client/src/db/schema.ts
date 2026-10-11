@@ -214,8 +214,8 @@ export type SafeLaneDrillResult = Omit<LaneDrillResult, 'id' | 'updatedAt'>
 export type SafeLap = Omit<Lap, 'id' | 'createdAt' | 'updatedAt'>
 export type SafeLibraryDrill = Omit<LibraryDrill, 'id' | 'createdAt' | 'updatedAt'>
 
-// Single import site for the frozen-document types.
-export type { SessionSnapshot, SnapshotDrill, DrillMetrics } from '../utils/sessionSnapshot'
+// Single import site for the frozen-document type.
+export type { SessionSnapshot } from '../utils/sessionSnapshot'
 
 class SwimSheetDB extends Dexie {
   swimmers!: EntityTable<Swimmer, 'id'>

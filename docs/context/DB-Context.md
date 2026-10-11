@@ -10,7 +10,7 @@ The client uses **Dexie (IndexedDB)** as its primary offline-first store and opt
 - All CRUD operates against local IndexedDB via Dexie
 - The app works fully offline — the server is only needed for sync and first-time load
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
-- Schema versioning: current version is 6 (camelCase field migration); tenant/share fields may appear as optional data ahead of a future formal claim migration.
+- Schema versioning: current version is **8**. v6 = camelCase field migration, v7 = additive, **v8 = frozen history snapshot** (`RunDrill.drillIndex`, `SessionRun.sessionSnapshot`, `Drill.libraryDrillId`). tenant/share fields may appear as optional data ahead of a future formal claim migration.
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
 
 ### Flexible identity model (confirmed product cases)
@@ -90,6 +90,31 @@ Drills have evolved beyond simple name/stroke/distance:
 - `segments` (within DrillItem) — for broken sets like IM or pyramids
 - `repeatCount`, `timingMode`, `focus`, `labels` for drill classification
 - `LibraryDrill` is the global drill bank (builtin + personal + customized)
+
+### Frozen History Snapshot
+
+A completed run is a **self-contained record**. At run start (`runService.createFromTemplate`) one `SessionSnapshot` JSON blob is frozen onto the `SessionRun`, holding every authored session/drill field verbatim plus derived per-drill metrics. `RunDrill.drillIndex` is a stable integer into that frozen array and replaces `parentDrillId`.
+
+**Why:** before this, `RunDrill` was a *lossy rendering* of the drill, not a copy — `items` were flattened to an `instructions` text string, only `items[0].stroke` survived, and `focus`/`labels`/`timingMode`/`segments` were dropped entirely. Editing a drill's sets silently rewrote history. Because history no longer reads `sessions` or `drills`, editing or deleting either can never alter what was recorded.
+
+**Rules:**
+- `poolLength` is **not** in the snapshot: `SessionRun.poolLength` is already frozen at run start from app settings and already rendered.
+- `visibility` is **not** captured (access control, not a fact about what happened). Nor is `libraryDrillId` (authoring provenance).
+- `RunDrill.stroke` is `metrics.dominantStroke`, not `items[0].stroke` — the old form mislabelled every mixed-stroke drill. Legacy rows keep their stored value.
+- **No backfill.** `version(8)` has no `upgrade()`. Existing runs keep `drillIndex` null/undefined and no snapshot; the authored detail is genuinely gone and is not reconstructed.
+- Dexie leaves `drillIndex` **undefined** (not null) on migrated rows, so readers must test `!= null`. `groupDrillRows` groups by `drillIndex` and falls back to `parentDrillId` when both rows lack one.
+
+`resolveRunDrills(run, storedRows)` in `runHistoryService.ts` supplies drill display fields from the snapshot and falls back to stored rows for: a pre-snapshot run, malformed JSON, a snapshot that parses to a non-object, an empty `drills` array, or an out-of-range index. **It never throws** — a coach looking at history cannot be handed an exception.
+
+**Reference-counting asymmetry** (deliberate, not inconsistent):
+- Editing a session/drill: always safe, no warning.
+- Deleting a drill from a session: always safe.
+- Deleting a **session**: refused while any run from it is `status === 'active'` (UX rule, not data safety). Completed runs never block — they only drive a confirm stating the count and that history is preserved.
+- Deleting a **library drill** in use: warns, names each referencing session and its drill count, then offers "Delete everywhere" or cancel.
+
+**Library provenance:** `Drill.libraryDrillId` records which `libraryDrills` entry a session drill was copied from. This is copy-on-use *with provenance* — a session still owns its own drill rows and edits never propagate. The cloud column is a **soft reference with no FK constraint**: a hard cascade would let one library deletion destroy drills inside sessions a coach still works from. A dangling reference is expected, not corruption — nothing resolves it on a read path, and repair (repoint/clear) is offered but never automatic.
+
+Design: `docs/superpowers/specs/2026-10-11-frozen-history-snapshot-design.md`.
 
 ### Data Persistence & Backup
 - Domain CRUD persists on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). Supabase is an optional cloud-sync target for configured, signed-in users; the app remains usable offline and does not rely on the legacy `/api` routes for domain data.
@@ -381,15 +406,15 @@ App-wide configuration (both client and server).
 
 ## Indexes
 
-### Dexie secondary indexes (schema v6)
+### Dexie secondary indexes (schema v8)
 
 | Table | Indexed properties |
 |-------|--------------------|
 | `swimmers` | unique `name`, `status`, `updatedAt` |
 | `sessions` | `createdAt`, `updatedAt` |
-| `drills` | `sessionId`, `focus`, `updatedAt` |
+| `drills` | `sessionId`, `libraryDrillId`, `focus`, `updatedAt` |
 | `sessionRuns` | `sessionId`, `status`, `date`, `updatedAt` |
-| `runDrills` | `runId`, `parentDrillId`, `updatedAt` |
+| `runDrills` | `runId`, `drillIndex`, `updatedAt` |
 | `runSwimmers` | `runId`, `swimmerId` |
 | `laps` | `runDrillId`, `swimmerId`, `createdAt` |
 | `laneDrillResults` | `runId`, `groupId`, `lane`, `runDrillId`, compound `[runId+groupId+runDrillId]`, `updatedAt` |

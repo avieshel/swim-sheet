@@ -4,6 +4,31 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ---
 
+## A-055: Frozen history snapshot — decouple history from sessions & drills ✅
+
+**Source**: User request — "if a swimmer completes a session... in the swimmer's history the coach can see which drills they did... so a coach can edit a session without 'rewriting history'".
+
+**Root cause**: `RunDrill` was a **lossy rendering** of the authored drill, not a copy. `items` were flattened into an `instructions` text string, only `items[0].stroke` survived (mislabelling every mixed-stroke drill), `description` was squashed into `notes`, and `focus`/`labels`/`timingMode`/`segments`/`repeatCount` were dropped entirely. History could not answer "which drills did they do".
+
+**Fix**: one `SessionSnapshot` JSON blob frozen onto `SessionRun` at run start (verbatim authored fields + derived per-drill metrics), and `RunDrill.parentDrillId` replaced by a stable `drillIndex` integer. History now renders with **zero reads** against `sessions`/`drills` — proven by a test asserting `exportRun` output is byte-identical when the session lookup returns nothing. `poolLength` needed no duplication: it is already frozen on `SessionRun` from app settings.
+
+**Design/spec**: `docs/superpowers/specs/2026-10-11-frozen-history-snapshot-design.md` · **Plan**: `docs/superpowers/plans/2026-10-11-frozen-history-snapshot.md` (9 tasks) · **PR**: #13
+
+**Two plan defects caught in implementation** (both would have shipped as silent bugs):
+- The plan's `drillIndex` was a running emit-count, but a drill with empty `items` is skipped while still holding its slot — the counter drifted and every later drill was mis-attributed. Implemented as the loop variable instead.
+- The plan said to delete `parent_drill_id` from `recordMigration.ts`. That map serves **backup restore**, not sync — an old backup on disk still contains the column, and `groupDrillRows` still reads `parentDrillId` as its legacy grouping fallback. Removing the rename would have silently degraded repetition grouping on any restored old history. Two existing tests caught it.
+
+**Priority**: High
+**Status**: Done — Tasks 1-9 implemented. 565 tests pass; `npm run check` (lint + tsc + knip + tests) green. Cloud migration `20261011000000_snapshot_columns.sql` applied to local and hosted.
+
+**Deferred by design** (not omissions):
+- **Session shortlist in "start live session"** — a recency-ranked picker over recent + relevant sessions, hiding last week's. The derived query already exists (`getSessionRunUsage`); this is UI only.
+- **Dangling library-reference repair UI** — `getDanglingLibraryRefs()` / `repointLibraryRef` / `clearLibraryRef` exist in `libraryRefService`; a Settings check surfacing them does not. Repair stays manual on purpose.
+- **`swim_sheet_org`** — replacing the nullable `library_drills.organization_id` with a real shared org for the agent-maintained library. Deliberately postponed: it rewrites all four `library_drills` RLS policies and is tenant modelling, unrelated to history integrity. Note the NULL case is currently theoretical — `toCloudRow` stamps the pushing user's org, so no code path produces NULL today.
+- **`Session.poolLength` drift** — the Postgres column and sync mapping exist, but the client `Session` interface omits the field and `dao.ts` never writes it. History does not need it.
+
+---
+
 ## Known Issues
 
 - **Tombstone retention purge is written but parked in `migrations_archive/`.**

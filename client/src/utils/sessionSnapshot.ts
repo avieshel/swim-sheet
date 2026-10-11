@@ -1,7 +1,7 @@
 import type { Drill, DrillItem, Session } from '../db/schema'
 import type { RunDrillStroke, Stroke } from '../types/swimming'
 
-export interface DrillMetrics {
+interface DrillMetrics {
   totalDistance: number
   setCount: number
   // 'mixed' when items is empty. RunDrill.stroke is already RunDrillStroke.
@@ -9,7 +9,7 @@ export interface DrillMetrics {
   strokeMix: Partial<Record<Stroke, number>>
 }
 
-export interface SnapshotDrill {
+interface SnapshotDrill {
   name: string
   stroke: Stroke
   items: DrillItem[]
