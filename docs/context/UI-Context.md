@@ -126,6 +126,26 @@ The Active Run View (`pages/live/ActiveRunView.tsx`) is a `flex-1 min-h-0 flex f
 - **Chevron convention (all three sections)**: collapsed → `chevron_right`, expanded → `expand_more`. Matches `GroupCard`. The per-drill detail row and the `SessionsList` "Show all (N)" toggles are separate controls and keep their own `expand_less`/`expand_more` pairs.
 - Collapse state is still component-local `useState` (no persistence); only the *defaults* are pinned (header and swimmers collapsed, drills expanded).
 
+### Drill Iteration Grouping (`live/DrillsSection.tsx`)
+
+`createFromTemplate` unrolls one drill into one `RunDrill` row per repetition **per step** (`3 × (50 hard, 100 medium, 150 easy)` → 9 rows). The section renders one row per *logical* drill instead, so a coach scanning the overview sees a drill once rather than nine times.
+
+- **Grouping** is `groupDrillRows` (consecutive rows sharing `drillIndex`, falling back to `parentDrillId` for legacy rows), then `buildDrillGroup` cuts the rows back into the coach's repetitions. There are no set/step columns on the row — `buildDrillGroup` recovers them from the `(r/n) ` prefix `createFromTemplate` writes into `name` and the `[i/n]` rep label in `instructions`.
+- **Title** is `{setCount} × {stripRepPrefix(name)}`, so `3 × Pyramid`. A group that unrolled to a single row renders exactly as before, with no prefix.
+- **Subtitle** is summed distance + dominant stroke, or `{m}m · {setCount} rounds × {stepCount} steps` when the repetition has steps.
+- **Fold threshold (`FOLD_THRESHOLD = 4`)**: a group of 4+ rows folds behind its chevron; below it the iteration rows render inline. A multi-step repetition folds like any other, since row count — not set count — drives the decision.
+- **Fold cap (`max-h-[6.5rem]`)**: an expanded fold scrolls past ~3 rows, with a `{done}/{total} done · show all` footer that clears the cap for that group. The cap is deliberately shallow so the section's own scroll stays the primary one on a phone.
+- **Open-state hierarchy**: everything rendered *inside* a drill — the iteration body and the description/equipment panel alike — lands in a single inset box (`FOLD_BOX` → `ml-8 md:ml-11 mr-4 md:mr-5 mb-2 rounded-xl border border-outline-variant/30 bg-surface-container-low/30 overflow-hidden`) via the `DrillFold` wrapper. An expanded drill therefore reads as *opened*, not as more list. One box per drill regardless of which parts are showing, so a drill showing only its details still gets the box. `overflow-hidden` lives on the box and the `FOLD_CAP` scroll lives on an inner div, so the scroll can't break the rounded corners.
+- **The box is inset asymmetrically — deeper on the left than the right**, and the two sides do different jobs. The extra left inset is what makes it read as "looking into" the drill. The right inset is what carries the per-iteration timer/check controls inward, clear of the parent drill's own controls.
+- **The inward offset of the iteration controls is load-bearing**: parent buttons sit at `p-3`/`p-4` (12/16px from the card edge), iteration buttons at box inset + `pr-6` (40/44px) — a consistent **28px** of depth at both breakpoints. That is slightly more than one control column (`w-6` + `gap-1` = 28px), so an iteration icon lands a clean step in rather than ambiguously *between* two parent columns. A ~16px offset straddles the parent's columns and reads as misalignment rather than nesting. Don't tune the two insets independently — the relationship between them is the effect.
+- Inside the box: rows at `pl-3 pr-6`, round sub-headers at `px-3`, and rows nested under a round at `pl-6` — three tiers (drill → round → step). Both the inline and folded paths share this treatment so the two read identically.
+- The box carries no left rail — a full border plus inset supersedes it, and stacking both read as heavier than the drill names warranted.
+- **Rounds**: when a set holds more than one step, the fold renders a `Round {r}/{n}` sub-header at `pl-3` with its own `{done}/{steps}` count; its steps then sit one level deeper at `pl-6`.
+- **Progress**: pips when `total <= PIP_THRESHOLD` (6), otherwise a thin bar — both beside a `{done}/{total}` label. It is a **button**: tapping it enters timing mode directly on the first incomplete row, so reaching the granular view is one tap instead of expand-and-hunt.
+- **Group controls**: the header timer jumps to the first incomplete row (falling back to row 1 when all are done); the header check toggles *every* row in the group. Each iteration row keeps its own timer and check. Both fan out sequentially — each `onToggleDrillDone` refreshes `laneDrillResults`, so a parallel burst would interleave stale reads.
+- `interval` and `instructions` were previously stored but never rendered here; they now show on each iteration line (rep label as a badge, otherwise the intensity text).
+- **Not built yet**: auto-opening a drill's fold on exiting timing mode. `DrillsSection` remounts when timing mode closes, so its local state resets; this needs state lifted to `ActiveRunView`. Belongs with the planned single-drill timing view, which is where full detail is intended to land.
+
 ---
 
 ## Screens
