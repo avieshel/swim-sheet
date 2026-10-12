@@ -123,7 +123,7 @@ The Active Run View (`pages/live/ActiveRunView.tsx`) is a `flex-1 min-h-0 flex f
 - **50/50 split**: when both Drills and Swimmers are expanded, both are `flex-1`, so they split the remaining height evenly (verified at a 1.000 ratio).
 - **Timing mode** replaces the two sections with the `GroupCard` grid in a `flex-1 min-h-0 overflow-y-auto` container, so it scrolls internally like the overview does.
 - **Empty-swimmer state**: when a run has no swimmers assigned, the expanded Swimmers section shows a "No swimmers assigned to lanes yet." message with an **"Assign swimmers to lanes"** CTA (primary, 44px) that opens the lane editor, instead of an empty lane list.
-- **Chevron convention (all three sections)**: collapsed → `chevron_right`, expanded → `expand_more`. Matches `GroupCard`. The per-drill detail row and the `SessionsList` "Show all (N)" toggles are separate controls and keep their own `expand_less`/`expand_more` pairs.
+- **Chevron convention**: collapsed → `chevron_right`, expanded → `expand_more`. Matches `GroupCard` and the three section headers. The per-drill chevron follows it too. Note that the per-drill chevron's state is *not* the same as "are this drill's iterations visible" — a group below `FOLD_THRESHOLD` shows its iterations unconditionally, so its chevron tracks the details panel instead. Two derived values, `open` (what's rendered) and `expanded` (what the chevron toggles); collapsing them makes short groups show a down-chevron with nothing behind it. The `SessionsList` "Show all (N)" toggles remain separate controls.
 - Collapse state is still component-local `useState` (no persistence); only the *defaults* are pinned (header and swimmers collapsed, drills expanded).
 
 ### Drill Iteration Grouping (`live/DrillsSection.tsx`)

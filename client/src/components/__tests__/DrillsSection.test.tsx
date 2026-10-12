@@ -24,7 +24,7 @@ const results = (...entries: Array<[string, string]>): LaneDrillResult[] =>
 function renderSection(runDrills: RunDrill[], laneDrillResults: LaneDrillResult[] = []) {
   const onEnterTiming = vi.fn()
   const onToggleDrillDone = vi.fn().mockResolvedValue(undefined)
-  render(
+  const { unmount } = render(
     <DrillsSection
       runDrills={runDrills}
       laneDrillResults={laneDrillResults}
@@ -33,7 +33,7 @@ function renderSection(runDrills: RunDrill[], laneDrillResults: LaneDrillResult[
       onToggleDrillDone={onToggleDrillDone}
     />
   )
-  return { onEnterTiming, onToggleDrillDone }
+  return { onEnterTiming, onToggleDrillDone, unmount }
 }
 
 const threeRepeats = [
@@ -74,8 +74,25 @@ describe('DrillsSection grouping', () => {
     renderSection(fourRepeats)
     expect(screen.queryByText('50m freestyle')).toBeNull()
 
-    fireEvent.click(screen.getByTitle('Expand details'))
+    fireEvent.click(screen.getByTitle('Show iterations'))
     expect(screen.getAllByText('50m freestyle')).toHaveLength(4)
+  })
+
+  it('points the chevron right when collapsed and down when expanded', () => {
+    const { unmount } = renderSection(fourRepeats)
+    const icon = () => screen.getByTitle(/^(Show|Hide) iterations$/).querySelector('span')
+
+    expect(icon()?.textContent).toBe('chevron_right')
+    fireEvent.click(screen.getByTitle('Show iterations'))
+    expect(screen.getByTitle('Hide iterations').querySelector('span')?.textContent).toBe('expand_more')
+    unmount()
+
+    // A short group's iterations are always visible, so its chevron drives the
+    // details panel and must still start collapsed.
+    renderSection(threeRepeats)
+    expect(screen.getByTitle('Show details').querySelector('span')?.textContent).toBe('chevron_right')
+    fireEvent.click(screen.getByTitle('Show details'))
+    expect(screen.getByTitle('Hide details').querySelector('span')?.textContent).toBe('expand_more')
   })
 
   it('collapses a multi-step repetition to one row and nests its steps under rounds', () => {
@@ -91,7 +108,7 @@ describe('DrillsSection grouping', () => {
     expect(screen.getByText('900m · 3 rounds × 3 steps')).toBeTruthy()
     expect(screen.queryByText('Round 1/3')).toBeNull()
 
-    fireEvent.click(screen.getByTitle('Expand details'))
+    fireEvent.click(screen.getByTitle('Show iterations'))
     expect(screen.getByText('Round 1/3')).toBeTruthy()
     expect(screen.getByText('Round 3/3')).toBeTruthy()
     expect(screen.getAllByText('50m freestyle')).toHaveLength(3)

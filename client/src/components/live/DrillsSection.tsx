@@ -277,6 +277,10 @@ export function DrillsSection({
             const key = group.rows[0].id
             const folded = group.rows.length >= FOLD_THRESHOLD
             const open = folded ? openFolds.has(key) : true
+            // What the chevron actually toggles. Differs from `open`: a short
+            // group shows its iterations unconditionally, so its chevron drives
+            // the details panel instead and must not read as always-expanded.
+            const expanded = folded ? open : openDetails.has(key)
             const progress = computeDrillRowProgress(group.rows, laneDrillResults, activeGroups)
             const jumpRow = firstIncompleteDrillRow(group.rows, laneDrillResults, activeGroups)
             const equipment = group.rows[0].equipment
@@ -340,9 +344,11 @@ export function DrillsSection({
                         ? setOpenFolds(prev => toggleIn(prev, key))
                         : setOpenDetails(prev => toggleIn(prev, key))}
                       className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-                      title={open ? 'Collapse details' : 'Expand details'}
+                      title={expanded
+                        ? (folded ? 'Hide iterations' : 'Hide details')
+                        : (folded ? 'Show iterations' : 'Show details')}
                     >
-                      <Icon name={open ? 'expand_less' : 'expand_more'} size="sm" />
+                      <Icon name={expanded ? 'expand_more' : 'chevron_right'} size="sm" />
                     </button>
                   </div>
                 </div>
