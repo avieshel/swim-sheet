@@ -180,6 +180,14 @@ function DrillSetRows({ group, laneDrillResults, activeGroups, onEnterTiming, on
   )
 }
 
+// Short groups start open: a couple of iterations are readable at a glance,
+// which is the common case, and the coach can still fold them back to a single
+// line. Anything at or above the threshold starts folded, and a drill that
+// never unrolled shows only its header until asked.
+function defaultExpanded(group: DrillGroup): boolean {
+  return group.rows.length > 1 && group.rows.length < FOLD_THRESHOLD
+}
+
 function DrillFold({ children }: { children: ReactNode }) {
   return <div className={FOLD_BOX}>{children}</div>
 }
@@ -205,7 +213,9 @@ function GroupDetails({ group, divider }: { group: DrillGroup; divider: boolean 
           </span>
         </div>
       )}
-      {!hasDescription && !hasEquipment && (
+      {/* Only an explicitly opened, otherwise-empty panel explains itself. Inside
+          an already-populated box the placeholder is trailing noise. */}
+      {!hasDescription && !hasEquipment && group.rows.length === 1 && (
         <p className="italic text-on-surface-variant/60">No additional details for this drill.</p>
       )}
     </div>
@@ -216,9 +226,8 @@ export function DrillsSection({
   runDrills, laneDrillResults, groups,
   onEnterTiming, onToggleDrillDone
 }: DrillsSectionProps) {
-  const [openFolds, setOpenFolds] = useState<Set<string>>(() => new Set())
+  const [expandedByDrill, setExpandedByDrill] = useState<Record<string, boolean>>({})
   const [uncappedFolds, setUncappedFolds] = useState<Set<string>>(() => new Set())
-  const [openDetails, setOpenDetails] = useState<Set<string>>(() => new Set())
   const [collapsed, setCollapsed] = useState(false)
   const activeGroups = groups.filter(g => g.swimmers.length > 0)
   const drillGroups = groupDrillRows(runDrills).map(buildDrillGroup)
@@ -276,26 +285,21 @@ export function DrillsSection({
           {drillGroups.map((group, idx) => {
             const key = group.rows[0].id
             const folded = group.rows.length >= FOLD_THRESHOLD
-            const open = folded ? openFolds.has(key) : true
-            // What the chevron actually toggles. Differs from `open`: a short
-            // group shows its iterations unconditionally, so its chevron drives
-            // the details panel instead and must not read as always-expanded.
-            const expanded = folded ? open : openDetails.has(key)
+            const expanded = expandedByDrill[key] ?? defaultExpanded(group)
+            const toggleExpanded = () => setExpandedByDrill(prev => ({ ...prev, [key]: !expanded }))
             const progress = computeDrillRowProgress(group.rows, laneDrillResults, activeGroups)
             const jumpRow = firstIncompleteDrillRow(group.rows, laneDrillResults, activeGroups)
             const equipment = group.rows[0].equipment
             const hasEquipment = Boolean(equipment && equipment.length > 0)
-            const showIterations = group.rows.length > 1 && (!folded || open)
-            const showDetails = folded ? open : openDetails.has(key)
-            const capped = folded && open && !uncappedFolds.has(key)
+            const showIterations = group.rows.length > 1 && expanded
+            const showDetails = expanded
+            const capped = folded && expanded && !uncappedFolds.has(key)
 
             return (
               <div key={key} className="transition-colors hover:bg-surface-container-low/50">
                 <div className="flex items-center justify-between gap-3 p-3 md:p-4">
                   <button
-                    onClick={() => folded
-                      ? setOpenFolds(prev => toggleIn(prev, key))
-                      : setOpenDetails(prev => toggleIn(prev, key))}
+                    onClick={toggleExpanded}
                     className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer group"
                   >
                     <span className="text-label-sm text-on-surface-variant tabular-nums w-5 shrink-0">
@@ -340,13 +344,11 @@ export function DrillsSection({
                       {progress.complete && <Icon name="check" size="xs" />}
                     </button>
                     <button
-                      onClick={() => folded
-                        ? setOpenFolds(prev => toggleIn(prev, key))
-                        : setOpenDetails(prev => toggleIn(prev, key))}
+                      onClick={toggleExpanded}
                       className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-                      title={expanded
-                        ? (folded ? 'Hide iterations' : 'Hide details')
-                        : (folded ? 'Show iterations' : 'Show details')}
+                      title={group.rows.length > 1
+                        ? (showIterations ? 'Hide iterations' : 'Show iterations')
+                        : (showDetails ? 'Hide details' : 'Show details')}
                     >
                       <Icon name={expanded ? 'expand_more' : 'chevron_right'} size="sm" />
                     </button>
@@ -377,7 +379,7 @@ export function DrillsSection({
                     </button>
                   )}
 
-                  {showDetails && <GroupDetails group={group} divider={showIterations || capped} />}
+                  {showDetails && <GroupDetails group={group} divider={showIterations} />}
                 </DrillFold>
               )}
               </div>

@@ -87,12 +87,57 @@ describe('DrillsSection grouping', () => {
     expect(screen.getByTitle('Hide iterations').querySelector('span')?.textContent).toBe('expand_more')
     unmount()
 
-    // A short group's iterations are always visible, so its chevron drives the
-    // details panel and must still start collapsed.
+    // A short group opens by default, so its chevron starts expanded...
     renderSection(threeRepeats)
-    expect(screen.getByTitle('Show details').querySelector('span')?.textContent).toBe('chevron_right')
+    expect(screen.getByTitle('Hide iterations').querySelector('span')?.textContent).toBe('expand_more')
+    fireEvent.click(screen.getByTitle('Hide iterations'))
+    expect(screen.getByTitle('Show iterations').querySelector('span')?.textContent).toBe('chevron_right')
+  })
+
+  it('collapses a short repetition back to a single line', () => {
+    const twoRepeats = [row('r1', '(1/2) 8x50 Fly', 0), row('r2', '(2/2) 8x50 Fly', 1)]
+    renderSection(twoRepeats)
+
+    expect(screen.getAllByText('50m freestyle')).toHaveLength(2)
+    fireEvent.click(screen.getByTitle('Hide iterations'))
+    expect(screen.queryByText('50m freestyle')).toBeNull()
+    // The parent row survives the collapse.
+    expect(screen.getByText('2 × 8x50 Fly')).toBeTruthy()
+  })
+
+  it('re-expands a short repetition on a second tap', () => {
+    const twoRepeats = [row('r1', '(1/2) 8x50 Fly', 0), row('r2', '(2/2) 8x50 Fly', 1)]
+    renderSection(twoRepeats)
+
+    fireEvent.click(screen.getByTitle('Hide iterations'))
+    fireEvent.click(screen.getByTitle('Show iterations'))
+    expect(screen.getAllByText('50m freestyle')).toHaveLength(2)
+  })
+
+  it('toggles the details panel of a single drill without hiding the name', () => {
+    renderSection([row('solo', '100 Free', 0, { notes: 'Easy and long.' })])
+
+    // A drill that never unrolled has nothing to show until asked.
+    expect(screen.getByText('100 Free')).toBeTruthy()
+    expect(screen.queryByText('Easy and long.')).toBeNull()
+
     fireEvent.click(screen.getByTitle('Show details'))
-    expect(screen.getByTitle('Hide details').querySelector('span')?.textContent).toBe('expand_more')
+    expect(screen.getByText('Easy and long.')).toBeTruthy()
+
+    fireEvent.click(screen.getByTitle('Hide details'))
+    expect(screen.getByText('100 Free')).toBeTruthy()
+    expect(screen.queryByText('Easy and long.')).toBeNull()
+  })
+
+  it('explains an empty panel when a single drill is opened', () => {
+    renderSection([row('solo', '100 Free', 0)])
+    fireEvent.click(screen.getByTitle('Show details'))
+    expect(screen.getByText('No additional details for this drill.')).toBeTruthy()
+  })
+
+  it('omits the empty-details placeholder inside an expanded repetition', () => {
+    renderSection(threeRepeats)
+    expect(screen.queryByText('No additional details for this drill.')).toBeNull()
   })
 
   it('collapses a multi-step repetition to one row and nests its steps under rounds', () => {
