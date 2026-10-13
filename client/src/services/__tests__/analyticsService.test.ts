@@ -18,6 +18,8 @@ vi.mock('../deviceContext', () => ({
 import { analytics, isNewSession } from '../analyticsService'
 
 const QUEUE_KEY = 'swimsheet_analytics_queue'
+const DEVICE_ID_KEY = 'swimsheet_device_id'
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SESSION_ID_KEY = 'swimsheet_session_id'
 const SESSION_START_KEY = 'swimsheet_session_start'
 const SESSION_LAST_KEY = 'swimsheet_session_last'
@@ -28,6 +30,7 @@ interface Row {
   event_name: string
   properties: Record<string, unknown>
   user_id: string | null
+  device_id: string
   session_id: string
   app_version: string
   platform: string
@@ -63,15 +66,57 @@ function sentRows(callIndex: number): Row[] {
   return JSON.parse(String(call[1]?.body)) as Row[]
 }
 
+function allSentRows(): Row[] {
+  return fetchMock.mock.calls.flatMap((call) => JSON.parse(String(call[1]?.body)) as Row[])
+}
+
 const fetchMock = vi.fn()
 
 function drain(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0))
 }
 
+const pristineLocalGet = localStorage.getItem.bind(localStorage)
+const pristineLocalSet = localStorage.setItem.bind(localStorage)
+const pristineSessionGet = sessionStorage.getItem.bind(sessionStorage)
+const pristineSessionSet = sessionStorage.setItem.bind(sessionStorage)
+
+function denyDeviceId(): DOMException {
+  return new DOMException('storage disabled', 'SecurityError')
+}
+
+function blockDeviceIdStorage(): void {
+  vi.spyOn(localStorage, 'getItem').mockImplementation((key: string) => {
+    if (key === DEVICE_ID_KEY) throw denyDeviceId()
+    return pristineLocalGet(key)
+  })
+  vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+    if (key === DEVICE_ID_KEY) throw denyDeviceId()
+    return pristineLocalSet(key, value)
+  })
+}
+
+function blockAllDeviceIdStorage(): void {
+  blockDeviceIdStorage()
+  vi.spyOn(sessionStorage, 'getItem').mockImplementation((key: string) => {
+    if (key === DEVICE_ID_KEY) throw denyDeviceId()
+    return pristineSessionGet(key)
+  })
+  vi.spyOn(sessionStorage, 'setItem').mockImplementation((key: string, value: string) => {
+    if (key === DEVICE_ID_KEY) throw denyDeviceId()
+    return pristineSessionSet(key, value)
+  })
+}
+
+async function freshAnalyticsService() {
+  vi.resetModules()
+  return (await import('../analyticsService')).analytics
+}
+
 describe('analyticsService', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     fetchMock.mockReset()
     fetchMock.mockResolvedValue(okResponse())
     vi.stubGlobal('fetch', fetchMock)
@@ -385,5 +430,55 @@ describe('analyticsService', () => {
     const recovered = analytics.getStats()
     expect(recovered.queued).toBe(0)
     expect(recovered.eventsDelivered).toBeGreaterThanOrEqual(3)
+  })
+
+  it('uses one stable per-device id when localStorage is unavailable', async () => {
+    blockDeviceIdStorage()
+    const instance = await freshAnalyticsService()
+
+    instance.track({ name: 'view_swimmers' })
+    await drain()
+    instance.track({ name: 'edit_swimmer' })
+    await drain()
+
+    const ids = allSentRows().map((r) => r.device_id)
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).toMatch(UUID_RE)
+    expect(ids[0]).not.toBe('anonymous-device')
+    expect(ids[1]).toBe(ids[0])
+  })
+
+  it('survives a reload via sessionStorage when localStorage is unavailable', async () => {
+    blockDeviceIdStorage()
+
+    const firstLoad = await freshAnalyticsService()
+    firstLoad.track({ name: 'view_swimmers' })
+    await drain()
+    const beforeReload = allSentRows()[0].device_id
+
+    const reloaded = await freshAnalyticsService()
+    reloaded.track({ name: 'edit_swimmer' })
+    await drain()
+
+    const ids = allSentRows().map((r) => r.device_id)
+    expect(ids).toHaveLength(2)
+    expect(beforeReload).toMatch(UUID_RE)
+    expect(ids[1]).toBe(beforeReload)
+  })
+
+  it('mints a fresh fallback id when sessionStorage is also unavailable', async () => {
+    blockAllDeviceIdStorage()
+
+    const instance = await freshAnalyticsService()
+    instance.track({ name: 'view_swimmers' })
+    await drain()
+    instance.track({ name: 'edit_swimmer' })
+    await drain()
+
+    const ids = allSentRows().map((r) => r.device_id)
+    expect(ids).toHaveLength(2)
+    expect(ids[0]).toMatch(UUID_RE)
+    expect(ids[0]).not.toBe('anonymous-device')
+    expect(ids[1]).toBe(ids[0])
   })
 })
