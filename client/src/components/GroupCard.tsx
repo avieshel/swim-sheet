@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { addSwimmerToRun } from '../api/runs'
-import type { RunDrill, LaneDrillResult } from '../api/runs'
+import type { RunDrill, LaneDrillResult, SwimmerDrillStatus } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
 import { formatTime } from '../utils/formatTime'
@@ -327,7 +327,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
 
 // ── GroupCard ───────────────────────────────────────────────────────────────
 
-export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId, loading, rosterSwimmers, onSwimmerSaved }: {
+export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, onCompleteDrill, onResetDrill, onClearSwimmer, onEditSavedSwimmer, runId, loading, rosterSwimmers, onSwimmerSaved, onSwimmerStart, onSwimmerLap, onSwimmerComplete, onSwimmerSkip, onSwimmerMarkDone, onSkipSavedSwimmer, onMarkDoneSavedSwimmer, hideDrillNav }: {
   group: TimedGroup;
   runDrills: RunDrill[];
   laneDrillResults: LaneDrillResult[];
@@ -340,6 +340,14 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
   loading?: boolean;
   rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>;
   onSwimmerSaved?: () => void;
+  onSwimmerStart: (groupId: string, swimmerId: number) => void;
+  onSwimmerLap: (groupId: string, swimmerId: number) => void;
+  onSwimmerComplete: (groupId: string, swimmerId: number) => void;
+  onSwimmerSkip: (groupId: string, swimmerId: number) => void;
+  onSwimmerMarkDone: (groupId: string, swimmerId: number) => void;
+  onSkipSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
+  onMarkDoneSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
+  hideDrillNav?: boolean;
 }) {
   const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const liveGroup = groups.find(g => g.id === group.id) ?? group
@@ -387,6 +395,9 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
   const laneResult = liveGroup.currentRunDrillId ? laneDrillResults.find(r => r.groupId === liveGroup.id && r.runDrillId === liveGroup.currentRunDrillId) : null
   const isCompletedDrill = laneResult?.completed === true
   const savedData: SavedDrillData | null = isCompletedDrill && laneResult?.data ? JSON.parse(laneResult.data) : null
+  const rawSavedData: SavedDrillData | null = laneResult?.data ? JSON.parse(laneResult.data) : null
+  const savedStatusFor = (dbId?: string): SwimmerDrillStatus | undefined =>
+    dbId ? rawSavedData?.swimmers?.find(s => s.dbId === dbId)?.status : undefined
 
   const drillStarted = (() => {
     if (!runId || !liveGroup.currentRunDrillId) return false
@@ -449,38 +460,6 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
   const totalStrokeCount = liveGroup.swimmers.reduce((acc, s) => {
     return acc + Object.values(s.lapStrokeCounts).reduce((a, b) => a + (Number(b) || 0), 0)
   }, 0)
-
-  const handleSwimmerStart = (swimmerId: number) => {
-    if (!runId || !liveGroup.currentRunDrillId) return
-    const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
-    if (!swimmer || !swimmer.dbId) return
-    const notStarted = liveGroup.swimmers.filter(s => s.dbId && store.getSwimmerTiming(runId, liveGroup.id, liveGroup.currentRunDrillId!, s.dbId).startedAt == null).length
-    ensureSessionRunning()
-    analytics.track(Events.SwimmerStarted(liveGroup.lane, notStarted))
-    store.markSwimmerStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
-  }
-
-  const handleSwimmerLap = (swimmerId: number) => {
-    if (!runId || !liveGroup.currentRunDrillId) return
-    const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
-    if (!swimmer || !swimmer.dbId) return
-    analytics.track(Events.LapRecorded(liveGroup.lane, 1))
-    store.markSwimmerLap(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
-  }
-
-  const handleSwimmerComplete = (swimmerId: number) => {
-    if (!runId || !liveGroup.currentRunDrillId) return
-    const swimmer = liveGroup.swimmers.find(s => s.id === swimmerId)
-    if (!swimmer || !swimmer.dbId) return
-    analytics.track(Events.SwimmerCompleted(liveGroup.lane, 1))
-    store.markSwimmerDone(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
-    dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId } })
-    const otherActive = liveGroup.swimmers.filter(s => s.id !== swimmerId && !s.completed)
-    if (otherActive.length === 0) {
-      const remaining = liveGroup.swimmers.filter(s => s.dbId).map(s => s.dbId!)
-      store.batchStopSwimmers(runId, liveGroup.id, liveGroup.currentRunDrillId, remaining, sessionElapsed)
-    }
-  }
 
   const handleBatchLaneStop = () => {
     if (!runId || !liveGroup.currentRunDrillId) return
@@ -603,7 +582,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
       {!collapsed && (
         <>
           {/* Drill Navigation */}
-          {currentDrillIndex >= 0 && (
+          {!hideDrillNav && currentDrillIndex >= 0 && (
             <DrillNav currentDrillIndex={currentDrillIndex} runDrills={runDrills} onSelectDrill={selectDrill} />
           )}
 
@@ -625,6 +604,12 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
                   onClearSavedSwimmer={(dbId) => {
                     if (liveGroup.currentRunDrillId) onEditSavedSwimmer(liveGroup.id, liveGroup.currentRunDrillId, dbId, { laps: [], startedAt: null, completedAt: null })
                   }}
+                  onSkipSavedSwimmer={(dbId) => {
+                    if (liveGroup.currentRunDrillId) onSkipSavedSwimmer(liveGroup.id, liveGroup.currentRunDrillId, dbId)
+                  }}
+                  onMarkDoneSavedSwimmer={(dbId) => {
+                    if (liveGroup.currentRunDrillId) onMarkDoneSavedSwimmer(liveGroup.id, liveGroup.currentRunDrillId, dbId)
+                  }}
                   rosterSwimmers={rosterSwimmers}
                   onSwimmerSaved={onSwimmerSaved}
                   currentGroupId={liveGroup.id}
@@ -640,11 +625,14 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
                   idx={idx}
                   runId={runId}
                   drillId={liveGroup.currentRunDrillId}
-                  onStart={handleSwimmerStart}
-                  onLap={handleSwimmerLap}
-                  onComplete={handleSwimmerComplete}
+                  onStart={(id) => onSwimmerStart(liveGroup.id, id)}
+                  onLap={(id) => onSwimmerLap(liveGroup.id, id)}
+                  onComplete={(id) => onSwimmerComplete(liveGroup.id, id)}
                   onClear={(swimmerId, dbId) => setConfirmClearSwimmer({ swimmerId, dbId })}
+                  onSkip={(id) => onSwimmerSkip(liveGroup.id, id)}
+                  onMarkDone={(id) => onSwimmerMarkDone(liveGroup.id, id)}
                   handleMoveSwimmer={handleMoveSwimmer}
+                  savedStatus={savedStatusFor(swimmer.dbId)}
                   rosterSwimmers={rosterSwimmers}
                   onSwimmerSaved={onSwimmerSaved}
                   currentGroupId={liveGroup.id}

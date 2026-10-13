@@ -1,7 +1,7 @@
 import { runService } from '../services/runService'
 import { getRunHistory as getRunHistoryFromService, getRunById as getRunByIdFromService, deleteRun as deleteRunFromService, exportRun as exportRunFromService } from '../services/runHistoryService'
 import type { RunHistoryData, RunSummary } from '../services/runHistoryService'
-import type { SafeSessionRun, SessionRun, SafeRunDrill, RunDrill, SafeLaneDrillResult, LaneDrillResult, Swimmer, RunSwimmer, SafeLap, Lap, SavedDrillData } from '../db/schema'
+import type { SafeSessionRun, SessionRun, SafeRunDrill, RunDrill, SafeLaneDrillResult, LaneDrillResult, Swimmer, RunSwimmer, SafeLap, Lap, SavedDrillData, SwimmerDrillStatus, SavedSwimmerData } from '../db/schema'
 import type { CompleteRunLap, StartLaneMarker, CompleteLaneMarker } from '../services/runService'
 import type { LiveDrillTiming, LiveTimingStore } from '../timing/liveTiming'
 import type { TimedGroup } from '../context/LiveSessionContext'
@@ -196,6 +196,7 @@ export interface BuildLaneResultInput {
   live: LiveDrillTiming
   swimmers: LaneResultSwimmerInput[]
   poolLength: number
+  existingData?: SavedDrillData
 }
 
 export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
@@ -203,13 +204,19 @@ export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
     const lt = input.live.swimmers.find(l => l.dbId === sw.dbId)
       ?? { dbId: sw.dbId, startedAt: null, completedAt: null, lapTimestamps: [] as number[] }
     const splits = lt.startedAt != null ? timestampSplits(lt.lapTimestamps, lt.startedAt) : []
+    const ex = input.existingData?.swimmers?.find(e => e.dbId === sw.dbId)
+    let status: SwimmerDrillStatus
+    if (lt.completedAt != null || splits.length > 0) status = 'timed'
+    else if (ex?.status === 'skipped' || ex?.status === 'notdone') status = ex.status
+    else status = 'done'
     return {
       dbId: sw.dbId,
       name: sw.name,
       startedAt: lt.startedAt,
       completedAt: lt.completedAt,
       laps: splits.map((time, i) => ({ time, strokeCount: sw.lapStrokeCounts[i + 1] })),
-      completed: sw.completed,
+      completed: status === 'skipped' || status === 'notdone' ? false : sw.completed,
+      status,
     }
   })
   return {
@@ -218,6 +225,137 @@ export function buildLaneResult(input: BuildLaneResultInput): SavedDrillData {
     sessionStartedAt: input.sessionStartedAt,
     poolLength: input.poolLength,
     swimmers,
+  }
+}
+
+// ── Per-(swimmer, drill) status model ───────────────────────
+// Priority when deriving a status from stored fields: an explicit `status`
+// wins; otherwise a recorded time stamp ('timed') implies 'done', and a bare
+// completion marker is 'done'. Anything with no signal defaults to 'done' so a
+// completed session stays coherent (every swimmer gets a status per drill).
+export function deriveSwimmerStatus(saved: SavedSwimmerData): SwimmerDrillStatus {
+  if (saved.status) return saved.status
+  if (saved.completedAt != null || (saved.laps && saved.laps.length > 0)) return 'timed'
+  if (saved.completed) return 'done'
+  return 'done'
+}
+
+// Merge an existing saved result with the current lane roster + any live
+// (in-progress, not-yet-persisted) timing, so the result at session completion
+// is coherent: every active swimmer has exactly one entry.
+//  - existing entry is kept (status re-derived, name synced to roster)
+//  - a swimmer with live timing but no saved entry becomes 'timed'
+//  - a swimmer with neither becomes 'done' (the lazy coach default)
+//  - a swimmer present only in the old blob but no longer in the lane is dropped
+export function reconcileLaneStatuses(
+  existing: SavedSwimmerData[] | null,
+  activeSwimmers: Array<{ dbId: string; name: string }>,
+  live: LiveDrillTiming | null,
+  defaultStatus: SwimmerDrillStatus = 'done',
+): SavedSwimmerData[] {
+  const existingByDbId = new Map((existing ?? []).map(s => [s.dbId, s]))
+  const liveByDbId = new Map((live?.swimmers ?? []).map(s => [s.dbId, s]))
+  const result: SavedSwimmerData[] = []
+  for (const sw of activeSwimmers) {
+    const ex = existingByDbId.get(sw.dbId)
+    if (ex) {
+      result.push({ ...ex, name: sw.name, status: deriveSwimmerStatus(ex) })
+      continue
+    }
+    const lv = liveByDbId.get(sw.dbId)
+    const hasTiming = lv != null && (lv.startedAt != null || lv.completedAt != null || lv.lapTimestamps.length > 0)
+    if (hasTiming && lv) {
+      const splits = lv.startedAt != null ? timestampSplits(lv.lapTimestamps, lv.startedAt) : []
+      result.push({
+        dbId: sw.dbId,
+        name: sw.name,
+        startedAt: lv.startedAt,
+        completedAt: lv.completedAt,
+        laps: splits.map(time => ({ time })),
+        completed: true,
+        status: 'timed',
+      })
+      continue
+    }
+    result.push({
+      dbId: sw.dbId,
+      name: sw.name,
+      startedAt: null,
+      completedAt: null,
+      laps: [],
+      completed: true,
+      status: defaultStatus,
+    })
+  }
+  return result
+}
+
+// Remove results for drills the coach deleted from the running session, so a
+// removed drill (e.g. drill 10 of 13) leaves no orphaned per-swimmer statuses
+// or laps behind. Run before the laps/status are collected at completion.
+export async function pruneRemovedDrillData(
+  runId: string,
+  runDrills: Array<{ id: string }>,
+): Promise<void> {
+  const currentIds = new Set(runDrills.map(d => d.id))
+  const results = await getLaneResults(runId)
+  const byGroup = new Map<string, string[]>()
+  const removedDrillIds = new Set<string>()
+  for (const r of results) {
+    if (currentIds.has(r.runDrillId)) continue
+    removedDrillIds.add(r.runDrillId)
+    const list = byGroup.get(r.groupId) ?? []
+    list.push(r.runDrillId)
+    byGroup.set(r.groupId, list)
+  }
+  if (removedDrillIds.size === 0) return
+  for (const [groupId, drillIds] of byGroup) {
+    await deleteLaneResultsForDrills(runId, groupId, drillIds)
+  }
+  await deleteLapsForDrills([...removedDrillIds])
+}
+
+// Session-completion coherence pass: for every (lane, drill), ensure a
+// LaneDrillResult with one entry per active swimmer. A lane the coach left done
+// defaults missing swimmers to 'done'; a lane explicitly un-did defaults them
+// to 'notdone'; swimmers with live timing become 'timed'; explicit/saved entries
+// are preserved. This is what makes the saved data analyzable — no gaps.
+export async function finalizeSessionStatuses(
+  runId: string,
+  groups: TimedGroup[],
+  runDrills: Array<{ id: string }>,
+  store: LiveTimingStore,
+): Promise<void> {
+  const run = await getRun(runId)
+  const poolLength = run?.poolLength ?? 25
+  for (const group of groups) {
+    const active = group.swimmers.filter(s => s.dbId).map(s => ({ dbId: s.dbId!, name: s.name }))
+    if (active.length === 0) continue
+    for (const drill of runDrills) {
+      const existing = await getLaneResult(runId, group.id, drill.id)
+      let existingData: SavedDrillData | null = null
+      if (existing?.data) {
+        try { existingData = JSON.parse(existing.data) } catch { existingData = null }
+      }
+      const live = store.getDrillTiming(runId, group.id, drill.id, active.map(a => a.dbId))
+      const defaultStatus: SwimmerDrillStatus = existing && !existing.completed ? 'notdone' : 'done'
+      const swimmers = reconcileLaneStatuses(existingData?.swimmers ?? null, active, live, defaultStatus)
+      const data: SavedDrillData = {
+        drillStart: live?.drillStart ?? 0,
+        drillEnd: live?.drillEnd ?? null,
+        sessionStartedAt: existingData?.sessionStartedAt ?? 0,
+        poolLength,
+        swimmers,
+      }
+      await setLaneResult({
+        runId,
+        groupId: group.id,
+        lane: group.lane,
+        runDrillId: drill.id,
+        completed: existing ? existing.completed : true,
+        data: JSON.stringify(data),
+      })
+    }
   }
 }
 
@@ -334,6 +472,6 @@ export function exportRun(runId: string): Promise<Blob> {
   return exportRunFromService(runId)
 }
 
-export type { SessionRun, RunDrill, LaneDrillResult, Swimmer, RunSwimmer, Lap, SavedDrillData } from '../db/schema'
+export type { SessionRun, RunDrill, LaneDrillResult, Swimmer, RunSwimmer, Lap, SavedDrillData, SwimmerDrillStatus, SavedSwimmerData } from '../db/schema'
 export type { CompleteRunLap, StartLaneMarker, CompleteLaneMarker } from '../services/runService'
 export type { RunSummary, RunSwimmerSummary, RunHistoryData } from '../services/runHistoryService'
