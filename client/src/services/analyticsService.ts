@@ -63,6 +63,22 @@ function getTimezone(): string {
   }
 }
 
+let fallbackDeviceId: string | null = null
+
+function readSessionDeviceId(): string {
+  try {
+    let id = sessionStorage.getItem(DEVICE_ID_KEY)
+    if (!id) {
+      id = uuidv7()
+      sessionStorage.setItem(DEVICE_ID_KEY, id)
+    }
+    return id
+  } catch {
+    fallbackDeviceId = uuidv7()
+    return fallbackDeviceId
+  }
+}
+
 function getDeviceId(): string {
   try {
     let id = localStorage.getItem(DEVICE_ID_KEY)
@@ -72,7 +88,10 @@ function getDeviceId(): string {
     }
     return id
   } catch {
-    return 'anonymous-device'
+    if (!fallbackDeviceId) {
+      fallbackDeviceId = readSessionDeviceId()
+    }
+    return fallbackDeviceId
   }
 }
 

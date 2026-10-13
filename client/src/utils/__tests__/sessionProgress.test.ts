@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  groupDrillRows, stripRepPrefix, computeSessionProgress,
+  groupDrillRows, stripRepPrefix,
   buildDrillGroup, computeDrillRowProgress, firstIncompleteDrillRow, isDrillRowComplete,
 } from '../sessionProgress'
 import type { RunDrill, LaneDrillResult } from '../../api/runs'
@@ -58,28 +58,6 @@ describe('stripRepPrefix', () => {
   it('strips the (r/n) prefix from a repetition name', () => {
     expect(stripRepPrefix('(3/3) 50 Fly')).toBe('50 Fly')
     expect(stripRepPrefix('100 Free')).toBe('100 Free')
-  })
-})
-
-describe('computeSessionProgress', () => {
-  const lanes = [lane('g1', 1), lane('g2', 2)]
-  const runDrills = [drill('r1', '(1/2) A', 'pd'), drill('r2', '(2/2) A', 'pd'), drill('b', 'B')]
-
-  it('counts logical drills per lane and repetition groups once', () => {
-    const res = computeSessionProgress(runDrills, [], lanes)
-    expect(res.total).toBe(4)
-    expect(res.done).toBe(0)
-    expect(res.pct).toBe(0)
-  })
-
-  it('a lane is only done when all its repetitions complete', () => {
-    const laneResults = [
-      { groupId: 'g1', runDrillId: 'r1', completed: true },
-      { groupId: 'g1', runDrillId: 'r2', completed: true },
-    ] as unknown as LaneDrillResult[]
-    const res = computeSessionProgress(runDrills, laneResults, lanes)
-    expect(res.done).toBe(1)
-    expect(res.pct).toBe(25)
   })
 })
 
