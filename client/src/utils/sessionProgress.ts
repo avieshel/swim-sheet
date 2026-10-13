@@ -30,12 +30,6 @@ export function groupDrillRows(runDrills: RunDrill[]): RunDrill[][] {
   return groups
 }
 
-export interface SessionProgress {
-  done: number
-  total: number
-  pct: number
-}
-
 // A row counts as complete only when every active group has completed it, so
 // one lane lagging never reads as done.
 export function isDrillRowComplete(
@@ -108,22 +102,4 @@ export function firstIncompleteDrillRow(
   activeGroups: TimedGroup[],
 ): RunDrill | undefined {
   return rows.find(row => !isDrillRowComplete(row, laneDrillResults, activeGroups)) ?? rows[0]
-}
-
-// Progress counts logical drills (a repetition-group counts once per lane).
-export function computeSessionProgress(
-  runDrills: RunDrill[],
-  laneDrillResults: LaneDrillResult[],
-  activeGroups: TimedGroup[],
-): SessionProgress {
-  const groups = groupDrillRows(runDrills)
-  let done = 0
-  for (const gd of groups) {
-    for (const lane of activeGroups) {
-      const allDone = gd.every(d => isDrillRowComplete(d, laneDrillResults, [lane]))
-      if (allDone) done++
-    }
-  }
-  const total = groups.length * activeGroups.length
-  return { done, total, pct: total > 0 ? Math.round((done / total) * 100) : 0 }
 }
