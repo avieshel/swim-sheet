@@ -24,6 +24,7 @@ function useLongPressMenu() {
   const timer = useRef<number | null>(null)
   const longFired = useRef(false)
   const start = useRef<{ x: number; y: number } | null>(null)
+  const lastPointerType = useRef<string>('touch')
 
   const clearTimer = () => {
     if (timer.current != null) {
@@ -32,8 +33,16 @@ function useLongPressMenu() {
     }
   }
 
+  // Only the primary button drives the gesture. Desktop secondary clicks
+  // (right / middle) must stay inert: they are how a user copies a name or
+  // opens the browser menu, and silently turning one into "mark done" would
+  // write status to the lane result behind their back.
+  const isPrimary = (e: React.PointerEvent) => e.button === 0
+
   const onPointerDown = (e: React.PointerEvent) => {
+    lastPointerType.current = e.pointerType
     if (menu) return
+    if (!isPrimary(e)) return
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('input') || target.closest('[data-no-longpress]')) return
     longFired.current = false
@@ -52,6 +61,7 @@ function useLongPressMenu() {
       longFired.current = false
       return
     }
+    if (!isPrimary(e)) return
     const target = e.target as HTMLElement
     if (target.closest('button') || target.closest('input') || target.closest('[data-no-longpress]')) return
     const s = start.current
@@ -62,6 +72,14 @@ function useLongPressMenu() {
   const onPointerCancel = () => {
     clearTimer()
     longFired.current = false
+  }
+
+  // Suppress the OS context menu only where our long-press is the intended
+  // gesture (touch / pen). On desktop the native menu is what a right-click
+  // should produce, so it is left alone.
+  const onContextMenu = (e: React.MouseEvent) => {
+    if (lastPointerType.current === 'mouse') return
+    e.preventDefault()
   }
 
   const renderMenu = (items: LongPressMenuItem[]) => {
@@ -91,7 +109,7 @@ function useLongPressMenu() {
     )
   }
 
-  return { onPointerDown, onPointerUp, onPointerCancel, renderMenu }
+  return { onPointerDown, onPointerUp, onPointerCancel, onContextMenu, renderMenu }
 }
 
 function StrokeCountStepper({ value, onChange }: {
@@ -195,7 +213,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
       onPointerDown={longPress.onPointerDown}
       onPointerUp={(e) => longPress.onPointerUp(e)}
       onPointerCancel={longPress.onPointerCancel}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={longPress.onContextMenu}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
@@ -482,7 +500,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
       onPointerDown={longPress.onPointerDown}
       onPointerUp={(e) => longPress.onPointerUp(e, handleTapComplete)}
       onPointerCancel={longPress.onPointerCancel}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={longPress.onContextMenu}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
