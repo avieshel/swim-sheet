@@ -132,6 +132,16 @@ export interface LapEntry {
   strokeCount?: number
 }
 
+// Per-(swimmer, drill) status. A swimmer's standing on a drill is one of:
+//  - 'timed'   : has a recorded time stamp (implies done)
+//  - 'done'    : drill marked complete for this swimmer, no precise time
+//  - 'skipped' : coach explicitly took this swimmer out of the drill
+//  - 'notdone' : coach explicitly left this swimmer / drill incomplete
+//                (distinct from the implicit lazy 'done' default)
+// Open to more states later (e.g. "did 2 of 4 iterations") — hence an enum,
+// not a boolean.
+export type SwimmerDrillStatus = 'done' | 'timed' | 'skipped' | 'notdone'
+
 export interface SavedSwimmerData {
   dbId: string
   name: string
@@ -139,6 +149,7 @@ export interface SavedSwimmerData {
   completedAt: number | null
   laps: LapEntry[]
   completed: boolean
+  status?: SwimmerDrillStatus
 }
 
 export interface SavedDrillData {

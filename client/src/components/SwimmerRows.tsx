@@ -1,13 +1,98 @@
-import React, { useContext, useMemo, useState } from 'react'
+import React, { useContext, useMemo, useRef, useState } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
 import { timestampSplits, removeLapEntry, updateStrokeCount } from '../utils/lapEditing'
 import { K } from '../timing/timestampStore'
 import { formatTime } from '../utils/formatTime'
 import { useSwimmerEditModal } from './useSwimmerEditModal'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
-import { removeSwimmerFromRun } from '../api/runs'
+import { removeSwimmerFromRun, type SwimmerDrillStatus } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
+
+// A single tap completes the swimmer; a long press (≈450ms) opens a small
+// anchorless menu at the touch point. Buttons/inputs inside the row are excluded
+// so their own handlers run instead. The returned `renderMenu` uses fixed
+// positioning, so it is never clipped by the row's `overflow-hidden`.
+interface LongPressMenuItem {
+  label: string
+  icon: string
+  onClick: () => void
+}
+
+function useLongPressMenu() {
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const timer = useRef<number | null>(null)
+  const longFired = useRef(false)
+  const start = useRef<{ x: number; y: number } | null>(null)
+
+  const clearTimer = () => {
+    if (timer.current != null) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+  }
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (menu) return
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[data-no-longpress]')) return
+    longFired.current = false
+    start.current = { x: e.clientX, y: e.clientY }
+    const px = e.clientX
+    const py = e.clientY
+    timer.current = window.setTimeout(() => {
+      longFired.current = true
+      setMenu({ x: px, y: py })
+    }, 450)
+  }
+
+  const onPointerUp = (e: React.PointerEvent, onTap?: () => void) => {
+    clearTimer()
+    if (longFired.current) {
+      longFired.current = false
+      return
+    }
+    const target = e.target as HTMLElement
+    if (target.closest('button') || target.closest('input') || target.closest('[data-no-longpress]')) return
+    const s = start.current
+    if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > 8) return
+    onTap?.()
+  }
+
+  const onPointerCancel = () => {
+    clearTimer()
+    longFired.current = false
+  }
+
+  const renderMenu = (items: LongPressMenuItem[]) => {
+    if (!menu) return null
+    const itemHeight = 44
+    const top = Math.min(menu.y + 8, window.innerHeight - items.length * itemHeight - 16)
+    const left = Math.min(menu.x, window.innerWidth - 180)
+    return (
+      <>
+        <div className="fixed inset-0 z-[60]" onPointerDown={() => setMenu(null)} />
+        <div
+          className="fixed z-[61] min-w-[160px] bg-surface-container-high rounded-xl border border-outline-variant shadow-xl p-1 flex flex-col"
+          style={{ top, left }}
+        >
+          {items.map((item) => (
+            <button
+              key={item.label}
+              onClick={() => { setMenu(null); item.onClick() }}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-body-md text-on-surface hover:bg-surface-variant transition-colors cursor-pointer"
+            >
+              <Icon name={item.icon} size="sm" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </>
+    )
+  }
+
+  return { onPointerDown, onPointerUp, onPointerCancel, renderMenu }
+}
 
 function StrokeCountStepper({ value, onChange }: {
   value: number | undefined
@@ -54,12 +139,16 @@ interface SavedSwimmerRowProps {
   onSwimmerSaved?: () => void
   currentGroupId: string
   findExistingAllocation: (dbId: string) => { groupId: string; groupName: string } | null
+  onRemoveFromFocus?: (dbId: string) => void
+  onSkipSavedSwimmer?: (dbId: string) => void
+  onMarkDoneSavedSwimmer?: (dbId: string) => void
 }
 
-export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, onClearSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: SavedSwimmerRowProps) {
+export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, onClearSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation, onRemoveFromFocus, onSkipSavedSwimmer, onMarkDoneSavedSwimmer }: SavedSwimmerRowProps) {
   const { dispatch } = useContext(LiveSessionContext)
   const lapEntries = saved.laps ?? []
   const [confirmClear, setConfirmClear] = useState(false)
+  const longPress = useLongPressMenu()
 
   const displayTime = (() => {
     if (saved.startedAt == null) return '--:--.--'
@@ -101,7 +190,13 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
   })
 
   return (
-    <div className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden">
+    <div
+      className="bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden select-none"
+      onPointerDown={longPress.onPointerDown}
+      onPointerUp={(e) => longPress.onPointerUp(e)}
+      onPointerCancel={longPress.onPointerCancel}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
         <div className="min-w-0 flex-1 flex flex-col">
@@ -117,6 +212,9 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
               <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">wanna be</span>
             )}
             <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Saved</span>
+            {saved.status === 'skipped' && (
+              <span className="text-label-caps text-on-surface-variant bg-surface-variant px-1.5 py-0.5 rounded-full">Skipped</span>
+            )}
           </div>
         </div>
         <div className="flex items-start gap-1.5 shrink-0">
@@ -146,6 +244,15 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
           <button onClick={() => toggleLapEdit(`saved-${saved.dbId}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none -mr-1 mt-0.5">
             <Icon name={isEditing ? 'check' : 'more_horiz'} size="sm" />
           </button>
+          {onRemoveFromFocus && (
+            <button
+              onClick={() => onRemoveFromFocus(saved.dbId)}
+              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1 mt-0.5"
+              title="Remove from timing focus"
+            >
+              <Icon name="close" size="sm" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -226,6 +333,14 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
       />
 
       {modal}
+      {longPress.renderMenu(
+        saved.status === 'skipped'
+          ? [{ label: 'Mark done', icon: 'check', onClick: () => onMarkDoneSavedSwimmer?.(saved.dbId) }]
+          : [
+              { label: 'Skip', icon: 'fast_forward', onClick: () => onSkipSavedSwimmer?.(saved.dbId) },
+              { label: 'Clear swimmer', icon: 'restart_alt', onClick: () => setConfirmClear(true) },
+            ],
+      )}
     </div>
   )
 }
@@ -240,18 +355,29 @@ interface ActiveSwimmerRowProps {
   onLap: (swimmerId: number) => void
   onComplete: (swimmerId: number) => void
   onClear: (swimmerId: number, dbId: string | undefined) => void
+  onSkip: (swimmerId: number) => void
+  onMarkDone: (swimmerId: number) => void
   handleMoveSwimmer: (swimmerId: number, direction: 'up' | 'down') => void
   rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>
   onSwimmerSaved?: () => void
   currentGroupId: string
   findExistingAllocation: (dbId: string) => { groupId: string; groupName: string } | null
+  onRemoveFromFocus?: (swimmerId: number) => void
+  savedStatus?: SwimmerDrillStatus
 }
 
-export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, onClear, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation }: ActiveSwimmerRowProps) {
+export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, onClear, onSkip, onMarkDone, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation, onRemoveFromFocus, savedStatus }: ActiveSwimmerRowProps) {
   const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
   const storeVersion = store.version
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const longPress = useLongPressMenu()
+
+  const handleTapComplete = () => {
+    if (swimmer.completed || savedStatus === 'skipped') return
+    if (startedAt == null) onMarkDone(swimmer.id)
+    else onComplete(swimmer.id)
+  }
 
   const isVirtual = isVirtualSwimmer(swimmer.dbId)
   const { saving, handleNameClick, modal } = useSwimmerEditModal({
@@ -349,10 +475,14 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
 
   return (
     <div 
-      className={`bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden transition-all ${isDragging ? 'opacity-50 scale-95' : ''}`}
+      className={`bg-surface-container rounded-xl border border-outline-variant/20 overflow-hidden transition-all select-none ${isDragging ? 'opacity-50 scale-95' : ''}`}
       draggable="true"
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onPointerDown={longPress.onPointerDown}
+      onPointerUp={(e) => longPress.onPointerUp(e, handleTapComplete)}
+      onPointerCancel={longPress.onPointerCancel}
+      onContextMenu={(e) => e.preventDefault()}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 px-3 pt-3 pb-1.5">
@@ -390,8 +520,11 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
                   </button>
                 </span>
               )}
-              {swimmer.completed && (
+              {swimmer.completed && savedStatus !== 'skipped' && (
                 <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Done</span>
+              )}
+              {savedStatus === 'skipped' && (
+                <span className="text-label-caps text-on-surface-variant bg-surface-variant px-1.5 py-0.5 rounded-full">Skipped</span>
               )}
             </div>
           </div>
@@ -403,13 +536,23 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
               <span className="font-mono text-label-sm tabular-nums text-on-surface-variant mt-0.5">(+{(goOffset / 1000).toFixed(2)}s)</span>
             )}
           </div>
-          <button
-            onClick={() => setShowRemoveConfirm(true)}
-            className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
-            title={isVirtual ? 'Remove swimmer' : 'Remove swimmer from this lane'}
-          >
-            <Icon name="close" size="sm" />
-          </button>
+          {onRemoveFromFocus ? (
+            <button
+              onClick={() => onRemoveFromFocus(swimmer.id)}
+              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
+              title="Remove from timing focus"
+            >
+              <Icon name="close" size="sm" />
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowRemoveConfirm(true)}
+              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
+              title={isVirtual ? 'Remove swimmer' : 'Remove swimmer from this lane'}
+            >
+              <Icon name="close" size="sm" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -458,7 +601,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
       <div className="px-3 py-2 flex gap-1.5 justify-center">
         <button
           onClick={() => onStart(swimmer.id)}
-          disabled={hasIndividualStart || swimmer.completed}
+          disabled={hasIndividualStart || swimmer.completed || savedStatus === 'skipped'}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary text-on-primary hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <Icon name="play_arrow" size="xs" />
@@ -466,7 +609,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         </button>
         <button
           onClick={() => onLap(swimmer.id)}
-          disabled={swimmer.completed}
+          disabled={swimmer.completed || savedStatus === 'skipped'}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary text-on-primary hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <Icon name="flag" size="xs" />
@@ -474,7 +617,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         </button>
         <button
           onClick={() => onComplete(swimmer.id)}
-          disabled={swimmer.completed}
+          disabled={swimmer.completed || savedStatus === 'skipped'}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer bg-primary-container text-on-primary-container hover:brightness-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
         >
           <Icon name="check" size="xs" />
@@ -482,7 +625,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         </button>
         <button
           onClick={() => onClear(swimmer.id, swimmer.dbId)}
-          disabled={startedAt == null && !swimmer.completed}
+          disabled={startedAt == null && !swimmer.completed || savedStatus === 'skipped'}
           className="flex-1 flex items-center justify-center gap-0.5 h-11 md:h-12 px-3 md:px-4 text-label-sm md:text-xs rounded-full font-bold transition-all cursor-pointer border border-outline text-on-surface-variant hover:bg-surface-variant active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Icon name="restart_alt" size="xs" />
@@ -504,6 +647,14 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
         onConfirm={handleRemoveSwimmer}
         onCancel={() => setShowRemoveConfirm(false)}
       />
+      {longPress.renderMenu(
+        savedStatus === 'skipped'
+          ? [{ label: 'Mark done', icon: 'check', onClick: () => onMarkDone(swimmer.id) }]
+          : [
+              { label: 'Complete', icon: 'check', onClick: handleTapComplete },
+              { label: 'Skip', icon: 'fast_forward', onClick: () => onSkip(swimmer.id) },
+            ],
+      )}
     </div>
   )
 })

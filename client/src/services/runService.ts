@@ -41,8 +41,10 @@ export interface LaneResultSwimmerUpdate {
   laps?: { time: number; strokeCount?: number }[]
   startedAt?: number | null
   completedAt?: number | null
+  completed?: boolean
   name?: string
   dbId?: string
+  status?: 'done' | 'timed' | 'skipped' | 'notdone'
 }
 
 export interface CompleteRunLap {
@@ -211,6 +213,8 @@ export const runService = {
     if ('completedAt' in updates) swimmer.completedAt = updates.completedAt ?? null
     if (updates.name !== undefined) swimmer.name = updates.name
     if (updates.dbId !== undefined) swimmer.dbId = updates.dbId
+    if (updates.completed !== undefined) swimmer.completed = updates.completed
+    if (updates.status !== undefined) swimmer.status = updates.status
     await upsertLaneDrillResult({ ...result, data: JSON.stringify(data) })
   },
 

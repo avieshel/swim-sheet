@@ -4,9 +4,10 @@ import { Icon } from '../Icon'
 
 interface LaneSwimmersSectionProps {
   onManageSwimmers: (lane?: number) => void
+  onEnterTimingSwimmers: (dbIds: string[]) => void
 }
 
-export function LaneSwimmersSection({ onManageSwimmers }: LaneSwimmersSectionProps) {
+export function LaneSwimmersSection({ onManageSwimmers, onEnterTimingSwimmers }: LaneSwimmersSectionProps) {
   const { groups } = useContext(LiveSessionContext)
   const [isExpanded, setIsExpanded] = useState(false)
   const swimmerCount = groups.reduce((sum, g) => sum + g.swimmers.length, 0)
@@ -61,15 +62,25 @@ export function LaneSwimmersSection({ onManageSwimmers }: LaneSwimmersSectionPro
             </div>
           ) : (
             <>
-              <div className="space-y-2 pt-2">
+              <div className="space-y-3 pt-2">
                 {activeGroups.map(group => (
-                  <div key={group.id} className="text-label-sm flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3 py-1 border-b border-outline-variant/10 last:border-0">
-                    <span className="font-bold text-on-surface shrink-0">Lane {group.lane}:</span>
-                    <span className="text-on-surface-variant">
-                      {group.swimmers.length > 0
-                        ? group.swimmers.map(s => s.name).join(', ')
-                        : <span className="italic opacity-60">No swimmers assigned</span>}
-                    </span>
+                  <div key={group.id} className="py-1 border-b border-outline-variant/10 last:border-0">
+                    <div className="text-label-sm font-bold text-on-surface mb-1.5">Lane {group.lane}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {group.swimmers.length === 0 ? (
+                        <span className="text-label-sm italic text-on-surface-variant opacity-60">No swimmers assigned</span>
+                      ) : group.swimmers.map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => s.dbId && onEnterTimingSwimmers([s.dbId])}
+                          title={`Time ${s.name}`}
+                          className="flex items-center gap-1.5 h-10 px-3 rounded-full bg-surface-container border border-outline-variant/30 text-on-surface text-label-sm font-medium hover:bg-primary-container/30 transition-all cursor-pointer"
+                        >
+                          <Icon name="timer" size="xs" className="text-primary" />
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

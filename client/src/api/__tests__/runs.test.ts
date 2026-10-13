@@ -34,6 +34,8 @@ vi.mock('../../services/runService', () => ({
     getLapsForRunDrill: vi.fn(),
     getLapsForSwimmer: vi.fn(),
     addLap: vi.fn(),
+    deleteLaneResultsForDrills: vi.fn(),
+    deleteLapsForDrills: vi.fn(),
   },
 }))
 
@@ -44,12 +46,12 @@ vi.mock('../../services/runHistoryService', () => ({
   exportRun: vi.fn(),
 }))
 
-import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, startLaneResult, completeLaneResult, uncompleteLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult, getRunHistory, getRunById, deleteRun, exportRun } from '../runs'
+import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, startLaneResult, completeLaneResult, uncompleteLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult, getRunHistory, getRunById, deleteRun, exportRun, pruneRemovedDrillData } from '../runs'
 import { runService } from '../../services/runService'
 import type { SafeSessionRun, SafeLaneDrillResult, SafeLap } from '../../db/schema'
 import type { LiveDrillTiming } from '../../timing/liveTiming'
 import type { CompleteRunLap } from '../../services/runService'
-import type { RunSummary, RunSwimmerSummary, RunHistoryData } from '../runs'
+import type { RunSummary, RunSwimmerSummary, RunHistoryData, SavedDrillData } from '../runs'
 
 describe('runs API', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -324,6 +326,7 @@ describe('runs API', () => {
           { time: 1000, strokeCount: 20 },
         ],
         completed: true,
+        status: 'timed',
       },
     ])
   })
@@ -351,6 +354,73 @@ describe('runs API', () => {
     expect(result.drillEnd).toBe(7000)
     expect(result.swimmers[0].laps).toEqual([])
     expect(result.swimmers[0].completed).toBe(false)
+  })
+
+  it('buildLaneResult preserves an explicit skipped/notdone status when there is no live timing', () => {
+    const live: LiveDrillTiming = {
+      drillStart: 1000,
+      drillEnd: null,
+      swimmers: [],
+    }
+    const existingData: SavedDrillData = {
+      drillStart: 1000,
+      drillEnd: null,
+      sessionStartedAt: 0,
+      poolLength: 25,
+      swimmers: [
+        { dbId: 'sw1', name: 'Alice', startedAt: null, completedAt: null, laps: [], status: 'skipped' },
+        { dbId: 'sw2', name: 'Bob', startedAt: null, completedAt: null, laps: [], status: 'notdone' },
+      ],
+    }
+    const result = buildLaneResult({
+      runId: 'r1',
+      groupId: 'g1',
+      drillId: 'rd1',
+      sessionStartedAt: 0,
+      now: 7000,
+      live,
+      swimmers: [
+        { dbId: 'sw1', name: 'Alice', completed: false, lapStrokeCounts: {} },
+        { dbId: 'sw2', name: 'Bob', completed: false, lapStrokeCounts: {} },
+      ],
+      existingData,
+    })
+    expect(result.swimmers[0].status).toBe('skipped')
+    expect(result.swimmers[0].completed).toBe(false)
+    expect(result.swimmers[1].status).toBe('notdone')
+    expect(result.swimmers[1].completed).toBe(false)
+  })
+
+  it('buildLaneResult prefers a recorded time over a stale skipped status', () => {
+    const live: LiveDrillTiming = {
+      drillStart: 1000,
+      drillEnd: null,
+      swimmers: [
+        { dbId: 'sw1', startedAt: 1000, completedAt: 5000, lapTimestamps: [] },
+      ],
+    }
+    const existingData: SavedDrillData = {
+      drillStart: 1000,
+      drillEnd: null,
+      sessionStartedAt: 0,
+      poolLength: 25,
+      swimmers: [
+        { dbId: 'sw1', name: 'Alice', startedAt: null, completedAt: null, laps: [], status: 'skipped' },
+      ],
+    }
+    const result = buildLaneResult({
+      runId: 'r1',
+      groupId: 'g1',
+      drillId: 'rd1',
+      sessionStartedAt: 0,
+      now: 7000,
+      live,
+      swimmers: [
+        { dbId: 'sw1', name: 'Alice', completed: true, lapStrokeCounts: {} },
+      ],
+      existingData,
+    })
+    expect(result.swimmers[0].status).toBe('timed')
   })
 
   // ── Run History ──
@@ -396,6 +466,32 @@ describe('runs API', () => {
 
   it('exposes the run history read-model types', () => {
     swimmerSummaryFixture()
+  })
+
+  // ── Removed-drill pruning ──
+
+  it('pruneRemovedDrillData deletes orphaned results and laps for removed drills', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      { id: 'lr1', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'd1', completed: true, data: null, updatedAt: '' },
+      { id: 'lr2', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'd10', completed: true, data: null, updatedAt: '' },
+      { id: 'lr3', runId: 'r1', groupId: 'g2', lane: 2, runDrillId: 'd10', completed: true, data: null, updatedAt: '' },
+    ])
+    await pruneRemovedDrillData('r1', [{ id: 'd1' }, { id: 'd2' }])
+    // drill 10 (removed) is cleaned for both lanes
+    expect(runService.deleteLaneResultsForDrills).toHaveBeenCalledWith('r1', 'g1', ['d10'])
+    expect(runService.deleteLaneResultsForDrills).toHaveBeenCalledWith('r1', 'g2', ['d10'])
+    expect(runService.deleteLapsForDrills).toHaveBeenCalledWith(['d10'])
+    // current drills are untouched
+    expect(runService.deleteLaneResultsForDrills).not.toHaveBeenCalledWith('r1', 'g1', ['d1'])
+  })
+
+  it('pruneRemovedDrillData is a no-op when no drills were removed', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      { id: 'lr1', runId: 'r1', groupId: 'g1', lane: 1, runDrillId: 'd1', completed: true, data: null, updatedAt: '' },
+    ])
+    await pruneRemovedDrillData('r1', [{ id: 'd1' }])
+    expect(runService.deleteLaneResultsForDrills).not.toHaveBeenCalled()
+    expect(runService.deleteLapsForDrills).not.toHaveBeenCalled()
   })
 })
 
