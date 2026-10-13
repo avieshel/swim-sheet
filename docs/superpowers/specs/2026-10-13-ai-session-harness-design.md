@@ -107,7 +107,7 @@ first version toward full richness.
 │     ├── context.ts      builds structural context             │
 │     └── apply.ts        the one writer                        │
 │       ↓                                                       │
-│  sessionService.create() + drillService   (existing, untouched)│
+│  sessionDraftService.apply() → draft-specific DAO transaction  │
 └──────────────────────────────────────────────────────────────┘
                     │ HTTPS, caller's Supabase JWT
                     ▼
@@ -139,8 +139,10 @@ workspace, and a duplicated schema that drifts is worse than a loose check.
 
 **3. Single writer.** `sessionDraftService.apply()` is the only code that turns a draft into a
 persisted session. The non-harness path constructs a `SessionDraft` and goes through the *same*
-validator and writer. There is no second route into the DB, and the model never reaches
-`sessionService.create()` on its own.
+validator and writer. The writer uses a dedicated transactional DAO insert for the session and its
+drills; it does not call the existing `addDrill()` path, which also writes to `libraryDrills`. The
+existing direct session/drill APIs remain unchanged and available. There is no second route from
+the model into the DB.
 
 **4. No domain-data reads.** The client builds the structural context locally and sends it in the
 request. The function does not query swimmers, sessions, drills, or library data. It does use a
@@ -197,7 +199,8 @@ duplicate summary values: the mapper derives `Drill.distance` as
 distance-weighted dominant stroke, matching the app's current drill metrics. It supplies neutral
 defaults for required app fields (`notes: ''`, `labels: []`, `focus: 'none'`,
 `timingMode: 'individual'`). The validated draft service is also callable directly without
-invoking the harness.
+invoking the harness. It persists the session and all generated drills in one Dexie transaction
+and does not add those drills to `libraryDrills`.
 
 ### Draft marker and library evolution
 
