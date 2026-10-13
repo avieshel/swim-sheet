@@ -15,11 +15,11 @@ vi.mock('../deviceContext', () => ({
   })),
 }))
 
+import { validate as isUuid } from 'uuid'
 import { analytics, isNewSession } from '../analyticsService'
 
 const QUEUE_KEY = 'swimsheet_analytics_queue'
 const DEVICE_ID_KEY = 'swimsheet_device_id'
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SESSION_ID_KEY = 'swimsheet_session_id'
 const SESSION_START_KEY = 'swimsheet_session_start'
 const SESSION_LAST_KEY = 'swimsheet_session_last'
@@ -443,8 +443,7 @@ describe('analyticsService', () => {
 
     const ids = allSentRows().map((r) => r.device_id)
     expect(ids).toHaveLength(2)
-    expect(ids[0]).toMatch(UUID_RE)
-    expect(ids[0]).not.toBe('anonymous-device')
+    expect(isUuid(ids[0])).toBe(true)
     expect(ids[1]).toBe(ids[0])
   })
 
@@ -462,7 +461,7 @@ describe('analyticsService', () => {
 
     const ids = allSentRows().map((r) => r.device_id)
     expect(ids).toHaveLength(2)
-    expect(beforeReload).toMatch(UUID_RE)
+    expect(isUuid(beforeReload)).toBe(true)
     expect(ids[1]).toBe(beforeReload)
   })
 
@@ -477,8 +476,7 @@ describe('analyticsService', () => {
 
     const ids = allSentRows().map((r) => r.device_id)
     expect(ids).toHaveLength(2)
-    expect(ids[0]).toMatch(UUID_RE)
-    expect(ids[0]).not.toBe('anonymous-device')
+    expect(isUuid(ids[0])).toBe(true)
     expect(ids[1]).toBe(ids[0])
   })
 })
