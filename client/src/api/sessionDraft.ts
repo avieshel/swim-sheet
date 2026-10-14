@@ -41,6 +41,7 @@ export type SessionDraftResult =
   | { outcome: 'network' }
   | { outcome: 'auth' }
   | { outcome: 'rate_limited'; retryAfterSeconds: number }
+  | { outcome: 'provider_rate_limited'; retryAfterSeconds: number }
   | { outcome: 'privacy' }
   | { outcome: 'timeout' }
   | { outcome: 'provider' }
@@ -94,11 +95,57 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
   }
 }
 
-function mapInvokeError(error: { status?: number; message?: string }): SessionDraftResult {
-  const status = error.status
+// supabase-js throws a FunctionsHttpError whose `context` is the fetch Response;
+// it does not expose the status directly, so read it (and the retry hint) from
+// the Response. The harness echoes `retry_after_seconds` in the body as well as
+// the standard Retry-After header.
+interface InvokeErrorLike {
+  status?: number
+  message?: string
+  context?: unknown
+}
+
+interface HarnessErrorBody {
+  error?: string
+  retry_after_seconds?: number
+}
+
+async function readErrorBody(context: Response): Promise<HarnessErrorBody> {
+  try {
+    const parsed = (await context.clone().json()) as unknown
+    return parsed !== null && typeof parsed === 'object' ? (parsed as HarnessErrorBody) : {}
+  } catch {
+    return {}
+  }
+}
+
+function readRetryHeader(context: Response): number | undefined {
+  const raw = context.headers.get('Retry-After')
+  if (!raw) return undefined
+  const seconds = Number.parseInt(raw, 10)
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined
+}
+
+async function mapInvokeError(error: InvokeErrorLike): Promise<SessionDraftResult> {
+  const context = error.context
+  const isResponse = context instanceof Response
+  const status = isResponse ? context.status : error.status
+
   if (status === 401 || status === 403) return { outcome: 'auth' }
-  if (status === 429) return { outcome: 'rate_limited', retryAfterSeconds: 3600 }
   if (status === 408) return { outcome: 'timeout' }
+  if (status === 429) {
+    const body = isResponse ? await readErrorBody(context) : {}
+    const headerSeconds = isResponse ? readRetryHeader(context) : undefined
+    const bodySeconds =
+      typeof body.retry_after_seconds === 'number' && body.retry_after_seconds > 0
+        ? body.retry_after_seconds
+        : undefined
+    const retryAfterSeconds =
+      headerSeconds ?? bodySeconds ?? defaultSessionDraftConfig.limits.rateLimitFallbackSeconds
+    return body.error === 'provider_rate_limited'
+      ? { outcome: 'provider_rate_limited', retryAfterSeconds }
+      : { outcome: 'rate_limited', retryAfterSeconds }
+  }
   if (status !== undefined && status >= 500) return { outcome: 'provider' }
   return { outcome: 'network' }
 }
@@ -130,7 +177,7 @@ export async function requestSessionDraft(prepared: PreparedSessionDraft): Promi
   }
 
   const { data, error } = await supabase.functions.invoke('ai-session-harness', { body })
-  if (error) return mapInvokeError(error)
+  if (error) return await mapInvokeError(error)
 
   const validation = validateHarnessResult(data)
   if (!validation.ok) return { outcome: 'invalid' }

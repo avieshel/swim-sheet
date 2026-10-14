@@ -3,6 +3,7 @@
 
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1'
 import { callProvider, ProviderError, type ProviderConfig } from './provider.ts'
+import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
 import type { SessionDraftRequest } from './contract.ts'
 
 const request: SessionDraftRequest = {
@@ -39,6 +40,48 @@ Deno.test('callProvider maps a non-2xx response to a status error', async () => 
   const restore = stubFetch(() => Promise.resolve(new Response('nope', { status: 500 })))
   try {
     await assertRejects(() => callProvider(request, config), ProviderError, 'provider returned 500')
+  } finally {
+    restore()
+  }
+})
+
+async function captureProviderError(fn: () => Promise<unknown>): Promise<ProviderError> {
+  try {
+    await fn()
+  } catch (err) {
+    if (err instanceof ProviderError) return err
+    throw err
+  }
+  throw new Error('expected callProvider to throw ProviderError')
+}
+
+Deno.test('callProvider maps an upstream 429 to rate_limited with its Retry-After hint', async () => {
+  const restore = stubFetch(() => Promise.resolve(new Response('slow', { status: 429, headers: { 'Retry-After': '42' } })))
+  try {
+    const err = await captureProviderError(() => callProvider(request, config))
+    assertEquals(err.kind, 'rate_limited')
+    assertEquals(err.retryAfterSeconds, 42)
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProvider falls back to a default retry when the 429 has no Retry-After', async () => {
+  const restore = stubFetch(() => Promise.resolve(new Response('slow', { status: 429 })))
+  try {
+    const err = await captureProviderError(() => callProvider(request, config))
+    assertEquals(err.kind, 'rate_limited')
+    assertEquals(err.retryAfterSeconds, PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS)
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProvider maps an upstream 503 to unavailable', async () => {
+  const restore = stubFetch(() => Promise.resolve(new Response('down', { status: 503 })))
+  try {
+    const err = await captureProviderError(() => callProvider(request, config))
+    assertEquals(err.kind, 'unavailable')
   } finally {
     restore()
   }

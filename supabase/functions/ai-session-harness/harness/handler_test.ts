@@ -80,12 +80,12 @@ Deno.test('returns 503 when the rate-limit store is unavailable', async () => {
   assertEquals(res.body.error, 'rate_limit_unavailable')
 })
 
-Deno.test('returns 429 with Retry-After when rate limited', async () => {
+Deno.test('returns 429 with Retry-After and echoed seconds when rate limited', async () => {
   const deps = makeDeps({ recordRequest: () => Promise.resolve({ allowed: false, retry_after_seconds: 7 }) })
   const res = await createHandler(deps)(makeRequest(OK_BODY))
   assertEquals(res.status, 429)
   assertEquals(res.headers.get('Retry-After'), '7')
-  assertEquals(((await res.json()) as Record<string, unknown>).error, 'rate_limited')
+  assertEquals(await res.json(), { error: 'rate_limited', retry_after_seconds: 7 })
 })
 
 Deno.test('returns the agent draft on success', async () => {
@@ -105,6 +105,21 @@ Deno.test('returns 408 when the agent times out', async () => {
   const res = await call(deps, makeRequest(OK_BODY))
   assertEquals(res.status, 408)
   assertEquals(res.body.error, 'provider_timeout')
+})
+
+Deno.test('returns 429 with the provider retry hint when the upstream rate-limits', async () => {
+  const deps = makeDeps({ runAgent: () => Promise.reject(new ProviderError('rate_limited', 'slow', 33)) })
+  const res = await createHandler(deps)(makeRequest(OK_BODY))
+  assertEquals(res.status, 429)
+  assertEquals(res.headers.get('Retry-After'), '33')
+  assertEquals(await res.json(), { error: 'provider_rate_limited', retry_after_seconds: 33 })
+})
+
+Deno.test('returns 503 when the provider is unavailable', async () => {
+  const deps = makeDeps({ runAgent: () => Promise.reject(new ProviderError('unavailable', 'down')) })
+  const res = await call(deps, makeRequest(OK_BODY))
+  assertEquals(res.status, 503)
+  assertEquals(res.body.error, 'provider_unavailable')
 })
 
 Deno.test('returns 502 for other agent failures', async () => {

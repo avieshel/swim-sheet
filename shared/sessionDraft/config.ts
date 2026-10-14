@@ -30,6 +30,9 @@ export interface SessionDraftLimits {
   maxRecentSessions: number
   maxDistance: number
   maxRepeatCount: number
+  // Retry window to tell the client to wait when the harness returns 429 without
+  // a Retry-After value. Matches the per-user rate-limit window.
+  rateLimitFallbackSeconds: number
 }
 
 export interface SessionDraftConfig {
@@ -55,6 +58,7 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
     maxRecentSessions: 2,
     maxDistance: 10_000,
     maxRepeatCount: 100,
+    rateLimitFallbackSeconds: 3600,
   },
 }
 

@@ -15,6 +15,17 @@ import type { Session } from '../api/sessions'
 
 type Phase = 'compose' | 'review' | 'done'
 
+function formatRetryWait(seconds: number): string {
+  if (seconds < 60) {
+    const s = Math.max(1, Math.ceil(seconds))
+    return `${s} second${s === 1 ? '' : 's'}`
+  }
+  const minutes = Math.ceil(seconds / 60)
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`
+  const hours = Math.ceil(minutes / 60)
+  return `${hours} hour${hours === 1 ? '' : 's'}`
+}
+
 export const AiSessionDraft: React.FC = () => {
   const { user, status } = useAuth()
   const navigate = useNavigate()
@@ -256,7 +267,13 @@ export const AiSessionDraft: React.FC = () => {
 
         {result && (result.outcome === 'rate_limited') && (
           <div className="mt-4 text-label-sm text-on-surface-variant">
-            You have reached the AI request limit. Please try again later.
+            You have reached the AI request limit. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
+          </div>
+        )}
+
+        {result && (result.outcome === 'provider_rate_limited') && (
+          <div className="mt-4 text-label-sm text-on-surface-variant">
+            The AI service is busy right now. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
           </div>
         )}
 

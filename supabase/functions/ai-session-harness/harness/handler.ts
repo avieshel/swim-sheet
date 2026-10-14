@@ -6,10 +6,11 @@
 // handler_test.ts) and keeps the agent independently testable.
 
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
+import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from '../agent/config.ts'
 import { ProviderError } from '../agent/provider.ts'
 import { validateHarnessResult } from '../agent/output.ts'
 import type { SessionDraftRequest } from '../agent/contract.ts'
-import { json, jsonWithRetryAfter } from './http.ts'
+import { json, rateLimited } from './http.ts'
 
 export type AuthOutcome =
   | { kind: 'authenticated'; userId: string }
@@ -60,7 +61,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     const rate = await deps.recordRequest(auth.userId)
     if (!rate) return json({ error: 'rate_limit_unavailable' }, 503)
     if (!rate.allowed) {
-      return jsonWithRetryAfter({ error: 'rate_limited' }, 429, rate.retry_after_seconds)
+      return rateLimited('rate_limited', rate.retry_after_seconds)
     }
 
     // 4. One structured-output agent call, validated before returning.
@@ -70,8 +71,12 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       if (!validation.ok) return json({ error: 'invalid_provider_response' }, 502)
       return json(validation.value, 200)
     } catch (err) {
-      if (err instanceof ProviderError && err.kind === 'timeout') {
-        return json({ error: 'provider_timeout' }, 408)
+      if (err instanceof ProviderError) {
+        if (err.kind === 'timeout') return json({ error: 'provider_timeout' }, 408)
+        if (err.kind === 'rate_limited') {
+          return rateLimited('provider_rate_limited', err.retryAfterSeconds ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS)
+        }
+        if (err.kind === 'unavailable') return json({ error: 'provider_unavailable' }, 503)
       }
       return json({ error: 'provider_error' }, 502)
     }

@@ -3,17 +3,32 @@
 // browser. Swapping providers later must keep the same HarnessResult shape.
 
 import { buildSystemPrompt, buildUserContent } from './prompt.ts'
-import { PROVIDER_REQUEST_TIMEOUT_MS, PROVIDER_TEMPERATURE } from './config.ts'
+import {
+  PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
+  PROVIDER_REQUEST_TIMEOUT_MS,
+  PROVIDER_TEMPERATURE,
+} from './config.ts'
 import type { HarnessResult, SessionDraftRequest } from './contract.ts'
+
+export type ProviderErrorKind = 'timeout' | 'status' | 'shape' | 'network' | 'rate_limited' | 'unavailable'
 
 export class ProviderError extends Error {
   constructor(
-    public readonly kind: 'timeout' | 'status' | 'shape' | 'network',
+    public readonly kind: ProviderErrorKind,
     message: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message)
     this.name = 'ProviderError'
   }
+}
+
+// Retry-After is seconds per RFC 9110 (the HTTP-date form is not used by the
+// providers we target). Anything unparseable falls back to the config default.
+function parseRetryAfterSeconds(header: string | null): number | undefined {
+  if (!header) return undefined
+  const seconds = Number.parseInt(header.trim(), 10)
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined
 }
 
 export interface ProviderConfig {
@@ -67,6 +82,16 @@ export async function callProvider(
     })
 
     if (!res.ok) {
+      if (res.status === 429) {
+        throw new ProviderError(
+          'rate_limited',
+          'provider rate limited',
+          parseRetryAfterSeconds(res.headers.get('Retry-After')) ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
+        )
+      }
+      if (res.status === 503) {
+        throw new ProviderError('unavailable', `provider returned ${res.status}`)
+      }
       throw new ProviderError('status', `provider returned ${res.status}`)
     }
 

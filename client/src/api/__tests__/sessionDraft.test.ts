@@ -36,8 +36,9 @@ import { getAllSwimmers } from '../../db/dao'
 import { settingsService } from '../../services/settingsService'
 import { sessionService } from '../../services/sessionService'
 import { getSessionDrills } from '../drills'
-import { prepareSessionDraft, requestSessionDraft, applySessionDraft } from '../sessionDraft'
+import { prepareSessionDraft, requestSessionDraft, applySessionDraft, type PreparedSessionDraft } from '../sessionDraft'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
+import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
 
 const invoke = supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>
 
@@ -46,6 +47,30 @@ function validDraft(): SessionDraftV1 {
     schemaVersion: 1,
     session: { name: 'Tuesday Endurance' },
     drills: [{ name: 'Warmup', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 2 }] }],
+  }
+}
+
+// Mirrors the real supabase-js failure: error.context is the fetch Response.
+function httpError(status: number, body: Record<string, unknown>, headers: Record<string, string> = {}) {
+  return {
+    data: null,
+    error: {
+      context: new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json', ...headers },
+      }),
+    },
+  }
+}
+
+function prepared(overrides: Partial<PreparedSessionDraft> = {}): PreparedSessionDraft {
+  return {
+    prompt: 'A set',
+    seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
+    context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
+    removedCategories: [],
+    knownSwimmerNames: [],
+    ...overrides,
   }
 }
 
@@ -102,34 +127,47 @@ describe('requestSessionDraft', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
-  it('maps a 401 to auth', async () => {
-    invoke.mockResolvedValue({ data: null, error: { status: 401, message: 'no' } })
-    const result = await requestSessionDraft({
-      prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
-      context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
-    })
-    expect(result).toEqual({ outcome: 'auth' })
+  it('maps a 401 to auth (reading status from the error context Response)', async () => {
+    invoke.mockResolvedValue(httpError(401, { error: 'unauthorized' }))
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'auth' })
   })
 
-  it('maps a 429 to rate_limited', async () => {
-    invoke.mockResolvedValue({ data: null, error: { status: 429, message: 'slow down' } })
-    const result = await requestSessionDraft({
-      prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
-      context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
+  it('maps a 429 to rate_limited with the echoed retry seconds', async () => {
+    invoke.mockResolvedValue(httpError(429, { error: 'rate_limited', retry_after_seconds: 120 }))
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'rate_limited', retryAfterSeconds: 120 })
+  })
+
+  it('reads retry seconds from the Retry-After header when the body omits them', async () => {
+    invoke.mockResolvedValue(httpError(429, { error: 'rate_limited' }, { 'Retry-After': '90' }))
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'rate_limited', retryAfterSeconds: 90 })
+  })
+
+  it('distinguishes an upstream provider rate limit from the user quota', async () => {
+    invoke.mockResolvedValue(httpError(429, { error: 'provider_rate_limited', retry_after_seconds: 30 }))
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'provider_rate_limited', retryAfterSeconds: 30 })
+  })
+
+  it('falls back to the configured window when a 429 carries no retry hint', async () => {
+    invoke.mockResolvedValue(httpError(429, { error: 'rate_limited' }))
+    expect(await requestSessionDraft(prepared())).toEqual({
+      outcome: 'rate_limited',
+      retryAfterSeconds: defaultSessionDraftConfig.limits.rateLimitFallbackSeconds,
     })
-    expect(result.outcome).toBe('rate_limited')
   })
 
   it('maps a 5xx to provider', async () => {
-    invoke.mockResolvedValue({ data: null, error: { status: 502, message: 'bad gateway' } })
-    const result = await requestSessionDraft({
-      prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
-      context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
-    })
-    expect(result).toEqual({ outcome: 'provider' })
+    invoke.mockResolvedValue(httpError(502, { error: 'provider_error' }))
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'provider' })
+  })
+
+  it('maps a 503 provider-unavailable response to provider', async () => {
+    invoke.mockResolvedValue(httpError(503, { error: 'provider_unavailable' }))
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'provider' })
+  })
+
+  it('treats a statusless error as network', async () => {
+    invoke.mockResolvedValue({ data: null, error: {} })
+    expect(await requestSessionDraft(prepared())).toEqual({ outcome: 'network' })
   })
 
   it('treats an invalid payload as invalid', async () => {
