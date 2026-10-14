@@ -37,7 +37,7 @@ import { settingsService } from '../../services/settingsService'
 import { sessionService } from '../../services/sessionService'
 import { getSessionDrills } from '../drills'
 import { prepareSessionDraft, requestSessionDraft, applySessionDraft } from '../sessionDraft'
-import type { SessionDraftV1 } from '../../services/sessionDraft/schema'
+import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 
 const invoke = supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>
 

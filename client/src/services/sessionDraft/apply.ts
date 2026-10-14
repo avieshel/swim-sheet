@@ -2,7 +2,7 @@ import { db } from '../../db/schema'
 import type { SafeDrill, SafeSession, Session } from '../../db/schema'
 import { addSessionWithDrills, updateSession } from '../../db/dao'
 import type { Stroke } from '../../types/swimming'
-import type { SessionDraftV1 } from './schema'
+import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 import { validateSessionDraft } from './validate'
 
 export type ApplyDraftResult =

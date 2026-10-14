@@ -3,9 +3,15 @@
 // counts, session notes, or drill-library contents.
 
 import type { SessionDraftContext, SessionDraftRequest } from './contract.ts'
+import type { IntensityV1 } from '../../../shared/sessionDraft/types.ts'
+import { defaultSessionDraftConfig } from '../../../shared/sessionDraft/config.ts'
 
 export function buildSystemPrompt(context: SessionDraftContext): string {
   const equipmentList = context.equipmentOptions.length > 0 ? context.equipmentOptions.join(', ') : '(none enabled)'
+  const strokeList = defaultSessionDraftConfig.strokeValues.join(', ')
+  const intensityLines = (Object.entries(defaultSessionDraftConfig.intensityLabels) as [IntensityV1, string][])
+    .map(([v, label]) => `${label} -> "${v}"`)
+    .join(', ')
   return [
     'You are a swimming workout assistant for a coach. You complete a session',
     'draft as JSON. Respond with exactly one JSON object, no prose, of this shape:',
@@ -17,11 +23,10 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
     'The draft uses schemaVersion 1. session.name is a short title. drills is a',
     'non-empty array; each drill has name (string), repeatCount (positive integer),',
     'and items (non-empty array). Each item has distance (positive integer, meters),',
-    `stroke (one of freestyle, backstroke, breaststroke, butterfly, im), repeatCount`,
+    `stroke (one of ${strokeList}), repeatCount`,
     '(positive integer).',
     '',
-    'Intensity is optional. Map effort cues: easy -> "v1", medium/moderate -> "v2",',
-    'strong -> "v3", hard -> "v4". Omit intensity when there is no effort cue.',
+    `Intensity is optional. Map effort cues: ${intensityLines}. Omit intensity when there is no effort cue.`,
     'interval is an optional short string like "1:30" or "RI 20s".',
     `equipment is an optional array restricted to these enabled ids: ${equipmentList}.`,
     '',

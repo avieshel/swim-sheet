@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { validateSessionDraft, validateHarnessResult, isValidPromptLength } from '../validate'
-import type { SessionDraftV1 } from '../schema'
+import type { SessionDraftV1 } from '../../../../../shared/sessionDraft/types'
 
 function validDrill() {
   return {

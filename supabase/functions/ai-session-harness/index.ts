@@ -8,7 +8,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { callProvider, getProviderConfig, ProviderError } from './provider.ts'
 import { validateHarnessResult } from './output.ts'
-import { MAX_PROMPT_LENGTH } from './config.ts'
+import { defaultSessionDraftConfig } from '../../../shared/sessionDraft/config.ts'
 import type { SessionDraftRequest } from './contract.ts'
 
 function json(body: unknown, status = 200): Response {
@@ -49,7 +49,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: 'invalid_json' }, 400)
   }
   if (!isRequest(raw)) return json({ error: 'invalid_request' }, 400)
-  if (raw.prompt.length > MAX_PROMPT_LENGTH) return json({ error: 'prompt_too_long' }, 400)
+  if (raw.prompt.length > defaultSessionDraftConfig.limits.maxPromptLength) {
+    return json({ error: 'prompt_too_long' }, 400)
+  }
 
   const request = raw as SessionDraftRequest
 

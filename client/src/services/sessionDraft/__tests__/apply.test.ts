@@ -6,7 +6,7 @@ import {
   keepSessionDraft,
   mapDraftToSessionAndDrills,
 } from '../apply'
-import type { SessionDraftV1 } from '../schema'
+import type { SessionDraftV1 } from '../../../../../shared/sessionDraft/types'
 
 const draft: SessionDraftV1 = {
   schemaVersion: 1,

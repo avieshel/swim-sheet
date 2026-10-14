@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildSessionDraftContext } from '../context'
-import type { ContextInput } from '../schema'
+import type { ContextInput } from '../../../../../shared/sessionDraft/types'
 
 const baseInput: ContextInput = {
   poolLength: 25,

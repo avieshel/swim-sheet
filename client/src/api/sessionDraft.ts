@@ -8,7 +8,6 @@ import type {
   ApplyDraftResult,
 } from '../services/sessionDraft/apply'
 import {
-  EQUIPMENT_IDS,
   type ContextInput,
   type EquipmentId,
   type HarnessResult,
@@ -16,13 +15,13 @@ import {
   type SessionDraftRequest,
   type SessionDraftSeedV1,
   type SessionDraftV1,
-} from '../services/sessionDraft/schema'
+} from '../../../shared/sessionDraft/types'
+import { EQUIPMENT_IDS, defaultSessionDraftConfig } from '../../../shared/sessionDraft/config'
 import { settingsService } from '../services/settingsService'
 import { getAllSwimmers } from '../db/dao'
 import { sessionService } from '../services/sessionService'
 import { getSessionDrills } from './drills'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
-import { AI_DRAFT_MAX_RECENT_SESSIONS } from '../constants/aiSessionDraft'
 
 // The only client network boundary for the AI draft. Pages never call the Edge
 // Function directly.
@@ -47,7 +46,7 @@ export type SessionDraftResult =
   | { outcome: 'provider' }
 
 async function buildRecentSessions(): Promise<ContextInput['recentSessions']> {
-  const sessions = (await sessionService.list()).slice(0, AI_DRAFT_MAX_RECENT_SESSIONS)
+  const sessions = (await sessionService.list()).slice(0, defaultSessionDraftConfig.limits.maxRecentSessions)
   return Promise.all(
     sessions.map(async (session) => {
       const drills = await getSessionDrills(session.id)

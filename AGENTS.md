@@ -67,9 +67,7 @@ npm run test:e2e              # Playwright e2e tests
    is not developed with Claude. Enforced by `.husky/commit-msg`, which blocks the commit.
  7. **No magic numbers for limits or constraints** — every tunable bound (request/response
     size caps, counts, rates, timeouts, thresholds, retries) must live in a dedicated config
-    module that is imported, never inlined at the point of use. Client limits go in
-    `client/src/constants/` (e.g. `aiSessionDraft.ts`); the Deno Edge Function keeps the
-    parallel set in `supabase/functions/ai-session-harness/config.ts`. SQL constraints are
+    module that is imported, never inlined at the point of use. The canonical contract (types, allowlists, limits, and pure validators) for the AI session harness is the shared module `shared/sessionDraft/`; both the PWA (`client/src/services/sessionDraft/validate.ts` binds the default config) and the Deno Edge Function (which imports `defaultSessionDraftConfig` directly) consume it — there is no parallel copy to keep in sync. SQL constraints are
     declared as named constants in the migration. Naked numeric literals in those roles are a
     review-failing smell.
 

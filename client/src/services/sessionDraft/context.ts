@@ -1,6 +1,6 @@
-import type { ContextInput, SessionDraftContext } from './schema'
+import type { ContextInput, SessionDraftContext } from '../../../../shared/sessionDraft/types'
+import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
 import { sanitizePrompt } from './sanitize'
-import { AI_DRAFT_MAX_RECENT_SESSIONS } from '../../constants/aiSessionDraft'
 
 // Builds the bounded structural context sent to the model. It is deliberately
 // allow-listed: every field here is numeric, an enum, or a sanitized group name.
@@ -12,7 +12,7 @@ export function buildSessionDraftContext(input: ContextInput): SessionDraftConte
     .map((group) => sanitizePrompt(group, input.knownSwimmerNames).text)
     .filter((group) => group.trim().length > 0)
 
-  const recentSessions = input.recentSessions.slice(0, AI_DRAFT_MAX_RECENT_SESSIONS)
+  const recentSessions = input.recentSessions.slice(0, defaultSessionDraftConfig.limits.maxRecentSessions)
 
   return {
     poolLength: input.poolLength,
