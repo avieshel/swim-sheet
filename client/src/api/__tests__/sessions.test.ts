@@ -12,7 +12,16 @@ vi.mock('../../services/sessionService', () => ({
   },
 }))
 
-import { listSessions, getSession, createSession, updateSession, deleteSession, listCompletedRuns } from '../sessions'
+const mockApply = vi.hoisted(() => ({
+  applySessionDraft: vi.fn(),
+}))
+
+vi.mock('../../services/sessionDraft/apply', () => ({
+  applySessionDraft: (input: unknown, options: { markUnreviewed: boolean }) =>
+    mockApply.applySessionDraft(input, options),
+}))
+
+import { listSessions, getSession, createSession, updateSession, deleteSession, listCompletedRuns, createSessionFromDraft } from '../sessions'
 import { sessionService } from '../../services/sessionService'
 import type { SafeSession } from '../../db/schema'
 
@@ -62,5 +71,29 @@ describe('sessions API', () => {
     const result = await listCompletedRuns()
     expect(sessionService.getCompletedRuns).toHaveBeenCalledOnce()
     expect(result).toBe(expected)
+  })
+})
+
+describe('createSessionFromDraft (direct, no harness)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('routes to the draft service and leaves the session unmarked', async () => {
+    const draft = { schemaVersion: 1, session: { name: 'X' }, drills: [] }
+    mockApply.applySessionDraft.mockResolvedValue({ outcome: 'created', sessionId: 's9' })
+    const result = await createSessionFromDraft(draft)
+    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(draft, { markUnreviewed: false })
+    expect(result).toEqual({ outcome: 'created', sessionId: 's9' })
+  })
+
+  it('propagates an invalid draft without marking', async () => {
+    mockApply.applySessionDraft.mockResolvedValue({
+      outcome: 'invalid',
+      error: { code: 'invalid_shape', message: 'bad' },
+    })
+    const result = await createSessionFromDraft({ schemaVersion: 2 })
+    expect(result).toEqual({
+      outcome: 'invalid',
+      error: { code: 'invalid_shape', message: 'bad' },
+    })
   })
 })

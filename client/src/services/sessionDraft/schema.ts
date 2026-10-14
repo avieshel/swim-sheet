@@ -34,7 +34,7 @@ export interface SessionDraftItemV1 {
   equipment?: EquipmentId[]
 }
 
-export interface SessionDraftDrillV1 {
+interface SessionDraftDrillV1 {
   name: string
   repeatCount: number
   items: SessionDraftItemV1[]
@@ -56,7 +56,7 @@ export interface SessionDraftSeedV1 {
 
 // ── Structural context (no roster, no swimmer records) ───────
 
-export interface RecentSessionShape {
+interface RecentSessionShape {
   totalDistance: number
   drills: Array<{ distance: number; stroke: Stroke; repeatCount: number }>
 }
@@ -92,7 +92,7 @@ export type HarnessResult =
 
 // ── Validation result types ──────────────────────────────────
 
-export type DraftValidationErrorCode =
+type DraftValidationErrorCode =
   | 'invalid_shape'
   | 'unsupported_version'
   | 'limit_exceeded'

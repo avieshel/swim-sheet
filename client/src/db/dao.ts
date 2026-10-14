@@ -71,6 +71,30 @@ export async function deleteSession(id: string): Promise<void> {
   })
 }
 
+// Atomic session + drills insert for AI drafts. It writes directly to the drills
+// table and must NOT call addDrill(), which also writes to libraryDrills. A
+// failure at any point rolls the whole transaction back — no partial session.
+export async function addSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+): Promise<string> {
+  const now = new Date().toISOString()
+  const sessionId = crypto.randomUUID()
+  await db.transaction('rw', [db.sessions, db.drills], async () => {
+    await db.sessions.add({ ...session, id: sessionId, createdAt: now, updatedAt: now })
+    for (const drill of drills) {
+      await db.drills.add({
+        ...drill,
+        sessionId,
+        id: crypto.randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+  })
+  return sessionId
+}
+
 // ── Template Drills ────────────────────────────────────────
 
 export async function getDrillsForSession(sessionId: string): Promise<Drill[]> {

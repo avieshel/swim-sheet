@@ -158,6 +158,19 @@ describe('toCloudRow', () => {
     const row = toCloudRow('drills', c, 'org-A', 'u1')
     expect(row).toMatchObject({ id: 'd1', session_id: 's1', drill_order: 0, items: '[{"distance":25,"stroke":"freestyle"}]' })
   })
+
+  test('session omits the local-only aiDraftStatus marker', () => {
+    const c: LocalChange = {
+      table: 'sessions',
+      id: 's1',
+      op: 'upsert',
+      payload: { id: 's1', name: 'X', notes: '', aiDraftStatus: 'unreviewed', createdAt: 't', updatedAt: 't' },
+      rev: null,
+    }
+    const row = toCloudRow('sessions', c, 'org-A', 'u1')
+    expect(row).not.toHaveProperty('aiDraftStatus')
+    expect(row).toMatchObject({ id: 's1', name: 'X' })
+  })
 })
 
 describe('fromCloudRow', () => {

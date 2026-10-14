@@ -1,5 +1,7 @@
 import { sessionService } from '../services/sessionService'
 import type { DeleteSessionResult } from '../services/sessionService'
+import { applySessionDraft } from '../services/sessionDraft/apply'
+import type { ApplyDraftResult } from '../services/sessionDraft/apply'
 import type { SafeSession, Session, SessionRun } from '../db/schema'
 
 export function listSessions(): Promise<Session[]> {
@@ -39,3 +41,12 @@ export function listCompletedRuns(): Promise<SessionRun[]> {
 // }
 
 export type { Session, SessionRun } from '../db/schema'
+
+// Direct draft creation bypasses the AI harness entirely. It shares the same
+// validator and writer as the harness path but does not mark the session as an
+// unreviewed draft.
+export function createSessionFromDraft(input: unknown): Promise<ApplyDraftResult> {
+  return applySessionDraft(input, { markUnreviewed: false })
+}
+
+export type { ApplyDraftResult } from '../services/sessionDraft/apply'

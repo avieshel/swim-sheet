@@ -5,10 +5,10 @@ import type {
   IntensityV1,
   SessionDraftItemV1,
   SessionDraftV1,
-  Stroke,
   ValidationResult,
 } from './schema'
 import { EQUIPMENT_IDS, INTENSITY_VALUES, STROKE_VALUES } from './schema'
+import type { Stroke } from '../../types/swimming'
 
 // Size limits. Names and free-text intervals are bounded; structural counts are
 // bounded so a malformed or hostile response cannot blow up the client.
@@ -199,11 +199,3 @@ export function validateHarnessResult(input: unknown): ValidationResult<HarnessR
 export function isValidPromptLength(prompt: string): boolean {
   return prompt.length <= MAX_PROMPT_LENGTH
 }
-
-export const DRAFT_LIMITS = {
-  nameLength: MAX_NAME_LENGTH,
-  intervalLength: MAX_INTERVAL_LENGTH,
-  promptLength: MAX_PROMPT_LENGTH,
-  drills: MAX_DRILLS,
-  itemsPerDrill: MAX_ITEMS_PER_DRILL,
-} as const

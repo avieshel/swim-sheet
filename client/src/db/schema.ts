@@ -20,6 +20,9 @@ export interface Session {
   notes: string
   visibility?: 'private' | 'organization'
   catalogKey?: string
+  // Local-only marker for an unreviewed AI-generated draft. Never serialized to
+  // the cloud; excluded from the sync row mapping by design.
+  aiDraftStatus?: 'unreviewed'
   createdAt: string
   updatedAt: string
 }
