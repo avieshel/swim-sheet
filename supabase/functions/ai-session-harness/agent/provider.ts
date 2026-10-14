@@ -1,6 +1,6 @@
 // Single structured-output provider adapter. OpenAI-compatible chat completions
 // with JSON mode. The provider key is a Supabase secret and never reaches the
-// browser. Swapping providers later must keep the same SessionDraft shape.
+// browser. Swapping providers later must keep the same HarnessResult shape.
 
 import { buildSystemPrompt, buildUserContent } from './prompt.ts'
 import { PROVIDER_REQUEST_TIMEOUT_MS, PROVIDER_TEMPERATURE } from './config.ts'

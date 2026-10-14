@@ -1,7 +1,7 @@
 // Deno unit tests for the pure scorer. Run: deno test evals/scorer_test.ts
 import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { scoreDraft, scoreResult } from './scorer.ts'
-import type { SessionDraftV1 } from '../functions/ai-session-harness/contract.ts'
+import type { SessionDraftV1 } from '../functions/ai-session-harness/agent/contract.ts'
 
 const sampleDraft: SessionDraftV1 = {
   schemaVersion: 1,

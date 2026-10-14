@@ -14,6 +14,10 @@ supabase/.env
 supabase/.branches/
 supabase/.temp/
 
+# Deno lockfiles live next to each deno.json; the repo-root one is an accidental
+# artifact of running `deno` from the root.
+/deno.lock
+
 # Agent skill packs (installed locally, not vendored)
 .agents/
 skills-lock.json

@@ -7,9 +7,9 @@
 // not run in normal CI: it needs a provider key, network, and spend. Without
 // PROVIDER_API_KEY it prints the plan and exits cleanly.
 
-import { callProvider, getProviderConfig } from '../functions/ai-session-harness/provider.ts'
-import { validateHarnessResult } from '../functions/ai-session-harness/output.ts'
-import type { SessionDraftRequest } from '../functions/ai-session-harness/contract.ts'
+import { callProvider, getProviderConfig } from '../functions/ai-session-harness/agent/provider.ts'
+import { validateHarnessResult } from '../functions/ai-session-harness/agent/output.ts'
+import type { SessionDraftRequest } from '../functions/ai-session-harness/agent/contract.ts'
 import { cases, defaultContext } from './cases.ts'
 import { scoreResult } from './scorer.ts'
 

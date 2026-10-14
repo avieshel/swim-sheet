@@ -4,7 +4,7 @@
 // requests) checkable structural requirements. The corpus is committed and runs
 // under `deno test` (scorer only) and under the opt-in `run.ts` live runner.
 
-import type { SessionDraftContext } from '../functions/ai-session-harness/contract.ts'
+import type { SessionDraftContext } from '../functions/ai-session-harness/agent/contract.ts'
 import type { EvalExpectation } from './scorer.ts'
 
 export interface EvalCase {

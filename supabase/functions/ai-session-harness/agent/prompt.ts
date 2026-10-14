@@ -3,8 +3,8 @@
 // counts, session notes, or drill-library contents.
 
 import type { SessionDraftContext, SessionDraftRequest } from './contract.ts'
-import type { IntensityV1 } from '../../../shared/sessionDraft/types.ts'
-import { defaultSessionDraftConfig } from '../../../shared/sessionDraft/config.ts'
+import type { IntensityV1 } from '../../../../shared/sessionDraft/types.ts'
+import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
 
 export function buildSystemPrompt(context: SessionDraftContext): string {
   const equipmentList = context.equipmentOptions.length > 0 ? context.equipmentOptions.join(', ') : '(none enabled)'

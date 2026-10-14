@@ -9,7 +9,7 @@ import type {
   IntensityV1,
   SessionDraftV1,
   Stroke,
-} from '../functions/ai-session-harness/contract.ts'
+} from '../functions/ai-session-harness/agent/contract.ts'
 
 export type Requirement =
   | { kind: 'drillCount'; min?: number; max?: number }
