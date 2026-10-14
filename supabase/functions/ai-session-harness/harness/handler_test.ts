@@ -14,7 +14,13 @@ const validDraft = {
   ],
 }
 
-const OK_BODY = JSON.stringify({ prompt: 'Plan a set' })
+const VALID_REQUEST = {
+  prompt: 'Plan a set',
+  seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
+  context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: [], recentSessions: [] },
+}
+
+const OK_BODY = JSON.stringify(VALID_REQUEST)
 
 function makeDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
   return {
@@ -63,15 +69,35 @@ Deno.test('returns 400 for a non-JSON body', async () => {
 })
 
 Deno.test('returns 400 when the prompt is not a string', async () => {
-  const res = await call(makeDeps(), makeRequest(JSON.stringify({ prompt: 123 })))
+  const res = await call(makeDeps(), makeRequest(JSON.stringify({ ...VALID_REQUEST, prompt: 123 })))
   assertEquals(res.status, 400)
   assertEquals(res.body.error, 'invalid_request')
 })
 
 Deno.test('returns 400 when the prompt exceeds the configured cap', async () => {
-  const res = await call(makeDeps(), makeRequest(JSON.stringify({ prompt: 'x'.repeat(4001) })))
+  const res = await call(makeDeps(), makeRequest(JSON.stringify({ ...VALID_REQUEST, prompt: 'x'.repeat(4001) })))
   assertEquals(res.status, 400)
   assertEquals(res.body.error, 'prompt_too_long')
+})
+
+Deno.test('returns 400 when the context is malformed', async () => {
+  const res = await call(
+    makeDeps(),
+    makeRequest(
+      JSON.stringify({ ...VALID_REQUEST, context: { ...VALID_REQUEST.context, equipmentOptions: ['monofin'] } }),
+    ),
+  )
+  assertEquals(res.status, 400)
+  assertEquals(res.body.error, 'invalid_request')
+})
+
+Deno.test('returns 400 when the seed is missing', async () => {
+  const res = await call(
+    makeDeps(),
+    makeRequest(JSON.stringify({ prompt: 'A set', context: VALID_REQUEST.context })),
+  )
+  assertEquals(res.status, 400)
+  assertEquals(res.body.error, 'invalid_request')
 })
 
 Deno.test('returns 503 when the rate-limit store is unavailable', async () => {

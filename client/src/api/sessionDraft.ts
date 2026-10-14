@@ -2,7 +2,7 @@ import { supabase, getCurrentUser } from './supabase'
 import { createSessionDraftSeed } from '../services/sessionDraft/seed'
 import { sanitizePrompt } from '../services/sessionDraft/sanitize'
 import { buildSessionDraftContext } from '../services/sessionDraft/context'
-import { validateHarnessResult, isValidPromptLength } from '../services/sessionDraft/validate'
+import { validateHarnessResult, validateSessionDraftRequest } from '../services/sessionDraft/validate'
 import { applySessionDraft as applyDraftService, keepSessionDraft as keepDraftService, getUnreviewedSessionDraft as getUnreviewedDraftService } from '../services/sessionDraft/apply'
 import type {
   ApplyDraftResult,
@@ -53,7 +53,7 @@ async function buildRecentSessions(): Promise<ContextInput['recentSessions']> {
       const drills = await getSessionDrills(session.id)
       return {
         totalDistance: drills.reduce((sum, drill) => sum + getDrillTotalDistance(drill), 0),
-        drills: drills.map((drill) => ({
+        drills: drills.slice(0, defaultSessionDraftConfig.limits.maxDrills).map((drill) => ({
           distance: drill.distance,
           stroke: drill.stroke,
           repeatCount: drill.repeatCount,
@@ -132,6 +132,7 @@ async function mapInvokeError(error: InvokeErrorLike): Promise<SessionDraftResul
   const status = isResponse ? context.status : error.status
 
   if (status === 401 || status === 403) return { outcome: 'auth' }
+  if (status === 400 || status === 422) return { outcome: 'invalid' }
   if (status === 408) return { outcome: 'timeout' }
   if (status === 429) {
     const body = isResponse ? await readErrorBody(context) : {}
@@ -161,19 +162,19 @@ function containsSwimmerName(result: HarnessResult, names: string[]): boolean {
 }
 
 export async function requestSessionDraft(prepared: PreparedSessionDraft): Promise<SessionDraftResult> {
-  if (!isValidPromptLength(prepared.prompt) || !prepared.prompt.trim()) {
+  const body: SessionDraftRequest = {
+    prompt: prepared.prompt,
+    seed: prepared.seed,
+    context: prepared.context,
+  }
+  // Validate the request we are about to send; the harness validates it again.
+  if (!validateSessionDraftRequest(body).ok) {
     return { outcome: 'invalid' }
   }
 
   const user = getCurrentUser()
   if (!user || user.is_anonymous) {
     return { outcome: 'auth' }
-  }
-
-  const body: SessionDraftRequest = {
-    prompt: prepared.prompt,
-    seed: prepared.seed,
-    context: prepared.context,
   }
 
   const { data, error } = await supabase.functions.invoke('ai-session-harness', { body })

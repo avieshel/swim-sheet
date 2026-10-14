@@ -5,12 +5,12 @@
 // That keeps the whole request lifecycle unit-testable with fakes (see
 // handler_test.ts) and keeps the agent independently testable.
 
-import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
 import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from '../agent/config.ts'
 import { ProviderError } from '../agent/provider.ts'
 import { validateHarnessResult } from '../agent/output.ts'
 import type { SessionDraftRequest } from '../agent/contract.ts'
 import { json, rateLimited } from './http.ts'
+import { validateRequest } from './request.ts'
 
 export type AuthOutcome =
   | { kind: 'authenticated'; userId: string }
@@ -44,18 +44,18 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     if (auth.kind === 'unauthenticated') return json({ error: 'unauthorized' }, 401)
     if (auth.kind === 'anonymous') return json({ error: 'anonymous_not_allowed' }, 401)
 
-    // 2. Parse and lightly validate the request.
+    // 2. Parse and validate the request at the trust boundary. The prompt,
+    //    seed, and structural context are all bounded by the shared config.
     let raw: unknown
     try {
       raw = await req.json()
     } catch {
       return json({ error: 'invalid_json' }, 400)
     }
-    if (!isRequest(raw)) return json({ error: 'invalid_request' }, 400)
-    if (raw.prompt.length > defaultSessionDraftConfig.limits.maxPromptLength) {
-      return json({ error: 'prompt_too_long' }, 400)
+    const request = validateRequest(raw)
+    if (!request.ok) {
+      return json({ error: request.reason === 'prompt_too_long' ? 'prompt_too_long' : 'invalid_request' }, 400)
     }
-    const request = raw as SessionDraftRequest
 
     // 3. Private per-user rate limit.
     const rate = await deps.recordRequest(auth.userId)
@@ -66,7 +66,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
 
     // 4. One structured-output agent call, validated before returning.
     try {
-      const result = await deps.runAgent(request)
+      const result = await deps.runAgent(request.value)
       const validation = validateHarnessResult(result)
       if (!validation.ok) return json({ error: 'invalid_provider_response' }, 502)
       return json(validation.value, 200)
@@ -81,13 +81,4 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       return json({ error: 'provider_error' }, 502)
     }
   }
-}
-
-export function isRequest(value: unknown): value is { prompt: string } & Partial<SessionDraftRequest> {
-  if (typeof value !== 'object' || value === null) return false
-  const obj = value as Record<string, unknown>
-  if (typeof obj.prompt !== 'string') return false
-  if (obj.seed !== undefined && typeof obj.seed !== 'object') return false
-  if (obj.context !== undefined && typeof obj.context !== 'object') return false
-  return true
 }

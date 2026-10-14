@@ -116,6 +116,14 @@ describe('requestSessionDraft', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
+  it('refuses an over-long prompt without calling the function', async () => {
+    const result = await requestSessionDraft(
+      prepared({ prompt: 'x'.repeat(defaultSessionDraftConfig.limits.maxPromptLength + 1) }),
+    )
+    expect(result).toEqual({ outcome: 'invalid' })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
   it('rejects anonymous users before any network call', async () => {
     mockUser.user = { id: 'u1', is_anonymous: true } as unknown as User
     const result = await requestSessionDraft({

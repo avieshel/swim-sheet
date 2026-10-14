@@ -26,6 +26,25 @@ function formatRetryWait(seconds: number): string {
   return `${hours} hour${hours === 1 ? '' : 's'}`
 }
 
+// Recoverable, non-draft outcomes that need their own message. The provider
+// being offline must be visible, not silent.
+function problemMessage(result: SessionDraftResult): string | null {
+  switch (result.outcome) {
+    case 'provider':
+      return 'The AI service is unavailable right now. Please try again later.'
+    case 'timeout':
+      return 'The AI service took too long to respond. Please try again.'
+    case 'network':
+      return "Couldn't reach the AI service. Check your connection and try again."
+    case 'auth':
+      return 'Your session has expired. Please sign in again, then retry.'
+    case 'invalid':
+      return "That request couldn't be processed. Please rephrase and try again."
+    default:
+      return null
+  }
+}
+
 export const AiSessionDraft: React.FC = () => {
   const { user, status } = useAuth()
   const navigate = useNavigate()
@@ -281,6 +300,10 @@ export const AiSessionDraft: React.FC = () => {
           <div className="mt-4 text-label-sm text-error">
             The response contained a swimmer name. It was blocked and nothing was saved.
           </div>
+        )}
+
+        {result && problemMessage(result) && (
+          <div className="mt-4 text-label-sm text-on-surface-variant">{problemMessage(result)}</div>
         )}
       </div>
     </div>

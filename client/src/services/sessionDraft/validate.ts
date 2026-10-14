@@ -8,6 +8,7 @@
 import {
   validateHarnessResult as validateHarnessResultFn,
   validateSessionDraft as validateSessionDraftFn,
+  validateSessionDraftRequest as validateSessionDraftRequestFn,
   isValidPromptLength as isValidPromptLengthFn,
 } from '../../../../shared/sessionDraft/validate'
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
@@ -18,6 +19,10 @@ export function validateSessionDraft(input: unknown) {
 
 export function validateHarnessResult(input: unknown) {
   return validateHarnessResultFn(defaultSessionDraftConfig, input)
+}
+
+export function validateSessionDraftRequest(input: unknown) {
+  return validateSessionDraftRequestFn(defaultSessionDraftConfig, input)
 }
 
 export function isValidPromptLength(prompt: string): boolean {

@@ -8,7 +8,11 @@ import type {
   EquipmentId,
   HarnessResult,
   IntensityV1,
+  RecentSessionShape,
+  SessionDraftContext,
   SessionDraftItemV1,
+  SessionDraftRequest,
+  SessionDraftSeedV1,
   SessionDraftV1,
   Stroke,
 } from './types.ts'
@@ -229,4 +233,148 @@ export function validateHarnessResult(
 // request, not in the draft object.
 export function isValidPromptLength(config: SessionDraftConfig, prompt: string): boolean {
   return prompt.length <= config.limits.maxPromptLength
+}
+
+// ---- Inbound request validation ----
+//
+// The trust boundary: the harness validates the request it receives so a
+// malformed or oversized context/seed cannot reach the prompt. The client runs
+// the same validator on the request it builds (defense in depth). Bounds are all
+// config-driven.
+
+function validateSeed(config: SessionDraftConfig, value: unknown): ValidationOutcome<SessionDraftSeedV1> {
+  if (!isPlainObject(value)) return fail('invalid_shape', 'request.seed must be an object')
+  if (!hasOnlyKeys(value, ['schemaVersion', 'session', 'drills'])) {
+    return fail('invalid_shape', 'request.seed has an unsupported field')
+  }
+  if (value.schemaVersion !== config.limits.schemaVersion) {
+    return fail('unsupported_version', 'request.seed schemaVersion is unsupported')
+  }
+  const session = value.session
+  if (!isPlainObject(session) || !hasOnlyKeys(session, ['name'])) {
+    return fail('invalid_shape', 'request.seed.session must be an object with only name')
+  }
+  if (session.name !== '') {
+    return fail('invalid_shape', "request.seed.session.name must be ''")
+  }
+  if (!Array.isArray(value.drills) || value.drills.length !== 0) {
+    return fail('invalid_shape', 'request.seed.drills must be empty')
+  }
+  return { ok: true, value: { schemaVersion: 1, session: { name: '' }, drills: [] } }
+}
+
+function validateRecentSession(config: SessionDraftConfig, value: unknown): ValidationOutcome<RecentSessionShape> {
+  if (!isPlainObject(value)) return fail('invalid_shape', 'request.context.recentSessions[] must be an object')
+  if (!hasOnlyKeys(value, ['totalDistance', 'drills'])) {
+    return fail('invalid_shape', 'request.context.recentSessions[] has an unsupported field')
+  }
+  const totalDistance = value.totalDistance
+  if (typeof totalDistance !== 'number' || !Number.isInteger(totalDistance) || totalDistance < 0) {
+    return fail('invalid_shape', 'request.context.recentSessions[].totalDistance must be a non-negative integer')
+  }
+  const drills = value.drills
+  if (!Array.isArray(drills) || drills.length > config.limits.maxDrills) {
+    return fail('limit_exceeded', `request.context.recentSessions[].drills exceeds ${config.limits.maxDrills}`)
+  }
+  const validatedDrills: RecentSessionShape['drills'] = []
+  for (const drill of drills) {
+    if (!isPlainObject(drill) || !hasOnlyKeys(drill, ['distance', 'stroke', 'repeatCount'])) {
+      return fail('invalid_shape', 'request.context.recentSessions[].drills[] has an unsupported shape')
+    }
+    const distance = drill.distance
+    const stroke = drill.stroke
+    const repeatCount = drill.repeatCount
+    if (!isPositiveInteger(distance) || !isStroke(stroke, config) || !isPositiveInteger(repeatCount)) {
+      return fail('invalid_shape', 'request.context.recentSessions[].drills[] fields are invalid')
+    }
+    validatedDrills.push({ distance, stroke, repeatCount })
+  }
+  return { ok: true, value: { totalDistance, drills: validatedDrills } }
+}
+
+function validateRequestContext(config: SessionDraftConfig, value: unknown): ValidationOutcome<SessionDraftContext> {
+  if (!isPlainObject(value)) return fail('invalid_shape', 'request.context must be an object')
+  if (!hasOnlyKeys(value, ['poolLength', 'distanceUnits', 'groupNames', 'equipmentOptions', 'recentSessions'])) {
+    return fail('invalid_shape', 'request.context has an unsupported field')
+  }
+  const poolLength = value.poolLength
+  if (!isPositiveInteger(poolLength)) {
+    return fail('invalid_shape', 'request.context.poolLength must be a positive integer')
+  }
+  const distanceUnits = value.distanceUnits
+  if (
+    typeof distanceUnits !== 'string' ||
+    distanceUnits.length === 0 ||
+    distanceUnits.length > config.limits.maxDistanceUnitsLength
+  ) {
+    return fail(
+      'invalid_shape',
+      `request.context.distanceUnits must be a string up to ${config.limits.maxDistanceUnitsLength} characters`,
+    )
+  }
+  const groupNames = value.groupNames
+  if (!Array.isArray(groupNames) || groupNames.length > config.limits.maxGroupNames) {
+    return fail('limit_exceeded', `request.context.groupNames exceeds ${config.limits.maxGroupNames}`)
+  }
+  if (
+    !groupNames.every(
+      (name) => typeof name === 'string' && name.trim().length > 0 && name.length <= config.limits.maxNameLength,
+    )
+  ) {
+    return fail('invalid_shape', 'request.context.groupNames must be non-empty strings within the name limit')
+  }
+  const equipmentOptions = value.equipmentOptions
+  if (!Array.isArray(equipmentOptions) || !equipmentOptions.every((id) => isEquipmentId(id, config))) {
+    return fail('invalid_shape', 'request.context.equipmentOptions must be an array of supported equipment ids')
+  }
+  const recentSessions = value.recentSessions
+  if (!Array.isArray(recentSessions) || recentSessions.length > config.limits.maxRecentSessions) {
+    return fail('limit_exceeded', `request.context.recentSessions exceeds ${config.limits.maxRecentSessions}`)
+  }
+  const validatedSessions: RecentSessionShape[] = []
+  for (const session of recentSessions) {
+    const result = validateRecentSession(config, session)
+    if (!result.ok) return result
+    validatedSessions.push(result.value)
+  }
+  return {
+    ok: true,
+    value: {
+      poolLength,
+      distanceUnits,
+      groupNames: groupNames as string[],
+      equipmentOptions: equipmentOptions as EquipmentId[],
+      recentSessions: validatedSessions,
+    },
+  }
+}
+
+export function validateSessionDraftRequest(
+  config: SessionDraftConfig,
+  input: unknown,
+):
+  | { ok: true; value: SessionDraftRequest }
+  | { ok: false; reason: 'prompt_too_long' | 'invalid_request'; message: string } {
+  if (!isPlainObject(input)) {
+    return { ok: false, reason: 'invalid_request', message: 'request must be an object' }
+  }
+  if (!hasOnlyKeys(input, ['prompt', 'seed', 'context'])) {
+    return { ok: false, reason: 'invalid_request', message: 'request has an unsupported field' }
+  }
+  const prompt = input.prompt
+  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+    return { ok: false, reason: 'invalid_request', message: 'request.prompt must be a non-empty string' }
+  }
+  if (prompt.length > config.limits.maxPromptLength) {
+    return {
+      ok: false,
+      reason: 'prompt_too_long',
+      message: `request.prompt exceeds ${config.limits.maxPromptLength} characters`,
+    }
+  }
+  const seed = validateSeed(config, input.seed)
+  if (!seed.ok) return { ok: false, reason: 'invalid_request', message: seed.error.message }
+  const context = validateRequestContext(config, input.context)
+  if (!context.ok) return { ok: false, reason: 'invalid_request', message: context.error.message }
+  return { ok: true, value: { prompt, seed: seed.value, context: context.value } }
 }

@@ -11,6 +11,7 @@ export function buildSessionDraftContext(input: ContextInput): SessionDraftConte
   const groupNames = input.groupNames
     .map((group) => sanitizePrompt(group, input.knownSwimmerNames).text)
     .filter((group) => group.trim().length > 0)
+    .slice(0, defaultSessionDraftConfig.limits.maxGroupNames)
 
   const recentSessions = input.recentSessions.slice(0, defaultSessionDraftConfig.limits.maxRecentSessions)
 
