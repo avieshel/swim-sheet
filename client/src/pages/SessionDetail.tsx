@@ -4,7 +4,8 @@ import { EquipmentIcons, type EquipmentType } from '../components/EquipmentIcons
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
 import { Icon } from '../components/Icon'
-import { getSession, updateSession } from '../api/sessions'
+import { getSession, updateSession, deleteSession } from '../api/sessions'
+import { keepSessionDraft } from '../api/sessionDraft'
 import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteDrill, updateLibraryDrill, deleteLibraryDrill, getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
 import type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../api/drills'
@@ -337,6 +338,40 @@ export const SessionDetail: React.FC = () => {
         <Icon name="arrow_back" size="sm" />
         <span className="text-label-sm font-medium">Back to Templates</span>
       </button>
+
+      {session.aiDraftStatus === 'unreviewed' && (
+        <div className="bg-tertiary-container/15 border border-tertiary/40 rounded-2xl p-4 md:p-5 mb-6 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+          <div className="flex items-center gap-2 text-on-surface">
+            <Icon name="auto_awesome" />
+            <span className="font-bold">AI draft — review</span>
+            <span className="text-label-sm text-on-surface-variant">
+              This session was created by AI. Keep it to make it a normal template, or discard it.
+            </span>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={async () => {
+                if (!id) return
+                await keepSessionDraft(id)
+                await loadData()
+              }}
+              className="px-5 py-2.5 bg-primary text-on-primary rounded-xl font-bold"
+            >
+              Keep session
+            </button>
+            <button
+              onClick={async () => {
+                if (!id) return
+                await deleteSession(id)
+                navigate('/sessions')
+              }}
+              className="px-5 py-2.5 border-2 border-outline text-on-surface rounded-xl font-bold"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Template Metadata */}
       <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant mb-6">

@@ -4,7 +4,7 @@ import type { LegalDocument } from '../components/LegalLayout'
 
 const document: LegalDocument = {
   title: 'Privacy Policy',
-  updated: '9 October 2026',
+  updated: '14 October 2026',
   intro:
     'This Privacy Policy explains what information Swim Sheet collects, why we collect it, and what choices you have. It applies to the Swim Sheet web app and progressive web app (the "App"). The App is developed and operated by an individual developer based in Israel, who acts as the data controller for information collected through the App. The source code is published at https://github.com/avieshel/swim-sheet.',
   sections: [
@@ -76,13 +76,21 @@ const document: LegalDocument = {
       ],
     },
     {
-      heading: '10. Changes to this policy',
+      heading: '10. AI session drafting',
+      paragraphs: [
+        'Swim Sheet offers an optional "Create with AI" feature that turns a plain-language description of a training session into an editable session draft. This is the only feature that requires you to sign in; everything else in the app stays no-account and offline-first.',
+        'Before anything is sent, the app redacts swimmer names, email addresses, and phone numbers that it can identify locally, and sends only the redacted description plus structural context: pool length, distance units, the equipment options you have enabled, and the distances, strokes, and repeat patterns of your two most recent sessions. It never sends swimmer records, roster counts, session or drill names and notes, or your drill library.',
+        'The redacted text and structural context are sent to the third-party language model provider we have configured (see Service providers). Automatic redaction is best-effort and not guaranteed to catch every personal detail, especially unknown names, so do not enter swimmer-identifying or health information. The server checks the model\'s response against your local swimmer names and blocks the draft if a match is found; nothing is saved in that case.',
+      ],
+    },
+    {
+      heading: '11. Changes to this policy',
       paragraphs: [
         'We may update this policy as the App changes. The "Last updated" date above always reflects the current version, and we will post a notice in the App if we make a material change.',
       ],
     },
     {
-      heading: '11. Contact',
+      heading: '12. Contact',
       paragraphs: [
         'The developer of Swim Sheet is based in Israel. For privacy questions, to make a data request, or to report a data concern, open an issue at https://github.com/avieshel/swim-sheet/issues. Because the project is maintained by an individual, responses may take some time.',
       ],
