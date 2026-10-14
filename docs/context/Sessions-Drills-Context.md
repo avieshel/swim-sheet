@@ -1023,3 +1023,12 @@ each other's findings (round 2).
 - UI/system context: `docs/context/UI-Context.md`
 - Session screen: `docs/context/Sessions-Screen-Context.md`
 - Drill bank screen: `docs/context/Drills-Screen-Context.md`
+
+## AI session drafts (v1)
+
+- The AI drafting flow (route `/sessions/ai`, page `AiSessionDraft`) turns a sanitized plain-language request into a complete, editable, discardable `Session` draft. It is the only sign-in-gated feature; anonymous users see a sign-in-required state and no request is sent.
+- The harness Edge Function (`supabase/functions/ai-session-harness/`) verifies the caller's JWT, enforces a private per-user rate limit (`public.ai_request_record`), makes one structured-output provider call, and validates the response. The provider key is a Supabase secret; the browser never sees it.
+- The client sanitizes the coach's text locally (redacting swimmer names / emails / phones) and sends only that plus structural context (pool length, units, equipment options, recent-session shapes). Swimmer records, roster counts, session/drill names and notes, and the drill library are never sent.
+- A draft is persisted via `addSessionWithDrills` (atomic, does **not** call `addDrill` which would write `libraryDrills`) and marked `aiDraftStatus: 'unreviewed'`. At most one unreviewed draft exists per local device. In `SessionDetail`, **Keep session** clears the marker (normal template); **Discard** deletes the draft. Ordinary edits to a kept session retain the marker until kept.
+- V1 item fields are `distance`, `stroke`, `repeatCount`, `intensity` (v1–v4), `interval`, `equipment`. The model never emits stored-but-not-editable `segments`. Intensity maps easy→v1, medium/moderate→v2, strong→v3, hard→v4; omit if no effort cue. Equipment is restricted to `fins`, `paddles`, `pullbuoy`, `snorkel`.
+- Evals: `supabase/evals/` holds a synthetic corpus (`cases.ts`), a pure scorer (`scorer.ts`, tested by `scorer_test.ts`), and a live opt-in runner (`run.ts`).
