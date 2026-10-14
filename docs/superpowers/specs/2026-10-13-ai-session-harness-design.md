@@ -45,13 +45,16 @@ first version toward full richness.
 6. The client sends no roster or swimmer records. A **local sanitizer flags and removes detected
    personal information** from the coach's prompt before transmission; the sanitized text is the
    only prompt text sent to the provider.
-7. The draft contract is **versioned and extensible**: v1 is lean, richer output is additive, and
-   growth is measured by a committed eval corpus rather than guesswork.
-8. **No new public domain table or RLS policy** for v1. A private operational rate-limit store and
+7. The draft contract is **versioned and extensible**. V1 produces a rich object using every
+   per-step field coaches can currently edit; added fields require editor support, versioned
+   validation, and eval coverage.
+8. **No invisible model output.** Every content field emitted by the model must be editable in the
+   normal session editor. Fields without editor support stay out of the active response contract.
+9. **No new public domain table or RLS policy** for v1. A private operational rate-limit store and
    migration are allowed and required for durable per-user throttling.
-9. The AI draft is the **only** sign-in-gated feature; the rest of the app stays no-account and
+10. The AI draft is the **only** sign-in-gated feature; the rest of the app stays no-account and
    offline-first.
-10. `npm run check` stays green, with no relaxation of any hard gate. Playwright coverage for this
+11. `npm run check` stays green, with no relaxation of any hard gate. Playwright coverage for this
     feature is deferred until the existing E2E infrastructure is corrected and reliable.
 
 ## Non-goals
@@ -61,6 +64,8 @@ first version toward full richness.
   harness*.
 - **Writing to `libraryDrills`.** A draft creates `Session` + `Drill` rows only. The model does not
   mutate the coach's drill bank.
+- **Generating `DrillItem.segments` in v1.** The field exists in storage, but the normal editor does
+  not currently expose it. Add it only when the coach can edit and inspect it.
 - **Editing or rewriting an existing session via AI.** v1 creates only.
 - **Athlete- or parent-facing surfaces.** Out of scope entirely.
 - **Working offline.** The feature needs network. It fails loudly instead.
@@ -71,11 +76,12 @@ first version toward full richness.
 | Decision | Choice |
 |---|---|
 | API key + call location | **Our key, via a Supabase Edge Function.** Key lives in Supabase secrets; it never reaches the browser. |
-| Draft richness | **Lean now, richer later.** v1 emits the minimum viable structure; the schema grows as evals are added. |
+| Draft construction | **Fill a blank seed.** The prompt starts with a shape-valid but incomplete session skeleton; the model returns a complete session object. |
+| Draft richness | **Rich over coach-editable v1 fields.** Items support intensity v1–v4, interval, and equipment; no model-emitted field may be invisible in the editor. |
 | Draft landing | **Save first, then edit.** Draft is persisted immediately with a marker, then opened in the normal editor. |
 | Draft count | **One per local database/device.** |
 | Direct (non-harness) creation | **Retained**, sharing one validator and one writer. |
-| Model context | **Structural only.** No swimmer records, session notes, roster counts, or drill-library contents in v1; coach-entered text is sanitized locally. |
+| Model context | **Structural only.** No swimmer records, session notes, roster counts, or drill-library contents in v1; coach-entered text is sanitized locally. Current equipment option IDs are included. |
 
 ## Known issues / accepted risks
 
@@ -103,6 +109,7 @@ first version toward full richness.
 │       ↓ validate (AUTHORITATIVE)                              │
 │  services/sessionDraft/                                        │
 │     ├── schema.ts       canonical SessionDraft + schemaVersion│
+│     ├── seed.ts         empty, shape-valid SessionDraft seed   │
 │     ├── validate.ts     the one validator, version-aware      │
 │     ├── context.ts      builds structural context             │
 │     └── apply.ts        the one writer                        │
@@ -126,7 +133,7 @@ first version toward full richness.
 ### Four decisions
 
 **1. The trust boundary is narrow and typed.** The Edge Function returns `unknown`. The client's
-entire contract is `unknown → SessionDraft | DraftValidationError`. Everything above
+entire contract is `unknown → validated SessionDraft | DraftValidationError`. Everything above
 `api/sessionDraft.ts` is fully typed. This is also how we satisfy the `no-explicit-any` gate
 without an `any` anywhere — `unknown` plus a narrowing validator is the legal pattern.
 
@@ -183,15 +190,41 @@ interface SessionDraftV1 {
       distance: number
       stroke: Stroke
       repeatCount: number
+      intensity?: 'v1' | 'v2' | 'v3' | 'v4'
       interval?: string
+      equipment?: ('fins' | 'paddles' | 'pullbuoy' | 'snorkel')[]
     }>
   }>
 }
 ```
 
+The prompt starts from a separate **shape-valid but semantically incomplete** seed:
+
+```ts
+interface SessionDraftSeedV1 {
+  schemaVersion: 1
+  session: { name: '' }
+  drills: []
+}
+```
+
+The seed is passed with the sanitized request; it is never persisted. The model returns the
+**complete** `SessionDraftV1`, adding meaningful session/drill names and the required drill/item
+structure. It is not a sparse patch. The prompt tells the model to use freestyle when stroke is
+unspecified and repeat counts of 1 when no repetition is stated. Use the existing effort mapping:
+v1 easy, v2 medium/moderate, v3 strong, and v4 hard. Intensity, interval, and equipment stay
+absent unless stated or clearly implied by the coach.
+
 V1 requires a non-empty session name, at least one drill, and at least one item per drill.
-Distances and repeat counts are positive integers. V1 intentionally omits segments, equipment,
-labels, and other richer fields; those can be added as the contract grows against evals.
+Distances and repeat counts are positive integers. Intensity is restricted to the editor's current
+v1–v4 choices; equipment is restricted to the current editor options. V1 includes all current
+coach-editable item fields (`distance`, `stroke`, `repeatCount`, `intensity`, `interval`,
+`equipment`). `segments` remains excluded until it is editable and visible in the app.
+
+Interpretations are explicit: `3 × 100m easy, medium, hard` is one drill with three 100m items
+at v1, v2, and v4; `3 × 100m easy` is one 100m item repeated three times at v1. When equipment
+changes within repeated work (for example, only the third repeat uses fins), represent the change
+as separate items so equipment does not incorrectly apply to all repeats.
 
 The client generates database IDs and timestamps. The model does not choose persisted IDs or
 duplicate summary values: the mapper derives `Drill.distance` as
@@ -222,15 +255,17 @@ runtime even when a direct caller supplies a TypeScript-typed value; types alone
 trust.
 
 Validation checks the schema version, required fields, non-empty names, known `Stroke` values,
-positive integer distances/repeats, and reasonable size limits for drills, items, and text. The
+positive integer distances/repeats, v1–v4 intensity, allowed equipment IDs, and reasonable size
+limits for drills, items, and text. The
 client derives summary fields rather than trusting redundant model-provided totals. If anything is
 malformed or inconsistent, **nothing is saved**. Malformed model output is not repaired: a
 plausible but incorrect session is worse than a clear failure.
 
 The function performs a looser defensive check for useful error handling; the client remains
-authoritative before any Dexie write. V1 validation tolerates unknown additive fields it does not
-use, so adding optional richness will not break older v1 drafts. An unsupported `schemaVersion`
-fails clearly; validators for older supported versions remain available.
+authoritative before any Dexie write. The client rejects unrecognized model-output fields rather
+than silently dropping content the coach might expect to edit. New fields arrive under a new
+versioned contract with their editor support and evals; validators for older supported versions
+remain available for existing drafts.
 
 Non-actionable input produces no draft and never reaches the writer. Its response shape is defined
 in §4.
@@ -239,14 +274,16 @@ in §4.
 
 ### Request and response
 
-The client sanitizes the coach's text locally, then sends that text plus bounded structural context
-in one authenticated request. V1 context includes pool length, distance units, sanitized group
-names, and up to two recent-session structural summaries (distances, strokes, and repeat patterns).
-It excludes swimmer records, session/drill names and notes, roster counts, and drill-library
-contents. Context strings pass through the local sanitizer as well. The Edge Function verifies the
-caller's Supabase JWT, derives the user ID from its verified subject, checks the rate limit, and
-makes **one structured-output call** to the configured LLM provider. The provider key is a Supabase
-secret; the browser never receives it.
+The client sanitizes the coach's text locally, creates `SessionDraftSeedV1`, and sends both with
+bounded structural context in one authenticated request. V1 context includes pool length, distance
+units, sanitized group names, the current equipment option IDs, and up to two recent-session
+structural summaries (distances, strokes, and repeat patterns). It excludes swimmer records,
+session/drill names and notes, roster counts, and drill-library contents. Context strings pass
+through the local sanitizer as well. The Edge Function verifies the caller's Supabase JWT, derives
+the user ID from its verified subject, checks the rate limit, and makes **one structured-output
+call** to the configured LLM provider. The prompt asks the model to complete the seed and return a
+full `SessionDraftV1`, not a patch. The provider key is a Supabase secret; the browser never
+receives it.
 
 The model returns exactly one of these discriminated response forms:
 
@@ -261,6 +298,15 @@ names. Structured output constrains the response shape, but does not alone guara
 contents, so the client checks returned text against local known swimmer names and blocks the save
 if a match is found. The full response still passes the §3 validator before it can reach the
 writer.
+
+The seed is a starting structure, not content to preserve blindly. The model must fill the session
+name and create the appropriate drills/items. For `3 × 100m easy, medium, hard`, it creates one
+drill with three 100m items at v1, v2, and v4; for `3 × 100m easy`, it creates one 100m item with
+repeat count 3 at v1. If only the third of three repeats uses fins, it splits that work into two
+items—two repeats without equipment and one with `equipment: ['fins']`—so equipment does not
+incorrectly apply to every repeat. Unspecified strokes default to freestyle and ordinary repeat
+counts to 1. Intensity, interval, and equipment remain unset unless the request states or clearly
+implies them.
 
 ### Local prompt sanitizer and privacy
 
@@ -316,8 +362,10 @@ is per local database/device; a draft on another device is not detected.
 
 Evals are part of v1, not a later quality pass. Keep a committed, synthetic corpus of actionable
 session requests and non-session requests. Each case defines the expected outcome and checkable
-requirements—such as distances, repeats, strokes, or intervals—rather than one exact JSON answer,
-since valid drafts can differ.
+requirements—such as distances, repeats, strokes, v-scale intensity, intervals, and equipment—
+rather than one exact JSON answer, since valid drafts can differ. Include cases for progressive
+items (`3 × 100m easy, medium, hard`), repeated items (`3 × 100m easy`), and equipment variation
+on only one repeat; verify these map to the right drill/item structure without invisible fields.
 
 An opt-in runner calls the real prompt/provider path and reports schema validity, correct
 actionability, preservation of explicit workout constraints, and latency/token usage where
