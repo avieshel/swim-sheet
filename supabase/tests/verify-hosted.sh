@@ -37,6 +37,14 @@ select
     where c.relnamespace = 'auth'::regnamespace and t.tgname = 'on_auth_user_created') as signup_trigger,
   (select array_to_string(p.proconfig, ', ') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'anonymize_swimmer') as anonymize_search_path,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'ai_request_record'
+       and has_function_privilege('anon', p.oid, 'execute')) as anon_can_call_rate_limit,
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'ai_request_record'
+       and has_function_privilege('authenticated', p.oid, 'execute')) as auth_can_call_rate_limit,
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'public' and c.relname = 'ai_request_log') as rate_limit_table_exposed,
   (select count(*) from supabase_migrations.schema_migrations) as recorded_migrations
 """
 
@@ -104,6 +112,9 @@ def main():
         ('authenticated can SELECT every public table', row['auth_missing_select'] == 0),
         ('anon confined to analytics_events INSERT', row['anon_scope_violations'] == 0),
         ('signup trigger on auth.users present', row['signup_trigger'] >= 1),
+        ('anon cannot call ai_request_record', row['anon_can_call_rate_limit'] == 0),
+        ('authenticated cannot call ai_request_record', row['auth_can_call_rate_limit'] == 0),
+        ('rate-limit table not exposed in public schema', row['rate_limit_table_exposed'] == 0),
     ]
 
     print('SwimSheet hosted security audit — project {0}'.format(ref))
