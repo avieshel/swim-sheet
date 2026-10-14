@@ -3,6 +3,7 @@
 // browser. Swapping providers later must keep the same SessionDraft shape.
 
 import { buildSystemPrompt, buildUserContent } from './prompt.ts'
+import { PROVIDER_REQUEST_TIMEOUT_MS, PROVIDER_TEMPERATURE } from './config.ts'
 import type { HarnessResult, SessionDraftRequest } from './contract.ts'
 
 export class ProviderError extends Error {
@@ -36,7 +37,7 @@ interface ChatCompletionResponse {
 export async function callProvider(
   request: SessionDraftRequest,
   config: ProviderConfig,
-  timeoutMs = 25_000,
+  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
 ): Promise<HarnessResult> {
   if (!config.apiKey) {
     throw new ProviderError('network', 'provider API key is not configured')
@@ -47,7 +48,7 @@ export async function callProvider(
   try {
     const body = {
       model: config.model,
-      temperature: 0.4,
+      temperature: PROVIDER_TEMPERATURE,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: buildSystemPrompt(request.context) },

@@ -9,14 +9,13 @@ import type {
 } from './schema'
 import { EQUIPMENT_IDS, INTENSITY_VALUES, STROKE_VALUES } from './schema'
 import type { Stroke } from '../../types/swimming'
-
-// Size limits. Names and free-text intervals are bounded; structural counts are
-// bounded so a malformed or hostile response cannot blow up the client.
-const MAX_NAME_LENGTH = 100
-const MAX_INTERVAL_LENGTH = 40
-const MAX_PROMPT_LENGTH = 4000
-const MAX_DRILLS = 30
-const MAX_ITEMS_PER_DRILL = 10
+import {
+  AI_DRAFT_MAX_NAME_LENGTH,
+  AI_DRAFT_MAX_INTERVAL_LENGTH,
+  AI_DRAFT_MAX_PROMPT_LENGTH,
+  AI_DRAFT_MAX_DRILLS,
+  AI_DRAFT_MAX_ITEMS_PER_DRILL,
+} from '../../constants/aiSessionDraft'
 
 function fail(code: DraftValidationError['code'], message: string): ValidationResult<never> {
   return { ok: false, error: { code, message } }
@@ -70,8 +69,8 @@ function validateItem(value: unknown, path: string): ValidationResult<SessionDra
     return fail('invalid_shape', `${path}.intensity must be one of v1–v4`)
   }
   if (value.interval !== undefined) {
-    if (typeof value.interval !== 'string' || value.interval.length > MAX_INTERVAL_LENGTH) {
-      return fail('invalid_shape', `${path}.interval must be a string up to ${MAX_INTERVAL_LENGTH} characters`)
+    if (typeof value.interval !== 'string' || value.interval.length > AI_DRAFT_MAX_INTERVAL_LENGTH) {
+      return fail('invalid_shape', `${path}.interval must be a string up to ${AI_DRAFT_MAX_INTERVAL_LENGTH} characters`)
     }
   }
   if (value.equipment !== undefined) {
@@ -115,16 +114,16 @@ export function validateSessionDraft(input: unknown): ValidationResult<SessionDr
   if (typeof session.name !== 'string' || session.name.trim().length === 0) {
     return fail('invalid_shape', 'draft.session.name must be a non-empty string')
   }
-  if (session.name.length > MAX_NAME_LENGTH) {
-    return fail('limit_exceeded', `draft.session.name exceeds ${MAX_NAME_LENGTH} characters`)
+  if (session.name.length > AI_DRAFT_MAX_NAME_LENGTH) {
+    return fail('limit_exceeded', `draft.session.name exceeds ${AI_DRAFT_MAX_NAME_LENGTH} characters`)
   }
 
   const drills = input.drills
   if (!Array.isArray(drills) || drills.length < 1) {
     return fail('invalid_shape', 'draft.drills must contain at least one drill')
   }
-  if (drills.length > MAX_DRILLS) {
-    return fail('limit_exceeded', `draft.drills exceeds ${MAX_DRILLS} drills`)
+  if (drills.length > AI_DRAFT_MAX_DRILLS) {
+    return fail('limit_exceeded', `draft.drills exceeds ${AI_DRAFT_MAX_DRILLS} drills`)
   }
 
   const validatedDrills: SessionDraftV1['drills'] = []
@@ -138,8 +137,8 @@ export function validateSessionDraft(input: unknown): ValidationResult<SessionDr
     if (typeof drill.name !== 'string' || drill.name.trim().length === 0) {
       return fail('invalid_shape', `${drillPath}.name must be a non-empty string`)
     }
-    if (drill.name.length > MAX_NAME_LENGTH) {
-      return fail('limit_exceeded', `${drillPath}.name exceeds ${MAX_NAME_LENGTH} characters`)
+    if (drill.name.length > AI_DRAFT_MAX_NAME_LENGTH) {
+      return fail('limit_exceeded', `${drillPath}.name exceeds ${AI_DRAFT_MAX_NAME_LENGTH} characters`)
     }
     if (!isPositiveInteger(drill.repeatCount)) {
       return fail('invalid_shape', `${drillPath}.repeatCount must be a positive integer`)
@@ -148,8 +147,8 @@ export function validateSessionDraft(input: unknown): ValidationResult<SessionDr
     if (!Array.isArray(items) || items.length < 1) {
       return fail('invalid_shape', `${drillPath}.items must contain at least one item`)
     }
-    if (items.length > MAX_ITEMS_PER_DRILL) {
-      return fail('limit_exceeded', `${drillPath}.items exceeds ${MAX_ITEMS_PER_DRILL} items`)
+    if (items.length > AI_DRAFT_MAX_ITEMS_PER_DRILL) {
+      return fail('limit_exceeded', `${drillPath}.items exceeds ${AI_DRAFT_MAX_ITEMS_PER_DRILL} items`)
     }
     const validatedItems: SessionDraftItemV1[] = []
     for (let i = 0; i < items.length; i++) {
@@ -197,5 +196,5 @@ export function validateHarnessResult(input: unknown): ValidationResult<HarnessR
 // The prompt is bounded separately from the draft because it travels in the
 // request, not in the draft object.
 export function isValidPromptLength(prompt: string): boolean {
-  return prompt.length <= MAX_PROMPT_LENGTH
+  return prompt.length <= AI_DRAFT_MAX_PROMPT_LENGTH
 }

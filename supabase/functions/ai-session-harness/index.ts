@@ -8,9 +8,8 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { callProvider, getProviderConfig, ProviderError } from './provider.ts'
 import { validateHarnessResult } from './output.ts'
+import { MAX_PROMPT_LENGTH } from './config.ts'
 import type { SessionDraftRequest } from './contract.ts'
-
-const MAX_PROMPT_LENGTH = 4000
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

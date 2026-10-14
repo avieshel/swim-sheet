@@ -13,15 +13,16 @@ import type {
   SessionDraftV1,
   Stroke,
 } from './contract.ts'
+import {
+  MAX_NAME_LENGTH,
+  MAX_INTERVAL_LENGTH,
+  MAX_DRILLS,
+  MAX_ITEMS_PER_DRILL,
+} from './config.ts'
 
 const EQUIPMENT_IDS: readonly EquipmentId[] = ['fins', 'paddles', 'pullbuoy', 'snorkel']
 const STROKE_VALUES: readonly Stroke[] = ['freestyle', 'backstroke', 'breaststroke', 'butterfly', 'im']
 const INTENSITY_VALUES: readonly IntensityV1[] = ['v1', 'v2', 'v3', 'v4']
-
-const MAX_NAME_LENGTH = 100
-const MAX_INTERVAL_LENGTH = 40
-const MAX_DRILLS = 30
-const MAX_ITEMS_PER_DRILL = 10
 
 export interface ValidationError {
   code: 'invalid_shape' | 'unsupported_version' | 'limit_exceeded'
