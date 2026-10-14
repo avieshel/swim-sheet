@@ -242,16 +242,26 @@ Individual swimmer profile.
 ### SessionsList (`/sessions`)
 Template manager — grid of saved session templates.
 
-- Header with "Session Templates" + "New Template" button
+- Header with "Session Templates" + "New Template" button + **"Create with AI"** link (routes to `/sessions/ai`)
 - Template cards: name, drill count, total distance, focus label
+- Card chip `AI draft` when `session.aiDraftStatus === 'unreviewed'` (local-only marker; not synced)
 - Click to navigate to editor (`/sessions/:id`)
 - Delete flows through a two-step confirmation:
   1. **Active run → refused.** "Cannot Delete Template — `<name>` is being delivered right now. Finish or cancel the active session before deleting it." (`Got it` dismisses.) This is a UX rule, not a data-safety one: the run's snapshot renders without the template.
   2. **Completed runs → informed, then allowed.** "`<name>` was used in N recorded sessions. Deleting it keeps that history — each run keeps its own snapshot of what was done." A template with no runs gets the single plain confirmation.
 
+### AiSessionDraft (`/sessions/ai`)
+The AI drafting entry point. The only sign-in-gated feature in the app.
+
+- Shows a sign-in-required state (with a Settings link) for anonymous / signed-out users — no request is made.
+- Two-step compose → review: the coach enters a plain-language description; the app sanitizes it locally (redacting swimmer names / emails / phones), then shows the sanitized prompt (editable) plus a notice of removed categories. "Generate draft" is disabled when the sanitized prompt is empty.
+- Sends only the sanitized prompt + structural context (pool length, units, equipment options, recent-session shapes) to the harness Edge Function via `api/sessionDraft`. On a `draft` outcome it persists the draft locally as an unreviewed session and navigates to the editor. `not_actionable` shows the model's message; `auth`/`rate_limited`/`provider_rate_limited`/`provider`/`timeout`/`network`/`privacy` map to distinct, recoverable messages that preserve the coach's input. Rate-limit outcomes (`rate_limited` for the per-user quota, `provider_rate_limited` when the upstream provider throttles) show a human-readable wait derived from the harness's `Retry-After` / `retry_after_seconds`; `provider`/`timeout`/`network`/`auth`/`invalid` each show a recoverable message. The client validates the request against the shared bounds before sending (defense in depth); the harness validates it again.
+- On entry, if a local unreviewed draft already exists it offers "Open draft" or "Discard and start over".
+
 ### SessionDetail (`/sessions/:id`)
 Template editor.
 
+- When `session.aiDraftStatus === 'unreviewed'`, shows an **"AI draft — review"** banner with **Keep session** (clears the local marker via `keepSessionDraft`) and **Discard** (deletes the draft via `deleteSession`).
 - Editable template name and default pool length
 - Drill list with order, stroke badge, distance — reorderable via drag handle
 - "Add Drill" form (name, stroke, distance) or drill library sidebar

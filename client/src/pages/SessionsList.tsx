@@ -263,6 +263,13 @@ export const SessionsList: React.FC = () => {
             <Icon name="add" />
             New Template
           </button>
+          <Link
+            to="/sessions/ai"
+            className="flex items-center gap-2 px-4 py-3 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-all no-underline"
+          >
+            <Icon name="auto_awesome" />
+            Create with AI
+          </Link>
         </div>
       </div>
 
@@ -362,6 +369,12 @@ export const SessionsList: React.FC = () => {
                         <span className="shrink-0 flex items-center gap-1 text-label-caps text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                           Live
+                        </span>
+                      )}
+                      {s.aiDraftStatus === 'unreviewed' && (
+                        <span className="shrink-0 flex items-center gap-1 text-label-caps text-tertiary bg-tertiary-container px-2 py-0.5 rounded-full">
+                          <Icon name="auto_awesome" size="sm" />
+                          AI draft
                         </span>
                       )}
                     </div>

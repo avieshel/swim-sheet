@@ -18,6 +18,7 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
 | Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
+| AI session harness (shared contract, agent/harness split, evals) | `shared/sessionDraft/`, `supabase/functions/ai-session-harness/`, `supabase/evals/` |
 | Template creation + promote-to-live flow (Initiative 1) | `docs/context/Session-Creation-To-Live-Context.md` |
 | Past sessions table + swimmer-filtered history (Initiative 2) | `docs/context/Past-Sessions-Data-Context.md` |
 | Implementation plan for both initiatives (sequenced tasks) | `docs/context/Session-Initiatives-PLAN.md` |
@@ -50,11 +51,14 @@ npm run build                 # lint + tsc + vite build
 npm run check                 # lint + tsc + unit tests (full validation)
 npm run test                  # Vitest unit tests
 npm run test:e2e              # Playwright e2e tests
+cd supabase/functions/ai-session-harness && deno task test   # Edge Function unit tests (fakes; no secrets)
+cd supabase/functions/ai-session-harness && deno task check  # Type-check the Edge Function
 ```
 
 ## Global Conventions
 
-1. **All source in `client/` or `server/`** — never at root
+1. **All source in `client/` or `server/`** — never at root, except the runtime-agnostic
+   shared contract in `shared/` (imported by both the PWA and the Supabase Edge Function)
 2. **4-layer architecture**: UI (`pages/`) → API (`api/`) → Services (`services/`) → DAO (`db/dao.ts`) → Dexie
    - Pages never import `dao.ts` or `db` directly (blocked by ESLint)
    - DAO is pure CRUD — no business logic
@@ -65,6 +69,16 @@ npm run test:e2e              # Playwright e2e tests
 6. **No AI-assistant attribution in commit messages** — never add `Co-Authored-By:`,
    `Signed-off-by:`, or `Generated with ...` trailers naming an AI assistant. This project
    is not developed with Claude. Enforced by `.husky/commit-msg`, which blocks the commit.
+ 7. **No magic numbers for limits or constraints** — every tunable bound (request/response
+    size caps, counts, rates, timeouts, thresholds, retries) must live in a dedicated config
+    module that is imported, never inlined at the point of use. The canonical contract (types, allowlists, limits, and pure validators) for the AI session harness is the shared module `shared/sessionDraft/`; both the PWA (`client/src/services/sessionDraft/validate.ts` binds the default config) and the Deno Edge Function (which imports `defaultSessionDraftConfig` directly) consume it — there is no parallel copy to keep in sync. SQL constraints are
+    declared as named constants in the migration. Naked numeric literals in those roles are a
+    review-failing smell.
+ 8. **AI harness: keep agent and harness separate** — in
+    `supabase/functions/ai-session-harness/`, LLM-facing code lives in `agent/` (prompt,
+    provider adapter, output validation) and transport/auth/rate-limit code in `harness/`
+    (an injectable `createHandler(deps)`, wired by `index.ts`). Both sides must be testable
+    with fakes — a module may not perform a side effect it did not receive via injection.
 
 ## Hard Gate Override Policy
 

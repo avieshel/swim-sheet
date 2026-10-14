@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "ignoreDependencies": ["lint-staged"],
-  "ignore": ["src/api/supabase.ts"]
+  "ignore": ["src/api/supabase.ts"],
+  "ignoreExportsUsedInFile": true
 }
