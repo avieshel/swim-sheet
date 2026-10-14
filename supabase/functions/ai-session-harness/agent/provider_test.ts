@@ -3,7 +3,7 @@
 
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1'
 import { callProvider, ProviderError, type ProviderConfig } from './provider.ts'
-import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
+import { PROVIDER_MAX_TOKENS, PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
 import type { SessionDraftRequest } from './contract.ts'
 
 const request: SessionDraftRequest = {
@@ -18,7 +18,7 @@ const request: SessionDraftRequest = {
   },
 }
 
-const config: ProviderConfig = { baseUrl: 'https://example.test/v1', apiKey: 'k', model: 'm' }
+const config: ProviderConfig = { baseUrl: 'https://example.test/v1', apiKey: 'k', model: 'm', maxTokens: PROVIDER_MAX_TOKENS }
 
 function stubFetch(impl: typeof fetch): () => void {
   const original = globalThis.fetch
@@ -103,20 +103,76 @@ Deno.test('callProvider maps a missing message to a shape error', async () => {
   }
 })
 
-Deno.test('callProvider returns the parsed structured result on success', async () => {
-  const draft = { outcome: 'draft', draft: { schemaVersion: 1, session: { name: 'S' }, drills: [] } }
-  const providerBody = { choices: [{ message: { content: JSON.stringify(draft) } }] }
+Deno.test('callProvider sends a bounded max_tokens', async () => {
+  let captured: { max_tokens?: number } | undefined
+  const restore = stubFetch((_url, init) => {
+    captured = JSON.parse(String(init?.body)) as { max_tokens?: number }
+    return Promise.resolve(
+      new Response(JSON.stringify({ choices: [{ message: { content: '{"outcome":"not_actionable","message":"hi"}' } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+  })
+  try {
+    await callProvider(request, config)
+    assertEquals(captured?.max_tokens, config.maxTokens)
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProvider recovers a fenced JSON block', async () => {
+  const payload = { outcome: 'draft', draft: { schemaVersion: 1, session: { name: 'S' }, drills: [] } }
   const restore = stubFetch(() =>
     Promise.resolve(
-      new Response(JSON.stringify(providerBody), {
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'Here is the draft:\n```json\n' + JSON.stringify(payload) + '\n```' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ),
+  )
+  try {
+    const result = await callProvider(request, config)
+    assertEquals(result.outcome, 'draft')
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProvider recovers JSON surrounded by prose', async () => {
+  const payload = { outcome: 'not_actionable', message: 'Not a session.' }
+  const restore = stubFetch(() =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: 'Sure! ' + JSON.stringify(payload) + ' Hope that helps.' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ),
+  )
+  try {
+    const result = await callProvider(request, config)
+    assertEquals(result.outcome, 'not_actionable')
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProvider rejects content that is not JSON at all', async () => {
+  const restore = stubFetch(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ choices: [{ message: { content: 'I cannot help with that.' } }] }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),
     ),
   )
   try {
-    const result = await callProvider(request, config)
-    assertEquals(result.outcome, 'draft')
+    await assertRejects(
+      () => callProvider(request, config),
+      ProviderError,
+      'provider response was not valid JSON',
+    )
   } finally {
     restore()
   }
