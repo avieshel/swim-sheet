@@ -482,6 +482,33 @@ export class SupabaseSyncTransport implements SyncTransport {
     }
   }
 
+  // Narrows `tables` to the ones the cloud could have rows for, in one request.
+  //
+  // The pull below costs one round trip per table, so a device that has nothing
+  // to sync — the common case, on the 60s poll and again after every local
+  // edit — was spending nine requests to learn that. Returns `tables`
+  // unchanged whenever the answer is unavailable (migration not applied yet,
+  // RPC error, unexpected shape), so the probe can only ever skip work. It must
+  // never be able to report "clean" on its own: that would strand a cursor
+  // behind a newer row and lose data with no error anywhere.
+  private async dirtyTables(
+    orgId: string,
+    nextCursors: Record<SyncTable, string>,
+    tables: SyncTable[],
+  ): Promise<SyncTable[]> {
+    try {
+      const { data, error } = await this.client.rpc('sync_pulse', {
+        p_organization: orgId,
+        p_cursors: nextCursors,
+      })
+      if (error || !Array.isArray(data)) return tables
+      const dirty = new Set(data as SyncTable[])
+      return tables.filter(table => dirty.has(table))
+    } catch {
+      return tables
+    }
+  }
+
   async pull(
     orgId: string,
     cursors: Record<SyncTable, string | null>,
@@ -499,7 +526,8 @@ export class SupabaseSyncTransport implements SyncTransport {
       laps: cursors.laps ?? MIN_CURSOR,
       laneDrillResults: cursors.laneDrillResults ?? MIN_CURSOR,
     }
-    for (const table of tables) {
+    const toPull = await this.dirtyTables(orgId, nextCursors, tables)
+    for (const table of toPull) {
       const cursor = nextCursors[table]
       const columns = table === 'laps'
         ? '*,run_drills!inner(session_runs!inner(status))'
