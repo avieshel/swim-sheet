@@ -68,18 +68,55 @@ Deno.test('the example draft is itself valid under the shared validator', () => 
 
 Deno.test('the example uses only equipment the context actually enables', () => {
   const example = buildExampleResult(context)
-  const item = example.draft.drills[0].items[0]
-  for (const id of item.equipment ?? []) {
-    assert(context.equipmentOptions.includes(id))
+  for (const drill of example.draft.drills) {
+    for (const item of drill.items) {
+      for (const id of item.equipment ?? []) {
+        assert(context.equipmentOptions.includes(id))
+      }
+    }
   }
 })
 
 Deno.test('the example omits equipment entirely when none is enabled', () => {
   const example = buildExampleResult({ ...context, equipmentOptions: [] })
-  assertEquals(example.draft.drills[0].items[0].equipment, undefined)
+  for (const drill of example.draft.drills) {
+    for (const item of drill.items) {
+      assertEquals(item.equipment, undefined)
+    }
+  }
 })
 
 Deno.test('the system prompt embeds the example verbatim', () => {
   const prompt = buildSystemPrompt(context)
   assert(prompt.includes(JSON.stringify(buildExampleResult(context), null, 2)))
+})
+
+// A one-drill, one-item example is ambiguous: a model can read `items` as
+// "the things in this drill" and then nest whole drills inside it, which the
+// validator rejects as unsupported fields on an item. The example therefore
+// has to demonstrate the real two-level shape.
+
+const ITEM_FIELDS = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment']
+
+Deno.test('the example shows more than one drill', () => {
+  assert(buildExampleResult(context).draft.drills.length >= 2)
+})
+
+Deno.test('the example shows a drill with more than one item', () => {
+  const drills = buildExampleResult(context).draft.drills
+  assert(drills.some((drill) => drill.items.length >= 2))
+})
+
+Deno.test('no example item carries drill-shaped fields', () => {
+  for (const drill of buildExampleResult(context).draft.drills) {
+    for (const item of drill.items) {
+      const extra = Object.keys(item).filter((key) => !ITEM_FIELDS.includes(key))
+      assertEquals(extra, [], `items[${Object.keys(item).join(',')}] has unexpected fields`)
+    }
+  }
+})
+
+Deno.test('the system prompt forbids nesting drills inside items', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('An item is never a drill'))
 })
