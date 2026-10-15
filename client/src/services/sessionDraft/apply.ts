@@ -39,12 +39,18 @@ function withDraftSlot<T>(fn: () => Promise<T>): Promise<T> {
 
 // ── Draft → session/drills mapping ───────────────────────────
 
-function deriveDrillDistance(
+export function draftDrillDistance(
   items: SessionDraftV1['drills'][number]['items'],
   drillRepeatCount: number,
 ): number {
   const perRep = items.reduce((sum, it) => sum + it.distance * it.repeatCount, 0)
   return perRep * drillRepeatCount
+}
+
+// Single source of truth for what a proposal adds up to, so the figure the coach
+// reads on the AI screen is the figure that gets persisted.
+export function draftTotalDistance(draft: SessionDraftV1): number {
+  return draft.drills.reduce((sum, drill) => sum + draftDrillDistance(drill.items, drill.repeatCount), 0)
 }
 
 function deriveDominantStroke(
@@ -73,7 +79,7 @@ export function mapDraftToSessionAndDrills(
   const drills: Array<Omit<SafeDrill, 'sessionId'>> = draft.drills.map((drill, order) => ({
     name: drill.name,
     stroke: deriveDominantStroke(drill.items),
-    distance: deriveDrillDistance(drill.items, drill.repeatCount),
+    distance: draftDrillDistance(drill.items, drill.repeatCount),
     order,
     items: drill.items.map((item) => ({
       id: crypto.randomUUID(),
