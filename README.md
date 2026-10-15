@@ -107,6 +107,18 @@ PROVIDER_TIMEOUT_MS=240000 \
 deno run --allow-env --allow-net supabase/evals/run.ts
 ```
 
+Observed on an M-series Mac, for calibration:
+
+| Model | Size | Score |
+|-------|------|-------|
+| `gemma4:latest` | 9.6 GB | 5/6, ~30 s per draft |
+| `glm-4.7-flash:latest` | 19 GB | too slow at 25 s, passes the trivial cases |
+| `qwen2.5-coder:7b` | 4.7 GB | 1/6 — malformed drafts |
+
+A hosted model is both faster and more contract-conformant; local models mostly fail on
+volume arithmetic (producing less total distance than the coach asked for) rather than on
+shape, once the validator tolerates `null` for absent optional fields.
+
 To develop against the hosted project instead, deploy the function and set the provider
 secrets there:
 
