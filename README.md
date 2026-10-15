@@ -115,6 +115,53 @@ supabase secrets set PROVIDER_BASE_URL=... PROVIDER_API_KEY=... PROVIDER_MODEL=.
 supabase functions deploy ai-session-harness
 ```
 
+### Debugging the AI screen
+
+Three independent signals tell you whether the LLM actually ran and what it was asked.
+
+**1. The request reached the function.** Every accepted request inserts a row:
+
+```bash
+docker exec -i supabase_db_swimsheet psql -U postgres -d postgres \
+  -c "select created_at from ai_private.ai_request_log order by created_at desc limit 5;"
+```
+
+**2. The model actually generated.** Ollama logs per-request timings, but only to its own
+stdout. Yours was started as a detached process, so that output went to whatever terminal
+launched it. To see it live, run `ollama serve` in a visible terminal — look for
+`prompt eval time`, `total time`, and the `[GIN]` access line.
+
+**3. What was actually sent and returned.** The function logs nothing by default. Turn on
+opt-in agent logging:
+
+```bash
+# in .env.functions.local
+AGENT_DEBUG=true
+supabase functions serve --env-file .env.functions.local ai-session-harness
+```
+
+Then `tail -f` the serve terminal. Every line is prefixed and single-line, so it greps and
+parses cleanly:
+
+```
+[ai-harness] agent.provider.request  {"url":..., "model":"gemma4:latest", "systemPrompt":"...", "userContent":"..."}
+[ai-harness] agent.provider.response {"status":200, "elapsedMs":29699, "finishReason":"stop", "content":"<raw model output>"}
+[ai-harness] agent.provider.parsed    {"outcome":"draft", "elapsedMs":29699}
+[ai-harness] harness.rejected         {"reason":"invalid_shape", "detail":"draft.drills[1].items[0].stroke is not a supported stroke"}
+[ai-harness] harness.denied           {"stage":"invalid-provider-response", "status":502}
+[ai-harness] harness.completed        {"outcome":"draft", "elapsedMs":29737}
+```
+
+`harness.rejected` / `harness.denied` tell you which lifecycle stage killed the request;
+`agent.provider.response` shows exactly what the model said. Never enable `AGENT_DEBUG` in
+a deployed environment — it prints the coach's own sanitized prompt, and this feature is
+built around not leaking that text.
+
+A failed draft is nearly always one of two things, and the log tells you which:
+`invalid_provider_response` (502) means the model broke the draft contract, so read
+`content` and compare against it; `provider_timeout` (408) means it was too slow and
+`PROVIDER_TIMEOUT_MS` is too low.
+
 ## Deployment (Cloudflare Pages)
 
 Cloudflare Pages automatically builds and deploys the application when connected to this GitHub repository.

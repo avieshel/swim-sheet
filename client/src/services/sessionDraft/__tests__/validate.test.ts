@@ -34,6 +34,55 @@ describe('validateSessionDraft', () => {
     expect(validateSessionDraft('nope').ok).toBe(false)
   })
 
+  // JSON `null` is one of the most common ways a model marks an optional field
+  // as absent. Treating it as present rejects the whole draft over something the
+  // coach never sees, so it normalizes to omitted instead.
+  it('treats null as omitted for an optional item field', () => {
+    const result = validateSessionDraft({
+      schemaVersion: 1,
+      session: { name: 'Tuesday Endurance' },
+      drills: [
+        {
+          name: 'Kick',
+          repeatCount: 1,
+          items: [
+            { distance: 50, stroke: 'freestyle', repeatCount: 4, intensity: null, interval: null, equipment: null },
+          ],
+        },
+      ],
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.drills[0].items[0].intensity).toBeUndefined()
+      expect(result.value.drills[0].items[0].interval).toBeUndefined()
+      expect(result.value.drills[0].items[0].equipment).toBeUndefined()
+    }
+  })
+
+  it('keeps a null in a required field rejected', () => {
+    const result = validateSessionDraft({
+      schemaVersion: 1,
+      session: { name: 'Tuesday Endurance' },
+      drills: [{ name: null, repeatCount: 1, items: [validDrill().items[0]] }],
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it('still rejects an out-of-range intensity', () => {
+    const result = validateSessionDraft({
+      schemaVersion: 1,
+      session: { name: 'Tuesday Endurance' },
+      drills: [
+        {
+          name: 'Set',
+          repeatCount: 1,
+          items: [{ distance: 100, stroke: 'freestyle', repeatCount: 2, intensity: 'v9' }],
+        },
+      ],
+    })
+    expect(result.ok).toBe(false)
+  })
+
   it('rejects an unsupported schema version', () => {
     const result = validateSessionDraft({ ...(validDraft() as object), schemaVersion: 2 })
     expect(result.ok).toBe(false)

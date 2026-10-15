@@ -56,6 +56,15 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
 }
 
+// Models routinely mark an optional field as absent with JSON `null` rather than
+// by omitting the key. At this boundary `null` means the same as `undefined`,
+// and treating it as present-but-invalid would fail an otherwise usable draft
+// over a distinction the coach never sees. Only ever applied to fields that are
+// genuinely optional.
+function isAbsent(value: unknown): boolean {
+  return value === undefined || value === null
+}
+
 function isStroke(value: unknown, config: SessionDraftConfig): value is Stroke {
   return typeof value === 'string' && (config.strokeValues as readonly string[]).includes(value)
 }
@@ -92,10 +101,10 @@ function validateItem(
   if (value.repeatCount > config.limits.maxRepeatCount) {
     return fail('limit_exceeded', `${path}.repeatCount exceeds ${config.limits.maxRepeatCount}`)
   }
-  if (value.intensity !== undefined && !isIntensity(value.intensity, config)) {
+  if (!isAbsent(value.intensity) && !isIntensity(value.intensity, config)) {
     return fail('invalid_shape', `${path}.intensity must be one of ${config.intensityValues.join(', ')}`)
   }
-  if (value.interval !== undefined) {
+  if (!isAbsent(value.interval)) {
     if (
       typeof value.interval !== 'string' ||
       value.interval.length > config.limits.maxIntervalLength ||
@@ -107,7 +116,7 @@ function validateItem(
       )
     }
   }
-  if (value.equipment !== undefined) {
+  if (!isAbsent(value.equipment)) {
     if (!Array.isArray(value.equipment) || !value.equipment.every((id) => isEquipmentId(id, config))) {
       return fail('invalid_shape', `${path}.equipment must be an array of supported equipment ids`)
     }
@@ -118,9 +127,9 @@ function validateItem(
       distance: value.distance,
       stroke: value.stroke,
       repeatCount: value.repeatCount,
-      intensity: value.intensity,
-      interval: value.interval,
-      equipment: value.equipment,
+      intensity: isAbsent(value.intensity) ? undefined : (value.intensity as IntensityV1),
+      interval: isAbsent(value.interval) ? undefined : (value.interval as string),
+      equipment: isAbsent(value.equipment) ? undefined : (value.equipment as EquipmentId[]),
     },
   }
 }
