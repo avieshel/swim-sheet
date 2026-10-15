@@ -34,8 +34,20 @@ function allItems(draft: SessionDraftV1): SessionDraftV1['drills'][number]['item
   return draft.drills.flatMap((d) => d.items)
 }
 
+// A repeat count is valid at either level: three repeats on the item, or a drill
+// repeated three times around a single item. Both are contract-valid and render
+// identically, so both are treated as the effective repeat count here. This must
+// mirror `draftDrillDistance` in the client's sessionDraft apply service.
+function effectiveRepeatCount(item: { repeatCount: number }, drillRepeatCount: number): number {
+  return item.repeatCount * drillRepeatCount
+}
+
 function draftDistance(draft: SessionDraftV1): number {
-  return allItems(draft).reduce((sum, item) => sum + item.distance * item.repeatCount, 0)
+  return draft.drills.reduce(
+    (sum, drill) =>
+      sum + drill.items.reduce((itemSum, item) => itemSum + item.distance * item.repeatCount, 0) * drill.repeatCount,
+    0,
+  )
 }
 
 export function scoreDraft(draft: SessionDraftV1, requirements: Requirement[]): ScoreResult {
@@ -73,8 +85,10 @@ export function scoreDraft(draft: SessionDraftV1, requirements: Requirement[]): 
         }
         break
       case 'repeatCountForDistance': {
-        const match = items.some(
-          (i) => i.distance === req.distance && i.repeatCount === req.repeatCount,
+        const match = draft.drills.some((drill) =>
+          drill.items.some(
+            (i) => i.distance === req.distance && effectiveRepeatCount(i, drill.repeatCount) === req.repeatCount,
+          ),
         )
         if (!match) {
           failures.push(`expected ${req.repeatCount}×${req.distance}m item`)
