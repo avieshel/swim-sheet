@@ -49,6 +49,72 @@ The client dev server proxies `/api` to the server (configured in `vite.config.t
 | `npm run test:e2e` | Playwright E2E tests |
 | `npm run check` | Lint + typecheck + unit tests |
 
+### AI session drafting (local backend)
+
+The AI screen at `/sessions/ai` is the only feature that needs a backend: it calls the
+`ai-session-harness` Edge Function, which holds the provider key and calls the LLM.
+
+```bash
+# Terminal 1 — local Supabase (Postgres + Auth + Storage)
+supabase start
+
+# Terminal 2 — the harness Edge Function
+cp .env.functions.example .env.functions.local   # once
+supabase functions serve --env-file .env.functions.local ai-session-harness
+
+# Terminal 3 — Client
+cd client && npm run dev
+```
+
+`.env.development.local` already points the client at `http://127.0.0.1:54321` and enables
+test login (`dev@swimsheet.local`), so no further client setup is needed.
+
+**Choosing the LLM.** The function is provider-agnostic — `agent/provider.ts` reads
+`PROVIDER_BASE_URL`, `PROVIDER_API_KEY`, and `PROVIDER_MODEL` from the environment, so
+switching providers needs no code change. `.env.functions.local` ships with local Ollama
+configured and OpenRouter as a commented alternative.
+
+Four env vars control the provider, all optional and all falling back to the defaults in
+`agent/config.ts` when unset or non-positive:
+
+| Variable | Default | Raise it when |
+|----------|---------|---------------|
+| `PROVIDER_MAX_TOKENS` | `2048` | a small model truncates the draft JSON mid-object |
+| `PROVIDER_TIMEOUT_MS` | `25000` | a large local model needs minutes to answer |
+| `PROVIDER_MODEL` | `gpt-4o-mini` | always set this locally |
+| `PROVIDER_BASE_URL` | `https://api.openai.com/v1` | always set this locally |
+
+For **Ollama**, the base URL must be `http://host.docker.internal:11434/v1`, not
+`localhost` — the function runs in a container, where `localhost` is the container
+itself. On Docker Desktop for macOS this resolves with no further changes; if you get a
+network error, start Ollama on all interfaces with
+`OLLAMA_HOST=0.0.0.0:11434 ollama serve`.
+
+For **OpenRouter** or any OpenAI-compatible host, uncomment that block in
+`.env.functions.local` and supply a key. OpenRouter's free models are rate-limited.
+
+Local model quality matters more than anything else here. Output that does not match the
+draft contract is rejected by the validator (`502 invalid_provider_response`), and a slow
+model hits the timeout (`408 provider_timeout`) — neither is a bug in the harness. Check a
+model cheaply, with no backend running at all:
+
+```bash
+# Calls the real provider for each eval case and scores the result.
+PROVIDER_BASE_URL=http://localhost:11434/v1 \
+PROVIDER_API_KEY=ollama \
+PROVIDER_MODEL=gemma4:latest \
+PROVIDER_TIMEOUT_MS=240000 \
+deno run --allow-env --allow-net supabase/evals/run.ts
+```
+
+To develop against the hosted project instead, deploy the function and set the provider
+secrets there:
+
+```bash
+supabase secrets set PROVIDER_BASE_URL=... PROVIDER_API_KEY=... PROVIDER_MODEL=...
+supabase functions deploy ai-session-harness
+```
+
 ## Deployment (Cloudflare Pages)
 
 Cloudflare Pages automatically builds and deploys the application when connected to this GitHub repository.

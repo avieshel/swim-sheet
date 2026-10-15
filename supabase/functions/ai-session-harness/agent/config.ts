@@ -15,9 +15,20 @@ export const PROVIDER_MAX_TOKENS = 2048
 // without its own Retry-After header. Provider tunable, not a contract limit.
 export const PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS = 30
 
+function positiveIntFromEnv(key: string, fallback: number): number {
+  const raw = Deno.env.get(key)
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 // Overridable per deployment/model via env ( Ollama, OpenRouter, etc.).
 export function getProviderMaxTokens(): number {
-  const raw = Deno.env.get('PROVIDER_MAX_TOKENS')
-  const parsed = raw ? Number.parseInt(raw, 10) : NaN
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : PROVIDER_MAX_TOKENS
+  return positiveIntFromEnv('PROVIDER_MAX_TOKENS', PROVIDER_MAX_TOKENS)
+}
+
+// A large model on local hardware can legitimately take minutes to emit the
+// whole draft, so the ceiling is overridable too. Unusable values fall back to
+// the default rather than disabling the timeout.
+export function getProviderTimeoutMs(): number {
+  return positiveIntFromEnv('PROVIDER_TIMEOUT_MS', PROVIDER_REQUEST_TIMEOUT_MS)
 }

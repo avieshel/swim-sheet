@@ -5,8 +5,8 @@
 import { buildSystemPrompt, buildUserContent } from './prompt.ts'
 import {
   getProviderMaxTokens,
+  getProviderTimeoutMs,
   PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
-  PROVIDER_REQUEST_TIMEOUT_MS,
   PROVIDER_TEMPERATURE,
 } from './config.ts'
 import type { HarnessResult, SessionDraftRequest } from './contract.ts'
@@ -78,7 +78,7 @@ interface ChatCompletionResponse {
 export async function callProvider(
   request: SessionDraftRequest,
   config: ProviderConfig,
-  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
+  timeoutMs = getProviderTimeoutMs(),
 ): Promise<HarnessResult> {
   if (!config.apiKey) {
     throw new ProviderError('network', 'provider API key is not configured')

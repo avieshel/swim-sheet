@@ -2,9 +2,46 @@
 // the sanitized coach text and structural context — no swimmer names, roster
 // counts, session notes, or drill-library contents.
 
-import type { SessionDraftContext, SessionDraftRequest } from './contract.ts'
+import type {
+  HarnessResult,
+  SessionDraftContext,
+  SessionDraftRequest,
+  SessionDraftV1,
+} from './contract.ts'
 import type { IntensityV1 } from '../../../../shared/sessionDraft/types.ts'
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
+
+// A complete, valid response built from the shared config. The system prompt
+// used to elide the inner draft as `{ ... }`, which left weaker models to guess
+// that `session` was an object rather than a bare string — a guess the strict
+// validator then rejected. Showing a real example removes the guesswork, and
+// deriving it from the config keeps it from drifting out of contract.
+export type DraftHarnessResult = Extract<HarnessResult, { outcome: 'draft' }>
+
+export function buildExampleResult(context: SessionDraftContext): DraftHarnessResult {
+  const enabledEquipment = context.equipmentOptions[0]
+  const draft: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'Aerobic 2000' },
+    drills: [
+      {
+        name: 'Main set',
+        repeatCount: 1,
+        items: [
+          {
+            distance: 100,
+            stroke: defaultSessionDraftConfig.strokeValues[0],
+            repeatCount: 10,
+            intensity: 'v2',
+            interval: '1:30',
+            ...(enabledEquipment ? { equipment: [enabledEquipment] } : {}),
+          },
+        ],
+      },
+    ],
+  }
+  return { outcome: 'draft', draft }
+}
 
 export function buildSystemPrompt(context: SessionDraftContext): string {
   const equipmentList = context.equipmentOptions.length > 0 ? context.equipmentOptions.join(', ') : '(none enabled)'
@@ -20,10 +57,13 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
     'or missing any workout detail), this shape instead:',
     '{ "outcome": "not_actionable", "message": "..." }',
     '',
-    'The draft uses schemaVersion 1. session.name is a short title. drills is a',
-    'non-empty array; each drill has name (string), repeatCount (positive integer),',
-    'and items (non-empty array). Each item has distance (positive integer, meters),',
-    `stroke (one of ${strokeList}), repeatCount`,
+    'A complete valid draft outcome looks exactly like this:',
+    JSON.stringify(buildExampleResult(context), null, 2),
+    '',
+    'The draft uses schemaVersion 1. session is an object with a single name key,',
+    'never a bare string. drills is a non-empty array; each drill has name (string),',
+    'repeatCount (positive integer), and items (non-empty array). Each item has',
+    `distance (positive integer, meters), stroke (one of ${strokeList}), repeatCount`,
     '(positive integer).',
     '',
     `Intensity is optional. Map effort cues: ${intensityLines}. Omit intensity when there is no effort cue.`,
