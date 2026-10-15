@@ -20,7 +20,10 @@ interface QueryTrace {
   updateRow?: Record<string, unknown>
 }
 
-type StubSupabase = SupabaseLike & { queries: QueryTrace[] }
+type StubSupabase = SupabaseLike & {
+  queries: QueryTrace[]
+  rpcCalls: Array<{ name: string; args?: Record<string, unknown> }>
+}
 
 function emptyCursors(): Record<SyncTable, string | null> {
   return {
@@ -54,6 +57,12 @@ function makeSupabaseStub(opts: {
   upsertAffected?: number
   upsertUpdatedAt?: string
   rpcError?: unknown
+  // The table names `sync_pulse` reports as having rows past the caller's
+  // cursors. Left unset it answers nothing, modelling a client deployed before
+  // the migration landed — the default for every test that is not about the
+  // probe, which is what keeps those tests on the full-fan-out path.
+  pulse?: unknown
+  pulseError?: unknown
 } = {}): StubSupabase {
   const updateAffected = opts.updateAffected
   const currentRow = opts.currentRow ?? null
@@ -65,6 +74,7 @@ function makeSupabaseStub(opts: {
   })
   const upsertAffected = opts.upsertAffected ?? 1
   const queries: QueryTrace[] = []
+  const rpcCalls: Array<{ name: string; args?: Record<string, unknown> }> = []
   let activeQuery: QueryTrace | undefined
   // The stub builder is thenable and chainable, so remember whether the chain
   // started with update() or upsert() to answer with the right shape.
@@ -122,12 +132,19 @@ function makeSupabaseStub(opts: {
   }
   return {
     queries,
+    rpcCalls,
     from: (table) => {
       activeQuery = { table, filters: [] }
       queries.push(activeQuery)
       return b
     },
-    rpc: () => Promise.resolve({ data: 'org-x', error: opts.rpcError ?? null }),
+    rpc: (name, args) => {
+      rpcCalls.push({ name, args })
+      if (name === 'sync_pulse') {
+        return Promise.resolve({ data: opts.pulse ?? null, error: opts.pulseError ?? null })
+      }
+      return Promise.resolve({ data: 'org-x', error: opts.rpcError ?? null })
+    },
   }
 }
 
@@ -437,6 +454,81 @@ describe('SupabaseSyncTransport.push', () => {
     }], 'org-A')
     expect(conflicts).toHaveLength(0)
     expect(applied).toEqual([{ table: 'swimmers', id: 's1', updatedAt: 'created-rev' }])
+  })
+})
+
+describe('SupabaseSyncTransport.pull probe', () => {
+  test('sends the current cursors so the server can decide what to ask for', async () => {
+    const stub = makeSupabaseStub({ pulse: [] })
+    const transport = new SupabaseSyncTransport(stub)
+    const cursors = { ...emptyCursors(), swimmers: 'rev-4', sessions: 'rev-7' }
+
+    await transport.pull('org-A', cursors)
+
+    expect(stub.rpcCalls[0]).toMatchObject({
+      name: 'sync_pulse',
+      args: { p_organization: 'org-A', p_cursors: expect.objectContaining({ swimmers: 'rev-4', sessions: 'rev-7' }) },
+    })
+  })
+
+  // The whole point: an idle device used to spend nine requests per poll
+  // discovering that nothing had changed.
+  test('asks for no table at all when nothing is past the cursor', async () => {
+    const stub = makeSupabaseStub({ pulse: [] })
+    const transport = new SupabaseSyncTransport(stub)
+
+    const result = await transport.pull('org-A', emptyCursors())
+
+    expect(stub.queries).toHaveLength(0)
+    expect(result.changes).toEqual([])
+  })
+
+  test('asks only for the tables the probe reported', async () => {
+    const stub = makeSupabaseStub({ pulse: ['swimmers'] })
+    const transport = new SupabaseSyncTransport(stub)
+
+    await transport.pull('org-A', emptyCursors())
+
+    expect(stub.queries.map((query) => query.table)).toEqual(['swimmers'])
+  })
+
+  // A skipped table must not have its cursor rewritten. Advancing one past rows
+  // that were never read is how a table silently stops syncing forever.
+  test('leaves the cursor of a skipped table untouched', async () => {
+    const stub = makeSupabaseStub({ pulse: ['swimmers'] })
+    const transport = new SupabaseSyncTransport(stub)
+    const cursors = { ...emptyCursors(), sessions: 'session-rev' }
+
+    const result = await transport.pull('org-A', cursors, ['swimmers', 'sessions'])
+
+    expect(result.nextCursors.sessions).toBe('session-rev')
+  })
+
+  test('restricts the probe answer to the requested tables', async () => {
+    const stub = makeSupabaseStub({ pulse: ['swimmers', 'sessionRuns'] })
+    const transport = new SupabaseSyncTransport(stub)
+
+    await transport.pull('org-A', emptyCursors(), HISTORY_TABLES)
+
+    expect(stub.queries.map((query) => query.table)).toEqual(['session_runs'])
+  })
+
+  test('falls back to the full fan-out when the probe answers nothing', async () => {
+    const stub = makeSupabaseStub()
+    const transport = new SupabaseSyncTransport(stub)
+
+    await transport.pull('org-A', emptyCursors())
+
+    expect(stub.queries).toHaveLength(9)
+  })
+
+  test('falls back to the full fan-out when the probe fails', async () => {
+    const stub = makeSupabaseStub({ pulseError: { message: 'function does not exist' } })
+    const transport = new SupabaseSyncTransport(stub)
+
+    await transport.pull('org-A', emptyCursors())
+
+    expect(stub.queries).toHaveLength(9)
   })
 })
 
