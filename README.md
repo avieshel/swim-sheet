@@ -59,7 +59,14 @@ The AI screen at `/sessions/ai` is the only feature that needs a backend: it cal
 supabase start
 
 # Terminal 2 — the harness Edge Function
-cp .env.functions.example .env.functions.local   # once
+cat > .env.functions.local <<'EOF'
+PROVIDER_BASE_URL=http://host.docker.internal:11434/v1
+PROVIDER_API_KEY=ollama
+PROVIDER_MODEL=gemma4:latest
+PROVIDER_MAX_TOKENS=4096
+PROVIDER_TIMEOUT_MS=240000
+AGENT_DEBUG=true
+EOF
 supabase functions serve --env-file .env.functions.local ai-session-harness
 
 # Terminal 3 — Client
@@ -71,8 +78,9 @@ test login (`dev@swimsheet.local`), so no further client setup is needed.
 
 **Choosing the LLM.** The function is provider-agnostic — `agent/provider.ts` reads
 `PROVIDER_BASE_URL`, `PROVIDER_API_KEY`, and `PROVIDER_MODEL` from the environment, so
-switching providers needs no code change. `.env.functions.local` ships with local Ollama
-configured and OpenRouter as a commented alternative.
+switching providers needs no code change. `.env.functions.local` is gitignored (the
+`*.local` rule), so create it yourself with the block above — every value is optional and
+falls back to the defaults.
 
 Four env vars control the provider, all optional and all falling back to the defaults in
 `agent/config.ts` when unset or non-positive:
