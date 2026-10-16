@@ -118,11 +118,35 @@ A drill's repeatCount  → repeats the whole block of steps
 A step's  repeatCount  → repeats that one step
 ```
 
-| Coach says | Encoded as |
+### Which one? Ask whether the repetitions are identical.
+
+| | Encoding |
 |---|---|
-| `400m warmup` | 1 drill, 1 step of 400m. Both counts 1. |
-| `3 x 100m` | 1 drill, 1 step of 100m, **step** repeatCount `3`. Drill stays 1. |
-| `2* 300, first at 2:00 per 100m, second with paddles at 1:50 per 100m` | 1 drill, **drill** repeatCount `2`, holding 2 steps of 300m, each step repeatCount `1`. |
+| **Identical** | one step, and give that step a `repeatCount` |
+| **Not identical** | one step per variation, each with `repeatCount` 1 |
+
+- `4 x 50m fast` → identical: **one** step of 50m freestyle, `repeatCount: 4`, at v4.
+- `3 x 100m easy, medium, hard` → not identical: **three** steps of 100m freestyle,
+  each `repeatCount: 1`, at v1, v2 and v4.
+- `400m warmup` → one drill, one step of 400m. Both counts 1.
+
+Two failure modes to avoid:
+
+- **Splitting an identical repetition** into separate steps — `4 x 50m` as four 50m steps
+  gives the same total but loses the shape, and the coach asked for four of one thing.
+- **Folding a real variation into one step's repeatCount** — `easy, medium, hard` as one
+  step repeated three times throws away the differences, which are the whole point.
+
+Distance, stroke or equipment changing also makes steps not identical, even when the
+effort does not.
+
+### Then ask, separately: does the coach repeat the whole block?
+
+- `2* 300, first at 2:00 per 100m, second with paddles at 1:50 per 100m` → one drill at
+  `repeatCount: 2` holding two 300m steps, each `repeatCount: 1`. The 2 belongs on the
+  drill because the whole two-step block repeats.
+
+Both counts stay at 1 unless the coach's wording asks otherwise.
 
 Total distance is `item.distance × item.repeatCount × drill.repeatCount` — see
 `draftDrillDistance`. Both encodings of "10 × 100m" are contract-valid and render
@@ -130,6 +154,13 @@ identically; the choice is about which level the coach's phrasing refers to.
 
 Effort, recovery and equipment are **always per step, never per drill**. A block whose
 steps differ is exactly what the step level exists for.
+
+> **Observed failures against `gemma4`.** `3 x 100m easy, medium, hard` produced the
+> correct three steps but also set the *drill*'s `repeatCount` to 3, reporting 900m instead
+> of 300m — the count of variations is not a block repeat. And `4*50m fast` produced two
+> invented warm-up drills the coach never asked for, putting the 4 on the drill rather than
+> the step. Both are model capability rather than contract gaps; re-check after changing
+> models.
 
 ---
 

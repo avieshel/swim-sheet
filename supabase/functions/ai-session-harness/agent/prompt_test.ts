@@ -168,8 +168,27 @@ Deno.test('the prompt shows the ambiguous 2* case as one drill with two steps', 
 
 Deno.test('the prompt shows 3 x 100m as one step repeated, not the whole drill', () => {
   const prompt = buildSystemPrompt(context)
-  assert(prompt.includes("one step of 100m with the step's repeatCount to 3"))
-  assert(prompt.includes('not the drill'))
+  assert(prompt.includes('"3 x 100m"     -> one step of 100m, repeatCount 3'))
+  assert(prompt.includes('A step\'s repeatCount is for repeating that one step'))
+})
+
+// The rule for choosing between the two: are the repetitions identical?
+Deno.test('the prompt decides reps vs steps by whether repetitions are identical', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('every repetition of it identical'))
+  assert(prompt.includes('one step, and give that step a repeatCount'))
+  assert(prompt.includes('not identical'))
+  assert(prompt.includes('one step per variation'))
+})
+
+Deno.test('the prompt shows the identical case as one step with repeats', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('4 x 50m fast'))
+})
+
+Deno.test('the prompt shows the varied case as one step per intensity', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('3 x 100m easy, medium, hard'))
 })
 
 Deno.test('the system prompt embeds the draft JSON schema', () => {
