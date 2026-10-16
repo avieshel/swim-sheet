@@ -9,6 +9,7 @@
 import { sanitizePrompt } from '../../shared/sessionDraft/sanitize.ts'
 import { createSessionDraftSeed } from '../../shared/sessionDraft/seed.ts'
 import { draftTotalDistance } from '../../shared/sessionDraft/distance.ts'
+import { formatDraft, describeDraftProblem } from '../../shared/sessionDraft/format.ts'
 import { EQUIPMENT_IDS } from '../../shared/sessionDraft/config.ts'
 import type { EquipmentId, SessionDraftContext, SessionDraftV1 } from '../../shared/sessionDraft/types.ts'
 import { buildSystemPrompt, buildUserContent } from '../functions/ai-session-harness/agent/prompt.ts'
@@ -34,7 +35,9 @@ export interface DraftRunResult {
   outcome?: 'draft' | 'not_actionable'
   message?: string
   summary?: { drills: number; items: number; totalDistance: number }
-  validation?: { ok: boolean; code?: string; message?: string }
+  /** One canonical line per drill — the same notation used for matching. */
+  lines?: string[]
+  validation?: { ok: boolean; code?: string; message?: string; advice?: string }
   error?: { kind: string; message: string }
 }
 
@@ -116,7 +119,12 @@ export async function runDraft(request: DraftRunRequest): Promise<DraftRunResult
   result.elapsedMs = elapsed()
 
   if (!validation.ok) {
-    result.validation = { ok: false, code: validation.error.code, message: validation.error.message }
+    result.validation = {
+      ok: false,
+      code: validation.error.code,
+      message: validation.error.message,
+      advice: describeDraftProblem(result.raw) ?? undefined,
+    }
     return result
   }
 
@@ -130,5 +138,6 @@ export async function runDraft(request: DraftRunRequest): Promise<DraftRunResult
   }
 
   result.summary = summarizeDraft(validation.value.draft)
+  result.lines = formatDraft(validation.value.draft)
   return result
 }

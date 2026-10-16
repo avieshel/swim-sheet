@@ -163,7 +163,10 @@ async function send() {
     if (d.error) {
       parts.push(panel('4 · Result', '<span class="tag bad">provider ' + esc(d.error.kind) + '</span><pre>' + esc(d.error.message) + '</pre>', true));
     } else if (d.validation && !d.validation.ok) {
-      parts.push(panel('4 · Result', '<span class="tag bad">rejected · ' + esc(d.validation.code) + '</span><pre>' + esc(d.validation.message) + '</pre>', true));
+      parts.push(panel('4 · Result',
+        '<span class="tag bad">rejected · ' + esc(d.validation.code) + '</span>'
+        + (d.validation.advice ? '<p style="margin:6px 0 0">' + esc(d.validation.advice) + '</p>' : '')
+        + '<pre style="margin-top:8px">' + esc(d.validation.message) + '</pre>', true));
       parts.push(panel('raw model output', '<pre>' + esc(JSON.stringify(d.raw, null, 2)) + '</pre>', true));
     } else if (d.outcome === 'not_actionable') {
       parts.push(panel('4 · Result', '<span class="tag warn">not_actionable</span><pre>' + esc(d.message) + '</pre>', true));
@@ -173,6 +176,8 @@ async function send() {
       parts.push(panel('4 · Result',
         '<span class="tag good">draft</span> <span class="meta">' + s.drills + ' drills · ' + s.items + ' items · ' + s.totalDistance + 'm</span>'
         + renderDraft(d.raw.draft), true));
+      parts.push(panel('drill lines (matching notation)',
+        '<pre>' + (d.lines || []).map(esc).join('\n') + '</pre>', true));
       parts.push(panel('raw model output', '<pre>' + esc(JSON.stringify(d.raw, null, 2)) + '</pre>', false));
     }
     $('out').innerHTML = parts.join('');
