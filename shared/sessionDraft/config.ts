@@ -16,7 +16,7 @@ export const INTENSITY_VALUES: readonly IntensityV1[] = ['v1', 'v2', 'v3', 'v4']
 export const INTENSITY_LABELS: Readonly<Record<IntensityV1, string>> = {
   v1: 'easy',
   v2: 'medium',
-  v3: 'strong',
+  v3: 'threshold',
   v4: 'hard',
 }
 

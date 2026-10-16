@@ -221,6 +221,22 @@ how matching should work — see "Open decisions" below.
 
 ---
 
+## The effort scale
+
+One source of truth: `INTENSITY_LABELS` in `shared/sessionDraft/config.ts`.
+
+| Level | Label |
+|---|---|
+| `v1` | easy |
+| `v2` | medium |
+| `v3` | threshold |
+| `v4` | hard |
+
+Both the system prompt and the generated JSON Schema read these labels rather than
+restating them. The schema once hardcoded its own copy and drifted — it said "strong"
+where the config and the built-in catalogue said "threshold". A test now asserts the
+schema takes every label verbatim from the config.
+
 ## Open decisions
 
 - **How the library reaches the agent.** The built-in 57 could be rendered into the prompt

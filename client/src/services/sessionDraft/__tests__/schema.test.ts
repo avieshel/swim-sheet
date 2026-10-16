@@ -92,6 +92,10 @@ function conform(value: unknown, schema: Schema, path: string, errors: string[])
   }
 }
 
+function assertIncludes(haystack: string | undefined, needle: string): void {
+  expect(haystack ?? '').toContain(needle)
+}
+
 function collectUndocumented(schema: Schema, path: string, found: string[]): void {
   if (schema.properties) {
     for (const [key, child] of Object.entries(schema.properties)) {
@@ -116,6 +120,18 @@ describe('buildDraftJsonSchema', () => {
     const item = schema.properties?.drills?.items?.properties?.items?.items
     expect(item?.properties?.stroke?.enum).toEqual([...config.strokeValues])
     expect(item?.properties?.intensity?.enum).toEqual([...config.intensityValues])
+  })
+
+  // The effort scale was once restated in the schema and drifted from the
+  // config — which said "strong" where the catalogue and the domain say
+  // "threshold". It is read from the config now, so it cannot.
+  it('takes the intensity labels verbatim from the shared config', () => {
+    const schema = buildDraftJsonSchema(config, context)
+    const description = schema.properties?.drills?.items?.properties?.items?.items?.properties?.intensity
+      ?.description
+    for (const value of config.intensityValues) {
+      assertIncludes(description, `${value} (${config.intensityLabels[value]})`)
+    }
   })
 
   it('restricts equipment to what the context enables', () => {

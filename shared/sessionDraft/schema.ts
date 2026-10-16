@@ -10,6 +10,10 @@
 // not merely what type it is, because the fields the model most often gets
 // wrong — the two levels of repeat count, when to split one repeat from another
 // — are semantic, not structural.
+//
+// The effort scale is read from `config.intensityLabels` rather than restated
+// here. It used to be duplicated in this file and drifted: the catalogue and the
+// domain both say "threshold" for v3 while this said "strong".
 
 import type { SessionDraftConfig } from './config.ts'
 import type { EquipmentId, SessionDraftContext } from './types.ts'
@@ -30,13 +34,6 @@ export interface JsonSchema {
   additionalProperties?: boolean
 }
 
-const INTENSITY_GUIDANCE: Record<string, string> = {
-  v1: 'easy, recovery pace',
-  v2: 'medium, steady aerobic',
-  v3: 'strong, threshold',
-  v4: 'hard, near-maximal',
-}
-
 export function buildDraftJsonSchema(
   config: SessionDraftConfig,
   context: SessionDraftContext,
@@ -44,7 +41,7 @@ export function buildDraftJsonSchema(
   const limits = config.limits
   const equipment = context.equipmentOptions.length > 0 ? context.equipmentOptions : [...config.equipmentIds]
   const intensityDescriptions = config.intensityValues
-    .map((value) => `${value} (${INTENSITY_GUIDANCE[value] ?? 'effort level'})`)
+    .map((value) => `${value} (${config.intensityLabels[value]})`)
     .join(', ')
 
   const item: JsonSchema = {
