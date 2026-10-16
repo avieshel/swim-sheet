@@ -144,6 +144,34 @@ Deno.test('the system prompt forbids nesting drills inside items', () => {
 // or guessed at. The JSON Schema states the shape precisely and carries a
 // description per field, so it has to actually reach the model.
 
+// The single most common thing the model gets wrong is which level a repeat
+// count belongs at. These rules were derived from real failures, so the
+// distinctions are pinned rather than left to the example alone.
+
+Deno.test('the prompt explains splitting the input into drills first', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('Split the coach'))
+  assert(prompt.includes('into drills first'))
+})
+
+Deno.test('the prompt distinguishes a block repeat from a step repeat', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes("A drill's repeatCount is for repeating the whole block"))
+  assert(prompt.includes("A step's repeatCount is for repeating that one step"))
+})
+
+Deno.test('the prompt shows the ambiguous 2* case as one drill with two steps', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('2* 300'))
+  assert(prompt.includes('one drill repeated twice, holding two steps'))
+})
+
+Deno.test('the prompt shows 3 x 100m as one step repeated, not the whole drill', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes("one step of 100m with the step's repeatCount to 3"))
+  assert(prompt.includes('not the drill'))
+})
+
 Deno.test('the system prompt embeds the draft JSON schema', () => {
   const prompt = buildSystemPrompt(context)
   const schema = buildDraftJsonSchema(defaultSessionDraftConfig, context)
