@@ -22,9 +22,23 @@ Deno.test('the inline script parses as valid JavaScript', () => {
 })
 
 Deno.test('the page carries the elements the script binds to', () => {
-  for (const id of ['prompt', 'send', 'clear', 'out', 'status', 'meta']) {
+  for (const id of ['prompt', 'send', 'clear', 'out', 'status', 'meta', 'toggle', 'examples']) {
     assert(PAGE.includes(`id="${id}"`), `missing #${id}`)
   }
+})
+
+// Collapsing the prompt and context was how they went missing entirely, which
+// is the opposite of a tool meant to show them.
+Deno.test('the system prompt and context panels are open by default', () => {
+  const script = inlineScript(PAGE)
+  assert(
+    script.includes("panel('2 · System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', true"),
+    'system prompt panel must default to open',
+  )
+  assert(
+    script.includes("panel('3 · Context sent', '<pre>' + esc(d.userContent) + '</pre>', true"),
+    'context panel must default to open',
+  )
 })
 
 Deno.test('the script binds a handler to every interactive control', () => {

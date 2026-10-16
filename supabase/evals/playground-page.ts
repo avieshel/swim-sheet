@@ -71,6 +71,7 @@ export const PAGE = `<!doctype html>
   <span class="grow"></span>
   <span class="meta" id="status"></span>
   <button id="examples">Examples</button>
+  <button id="toggle">Collapse all</button>
   <button id="clear">Clear</button>
 </header>
 <main>
@@ -135,9 +136,9 @@ async function send() {
     const removed = d.sanitized.removedCategories.length
       ? ' <span class="removed">removed: ' + esc(d.sanitized.removedCategories.join(', ')) + '</span>' : '';
     parts.push(panel('1 · Coach input (sanitised)', '<pre>' + esc(d.sanitized.text) + '</pre>' + removed, true));
-    parts.push(panel('2 · System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', false,
+    parts.push(panel('2 · System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', true,
       ' <span class="meta">' + d.systemPrompt.length + ' chars</span>'));
-    parts.push(panel('3 · Context sent', '<pre>' + esc(d.userContent) + '</pre>', false));
+    parts.push(panel('3 · Context sent', '<pre>' + esc(d.userContent) + '</pre>', true));
 
     if (d.error) {
       parts.push(panel('4 · Result', '<span class="tag bad">provider ' + esc(d.error.kind) + '</span><pre>' + esc(d.error.message) + '</pre>', true));
@@ -179,6 +180,11 @@ $('clear').onclick = () => {
   $('prompt').value = '';
   $('out').innerHTML = '<div class="empty">Cleared. Type a coach request and press Send.</div>';
   $('status').textContent = '';
+};
+$('toggle').onclick = () => {
+  const open = $('out').querySelectorAll('details[open]').length;
+  $('out').querySelectorAll('details').forEach((d) => { d.open = open === 0; });
+  $('toggle').textContent = open === 0 ? 'Collapse all' : 'Expand all';
 };
 $('examples').onclick = () => {
   $('prompt').value = EXAMPLES[Math.floor(Math.random() * EXAMPLES.length)];
