@@ -41,8 +41,16 @@ export const PAGE = `<!doctype html>
              font: 13px/1.55 var(--mono); }
   textarea:focus { outline: none; border-color: var(--accent); }
   .hint { color: var(--dim); font-size: 12px; }
-  .right { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+  .right { overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 4px; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+    .group { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .group > h2 { margin: 0; padding: 9px 13px; font-size: 11px; text-transform: uppercase;
+                  letter-spacing: .09em; color: var(--dim); background: #15171f;
+                  border-bottom: 1px solid var(--line); font-weight: 700; }
+    .group > h2 .badge { float: right; color: var(--dim); font-weight: 500;
+                         letter-spacing: 0; text-transform: none; }
+    .group section { border: 0; border-radius: 0; border-top: 1px solid var(--line); }
+    .group section:first-of-type { border-top: 0; }
   summary { cursor: pointer; padding: 9px 13px; font-weight: 600; font-size: 12px;
            text-transform: uppercase; letter-spacing: .05em; color: var(--dim);
            list-style: none; display: flex; align-items: center; gap: 8px; }
@@ -131,35 +139,52 @@ async function send() {
       body: JSON.stringify({ prompt: text }),
     });
     d = await r.json();
-    const parts = [];
 
     const removed = d.sanitized.removedCategories.length
       ? ' <span class="removed">removed: ' + esc(d.sanitized.removedCategories.join(', ')) + '</span>' : '';
-    parts.push(panel('1 · Coach input (sanitised)', '<pre>' + esc(d.sanitized.text) + '</pre>' + removed, true));
-    parts.push(panel('2 · System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', true,
-      ' <span class="meta">' + d.systemPrompt.length + ' chars</span>'));
-    parts.push(panel('3 · Context sent', '<pre>' + esc(d.userContent) + '</pre>', true));
+    const group = (title, badge, body) =>
+      '<div class="group"><h2>' + title + '<span class="badge">' + badge + '</span></h2>' + body + '</div>';
 
+    const planBody = Array.isArray(d.plan) && d.plan.length
+      ? '<pre>' + d.plan.map((l) => '\u2022 ' + esc(l)).join('\\n') + '</pre>'
+      : '<p class="empty" style="padding:12px 0">No plan returned — this model did not emit one.</p>';
+
+    const request = group('Agent &rarr; request', esc(d.model),
+      panel('Coach input (sanitised)', '<pre>' + esc(d.sanitized.text) + '</pre>' + removed, true)
+      + panel('Context sent', '<pre>' + esc(d.userContent) + '</pre>', true)
+      + panel('System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', true,
+          ' <span class="meta">' + d.systemPrompt.length + ' chars</span>'));
+
+    const planGroup = group('Agent &rarr; plan', Array.isArray(d.plan) ? d.plan.length + ' lines' : 'none',
+      panel('How the agent read the request', planBody, true));
+
+    const toolGroup = group('Agent &rarr; tools', 'none', panel('Tool calls',
+      '<p class="empty" style="padding:12px 0">No tools yet. Library lookup will show here.</p>', true));
+
+    let verdict;
     if (d.error) {
-      parts.push(panel('4 · Result', '<span class="tag bad">provider ' + esc(d.error.kind) + '</span><pre>' + esc(d.error.message) + '</pre>', true));
+      verdict = '<span class="tag bad">provider ' + esc(d.error.kind) + '</span><pre>' + esc(d.error.message) + '</pre>';
     } else if (d.validation && !d.validation.ok) {
-      parts.push(panel('4 · Result',
-        '<span class="tag bad">rejected · ' + esc(d.validation.code) + '</span>'
+      verdict = '<span class="tag bad">rejected &middot; ' + esc(d.validation.code) + '</span>'
         + (d.validation.advice ? '<p style="margin:6px 0 0">' + esc(d.validation.advice) + '</p>' : '')
-        + '<pre style="margin-top:8px">' + esc(d.validation.message) + '</pre>', true));
-      parts.push(panel('raw model output', '<pre>' + esc(JSON.stringify(d.raw, null, 2)) + '</pre>', true));
+        + '<pre style="margin-top:8px">' + esc(d.validation.message) + '</pre>';
     } else if (d.outcome === 'not_actionable') {
-      parts.push(panel('4 · Result', '<span class="tag warn">not_actionable</span><pre>' + esc(d.message) + '</pre>', true));
-      parts.push(panel('raw model output', '<pre>' + esc(JSON.stringify(d.raw, null, 2)) + '</pre>', false));
+      verdict = '<span class="tag warn">not_actionable</span><pre>' + esc(d.message) + '</pre>';
     } else {
-      const s = d.summary;
-      parts.push(panel('4 · Result',
-        '<span class="tag good">draft</span> <span class="meta">' + s.drills + ' drills · ' + s.items + ' items · ' + s.totalDistance + 'm</span>'
-        + renderDraft(d.raw.draft), true));
-      parts.push(panel('drill lines (matching notation)',
-        '<pre>' + (d.lines || []).map(esc).join('\\n') + '</pre>', true));
-      parts.push(panel('raw model output', '<pre>' + esc(JSON.stringify(d.raw, null, 2)) + '</pre>', false));
+      const sm = d.summary;
+      verdict = '<span class="tag good">draft</span> <span class="meta">'
+        + sm.drills + ' drills &middot; ' + sm.items + ' items &middot; ' + sm.totalDistance + 'm</span>'
+        + renderDraft(d.raw.draft);
     }
+
+    const result = group('Model &rarr; result', esc((d.elapsedMs / 1000).toFixed(1) + 's'),
+      panel('Verdict', verdict, true)
+      + panel('Drills (matching notation)',
+          '<pre>' + (d.lines || []).map(esc).join('\\n') + '</pre>', true)
+      + panel('Raw model output', '<pre>' + esc(JSON.stringify(d.raw, null, 2)) + '</pre>', false));
+
+    const parts = [request, planGroup, toolGroup, result];
+
     $('out').innerHTML = parts.join('');
   } catch (e) {
     $('out').innerHTML = '<div class="empty">' + esc(String(e)) + '</div>';

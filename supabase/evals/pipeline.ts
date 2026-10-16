@@ -37,6 +37,8 @@ export interface DraftRunResult {
   summary?: { drills: number; items: number; totalDistance: number }
   /** One canonical line per drill — the same notation used for matching. */
   lines?: string[]
+  /** How the agent read the request before building anything, when it said. */
+  plan?: string[]
   validation?: { ok: boolean; code?: string; message?: string; advice?: string }
   error?: { kind: string; message: string }
 }
@@ -139,5 +141,6 @@ export async function runDraft(request: DraftRunRequest): Promise<DraftRunResult
 
   result.summary = summarizeDraft(validation.value.draft)
   result.lines = formatDraft(validation.value.draft)
+  result.plan = validation.value.plan
   return result
 }

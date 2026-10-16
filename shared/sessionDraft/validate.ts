@@ -211,6 +211,22 @@ export function validateSessionDraft(
   }
 }
 
+function validatePlan(config: SessionDraftConfig, value: unknown): ValidationOutcome<string[]> {
+  if (!Array.isArray(value)) return fail('invalid_shape', 'draft.plan must be an array of strings')
+  if (value.length > config.limits.maxPlanEntries) {
+    return fail('limit_exceeded', `draft.plan exceeds ${config.limits.maxPlanEntries} entries`)
+  }
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.trim().length === 0) {
+      return fail('invalid_shape', 'draft.plan entries must be non-empty strings')
+    }
+    if (entry.length > config.limits.maxNameLength) {
+      return fail('limit_exceeded', `draft.plan entry exceeds ${config.limits.maxNameLength} characters`)
+    }
+  }
+  return { ok: true, value: value as string[] }
+}
+
 export function validateHarnessResult(
   config: SessionDraftConfig,
   input: unknown,
@@ -219,12 +235,23 @@ export function validateHarnessResult(
 
   const outcome = input.outcome
   if (outcome === 'draft') {
-    if (!hasOnlyKeys(input, ['outcome', 'draft'])) {
+    if (!hasOnlyKeys(input, ['outcome', 'plan', 'draft'])) {
       return fail('invalid_shape', 'draft outcome has an unsupported field')
+    }
+    if (input.plan !== undefined) {
+      const plan = validatePlan(config, input.plan)
+      if (!plan.ok) return plan
     }
     const draftResult = validateSessionDraft(config, input.draft)
     if (!draftResult.ok) return draftResult
-    return { ok: true, value: { outcome: 'draft', draft: draftResult.value } }
+    return {
+      ok: true,
+      value: {
+        outcome: 'draft',
+        plan: input.plan === undefined ? undefined : (input.plan as string[]),
+        draft: draftResult.value,
+      },
+    }
   }
   if (outcome === 'not_actionable') {
     if (!hasOnlyKeys(input, ['outcome', 'message'])) {

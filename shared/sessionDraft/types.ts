@@ -66,7 +66,14 @@ export interface SessionDraftRequest {
 }
 
 export type HarnessResult =
-  | { outcome: 'draft'; draft: SessionDraftV1 }
+  | {
+      outcome: 'draft'
+      // How the agent read the request before building anything: one short line
+      // per drill it decided on. Optional, because a model that omits it should
+      // still yield a usable draft — losing the plan beats losing the session.
+      plan?: string[]
+      draft: SessionDraftV1
+    }
   | { outcome: 'not_actionable'; message: string }
 
 // ---- Sanitizer types ----

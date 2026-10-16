@@ -27,6 +27,9 @@ export interface SessionDraftLimits {
   maxPromptLength: number
   maxDrills: number
   maxItemsPerDrill: number
+  // Cap on the agent's own plan lines. A plan that long has stopped being a
+  // plan, and would bloat every response.
+  maxPlanEntries: number
   maxRecentSessions: number
   maxDistance: number
   maxRepeatCount: number
@@ -58,6 +61,7 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
     maxPromptLength: 4000,
     maxDrills: 30,
     maxItemsPerDrill: 10,
+    maxPlanEntries: 12,
     maxRecentSessions: 2,
     maxDistance: 10_000,
     maxRepeatCount: 100,

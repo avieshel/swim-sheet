@@ -83,6 +83,52 @@ describe('validateSessionDraft', () => {
     expect(result.ok).toBe(false)
   })
 
+  // The plan is how the agent reports reading the request before the drills.
+  // It is optional so a model that forgets it still yields a usable draft —
+  // losing the plan is better than losing the session — but anything present
+  // must be well formed and bounded.
+  describe('harness result plan', () => {
+    const draft = () => ({
+      schemaVersion: 1,
+      session: { name: 'A' },
+      drills: [{ name: 'W', repeatCount: 1, items: [{ distance: 400, stroke: 'freestyle', repeatCount: 1 }] }],
+    })
+
+    it('accepts a draft outcome carrying a plan', () => {
+      const result = validateHarnessResult({
+        outcome: 'draft',
+        plan: ['Two drills: a 400m warmup, then a main set.'],
+        draft: draft(),
+      })
+      expect(result.ok).toBe(true)
+      if (result.ok && result.value.outcome === 'draft') {
+        expect(result.value.plan).toEqual(['Two drills: a 400m warmup, then a main set.'])
+      }
+    })
+
+    it('accepts a draft outcome with no plan at all', () => {
+      expect(validateHarnessResult({ outcome: 'draft', draft: draft() }).ok).toBe(true)
+    })
+
+    it('rejects a plan that is not an array of strings', () => {
+      expect(validateHarnessResult({ outcome: 'draft', plan: 'two drills', draft: draft() }).ok).toBe(false)
+      expect(validateHarnessResult({ outcome: 'draft', plan: [1, 2], draft: draft() }).ok).toBe(false)
+    })
+
+    it('rejects an empty plan entry', () => {
+      expect(validateHarnessResult({ outcome: 'draft', plan: ['  '], draft: draft() }).ok).toBe(false)
+    })
+
+    it('rejects more plan entries than the cap allows', () => {
+      const many = Array.from({ length: 40 }, (_, i) => `step ${i}`)
+      expect(validateHarnessResult({ outcome: 'draft', plan: many, draft: draft() }).ok).toBe(false)
+    })
+
+    it('rejects a plan on a not_actionable outcome', () => {
+      expect(validateHarnessResult({ outcome: 'not_actionable', message: 'no', plan: ['x'] }).ok).toBe(false)
+    })
+  })
+
   it('rejects an unsupported schema version', () => {
     const result = validateSessionDraft({ ...(validDraft() as object), schemaVersion: 2 })
     expect(result.ok).toBe(false)

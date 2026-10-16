@@ -32,13 +32,38 @@ Deno.test('the page carries the elements the script binds to', () => {
 Deno.test('the system prompt and context panels are open by default', () => {
   const script = inlineScript(PAGE)
   assert(
-    script.includes("panel('2 · System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', true"),
-    'system prompt panel must default to open',
+    script.includes("panel('Coach input (sanitised)', '<pre>' + esc(d.sanitized.text) + '</pre>' + removed, true"),
+    'sanitised input panel must default to open',
   )
   assert(
-    script.includes("panel('3 · Context sent', '<pre>' + esc(d.userContent) + '</pre>', true"),
+    script.includes("panel('Context sent', '<pre>' + esc(d.userContent) + '</pre>', true"),
     'context panel must default to open',
   )
+  assert(
+    script.includes("panel('System prompt', '<pre>' + esc(d.systemPrompt) + '</pre>', true"),
+    'system prompt panel must default to open',
+  )
+})
+
+// The point of the grouping is that a reader can see which side of the seam
+// produced what, and that tool calls have somewhere to live before they exist.
+Deno.test('results are grouped by who produced them', () => {
+  const script = inlineScript(PAGE)
+  for (const heading of [
+    'Agent &rarr; request',
+    'Agent &rarr; plan',
+    'Agent &rarr; tools',
+    'Model &rarr; result',
+  ]) {
+    assert(script.includes(heading), `missing group ${heading}`)
+  }
+  assert(script.includes('const parts = [request, planGroup, toolGroup, result];'))
+})
+
+Deno.test('the tools group exists before any tool does', () => {
+  const script = inlineScript(PAGE)
+  assert(script.includes('Tool calls'))
+  assert(script.includes('Library lookup will show here'))
 })
 
 Deno.test('the script binds a handler to every interactive control', () => {
