@@ -15,6 +15,9 @@
 // Env (all optional):
 //   PROVIDER_BASE_URL / PROVIDER_API_KEY / PROVIDER_MODEL / PROVIDER_MAX_TOKENS
 //     / PROVIDER_TIMEOUT_MS   read by agent/config.ts
+//   Loaded automatically from .env.functions.local — the same file
+//     `supabase functions serve --env-file` uses — so both run from one config.
+//     Values already in the environment win, so a one-off override still works.
 //   REPL_POOL_LENGTH     default 25
 //   REPL_DISTANCE_UNITS  default meters
 //   REPL_EQUIPMENT       comma separated, default all four
@@ -22,6 +25,7 @@
 //
 // Commands: /system, /context, /json, /clear, /quit
 
+import { hostFriendlyBaseUrl, loadLocalEnv, LOCAL_ENV_PATH } from './env.ts'
 import { sanitizePrompt } from '../../shared/sessionDraft/sanitize.ts'
 import { createSessionDraftSeed } from '../../shared/sessionDraft/seed.ts'
 import { draftTotalDistance } from '../../shared/sessionDraft/distance.ts'
@@ -49,15 +53,20 @@ function envList(key: string, fallback: string[]): string[] {
   return raw.split(',').map((s) => s.trim()).filter(Boolean)
 }
 
-const context: SessionDraftContext = {
-  poolLength: envInt('REPL_POOL_LENGTH', 25),
-  distanceUnits: Deno.env.get('REPL_DISTANCE_UNITS') ?? 'meters',
-  groupNames: [],
-  equipmentOptions: envList('REPL_EQUIPMENT', [...EQUIPMENT_IDS]) as EquipmentId[],
-  recentSessions: [],
-}
+// Built after the env file loads, so REPL_* overrides in the file are honoured.
+let context: SessionDraftContext
+let knownNames: string[] = []
 
-const knownNames = envList('REPL_NAMES', [])
+function buildContext(): void {
+  context = {
+    poolLength: envInt('REPL_POOL_LENGTH', 25),
+    distanceUnits: Deno.env.get('REPL_DISTANCE_UNITS') ?? 'meters',
+    groupNames: [],
+    equipmentOptions: envList('REPL_EQUIPMENT', [...EQUIPMENT_IDS]) as EquipmentId[],
+    recentSessions: [],
+  }
+  knownNames = envList('REPL_NAMES', [])
+}
 
 function describeDraft(draft: SessionDraftV1): string[] {
   const lines: string[] = []
@@ -125,7 +134,7 @@ function report(text: string, showRaw: boolean): void {
     })
 }
 
-function printHeader(): void {
+function printHeader(loaded: string[]): void {
   const config = getProviderConfig()
   console.log(`${BOLD}Session draft REPL${RESET} ${DIM}— ${config.model} via ${config.baseUrl}${RESET}`)
   console.log(
@@ -133,6 +142,7 @@ function printHeader(): void {
       context.equipmentOptions.join(', ') || 'none'
     }${RESET}`,
   )
+  if (loaded.length) console.log(`${DIM}loaded from ${LOCAL_ENV_PATH}: ${loaded.join(', ')}${RESET}`)
   if (knownNames.length) console.log(`${DIM}redacting names: ${knownNames.join(', ')}${RESET}`)
   console.log(`${DIM}type a coach request, or /system /context /json /clear /quit${RESET}\n`)
 }
@@ -156,9 +166,21 @@ async function* readInputLines(): AsyncGenerator<string> {
 }
 
 async function main(): Promise<void> {
+  const loaded = loadLocalEnv()
+
+  // The REPL reports every stage itself, so the function's raw debug records
+  // would only duplicate it mid-output.
+  Deno.env.set('AGENT_DEBUG', 'false')
+
+  const rewritten = hostFriendlyBaseUrl(Deno.env.get('PROVIDER_BASE_URL'))
+  if (rewritten && rewritten !== Deno.env.get('PROVIDER_BASE_URL')) {
+    Deno.env.set('PROVIDER_BASE_URL', rewritten)
+  }
+
+  buildContext()
   const config = getProviderConfig()
   if (!config.apiKey) {
-    console.error('PROVIDER_API_KEY is not set. Export it, or see .env.functions.example.')
+    console.error(`PROVIDER_API_KEY is not set. Set it in ${LOCAL_ENV_PATH} or export it directly.`)
     Deno.exit(1)
   }
 
@@ -168,7 +190,7 @@ async function main(): Promise<void> {
     return
   }
 
-  printHeader()
+  printHeader(loaded)
 
   let showRaw = false
   let queued: string | null = null

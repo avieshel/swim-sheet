@@ -112,7 +112,7 @@ PROVIDER_BASE_URL=http://localhost:11434/v1 \
 PROVIDER_API_KEY=ollama \
 PROVIDER_MODEL=gemma4:latest \
 PROVIDER_TIMEOUT_MS=240000 \
-deno run --allow-env --allow-net supabase/evals/run.ts
+deno run --allow-env --allow-net --allow-read supabase/evals/run.ts
 ```
 
 Observed on an M-series Mac, for calibration:
@@ -141,9 +141,9 @@ For iterating on the prompt and the validator without the browser, sign-in, rate
 limits, or the Edge Function:
 
 ```bash
-deno run --allow-env --allow-net supabase/evals/repl.ts
+deno run --allow-env --allow-net --allow-read supabase/evals/repl.ts
 # or one-shot:
-deno run --allow-env --allow-net supabase/evals/repl.ts "4 x 100 free, last with fins"
+deno run --allow-env --allow-net --allow-read supabase/evals/repl.ts "4 x 100 free, last with fins"
 ```
 
 ```
@@ -161,6 +161,13 @@ does — the sanitizer, the prompt builder, the provider adapter, and the shared
 validator — so what you tune here is what ships. Commands: `/system` (the exact
 prompt), `/context`, `/json` (raw model output), `/clear`, `/quit`. A trailing
 `\` continues a line, for long prompts.
+
+Provider settings load from `.env.functions.local` — the same file
+`supabase functions serve --env-file` uses — so there is one config for both.
+Anything already in your shell wins, so `REPL_POOL_LENGTH=50 …` overrides the
+file for one run. Because these tools run on the host rather than in a container,
+they rewrite `host.docker.internal` to `127.0.0.1` in `PROVIDER_BASE_URL`; the
+Edge Function needs it as-is.
 
 Env: the `PROVIDER_*` vars above, plus `REPL_POOL_LENGTH`, `REPL_DISTANCE_UNITS`,
 `REPL_EQUIPMENT`, and `REPL_NAMES` (comma-separated, so you can exercise redaction
