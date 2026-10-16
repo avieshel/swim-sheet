@@ -127,6 +127,40 @@ supabase secrets set PROVIDER_BASE_URL=... PROVIDER_API_KEY=... PROVIDER_MODEL=.
 supabase functions deploy ai-session-harness
 ```
 
+### Prompt playground (REPL)
+
+For iterating on the prompt and the validator without the browser, sign-in, rate
+limits, or the Edge Function:
+
+```bash
+deno run --allow-env --allow-net supabase/evals/repl.ts
+# or one-shot:
+deno run --allow-env --allow-net supabase/evals/repl.ts "4 x 100 free, last with fins"
+```
+
+```
+› 4 x 100m freestyle, the last one with fins.
+
+  sanitized  4 x 100m freestyle, the last one with fins.
+  removed    -
+  - not_actionable  The request '4 x 100m freestyle, the last one with fins' is not
+                    a complete training session. Please provide more details...
+  took       42.9s
+```
+
+It calls the provider directly and calls the **same** modules the Edge Function
+does — the sanitizer, the prompt builder, the provider adapter, and the shared
+validator — so what you tune here is what ships. Commands: `/system` (the exact
+prompt), `/context`, `/json` (raw model output), `/clear`, `/quit`. A trailing
+`\` continues a line, for long prompts.
+
+Env: the `PROVIDER_*` vars above, plus `REPL_POOL_LENGTH`, `REPL_DISTANCE_UNITS`,
+`REPL_EQUIPMENT`, and `REPL_NAMES` (comma-separated, so you can exercise redaction
+without a roster).
+
+For a batch pass/fail run over the eval corpus instead, use
+`supabase/evals/run.ts`.
+
 ### Debugging the AI screen
 
 Three independent signals tell you whether the LLM actually ran and what it was asked.

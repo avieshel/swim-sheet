@@ -3,7 +3,12 @@ import type { SafeDrill, SafeSession, Session } from '../../db/schema'
 import { addSessionWithDrills, updateSession } from '../../db/dao'
 import type { Stroke } from '../../types/swimming'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
+import { draftDrillDistance } from '../../../../shared/sessionDraft/distance'
 import { validateSessionDraft } from './validate'
+
+// Re-exported so components keep reaching the client service layer rather than
+// the shared contract directly.
+export { draftDrillDistance, draftTotalDistance } from '../../../../shared/sessionDraft/distance'
 
 export type ApplyDraftResult =
   | { outcome: 'created'; sessionId: string }
@@ -38,20 +43,6 @@ function withDraftSlot<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 // ── Draft → session/drills mapping ───────────────────────────
-
-export function draftDrillDistance(
-  items: SessionDraftV1['drills'][number]['items'],
-  drillRepeatCount: number,
-): number {
-  const perRep = items.reduce((sum, it) => sum + it.distance * it.repeatCount, 0)
-  return perRep * drillRepeatCount
-}
-
-// Single source of truth for what a proposal adds up to, so the figure the coach
-// reads on the AI screen is the figure that gets persisted.
-export function draftTotalDistance(draft: SessionDraftV1): number {
-  return draft.drills.reduce((sum, drill) => sum + draftDrillDistance(drill.items, drill.repeatCount), 0)
-}
 
 function deriveDominantStroke(
   items: SessionDraftV1['drills'][number]['items'],

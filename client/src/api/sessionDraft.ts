@@ -1,6 +1,6 @@
 import { supabase, getCurrentUser } from './supabase'
-import { createSessionDraftSeed } from '../services/sessionDraft/seed'
-import { sanitizePrompt } from '../services/sessionDraft/sanitize'
+import { createSessionDraftSeed } from '../../../shared/sessionDraft/seed'
+import { sanitizePrompt } from '../../../shared/sessionDraft/sanitize'
 import { buildSessionDraftContext } from '../services/sessionDraft/context'
 import { validateHarnessResult, validateSessionDraftRequest } from '../services/sessionDraft/validate'
 import { applySessionDraft as applyDraftService, keepSessionDraft as keepDraftService, getUnreviewedSessionDraft as getUnreviewedDraftService } from '../services/sessionDraft/apply'

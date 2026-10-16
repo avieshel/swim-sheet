@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizePrompt } from '../sanitize'
+import { sanitizePrompt } from '../../../../../shared/sessionDraft/sanitize'
 
 describe('sanitizePrompt', () => {
   it('redacts an exact known swimmer name case-insensitively', () => {

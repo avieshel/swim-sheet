@@ -10,6 +10,7 @@ import type {
   SessionDraftV1,
   Stroke,
 } from '../functions/ai-session-harness/agent/contract.ts'
+import { draftTotalDistance } from '../../shared/sessionDraft/distance.ts'
 
 export type Requirement =
   | { kind: 'drillCount'; min?: number; max?: number }
@@ -35,19 +36,17 @@ function allItems(draft: SessionDraftV1): SessionDraftV1['drills'][number]['item
 }
 
 // A repeat count is valid at either level: three repeats on the item, or a drill
-// repeated three times around a single item. Both are contract-valid and render
-// identically, so both are treated as the effective repeat count here. This must
-// mirror `draftDrillDistance` in the client's sessionDraft apply service.
+// repeated three times around a single item. Both render identically, so the
+// effective count is their product.
 function effectiveRepeatCount(item: { repeatCount: number }, drillRepeatCount: number): number {
   return item.repeatCount * drillRepeatCount
 }
 
+// Measured with the shared helper rather than a local copy, so the scorer and
+// the persisted session can never disagree about a draft's total. The scorer
+// previously dropped drill-level repeats and reported totals that were wrong.
 function draftDistance(draft: SessionDraftV1): number {
-  return draft.drills.reduce(
-    (sum, drill) =>
-      sum + drill.items.reduce((itemSum, item) => itemSum + item.distance * item.repeatCount, 0) * drill.repeatCount,
-    0,
-  )
+  return draftTotalDistance(draft)
 }
 
 export function scoreDraft(draft: SessionDraftV1, requirements: Requirement[]): ScoreResult {

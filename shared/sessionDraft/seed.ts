@@ -1,4 +1,4 @@
-import type { SessionDraftSeedV1 } from '../../../../shared/sessionDraft/types'
+import type { SessionDraftSeedV1 } from './types.ts'
 
 // The seed is a shape-valid but empty session structure. It is sent to the model
 // purely as a starting scaffold; it is never persisted and never accepted as a
