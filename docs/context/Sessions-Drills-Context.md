@@ -2,6 +2,15 @@
 
 ## Purpose
 
+> **Drill and session model.** The domain model now lives in two focused files:
+> `docs/context/Drill-Model-Context.md` (schema, drill identity, the two repeat
+> levels, canonical notation) and `docs/context/Session-Model-Context.md` (plan,
+> decomposition, rest/recovery, what the agent cannot set). This file keeps the
+> session-building flow, the sample session, the coach personas and the friction
+> analysis.
+
+
+
 Focused context for the **session-building** experience: how a coach takes a session
 from their head/notebook and turns it into a SwimSheet template. Covers the drill data
 model, the `DrillEditorModal` / `SessionDetail` flow, and how drills are snapshotted into

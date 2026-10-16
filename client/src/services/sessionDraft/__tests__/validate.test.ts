@@ -242,6 +242,50 @@ describe('validateSessionDraft', () => {
   })
 })
 
+// A drill's steps cannot distinguish "Fingertip Drag 100m" from "Single Arm Pull
+// 100m" — they are structurally identical. Identity comes from the name, and
+// from an optional description that says what the technique actually is.
+describe('drill identity', () => {
+  const drillWith = (extra: Record<string, unknown>) => ({
+    schemaVersion: 1,
+    session: { name: 'A' },
+    drills: [
+      {
+        name: 'Fingertip Drag',
+        repeatCount: 1,
+        items: [{ distance: 100, stroke: 'freestyle', repeatCount: 4 }],
+        ...extra,
+      },
+    ],
+  })
+
+  it('accepts a drill with a description', () => {
+    const result = validateSessionDraft(drillWith({ description: 'High elbow recovery, fingertips along the surface.' }))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].description).toContain('fingertips')
+  })
+
+  it('accepts a drill with no description', () => {
+    const result = validateSessionDraft(drillWith({}))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].description).toBeUndefined()
+  })
+
+  it('treats a null description as omitted', () => {
+    const result = validateSessionDraft(drillWith({ description: null }))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].description).toBeUndefined()
+  })
+
+  it('rejects a description that is not a string', () => {
+    expect(validateSessionDraft(drillWith({ description: 42 })).ok).toBe(false)
+  })
+
+  it('rejects a description beyond the description limit', () => {
+    expect(validateSessionDraft(drillWith({ description: 'x'.repeat(500) })).ok).toBe(false)
+  })
+})
+
 describe('validateHarnessResult', () => {
   it('accepts a draft outcome', () => {
     const result = validateHarnessResult({ outcome: 'draft', draft: validDraft() })

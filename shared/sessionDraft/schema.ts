@@ -111,9 +111,19 @@ export function buildDraftJsonSchema(
       name: {
         type: 'string',
         description:
-          'Short label for this block, such as "Warmup", "Main set" or "Kick 4x50". ' +
-          'Name it for what it is, not for the session.',
+          "This is the drill's identity. Steps cannot tell two drills apart: " +
+          '"Fingertip Drag", "Scull", "Single Arm Pull" and "3-5-7 Breathing" are all ' +
+          '100m freestyle — the name is what makes them different drills. Prefer a name ' +
+          'from the library catalogue when one fits; otherwise coin a descriptive one. ' +
+          'Never call it "Set 1" or repeat the session name.',
         maxLength: limits.maxNameLength,
+      },
+      description: {
+        type: 'string',
+        description:
+          'Optional. What the technique actually is, when the name alone does not tell ' +
+          'a coach what to do. Omit it when the name is self-explanatory.',
+        maxLength: limits.maxDescriptionLength,
       },
       repeatCount: {
         type: 'integer',

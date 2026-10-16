@@ -85,7 +85,7 @@ export function mapDraftToSessionAndDrills(
     timingMode: 'individual',
     focus: 'none',
     labels: [],
-    description: '',
+    description: drill.description ?? '',
   }))
 
   const session: SafeSession = {

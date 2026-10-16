@@ -23,6 +23,7 @@ export const INTENSITY_LABELS: Readonly<Record<IntensityV1, string>> = {
 export interface SessionDraftLimits {
   schemaVersion: number
   maxNameLength: number
+  maxDescriptionLength: number
   maxIntervalLength: number
   maxPromptLength: number
   maxDrills: number
@@ -57,6 +58,7 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
   limits: {
     schemaVersion: 1,
     maxNameLength: 100,
+    maxDescriptionLength: 400,
     maxIntervalLength: 40,
     maxPromptLength: 4000,
     maxDrills: 30,

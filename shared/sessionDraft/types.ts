@@ -20,7 +20,13 @@ export interface SessionDraftItemV1 {
 }
 
 export interface SessionDraftDrillV1 {
+  // The drill's identity. Its steps cannot distinguish "Fingertip Drag 100m"
+  // from "Single Arm Pull 100m" — those are structurally identical — so the
+  // name carries what makes the drill what it is.
   name: string
+  // Optional. Says what the technique actually is, when the name is not enough
+  // on its own. A dedicated typed field may replace this later.
+  description?: string
   repeatCount: number
   items: SessionDraftItemV1[]
 }

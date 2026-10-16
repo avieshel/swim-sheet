@@ -177,7 +177,7 @@ export function validateSessionDraft(
     const drill = drills[d]
     const drillPath = `draft.drills[${d}]`
     if (!isPlainObject(drill)) return fail('invalid_shape', `${drillPath} must be an object`)
-    if (!hasOnlyKeys(drill, ['name', 'repeatCount', 'items'])) {
+    if (!hasOnlyKeys(drill, ['name', 'description', 'repeatCount', 'items'])) {
       return fail('invalid_shape', `${drillPath} has an unsupported field`)
     }
     if (typeof drill.name !== 'string' || drill.name.trim().length === 0) {
@@ -185,6 +185,15 @@ export function validateSessionDraft(
     }
     if (drill.name.length > config.limits.maxNameLength) {
       return fail('limit_exceeded', `${drillPath}.name exceeds ${config.limits.maxNameLength} characters`)
+    }
+    // Optional, so `null` means omitted here for the same reason as on an item.
+    if (!isAbsent(drill.description)) {
+      if (typeof drill.description !== 'string') {
+        return fail('invalid_shape', `${drillPath}.description must be a string`)
+      }
+      if (drill.description.length > config.limits.maxDescriptionLength) {
+        return fail('limit_exceeded', `${drillPath}.description exceeds ${config.limits.maxDescriptionLength} characters`)
+      }
     }
     if (!isPositiveInteger(drill.repeatCount)) {
       return fail('invalid_shape', `${drillPath}.repeatCount must be a positive integer`)
@@ -202,7 +211,12 @@ export function validateSessionDraft(
       if (!result.ok) return result
       validatedItems.push(result.value)
     }
-    validatedDrills.push({ name: drill.name, repeatCount: drill.repeatCount, items: validatedItems })
+    validatedDrills.push({
+      name: drill.name,
+      description: isAbsent(drill.description) ? undefined : (drill.description as string),
+      repeatCount: drill.repeatCount,
+      items: validatedItems,
+    })
   }
 
   return {

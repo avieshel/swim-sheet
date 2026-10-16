@@ -119,7 +119,8 @@ async function boot() {
 function renderDraft(draft) {
   return draft.drills.map((d) => {
     const sets = d.repeatCount > 1 ? ' <span class="item">' + d.repeatCount + ' sets</span>' : '';
-    return '<div class="drill"><h4>' + esc(d.name) + sets + '</h4>' +
+    const desc = d.description ? '<div class="item">' + esc(d.description) + '</div>' : '';
+    return '<div class="drill"><h4>' + esc(d.name) + sets + '</h4>' + desc +
       d.items.map((i) => '<div class="item">' + esc([i.distance + 'm', i.stroke, 'x' + i.repeatCount,
         i.intensity || '-', i.interval || '', (i.equipment || []).join('+')].filter(Boolean).join('  ')) + '</div>').join('') +
       '</div>';
