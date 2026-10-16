@@ -26,14 +26,11 @@
 // Commands: /system, /context, /json, /clear, /quit
 
 import { hostFriendlyBaseUrl, loadLocalEnv, LOCAL_ENV_PATH } from './env.ts'
-import { sanitizePrompt } from '../../shared/sessionDraft/sanitize.ts'
+import { currentContext, currentKnownNames, runDraft } from './pipeline.ts'
+import type { SessionDraftV1 } from '../../shared/sessionDraft/types.ts'
 import { createSessionDraftSeed } from '../../shared/sessionDraft/seed.ts'
-import { draftTotalDistance } from '../../shared/sessionDraft/distance.ts'
-import { EQUIPMENT_IDS } from '../../shared/sessionDraft/config.ts'
-import type { EquipmentId, SessionDraftContext, SessionDraftV1 } from '../../shared/sessionDraft/types.ts'
-import { buildSystemPrompt, buildUserContent } from '../functions/ai-session-harness/agent/prompt.ts'
-import { callProvider, getProviderConfig, ProviderError } from '../functions/ai-session-harness/agent/provider.ts'
-import { validateHarnessResult } from '../functions/ai-session-harness/agent/output.ts'
+import { getProviderConfig } from '../functions/ai-session-harness/agent/provider.ts'
+import { buildSystemPrompt } from '../functions/ai-session-harness/agent/prompt.ts'
 
 const DIM = '[2m'
 const BOLD = '[1m'
@@ -41,32 +38,6 @@ const RED = '[31m'
 const GREEN = '[32m'
 const YELLOW = '[33m'
 const RESET = '[0m'
-
-function envInt(key: string, fallback: number): number {
-  const parsed = Number.parseInt(Deno.env.get(key) ?? '', 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-}
-
-function envList(key: string, fallback: string[]): string[] {
-  const raw = Deno.env.get(key)
-  if (raw === undefined) return fallback
-  return raw.split(',').map((s) => s.trim()).filter(Boolean)
-}
-
-// Built after the env file loads, so REPL_* overrides in the file are honoured.
-let context: SessionDraftContext
-let knownNames: string[] = []
-
-function buildContext(): void {
-  context = {
-    poolLength: envInt('REPL_POOL_LENGTH', 25),
-    distanceUnits: Deno.env.get('REPL_DISTANCE_UNITS') ?? 'meters',
-    groupNames: [],
-    equipmentOptions: envList('REPL_EQUIPMENT', [...EQUIPMENT_IDS]) as EquipmentId[],
-    recentSessions: [],
-  }
-  knownNames = envList('REPL_NAMES', [])
-}
 
 function describeDraft(draft: SessionDraftV1): string[] {
   const lines: string[] = []
@@ -88,54 +59,39 @@ function describeDraft(draft: SessionDraftV1): string[] {
   return lines
 }
 
-function report(text: string, showRaw: boolean): void {
-  const sanitized = sanitizePrompt(text, knownNames)
-  console.log(`\n${DIM}sanitized${RESET}  ${sanitized.text}`)
+async function report(text: string, showRaw: boolean): Promise<void> {
+  const result = await runDraft({ prompt: text })
+
+  console.log(`\n${DIM}sanitized${RESET}  ${result.sanitized.text}`)
   console.log(
-    `${DIM}removed  ${RESET}  ${sanitized.removedCategories.length ? sanitized.removedCategories.join(', ') : '-'}`,
+    `${DIM}removed  ${RESET}  ${result.sanitized.removedCategories.length ? result.sanitized.removedCategories.join(', ') : '-'}`,
   )
 
-  const request = { prompt: sanitized.text, seed: createSessionDraftSeed(), context }
-  const startedAt = performance.now()
-
-  const finish = (): void => {
-    console.log(`${DIM}took     ${RESET}  ${((performance.now() - startedAt) / 1000).toFixed(1)}s`)
+  if (showRaw) {
+    console.log(`\n${DIM}raw${RESET}`)
+    console.log(JSON.stringify(result.raw, null, 2))
   }
 
-  callProvider(request, getProviderConfig())
-    .then((raw) => {
-      if (showRaw) {
-        console.log(`\n${DIM}raw${RESET}`)
-        console.log(JSON.stringify(raw, null, 2))
-      }
-      const validation = validateHarnessResult(raw)
-      if (!validation.ok) {
-        console.log(`\n  ${RED}x rejected${RESET}  ${validation.error.code}: ${validation.error.message}`)
-        finish()
-        return
-      }
-      if (validation.value.outcome === 'not_actionable') {
-        console.log(`\n  ${YELLOW}- not_actionable${RESET}  ${validation.value.message}`)
-        finish()
-        return
-      }
-      const draft = validation.value.draft
-      const items = draft.drills.reduce((n, d) => n + d.items.length, 0)
-      console.log(
-        `\n  ${GREEN}+ draft${RESET}  ${draft.drills.length} drills, ${items} items, ${draftTotalDistance(draft)}m`,
-      )
-      console.log(describeDraft(draft).join('\n'))
-      finish()
-    })
-    .catch((err: unknown) => {
-      const kind = err instanceof ProviderError ? err.kind : 'unknown'
-      console.log(`\n  ${RED}x provider ${kind}${RESET}  ${err instanceof Error ? err.message : String(err)}`)
-      finish()
-    })
+  if (result.error) {
+    console.log(`\n  ${RED}x provider ${result.error.kind}${RESET}  ${result.error.message}`)
+  } else if (result.validation && !result.validation.ok) {
+    console.log(`\n  ${RED}x rejected${RESET}  ${result.validation.code}: ${result.validation.message}`)
+  } else if (result.outcome === 'not_actionable') {
+    console.log(`\n  ${YELLOW}- not_actionable${RESET}  ${result.message}`)
+  } else if (result.summary && result.raw && typeof result.raw === 'object' && 'draft' in result.raw) {
+    const draft = (result.raw as { draft: SessionDraftV1 }).draft
+    console.log(
+      `\n  ${GREEN}+ draft${RESET}  ${result.summary.drills} drills, ${result.summary.items} items, ${result.summary.totalDistance}m`,
+    )
+    console.log(describeDraft(draft).join('\n'))
+  }
+
+  console.log(`${DIM}took     ${RESET}  ${(result.elapsedMs / 1000).toFixed(1)}s`)
 }
 
 function printHeader(loaded: string[]): void {
   const config = getProviderConfig()
+  const context = currentContext()
   console.log(`${BOLD}Session draft REPL${RESET} ${DIM}— ${config.model} via ${config.baseUrl}${RESET}`)
   console.log(
     `${DIM}pool ${context.poolLength}${context.distanceUnits}, equipment: ${
@@ -143,7 +99,8 @@ function printHeader(loaded: string[]): void {
     }${RESET}`,
   )
   if (loaded.length) console.log(`${DIM}loaded from ${LOCAL_ENV_PATH}: ${loaded.join(', ')}${RESET}`)
-  if (knownNames.length) console.log(`${DIM}redacting names: ${knownNames.join(', ')}${RESET}`)
+  const names = currentKnownNames()
+  if (names.length) console.log(`${DIM}redacting names: ${names.join(', ')}${RESET}`)
   console.log(`${DIM}type a coach request, or /system /context /json /clear /quit${RESET}\n`)
 }
 
@@ -177,7 +134,6 @@ async function main(): Promise<void> {
     Deno.env.set('PROVIDER_BASE_URL', rewritten)
   }
 
-  buildContext()
   const config = getProviderConfig()
   if (!config.apiKey) {
     console.error(`PROVIDER_API_KEY is not set. Set it in ${LOCAL_ENV_PATH} or export it directly.`)
@@ -208,9 +164,9 @@ async function main(): Promise<void> {
         showRaw = !showRaw
         console.log(showRaw ? `${DIM}raw output on${RESET}` : `${DIM}raw output off${RESET}`)
       } else if (command === 'system') {
-        console.log(`\n${buildSystemPrompt(context)}\n`)
+        console.log(`\n${buildSystemPrompt(currentContext())}\n`)
       } else if (command === 'context') {
-        console.log(`\n${JSON.stringify(context, null, 2)}\n`)
+        console.log(`\n${JSON.stringify(currentContext(), null, 2)}\n`)
       } else if (command === 'clear') {
         console.log('cleared')
       } else if (command === 'help') {

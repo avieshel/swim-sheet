@@ -135,10 +135,26 @@ supabase secrets set PROVIDER_BASE_URL=... PROVIDER_API_KEY=... PROVIDER_MODEL=.
 supabase functions deploy ai-session-harness
 ```
 
-### Prompt playground (REPL)
+### Prompt playground
 
-For iterating on the prompt and the validator without the browser, sign-in, rate
-limits, or the Edge Function:
+For iterating on the prompt and the validator without the browser app, sign-in, rate
+limits, or the Edge Function.
+
+**Web UI** — shows every stage at once, which is the practical way to judge a prompt
+edit:
+
+```bash
+deno run --allow-env --allow-net --allow-read supabase/evals/playground.ts
+# → http://127.0.0.1:8788
+```
+
+Type a coach request and press Send (or Ctrl+Enter). You get the sanitised input, the
+full system prompt, the context that was sent, the raw model output, and the verdict —
+with the draft rendered as drills and items. Collapsible sections, a Clear button, and
+random examples. Binds to loopback only, since it sends whatever you type to a real
+provider.
+
+**CLI** — for scripting and piping:
 
 ```bash
 deno run --allow-env --allow-net --allow-read supabase/evals/repl.ts
@@ -151,27 +167,25 @@ deno run --allow-env --allow-net --allow-read supabase/evals/repl.ts "4 x 100 fr
 
   sanitized  4 x 100m freestyle, the last one with fins.
   removed    -
-  - not_actionable  The request '4 x 100m freestyle, the last one with fins' is not
-                    a complete training session. Please provide more details...
+  - not_actionable  The request '4 x 100m freestyle, the last one with fins' is not a complete training session...
   took       42.9s
 ```
 
-It calls the provider directly and calls the **same** modules the Edge Function
-does — the sanitizer, the prompt builder, the provider adapter, and the shared
-validator — so what you tune here is what ships. Commands: `/system` (the exact
-prompt), `/context`, `/json` (raw model output), `/clear`, `/quit`. A trailing
-`\` continues a line, for long prompts.
+Both call `supabase/evals/pipeline.ts`, so the browser, the CLI, and the Edge Function
+run the identical pipeline — the sanitizer, the prompt builder, the provider adapter,
+and the shared validator. CLI commands: `/system`, `/context`, `/json`, `/clear`,
+`/quit`.
 
 Provider settings load from `.env.functions.local` — the same file
-`supabase functions serve --env-file` uses — so there is one config for both.
-Anything already in your shell wins, so `REPL_POOL_LENGTH=50 …` overrides the
-file for one run. Because these tools run on the host rather than in a container,
-they rewrite `host.docker.internal` to `127.0.0.1` in `PROVIDER_BASE_URL`; the
-Edge Function needs it as-is.
+`supabase functions serve --env-file` uses — so there is one config for all of them.
+Anything already in your shell wins, so `REPL_POOL_LENGTH=50 …` overrides the file for
+one run. Because these tools run on the host rather than in a container, they rewrite
+`host.docker.internal` to `127.0.0.1` in `PROVIDER_BASE_URL`; the Edge Function needs it
+as-is.
 
 Env: the `PROVIDER_*` vars above, plus `REPL_POOL_LENGTH`, `REPL_DISTANCE_UNITS`,
-`REPL_EQUIPMENT`, and `REPL_NAMES` (comma-separated, so you can exercise redaction
-without a roster).
+`REPL_EQUIPMENT`, `REPL_GROUPS`, and `REPL_NAMES` (comma-separated, so you can exercise
+redaction without a roster).
 
 For a batch pass/fail run over the eval corpus instead, use
 `supabase/evals/run.ts`.
