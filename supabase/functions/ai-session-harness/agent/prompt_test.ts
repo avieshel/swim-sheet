@@ -2,6 +2,8 @@
 
 import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { buildSystemPrompt, buildUserContent, buildExampleResult } from './prompt.ts'
+import { buildDraftJsonSchema } from '../../../../shared/sessionDraft/schema.ts'
+import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
 import { validateSessionDraft, validateHarnessResult } from './output.ts'
 import type { SessionDraftContext, SessionDraftRequest } from './contract.ts'
 
@@ -13,6 +15,10 @@ const context: SessionDraftContext = {
   recentSessions: [],
 }
 
+// The prompt used to carry these facts as prose. They now live in the embedded
+// schema, so these assert the information reaches the model rather than how it
+// is worded.
+
 Deno.test('system prompt includes equipment options and pool length', () => {
   const prompt = buildSystemPrompt({
     poolLength: 25,
@@ -22,7 +28,8 @@ Deno.test('system prompt includes equipment options and pool length', () => {
     recentSessions: [],
   })
   assert(prompt.includes('25 m'))
-  assert(prompt.includes('fins, pullbuoy'))
+  assert(prompt.includes('"fins"'))
+  assert(prompt.includes('"pullbuoy"'))
 })
 
 Deno.test('system prompt derives strokes and intensity labels from the shared config', () => {
@@ -33,10 +40,22 @@ Deno.test('system prompt derives strokes and intensity labels from the shared co
     equipmentOptions: [],
     recentSessions: [],
   })
-  assert(prompt.includes('freestyle, backstroke, breaststroke, butterfly, im'))
-  assert(prompt.includes('easy -> "v1"'))
-  assert(prompt.includes('hard -> "v4"'))
-  assert(prompt.includes('(none enabled)'))
+  for (const stroke of defaultSessionDraftConfig.strokeValues) {
+    assert(prompt.includes(`"${stroke}"`))
+  }
+  assert(prompt.includes('v1 (easy'))
+  assert(prompt.includes('v4 (hard'))
+})
+
+Deno.test('system prompt says so when no equipment is enabled', () => {
+  const prompt = buildSystemPrompt({
+    poolLength: 50,
+    distanceUnits: 'm',
+    groupNames: [],
+    equipmentOptions: [],
+    recentSessions: [],
+  })
+  assert(prompt.includes('No equipment is enabled'))
 })
 
 Deno.test('user content embeds sanitized prompt and seed', () => {
@@ -119,4 +138,28 @@ Deno.test('no example item carries drill-shaped fields', () => {
 Deno.test('the system prompt forbids nesting drills inside items', () => {
   const prompt = buildSystemPrompt(context)
   assert(prompt.includes('An item is never a drill'))
+})
+
+// The prompt used to describe the draft's fields in prose, which models elided
+// or guessed at. The JSON Schema states the shape precisely and carries a
+// description per field, so it has to actually reach the model.
+
+Deno.test('the system prompt embeds the draft JSON schema', () => {
+  const prompt = buildSystemPrompt(context)
+  const schema = buildDraftJsonSchema(defaultSessionDraftConfig, context)
+  assert(prompt.includes(JSON.stringify(schema, null, 2)))
+})
+
+Deno.test('the system prompt presents the schema before the worked example', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(
+    prompt.indexOf('"schemaVersion"') < prompt.indexOf('A complete valid draft outcome'),
+    'schema must come before the example',
+  )
+})
+
+Deno.test('the schema in the prompt documents every drill field', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('Never nest one drill inside another'))
+  assert(prompt.includes('independent of the drill'))
 })
