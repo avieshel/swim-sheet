@@ -20,7 +20,13 @@ export interface SessionDraftItemV1 {
 }
 
 export interface SessionDraftDrillV1 {
+  // The drill's identity. Its steps cannot distinguish "Fingertip Drag 100m"
+  // from "Single Arm Pull 100m" — those are structurally identical — so the
+  // name carries what makes the drill what it is.
   name: string
+  // Optional. Says what the technique actually is, when the name is not enough
+  // on its own. A dedicated typed field may replace this later.
+  description?: string
   repeatCount: number
   items: SessionDraftItemV1[]
 }
@@ -66,7 +72,14 @@ export interface SessionDraftRequest {
 }
 
 export type HarnessResult =
-  | { outcome: 'draft'; draft: SessionDraftV1 }
+  | {
+      outcome: 'draft'
+      // How the agent read the request before building anything: one short line
+      // per drill it decided on. Optional, because a model that omits it should
+      // still yield a usable draft — losing the plan beats losing the session.
+      plan?: string[]
+      draft: SessionDraftV1
+    }
   | { outcome: 'not_actionable'; message: string }
 
 // ---- Sanitizer types ----

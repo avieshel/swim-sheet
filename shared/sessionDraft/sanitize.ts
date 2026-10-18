@@ -1,4 +1,4 @@
-import type { RemovedCategory, SanitizedPrompt } from '../../../../shared/sessionDraft/types'
+import type { RemovedCategory, SanitizedPrompt } from './types.ts'
 
 // Best-effort, fully local redaction. We never collect or transmit the original
 // matched values — only the categories that were found — and never log them.

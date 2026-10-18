@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icon'
+import { DraftSessionPanel } from '../components/ai/DraftSessionPanel'
 import {
   prepareSessionDraft,
   requestSessionDraft,
@@ -11,9 +12,10 @@ import {
   type PreparedSessionDraft,
   type SessionDraftResult,
 } from '../api/sessionDraft'
+import type { SessionDraftV1 } from '../../../shared/sessionDraft/types'
 import type { Session } from '../api/sessions'
 
-type Phase = 'compose' | 'review' | 'done'
+type Phase = 'compose' | 'review'
 
 function formatRetryWait(seconds: number): string {
   if (seconds < 60) {
@@ -56,6 +58,9 @@ export const AiSessionDraft: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<SessionDraftResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The proposal is staged here, not in the database: the coach fine-tunes it
+  // beside the prompt and nothing is persisted until they confirm.
+  const [draft, setDraft] = useState<SessionDraftV1 | null>(null)
 
   const [existingDraft, setExistingDraft] = useState<Session | null | undefined>(undefined)
 
@@ -162,18 +167,7 @@ export const AiSessionDraft: React.FC = () => {
     try {
       const outcome = await requestSessionDraft({ ...prepared, prompt: editedPrompt })
       setResult(outcome)
-      if (outcome.outcome === 'draft') {
-        const apply = await applySessionDraft(outcome.draft)
-        if (apply.outcome === 'created') {
-          navigate(`/sessions/${apply.sessionId}`)
-          return
-        }
-        if (apply.outcome === 'existing_draft') {
-          navigate(`/sessions/${apply.sessionId}`)
-          return
-        }
-        setError('That draft could not be saved. Please try again.')
-      }
+      if (outcome.outcome === 'draft') setDraft(outcome.draft)
     } catch {
       setError('Something went wrong reaching the AI service. Check your connection and try again.')
     } finally {
@@ -181,8 +175,26 @@ export const AiSessionDraft: React.FC = () => {
     }
   }
 
+  async function handleSaveSession() {
+    if (!draft) return
+    setLoading(true)
+    setError(null)
+    try {
+      const applied = await applySessionDraft(draft)
+      if (applied.outcome === 'created' || applied.outcome === 'existing_draft') {
+        navigate(`/sessions/${applied.sessionId}`)
+        return
+      }
+      setError('That draft could not be saved. Please try again.')
+    } catch {
+      setError('Something went wrong saving the draft. Check your connection and try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div>
       <div className="mb-6">
         <h2 className="font-headline-lg text-on-surface">Create with AI</h2>
         <p className="text-on-surface-variant mt-1">
@@ -191,120 +203,155 @@ export const AiSessionDraft: React.FC = () => {
         </p>
       </div>
 
-      <div className="bg-surface-container-lowest rounded-2xl p-5 md:p-6 border border-outline-variant">
-        {phase === 'compose' && (
-          <>
-            <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-              Session description
-            </label>
-            <textarea
-              value={raw}
-              onChange={(e) => setRaw(e.target.value)}
-              rows={6}
-              placeholder="e.g. A 2000m aerobic set: 200 free warmup, then 10x100 on 1:30 at v2, finish with 4x50 kick"
-              className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-3 py-2 text-sm outline-none rounded-t-lg resize-y"
-            />
-            <p className="text-caption text-on-surface-variant mt-2">
-              Do not include swimmer names, health details, or anything personal. Anything we detect is removed before sending.
-            </p>
-            <div className="flex gap-3 mt-5">
-              <button
-                onClick={handleContinue}
-                disabled={loading || !raw.trim()}
-                className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
+      <div
+        className="r-grid items-start"
+        style={{ '--grid-min': 'min(100%, 440px)' } as React.CSSProperties}
+      >
+        <div className="bg-surface-container-lowest rounded-2xl p-5 md:p-6 border border-outline-variant">
+          {phase === 'compose' && (
+            <>
+              <label
+                htmlFor="ai-session-description"
+                className="block font-label-caps text-label-caps text-on-surface-variant mb-1"
               >
-                <Icon name="arrow_forward" />
-                Review
-              </button>
-            </div>
-          </>
-        )}
-
-        {phase === 'review' && prepared && (
-          <>
-            {prepared.removedCategories.length > 0 && (
-              <div className="flex items-center gap-2 mb-3 text-label-sm text-tertiary-container bg-tertiary-container/10 px-3 py-2 rounded-lg">
-                <Icon name="shield" size="sm" />
-                Removed {prepared.removedCategories.join(', ')} — the model never sees the original values.
+                Session description
+              </label>
+              <textarea
+                id="ai-session-description"
+                value={raw}
+                onChange={(e) => setRaw(e.target.value)}
+                rows={6}
+                placeholder="e.g. A 2000m aerobic set: 200 free warmup, then 10x100 on 1:30 at v2, finish with 4x50 kick"
+                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-3 py-2 text-sm outline-none rounded-t-lg resize-y"
+              />
+              <p className="text-caption text-on-surface-variant mt-2">
+                Do not include swimmer names, health details, or anything personal. Anything we detect is removed before sending.
+              </p>
+              <div className="flex gap-3 mt-5">
+                <button
+                  onClick={handleContinue}
+                  disabled={loading || !raw.trim()}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
+                >
+                  <Icon name="arrow_forward" />
+                  Review
+                </button>
               </div>
-            )}
-            <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-              Sanitized prompt (editable)
-            </label>
-            <textarea
-              value={editedPrompt}
-              onChange={(e) => setEditedPrompt(e.target.value)}
-              rows={6}
-              className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-3 py-2 text-sm outline-none rounded-t-lg resize-y"
+            </>
+          )}
+
+          {phase === 'review' && prepared && (
+            <>
+              {prepared.removedCategories.length > 0 && (
+                <div className="flex items-center gap-2 mb-3 text-label-sm text-tertiary-container bg-tertiary-container/10 px-3 py-2 rounded-lg">
+                  <Icon name="shield" size="sm" />
+                  Removed {prepared.removedCategories.join(', ')} — the model never sees the original values.
+                </div>
+              )}
+              <label
+                htmlFor="ai-sanitized-prompt"
+                className="block font-label-caps text-label-caps text-on-surface-variant mb-1"
+              >
+                Sanitized prompt
+              </label>
+              <textarea
+                id="ai-sanitized-prompt"
+                value={editedPrompt}
+                onChange={(e) => setEditedPrompt(e.target.value)}
+                rows={6}
+                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-3 py-2 text-sm outline-none rounded-t-lg resize-y"
+              />
+              <p className="text-caption text-on-surface-variant mt-2">
+                Review the text above. If it is empty, nothing will be sent.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-5">
+                <button
+                  onClick={handleGenerate}
+                  disabled={loading || !editedPrompt.trim()}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
+                >
+                  {loading ? <Icon name="hourglass_empty" /> : <Icon name="auto_awesome" />}
+                  Generate draft
+                </button>
+                <button
+                  onClick={() => {
+                    setPhase('compose')
+                    setResult(null)
+                    setError(null)
+                    setDraft(null)
+                  }}
+                  disabled={loading}
+                  className="px-6 py-3 border-2 border-outline text-on-surface rounded-xl font-bold"
+                >
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+
+          {error && (
+            <div className="mt-4 flex items-center gap-2 text-label-sm text-error bg-error-container/20 px-3 py-2 rounded-lg">
+              <Icon name="error" size="sm" />
+              {error}
+            </div>
+          )}
+
+          {result && result.outcome === 'not_actionable' && (
+            <div className="mt-4 bg-surface-container-low rounded-lg p-3 text-on-surface">
+              <div className="flex items-center gap-2 font-bold mb-1">
+                <Icon name="info" size="sm" />
+                No session draft
+              </div>
+              <p className="text-label-sm text-on-surface-variant">{result.message}</p>
+              <p className="text-caption text-on-surface-variant mt-2">
+                Try describing a concrete workout (distances, strokes, repeats).
+              </p>
+            </div>
+          )}
+
+          {result && (result.outcome === 'rate_limited') && (
+            <div className="mt-4 text-label-sm text-on-surface-variant">
+              You have reached the AI request limit. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
+            </div>
+          )}
+
+          {result && (result.outcome === 'provider_rate_limited') && (
+            <div className="mt-4 text-label-sm text-on-surface-variant">
+              The AI service is busy right now. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
+            </div>
+          )}
+
+          {result && result.outcome === 'privacy' && (
+            <div className="mt-4 text-label-sm text-error">
+              The response contained a swimmer name. It was blocked and nothing was saved.
+            </div>
+          )}
+
+          {result && problemMessage(result) && (
+            <div className="mt-4 text-label-sm text-on-surface-variant">{problemMessage(result)}</div>
+          )}
+        </div>
+
+        <div>
+          {draft ? (
+            <DraftSessionPanel
+              draft={draft}
+              onChange={setDraft}
+              onSave={handleSaveSession}
+              onDiscard={() => setDraft(null)}
+              saving={loading}
             />
-            <p className="text-caption text-on-surface-variant mt-2">
-              Review the text above. If it is empty, nothing will be sent.
-            </p>
-            <div className="flex flex-wrap gap-3 mt-5">
-              <button
-                onClick={handleGenerate}
-                disabled={loading || !editedPrompt.trim()}
-                className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
-              >
-                {loading ? <Icon name="hourglass_empty" /> : <Icon name="auto_awesome" />}
-                Generate draft
-              </button>
-              <button
-                onClick={() => {
-                  setPhase('compose')
-                  setResult(null)
-                  setError(null)
-                }}
-                disabled={loading}
-                className="px-6 py-3 border-2 border-outline text-on-surface rounded-xl font-bold"
-              >
-                Back
-              </button>
+          ) : (
+            <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-dashed border-outline-variant text-center">
+              <Icon name="auto_awesome" size="xl" className="text-on-surface-variant" />
+              <p className="font-headline-md text-on-surface mt-3">Nothing proposed yet</p>
+              <p className="text-label-sm text-on-surface-variant mt-1">
+                Generate a draft from your description and it will appear here, ready to fine-tune
+                before anything is saved.
+              </p>
             </div>
-          </>
-        )}
-
-        {error && (
-          <div className="mt-4 flex items-center gap-2 text-label-sm text-error bg-error-container/20 px-3 py-2 rounded-lg">
-            <Icon name="error" size="sm" />
-            {error}
-          </div>
-        )}
-
-        {result && result.outcome === 'not_actionable' && (
-          <div className="mt-4 bg-surface-container-low rounded-lg p-3 text-on-surface">
-            <div className="flex items-center gap-2 font-bold mb-1">
-              <Icon name="info" size="sm" />
-              No session draft
-            </div>
-            <p className="text-label-sm text-on-surface-variant">{result.message}</p>
-            <p className="text-caption text-on-surface-variant mt-2">
-              Try describing a concrete workout (distances, strokes, repeats).
-            </p>
-          </div>
-        )}
-
-        {result && (result.outcome === 'rate_limited') && (
-          <div className="mt-4 text-label-sm text-on-surface-variant">
-            You have reached the AI request limit. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
-          </div>
-        )}
-
-        {result && (result.outcome === 'provider_rate_limited') && (
-          <div className="mt-4 text-label-sm text-on-surface-variant">
-            The AI service is busy right now. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
-          </div>
-        )}
-
-        {result && result.outcome === 'privacy' && (
-          <div className="mt-4 text-label-sm text-error">
-            The response contained a swimmer name. It was blocked and nothing was saved.
-          </div>
-        )}
-
-        {result && problemMessage(result) && (
-          <div className="mt-4 text-label-sm text-on-surface-variant">{problemMessage(result)}</div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

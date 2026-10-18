@@ -56,6 +56,15 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
 }
 
+// Models routinely mark an optional field as absent with JSON `null` rather than
+// by omitting the key. At this boundary `null` means the same as `undefined`,
+// and treating it as present-but-invalid would fail an otherwise usable draft
+// over a distinction the coach never sees. Only ever applied to fields that are
+// genuinely optional.
+function isAbsent(value: unknown): boolean {
+  return value === undefined || value === null
+}
+
 function isStroke(value: unknown, config: SessionDraftConfig): value is Stroke {
   return typeof value === 'string' && (config.strokeValues as readonly string[]).includes(value)
 }
@@ -92,10 +101,10 @@ function validateItem(
   if (value.repeatCount > config.limits.maxRepeatCount) {
     return fail('limit_exceeded', `${path}.repeatCount exceeds ${config.limits.maxRepeatCount}`)
   }
-  if (value.intensity !== undefined && !isIntensity(value.intensity, config)) {
+  if (!isAbsent(value.intensity) && !isIntensity(value.intensity, config)) {
     return fail('invalid_shape', `${path}.intensity must be one of ${config.intensityValues.join(', ')}`)
   }
-  if (value.interval !== undefined) {
+  if (!isAbsent(value.interval)) {
     if (
       typeof value.interval !== 'string' ||
       value.interval.length > config.limits.maxIntervalLength ||
@@ -107,7 +116,7 @@ function validateItem(
       )
     }
   }
-  if (value.equipment !== undefined) {
+  if (!isAbsent(value.equipment)) {
     if (!Array.isArray(value.equipment) || !value.equipment.every((id) => isEquipmentId(id, config))) {
       return fail('invalid_shape', `${path}.equipment must be an array of supported equipment ids`)
     }
@@ -118,9 +127,9 @@ function validateItem(
       distance: value.distance,
       stroke: value.stroke,
       repeatCount: value.repeatCount,
-      intensity: value.intensity,
-      interval: value.interval,
-      equipment: value.equipment,
+      intensity: isAbsent(value.intensity) ? undefined : (value.intensity as IntensityV1),
+      interval: isAbsent(value.interval) ? undefined : (value.interval as string),
+      equipment: isAbsent(value.equipment) ? undefined : (value.equipment as EquipmentId[]),
     },
   }
 }
@@ -168,7 +177,7 @@ export function validateSessionDraft(
     const drill = drills[d]
     const drillPath = `draft.drills[${d}]`
     if (!isPlainObject(drill)) return fail('invalid_shape', `${drillPath} must be an object`)
-    if (!hasOnlyKeys(drill, ['name', 'repeatCount', 'items'])) {
+    if (!hasOnlyKeys(drill, ['name', 'description', 'repeatCount', 'items'])) {
       return fail('invalid_shape', `${drillPath} has an unsupported field`)
     }
     if (typeof drill.name !== 'string' || drill.name.trim().length === 0) {
@@ -176,6 +185,15 @@ export function validateSessionDraft(
     }
     if (drill.name.length > config.limits.maxNameLength) {
       return fail('limit_exceeded', `${drillPath}.name exceeds ${config.limits.maxNameLength} characters`)
+    }
+    // Optional, so `null` means omitted here for the same reason as on an item.
+    if (!isAbsent(drill.description)) {
+      if (typeof drill.description !== 'string') {
+        return fail('invalid_shape', `${drillPath}.description must be a string`)
+      }
+      if (drill.description.length > config.limits.maxDescriptionLength) {
+        return fail('limit_exceeded', `${drillPath}.description exceeds ${config.limits.maxDescriptionLength} characters`)
+      }
     }
     if (!isPositiveInteger(drill.repeatCount)) {
       return fail('invalid_shape', `${drillPath}.repeatCount must be a positive integer`)
@@ -193,13 +211,34 @@ export function validateSessionDraft(
       if (!result.ok) return result
       validatedItems.push(result.value)
     }
-    validatedDrills.push({ name: drill.name, repeatCount: drill.repeatCount, items: validatedItems })
+    validatedDrills.push({
+      name: drill.name,
+      description: isAbsent(drill.description) ? undefined : (drill.description as string),
+      repeatCount: drill.repeatCount,
+      items: validatedItems,
+    })
   }
 
   return {
     ok: true,
     value: { schemaVersion: 1, session: { name: session.name }, drills: validatedDrills },
   }
+}
+
+function validatePlan(config: SessionDraftConfig, value: unknown): ValidationOutcome<string[]> {
+  if (!Array.isArray(value)) return fail('invalid_shape', 'draft.plan must be an array of strings')
+  if (value.length > config.limits.maxPlanEntries) {
+    return fail('limit_exceeded', `draft.plan exceeds ${config.limits.maxPlanEntries} entries`)
+  }
+  for (const entry of value) {
+    if (typeof entry !== 'string' || entry.trim().length === 0) {
+      return fail('invalid_shape', 'draft.plan entries must be non-empty strings')
+    }
+    if (entry.length > config.limits.maxNameLength) {
+      return fail('limit_exceeded', `draft.plan entry exceeds ${config.limits.maxNameLength} characters`)
+    }
+  }
+  return { ok: true, value: value as string[] }
 }
 
 export function validateHarnessResult(
@@ -210,12 +249,23 @@ export function validateHarnessResult(
 
   const outcome = input.outcome
   if (outcome === 'draft') {
-    if (!hasOnlyKeys(input, ['outcome', 'draft'])) {
+    if (!hasOnlyKeys(input, ['outcome', 'plan', 'draft'])) {
       return fail('invalid_shape', 'draft outcome has an unsupported field')
+    }
+    if (input.plan !== undefined) {
+      const plan = validatePlan(config, input.plan)
+      if (!plan.ok) return plan
     }
     const draftResult = validateSessionDraft(config, input.draft)
     if (!draftResult.ok) return draftResult
-    return { ok: true, value: { outcome: 'draft', draft: draftResult.value } }
+    return {
+      ok: true,
+      value: {
+        outcome: 'draft',
+        plan: input.plan === undefined ? undefined : (input.plan as string[]),
+        draft: draftResult.value,
+      },
+    }
   }
   if (outcome === 'not_actionable') {
     if (!hasOnlyKeys(input, ['outcome', 'message'])) {

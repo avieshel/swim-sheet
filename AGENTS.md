@@ -18,6 +18,8 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
 | Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
+| Drill domain model — schema, identity, repeat levels, notation | `docs/context/Drill-Model-Context.md` |
+| Session domain model — plan, decomposition, what the agent cannot set | `docs/context/Session-Model-Context.md` |
 | AI session harness (shared contract, agent/harness split, evals) | `shared/sessionDraft/`, `supabase/functions/ai-session-harness/`, `supabase/evals/` |
 | Template creation + promote-to-live flow (Initiative 1) | `docs/context/Session-Creation-To-Live-Context.md` |
 | Past sessions table + swimmer-filtered history (Initiative 2) | `docs/context/Past-Sessions-Data-Context.md` |

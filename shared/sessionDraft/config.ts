@@ -16,17 +16,21 @@ export const INTENSITY_VALUES: readonly IntensityV1[] = ['v1', 'v2', 'v3', 'v4']
 export const INTENSITY_LABELS: Readonly<Record<IntensityV1, string>> = {
   v1: 'easy',
   v2: 'medium',
-  v3: 'strong',
+  v3: 'threshold',
   v4: 'hard',
 }
 
 export interface SessionDraftLimits {
   schemaVersion: number
   maxNameLength: number
+  maxDescriptionLength: number
   maxIntervalLength: number
   maxPromptLength: number
   maxDrills: number
   maxItemsPerDrill: number
+  // Cap on the agent's own plan lines. A plan that long has stopped being a
+  // plan, and would bloat every response.
+  maxPlanEntries: number
   maxRecentSessions: number
   maxDistance: number
   maxRepeatCount: number
@@ -54,10 +58,12 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
   limits: {
     schemaVersion: 1,
     maxNameLength: 100,
+    maxDescriptionLength: 400,
     maxIntervalLength: 40,
     maxPromptLength: 4000,
     maxDrills: 30,
     maxItemsPerDrill: 10,
+    maxPlanEntries: 12,
     maxRecentSessions: 2,
     maxDistance: 10_000,
     maxRepeatCount: 100,

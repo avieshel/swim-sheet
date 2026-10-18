@@ -5,11 +5,12 @@
 import { buildSystemPrompt, buildUserContent } from './prompt.ts'
 import {
   getProviderMaxTokens,
+  getProviderTimeoutMs,
   PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
-  PROVIDER_REQUEST_TIMEOUT_MS,
   PROVIDER_TEMPERATURE,
 } from './config.ts'
 import type { HarnessResult, SessionDraftRequest } from './contract.ts'
+import { debugLog } from './debug.ts'
 
 export type ProviderErrorKind = 'timeout' | 'status' | 'shape' | 'network' | 'rate_limited' | 'unavailable'
 
@@ -72,13 +73,13 @@ export function getProviderConfig(): ProviderConfig {
 }
 
 interface ChatCompletionResponse {
-  choices?: Array<{ message?: { content?: string } }>
+  choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
 }
 
 export async function callProvider(
   request: SessionDraftRequest,
   config: ProviderConfig,
-  timeoutMs = PROVIDER_REQUEST_TIMEOUT_MS,
+  timeoutMs = getProviderTimeoutMs(),
 ): Promise<HarnessResult> {
   if (!config.apiKey) {
     throw new ProviderError('network', 'provider API key is not configured')
@@ -87,17 +88,30 @@ export async function callProvider(
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
+    const systemPrompt = buildSystemPrompt(request.context)
+    const userContent = buildUserContent(request)
     const body = {
       model: config.model,
       temperature: PROVIDER_TEMPERATURE,
       response_format: { type: 'json_object' },
       max_tokens: config.maxTokens,
       messages: [
-        { role: 'system', content: buildSystemPrompt(request.context) },
-        { role: 'user', content: buildUserContent(request) },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
       ],
     }
 
+    debugLog('agent.provider.request', {
+      url: `${config.baseUrl}/chat/completions`,
+      model: config.model,
+      temperature: PROVIDER_TEMPERATURE,
+      maxTokens: config.maxTokens,
+      timeoutMs,
+      systemPrompt,
+      userContent,
+    })
+
+    const startedAt = performance.now()
     const res = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -124,6 +138,15 @@ export async function callProvider(
 
     const json = (await res.json()) as ChatCompletionResponse
     const content = json.choices?.[0]?.message?.content
+    const elapsedMs = Math.round(performance.now() - startedAt)
+
+    debugLog('agent.provider.response', {
+      status: res.status,
+      elapsedMs,
+      finishReason: json.choices?.[0]?.finish_reason,
+      content: typeof content === 'string' ? content : null,
+    })
+
     if (typeof content !== 'string' || content.trim().length === 0) {
       throw new ProviderError('shape', 'provider response missing content')
     }
@@ -132,13 +155,20 @@ export async function callProvider(
     if (parsed === undefined) {
       throw new ProviderError('shape', 'provider response was not valid JSON')
     }
+    debugLog('agent.provider.parsed', { outcome: (parsed as HarnessResult).outcome, elapsedMs })
     return parsed as HarnessResult
   } catch (err) {
-    if (err instanceof ProviderError) throw err
+    if (err instanceof ProviderError) {
+      debugLog('agent.provider.failed', { kind: err.kind, message: err.message })
+      throw err
+    }
     if (err instanceof DOMException && err.name === 'AbortError') {
+      debugLog('agent.provider.failed', { kind: 'timeout', message: 'provider request timed out' })
       throw new ProviderError('timeout', 'provider request timed out')
     }
-    throw new ProviderError('network', err instanceof Error ? err.message : 'unknown network error')
+    const message = err instanceof Error ? err.message : 'unknown network error'
+    debugLog('agent.provider.failed', { kind: 'network', message })
+    throw new ProviderError('network', message)
   } finally {
     clearTimeout(timer)
   }

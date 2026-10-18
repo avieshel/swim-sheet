@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createSessionDraftSeed } from '../seed'
+import { createSessionDraftSeed } from '../../../../../shared/sessionDraft/seed'
 import { validateSessionDraft } from '../validate'
 
 describe('createSessionDraftSeed', () => {

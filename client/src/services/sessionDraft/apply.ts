@@ -3,7 +3,12 @@ import type { SafeDrill, SafeSession, Session } from '../../db/schema'
 import { addSessionWithDrills, updateSession } from '../../db/dao'
 import type { Stroke } from '../../types/swimming'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
+import { draftDrillDistance } from '../../../../shared/sessionDraft/distance'
 import { validateSessionDraft } from './validate'
+
+// Re-exported so components keep reaching the client service layer rather than
+// the shared contract directly.
+export { draftDrillDistance, draftTotalDistance } from '../../../../shared/sessionDraft/distance'
 
 export type ApplyDraftResult =
   | { outcome: 'created'; sessionId: string }
@@ -39,14 +44,6 @@ function withDraftSlot<T>(fn: () => Promise<T>): Promise<T> {
 
 // ── Draft → session/drills mapping ───────────────────────────
 
-function deriveDrillDistance(
-  items: SessionDraftV1['drills'][number]['items'],
-  drillRepeatCount: number,
-): number {
-  const perRep = items.reduce((sum, it) => sum + it.distance * it.repeatCount, 0)
-  return perRep * drillRepeatCount
-}
-
 function deriveDominantStroke(
   items: SessionDraftV1['drills'][number]['items'],
 ): Stroke {
@@ -73,7 +70,7 @@ export function mapDraftToSessionAndDrills(
   const drills: Array<Omit<SafeDrill, 'sessionId'>> = draft.drills.map((drill, order) => ({
     name: drill.name,
     stroke: deriveDominantStroke(drill.items),
-    distance: deriveDrillDistance(drill.items, drill.repeatCount),
+    distance: draftDrillDistance(drill.items, drill.repeatCount),
     order,
     items: drill.items.map((item) => ({
       id: crypto.randomUUID(),
@@ -88,7 +85,7 @@ export function mapDraftToSessionAndDrills(
     timingMode: 'individual',
     focus: 'none',
     labels: [],
-    description: '',
+    description: drill.description ?? '',
   }))
 
   const session: SafeSession = {

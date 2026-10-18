@@ -34,6 +34,101 @@ describe('validateSessionDraft', () => {
     expect(validateSessionDraft('nope').ok).toBe(false)
   })
 
+  // JSON `null` is one of the most common ways a model marks an optional field
+  // as absent. Treating it as present rejects the whole draft over something the
+  // coach never sees, so it normalizes to omitted instead.
+  it('treats null as omitted for an optional item field', () => {
+    const result = validateSessionDraft({
+      schemaVersion: 1,
+      session: { name: 'Tuesday Endurance' },
+      drills: [
+        {
+          name: 'Kick',
+          repeatCount: 1,
+          items: [
+            { distance: 50, stroke: 'freestyle', repeatCount: 4, intensity: null, interval: null, equipment: null },
+          ],
+        },
+      ],
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.drills[0].items[0].intensity).toBeUndefined()
+      expect(result.value.drills[0].items[0].interval).toBeUndefined()
+      expect(result.value.drills[0].items[0].equipment).toBeUndefined()
+    }
+  })
+
+  it('keeps a null in a required field rejected', () => {
+    const result = validateSessionDraft({
+      schemaVersion: 1,
+      session: { name: 'Tuesday Endurance' },
+      drills: [{ name: null, repeatCount: 1, items: [validDrill().items[0]] }],
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it('still rejects an out-of-range intensity', () => {
+    const result = validateSessionDraft({
+      schemaVersion: 1,
+      session: { name: 'Tuesday Endurance' },
+      drills: [
+        {
+          name: 'Set',
+          repeatCount: 1,
+          items: [{ distance: 100, stroke: 'freestyle', repeatCount: 2, intensity: 'v9' }],
+        },
+      ],
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  // The plan is how the agent reports reading the request before the drills.
+  // It is optional so a model that forgets it still yields a usable draft —
+  // losing the plan is better than losing the session — but anything present
+  // must be well formed and bounded.
+  describe('harness result plan', () => {
+    const draft = () => ({
+      schemaVersion: 1,
+      session: { name: 'A' },
+      drills: [{ name: 'W', repeatCount: 1, items: [{ distance: 400, stroke: 'freestyle', repeatCount: 1 }] }],
+    })
+
+    it('accepts a draft outcome carrying a plan', () => {
+      const result = validateHarnessResult({
+        outcome: 'draft',
+        plan: ['Two drills: a 400m warmup, then a main set.'],
+        draft: draft(),
+      })
+      expect(result.ok).toBe(true)
+      if (result.ok && result.value.outcome === 'draft') {
+        expect(result.value.plan).toEqual(['Two drills: a 400m warmup, then a main set.'])
+      }
+    })
+
+    it('accepts a draft outcome with no plan at all', () => {
+      expect(validateHarnessResult({ outcome: 'draft', draft: draft() }).ok).toBe(true)
+    })
+
+    it('rejects a plan that is not an array of strings', () => {
+      expect(validateHarnessResult({ outcome: 'draft', plan: 'two drills', draft: draft() }).ok).toBe(false)
+      expect(validateHarnessResult({ outcome: 'draft', plan: [1, 2], draft: draft() }).ok).toBe(false)
+    })
+
+    it('rejects an empty plan entry', () => {
+      expect(validateHarnessResult({ outcome: 'draft', plan: ['  '], draft: draft() }).ok).toBe(false)
+    })
+
+    it('rejects more plan entries than the cap allows', () => {
+      const many = Array.from({ length: 40 }, (_, i) => `step ${i}`)
+      expect(validateHarnessResult({ outcome: 'draft', plan: many, draft: draft() }).ok).toBe(false)
+    })
+
+    it('rejects a plan on a not_actionable outcome', () => {
+      expect(validateHarnessResult({ outcome: 'not_actionable', message: 'no', plan: ['x'] }).ok).toBe(false)
+    })
+  })
+
   it('rejects an unsupported schema version', () => {
     const result = validateSessionDraft({ ...(validDraft() as object), schemaVersion: 2 })
     expect(result.ok).toBe(false)
@@ -144,6 +239,50 @@ describe('validateSessionDraft', () => {
   it('rejects a draft carrying an unknown top-level field', () => {
     const result = validateSessionDraft({ ...(validDraft() as Record<string, unknown>), extra: true })
     expect(result.ok).toBe(false)
+  })
+})
+
+// A drill's steps cannot distinguish "Fingertip Drag 100m" from "Single Arm Pull
+// 100m" — they are structurally identical. Identity comes from the name, and
+// from an optional description that says what the technique actually is.
+describe('drill identity', () => {
+  const drillWith = (extra: Record<string, unknown>) => ({
+    schemaVersion: 1,
+    session: { name: 'A' },
+    drills: [
+      {
+        name: 'Fingertip Drag',
+        repeatCount: 1,
+        items: [{ distance: 100, stroke: 'freestyle', repeatCount: 4 }],
+        ...extra,
+      },
+    ],
+  })
+
+  it('accepts a drill with a description', () => {
+    const result = validateSessionDraft(drillWith({ description: 'High elbow recovery, fingertips along the surface.' }))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].description).toContain('fingertips')
+  })
+
+  it('accepts a drill with no description', () => {
+    const result = validateSessionDraft(drillWith({}))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].description).toBeUndefined()
+  })
+
+  it('treats a null description as omitted', () => {
+    const result = validateSessionDraft(drillWith({ description: null }))
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].description).toBeUndefined()
+  })
+
+  it('rejects a description that is not a string', () => {
+    expect(validateSessionDraft(drillWith({ description: 42 })).ok).toBe(false)
+  })
+
+  it('rejects a description beyond the description limit', () => {
+    expect(validateSessionDraft(drillWith({ description: 'x'.repeat(500) })).ok).toBe(false)
   })
 })
 

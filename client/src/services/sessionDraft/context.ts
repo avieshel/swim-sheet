@@ -1,6 +1,6 @@
 import type { ContextInput, SessionDraftContext } from '../../../../shared/sessionDraft/types'
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
-import { sanitizePrompt } from './sanitize'
+import { sanitizePrompt } from '../../../../shared/sessionDraft/sanitize'
 
 // Builds the bounded structural context sent to the model. It is deliberately
 // allow-listed: every field here is numeric, an enum, or a sanitized group name.

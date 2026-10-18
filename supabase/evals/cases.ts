@@ -26,13 +26,18 @@ export function defaultContext(): SessionDraftContext {
 export const cases: EvalCase[] = [
   {
     id: 'aerobic-2000-freestyle',
+    // The itemised parts sum to 1500m (300 + 10x100 + 4x50), so the expectation
+    // tracks the structure the prompt actually describes. It previously expected
+    // 1600-2400m — matching only the "2000m" framing in the first clause — and
+    // so failed every faithful completion. Whether the agent should pad out to a
+    // stated total is a product question, not current behaviour.
     prompt:
       'A 2000m aerobic set for a club squad: 300 free warmup, then 10x100 freestyle on 1:40 at moderate effort, finish with 4x50 backstroke easy.',
     expectation: {
       outcome: 'draft',
       requirements: [
         { kind: 'drillCount', min: 2, max: 8 },
-        { kind: 'totalDistance', min: 1600, max: 2400 },
+        { kind: 'totalDistance', min: 1400, max: 1600 },
         { kind: 'hasStroke', stroke: 'freestyle' },
         { kind: 'itemWithIntensity', intensity: 'v2' },
       ],
