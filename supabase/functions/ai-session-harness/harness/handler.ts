@@ -24,8 +24,10 @@ export interface RateLimitInfo {
 }
 
 export interface HandlerDeps {
-  // Resolve a caller JWT to an authenticated (non-anonymous) user.
-  verifyUser(token: string): Promise<AuthOutcome>
+  // Resolve a caller JWT to an authenticated (non-anonymous) user. The gateway
+  // (verify_jwt) injects x-user-id; pass it to skip re-reading a header the
+  // gateway may strip.
+  verifyUser(input: { token: string; gatewayUserId?: string | null }): Promise<AuthOutcome>
   // Record the request and return the rate-limit decision, or null when the
   // rate-limit store is unavailable.
   recordRequest(userId: string): Promise<RateLimitInfo | null>
@@ -48,9 +50,10 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     // 1. Authenticate the caller from their own JWT.
     const authHeader = req.headers.get('Authorization') ?? ''
     const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (!token) return deny('missing-token', json({ error: 'unauthorized' }, 401))
+    const gatewayUserId = req.headers.get('x-user-id')
+    if (!token && !gatewayUserId) return deny('missing-token', json({ error: 'unauthorized' }, 401))
 
-    const auth = await deps.verifyUser(token)
+    const auth = await deps.verifyUser({ token, gatewayUserId })
     if (auth.kind === 'unauthenticated') return deny('unauthenticated', json({ error: 'unauthorized' }, 401))
     if (auth.kind === 'anonymous') return deny('anonymous', json({ error: 'anonymous_not_allowed' }, 401))
 

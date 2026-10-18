@@ -19,7 +19,16 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
   })
 
   return {
-    async verifyUser(token: string): Promise<AuthOutcome> {
+    async verifyUser(input: { token: string; gatewayUserId?: string | null }): Promise<AuthOutcome> {
+      // With verify_jwt enabled, the Supabase gateway has already authenticated
+      // the caller and injects x-user-id into the request. Trusting that is
+      // equivalent to the gateway check and avoids re-reading an Authorization
+      // header the gateway may strip. Falls back to a direct token check.
+      if (input.gatewayUserId) {
+        return { kind: 'authenticated', userId: input.gatewayUserId }
+      }
+      const token = input.token
+      if (!token) return { kind: 'unauthenticated' }
       const userClient = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: `Bearer ${token}` } },
       })

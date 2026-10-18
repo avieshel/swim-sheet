@@ -9,9 +9,14 @@
 
 import { createDeps } from './harness/deps.ts'
 import { createHandler } from './harness/handler.ts'
-import { json } from './harness/http.ts'
+import { json, CORS_HEADERS } from './harness/http.ts'
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  // Answer the browser's CORS preflight before any auth or work. A 204 must
+  // carry no body, or the Deno runtime throws (EDGE_FUNCTION_ERROR).
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
   const deps = createDeps()
   if (!deps) return json({ error: 'misconfigured' }, 500)
   return createHandler(deps)(req)
