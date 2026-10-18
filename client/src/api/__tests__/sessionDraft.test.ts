@@ -103,6 +103,20 @@ describe('prepareSessionDraft', () => {
     expect(prepared.removedCategories).toContain('known_name')
     expect(prepared.prompt).toBe('Plan a set for [removed] and [removed]')
   })
+
+  it('drops malformed recent-session drills instead of failing the request', async () => {
+    vi.mocked(sessionService.list).mockResolvedValue([
+      { id: 's1' } as unknown as Awaited<ReturnType<typeof sessionService.list>>,
+    ])
+    vi.mocked(getSessionDrills).mockResolvedValue([
+      { distance: 0, stroke: 'freestyle', repeatCount: 1 },
+      { distance: 100, stroke: 'backstroke', repeatCount: 4 },
+    ] as unknown as Awaited<ReturnType<typeof getSessionDrills>>)
+    const preparedResult = await prepareSessionDraft('Plan a set')
+    expect(preparedResult.context.recentSessions).toEqual([
+      { totalDistance: 100, drills: [{ distance: 100, stroke: 'backstroke', repeatCount: 4 }] },
+    ])
+  })
 })
 
 describe('requestSessionDraft', () => {
@@ -112,7 +126,7 @@ describe('requestSessionDraft', () => {
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
       removedCategories: [], knownSwimmerNames: [],
     })
-    expect(result).toEqual({ outcome: 'invalid' })
+    expect(result.outcome).toBe('invalid')
     expect(invoke).not.toHaveBeenCalled()
   })
 
@@ -120,7 +134,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft(
       prepared({ prompt: 'x'.repeat(defaultSessionDraftConfig.limits.maxPromptLength + 1) }),
     )
-    expect(result).toEqual({ outcome: 'invalid' })
+    expect(result.outcome).toBe('invalid')
     expect(invoke).not.toHaveBeenCalled()
   })
 
@@ -185,7 +199,7 @@ describe('requestSessionDraft', () => {
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
       removedCategories: [], knownSwimmerNames: [],
     })
-    expect(result).toEqual({ outcome: 'invalid' })
+    expect(result.outcome).toBe('invalid')
   })
 
   it('returns a validated draft', async () => {

@@ -21,7 +21,6 @@ import { settingsService } from '../services/settingsService'
 import { getAllSwimmers } from '../db/dao'
 import { sessionService } from '../services/sessionService'
 import { getSessionDrills } from './drills'
-import { getDrillTotalDistance } from '../utils/drillHelpers'
 
 // The only client network boundary for the AI draft. Pages never call the Edge
 // Function directly.
@@ -37,7 +36,7 @@ export interface PreparedSessionDraft {
 export type SessionDraftResult =
   | { outcome: 'draft'; draft: SessionDraftV1 }
   | { outcome: 'not_actionable'; message: string }
-  | { outcome: 'invalid' }
+  | { outcome: 'invalid'; message?: string }
   | { outcome: 'network' }
   | { outcome: 'auth' }
   | { outcome: 'rate_limited'; retryAfterSeconds: number }
@@ -46,21 +45,41 @@ export type SessionDraftResult =
   | { outcome: 'timeout' }
   | { outcome: 'provider' }
 
+function isValidRecentDrill(drill: { distance: unknown; stroke: unknown; repeatCount: unknown }): boolean {
+  return (
+    typeof drill.distance === 'number' &&
+    Number.isInteger(drill.distance) &&
+    drill.distance > 0 &&
+    typeof drill.stroke === 'string' &&
+    (defaultSessionDraftConfig.strokeValues as readonly string[]).includes(drill.stroke) &&
+    typeof drill.repeatCount === 'number' &&
+    Number.isInteger(drill.repeatCount) &&
+    drill.repeatCount > 0
+  )
+}
+
+// Historical sessions can contain drills that no longer satisfy the draft
+// contract (a 0-distance drill, an off-list stroke, a 0 repeat). Dropping the
+// offending drills — instead of rejecting the whole AI request — keeps
+// generation working even when old data is imperfect.
 async function buildRecentSessions(): Promise<ContextInput['recentSessions']> {
   const sessions = (await sessionService.list()).slice(0, defaultSessionDraftConfig.limits.maxRecentSessions)
-  return Promise.all(
+  const built = await Promise.all(
     sessions.map(async (session) => {
-      const drills = await getSessionDrills(session.id)
-      return {
-        totalDistance: drills.reduce((sum, drill) => sum + getDrillTotalDistance(drill), 0),
-        drills: drills.slice(0, defaultSessionDraftConfig.limits.maxDrills).map((drill) => ({
+      const drills = (await getSessionDrills(session.id))
+        .filter(isValidRecentDrill)
+        .slice(0, defaultSessionDraftConfig.limits.maxDrills)
+        .map((drill) => ({
           distance: drill.distance,
           stroke: drill.stroke,
           repeatCount: drill.repeatCount,
-        })),
-      }
+        }))
+      if (drills.length === 0) return null
+      const totalDistance = drills.reduce((sum, drill) => sum + drill.distance, 0)
+      return { totalDistance, drills }
     }),
   )
+  return built.filter((session): session is NonNullable<typeof session> => session !== null)
 }
 
 export async function prepareSessionDraft(prompt: string): Promise<PreparedSessionDraft> {
@@ -168,8 +187,9 @@ export async function requestSessionDraft(prepared: PreparedSessionDraft): Promi
     context: prepared.context,
   }
   // Validate the request we are about to send; the harness validates it again.
-  if (!validateSessionDraftRequest(body).ok) {
-    return { outcome: 'invalid' }
+  const requestCheck = validateSessionDraftRequest(body)
+  if (!requestCheck.ok) {
+    return { outcome: 'invalid', message: requestCheck.message }
   }
 
   const user = getCurrentUser()
@@ -181,7 +201,7 @@ export async function requestSessionDraft(prepared: PreparedSessionDraft): Promi
   if (error) return await mapInvokeError(error)
 
   const validation = validateHarnessResult(data)
-  if (!validation.ok) return { outcome: 'invalid' }
+  if (!validation.ok) return { outcome: 'invalid', message: validation.error.message }
   if (containsSwimmerName(validation.value, prepared.knownSwimmerNames)) {
     return { outcome: 'privacy' }
   }

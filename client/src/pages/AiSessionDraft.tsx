@@ -41,7 +41,7 @@ function problemMessage(result: SessionDraftResult): string | null {
     case 'auth':
       return 'Your session has expired. Please sign in again, then retry.'
     case 'invalid':
-      return "That request couldn't be processed. Please rephrase and try again."
+      return result.message ?? "That request couldn't be processed. Please rephrase and try again."
     default:
       return null
   }
