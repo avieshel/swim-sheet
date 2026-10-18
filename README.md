@@ -144,7 +144,7 @@ limits, or the Edge Function.
 edit:
 
 ```bash
-deno run --allow-env --allow-net --allow-read supabase/evals/playground.ts
+deno run --allow-env --allow-net --allow-read .local-utils/playground.ts
 # → http://127.0.0.1:8788
 ```
 

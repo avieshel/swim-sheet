@@ -11,6 +11,10 @@ server/tsconfig.tsbuildinfo
 .env
 client/.env
 supabase/.env
+# Local AI-harness function env files carry provider API keys (Ollama/OpenRouter/...).
+# The shared template, if present, stays tracked.
+.env.functions.*
+!.env.functions.example
 supabase/.branches/
 supabase/.temp/
 
