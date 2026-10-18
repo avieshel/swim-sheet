@@ -1,11 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { User } from '@supabase/supabase-js'
 
 const mockUser = vi.hoisted(() => ({ user: { id: 'u1', is_anonymous: false } as unknown as User }))
 
 vi.mock('../supabase', () => ({
-  supabase: { functions: { invoke: vi.fn() } },
+  supabase: { functions: { invoke: vi.fn() }, auth: { getSession: vi.fn() } },
   getCurrentUser: () => mockUser.user,
+}))
+
+vi.mock('../../config', () => ({
+  config: { getSupabaseUrl: () => 'https://example.supabase.co', getSupabaseAnonKey: () => 'anon-key' },
 }))
 
 vi.mock('../../db/dao', () => ({
@@ -36,7 +40,7 @@ import { getAllSwimmers } from '../../db/dao'
 import { settingsService } from '../../services/settingsService'
 import { sessionService } from '../../services/sessionService'
 import { getSessionDrills } from '../drills'
-import { prepareSessionDraft, requestSessionDraft, applySessionDraft, type PreparedSessionDraft } from '../sessionDraft'
+import { prepareSessionDraft, requestSessionDraft, requestSessionDraftStream, applySessionDraft, type PreparedSessionDraft } from '../sessionDraft'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
 
@@ -242,5 +246,129 @@ describe('applySessionDraft (api wrapper)', () => {
     const result = await applySessionDraft(validDraft())
     expect(mockApply.applySessionDraft).toHaveBeenCalledWith(validDraft(), { markUnreviewed: true })
     expect(result).toEqual({ outcome: 'created', sessionId: 's1' })
+  })
+})
+
+describe('requestSessionDraftStream', () => {
+  const getSession = supabase.auth.getSession as unknown as ReturnType<typeof vi.fn>
+  const fetchMock = vi.fn()
+  const url = 'https://example.supabase.co/functions/v1/ai-session-harness'
+
+  function sseResponse(frames: object[], status = 200): Response {
+    const encoder = new TextEncoder()
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const frame of frames) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\n\n`))
+        }
+        controller.close()
+      },
+    })
+    return new Response(body, { status, headers: { 'Content-Type': 'text/event-stream' } })
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockReset()
+    getSession.mockReset()
+    getSession.mockResolvedValue({ data: { session: { access_token: 'jwt' } } })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('negotiates SSE and streams delta frames then a done frame', async () => {
+    const draft = validDraft()
+    const fullJson = JSON.stringify({ outcome: 'draft', draft })
+    fetchMock.mockResolvedValueOnce(
+      sseResponse([
+        { type: 'delta', text: fullJson.slice(0, 10) },
+        { type: 'delta', text: fullJson.slice(10) },
+        { type: 'done', result: { outcome: 'draft', draft } },
+      ]),
+    )
+
+    const onDelta = vi.fn()
+    const onDone = vi.fn()
+    const onError = vi.fn()
+    await requestSessionDraftStream(prepared(), { onDelta, onDone, onError })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [calledUrl, opts] = fetchMock.mock.calls[0] as [string, { headers: Record<string, string>; signal?: AbortSignal }]
+    expect(calledUrl).toBe(url)
+    expect(opts.headers.Accept).toBe('text/event-stream')
+    expect(opts.headers.Authorization).toBe('Bearer jwt')
+    expect(opts.headers.apikey).toBe('anon-key')
+    expect(onDelta).toHaveBeenCalledTimes(2)
+    expect(onDelta).toHaveBeenNthCalledWith(1, fullJson.slice(0, 10))
+    expect(onDone).toHaveBeenCalledWith({ outcome: 'draft', draft })
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('rejects anonymous users before any fetch', async () => {
+    mockUser.user = { id: 'u1', is_anonymous: true } as unknown as User
+    const onError = vi.fn()
+    await requestSessionDraftStream(prepared(), { onError })
+    expect(onError).toHaveBeenCalledWith({ outcome: 'auth' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('uses the configured URL and anon key for the raw fetch', async () => {
+    fetchMock.mockResolvedValueOnce(sseResponse([{ type: 'done', result: { outcome: 'not_actionable', message: 'x' } }]))
+    await requestSessionDraftStream(prepared(), {})
+    const [calledUrl, opts] = fetchMock.mock.calls[0] as [string, { headers: Record<string, string> }]
+    expect(calledUrl).toBe(url)
+    expect(opts.headers.apikey).toBe('anon-key')
+  })
+
+  it('reports network when fetch rejects', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('offline'))
+    const onError = vi.fn()
+    await requestSessionDraftStream(prepared(), { onError })
+    expect(onError).toHaveBeenCalledWith({ outcome: 'network' })
+  })
+
+  it('maps a non-ok response through the shared error mapping', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+    const onError = vi.fn()
+    await requestSessionDraftStream(prepared(), { onError })
+    expect(onError).toHaveBeenCalledWith({ outcome: 'auth' })
+  })
+
+  it('delivers an error frame as onError', async () => {
+    fetchMock.mockResolvedValueOnce(sseResponse([{ type: 'error', outcome: 'provider' }]))
+    const onError = vi.fn()
+    await requestSessionDraftStream(prepared(), { onError })
+    expect(onError).toHaveBeenCalledWith({ outcome: 'provider' })
+  })
+
+  it('carries retry seconds from a provider rate-limit error frame', async () => {
+    fetchMock.mockResolvedValueOnce(sseResponse([{ type: 'error', outcome: 'provider_rate_limited', retryAfterSeconds: 30 }]))
+    const onError = vi.fn()
+    await requestSessionDraftStream(prepared(), { onError })
+    expect(onError).toHaveBeenCalledWith({ outcome: 'provider_rate_limited', retryAfterSeconds: 30 })
+  })
+
+  it('shapes an invalid done payload to onDone invalid', async () => {
+    fetchMock.mockResolvedValueOnce(sseResponse([{ type: 'done', result: { outcome: 'bogus' } }]))
+    const onDone = vi.fn()
+    await requestSessionDraftStream(prepared(), { onDone })
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'invalid' }))
+  })
+
+  it('forwards an abort signal to fetch', async () => {
+    fetchMock.mockResolvedValueOnce(
+      sseResponse([{ type: 'delta', text: 'hi' }, { type: 'done', result: { outcome: 'not_actionable', message: 'x' } }]),
+    )
+    const ac = new AbortController()
+    await requestSessionDraftStream(prepared(), {}, ac.signal)
+    const opts = fetchMock.mock.calls[0][1] as { signal?: AbortSignal }
+    expect(opts.signal).toBe(ac.signal)
   })
 })

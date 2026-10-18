@@ -2,7 +2,7 @@
 // network boundary is covered without any real provider or spend.
 
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1'
-import { callProvider, ProviderError, type ProviderConfig } from './provider.ts'
+import { callProvider, callProviderStream, ProviderError, type ProviderConfig } from './provider.ts'
 import { PROVIDER_MAX_TOKENS, PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
 import type { SessionDraftRequest } from './contract.ts'
 
@@ -199,4 +199,74 @@ Deno.test('callProvider maps an unexpected fetch failure to a network error', as
   } finally {
     restore()
   }
+})
+
+// --- Streaming variant ---
+
+async function readStringStream(stream: ReadableStream<string>): Promise<string> {
+  const reader = stream.getReader()
+  let out = ''
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      out += value
+    }
+  } catch (err) {
+    if (err instanceof ProviderError) return `ERROR:${err.kind}`
+    throw err
+  }
+  return out
+}
+
+Deno.test('callProviderStream yields text deltas reconstructed from OpenAI-style SSE', async () => {
+  const payload = { outcome: 'draft', draft: { schemaVersion: 1, session: { name: 'S' }, drills: [] } }
+  const json = JSON.stringify(payload)
+  const half = Math.floor(json.length / 2)
+  const sse =
+    `data: ${JSON.stringify({ choices: [{ delta: { role: 'assistant' } }] })}\n\n` +
+    `data: ${JSON.stringify({ choices: [{ delta: { content: json.slice(0, half) } }] })}\n\n` +
+    `data: ${JSON.stringify({ choices: [{ delta: { content: json.slice(half) } }] })}\n\n` +
+    `data: [DONE]\n\n`
+  const restore = stubFetch(() => Promise.resolve(new Response(sse, { status: 200 })))
+  try {
+    const got = await readStringStream(callProviderStream(request, config))
+    assertEquals(JSON.parse(got), payload)
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProviderStream requests a stream and bounded max_tokens', async () => {
+  let captured: { stream?: boolean; max_tokens?: number } | undefined
+  const restore = stubFetch((_url, init) => {
+    captured = JSON.parse(String(init?.body)) as { stream?: boolean; max_tokens?: number }
+    return Promise.resolve(
+      new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: '{"outcome":"not_actionable","message":"hi"}' } }] })}\n\n`, {
+        status: 200,
+      }),
+    )
+  })
+  try {
+    await readStringStream(callProviderStream(request, config))
+    assertEquals(captured?.stream, true)
+    assertEquals(captured?.max_tokens, config.maxTokens)
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProviderStream maps an upstream 429 to rate_limited', async () => {
+  const restore = stubFetch(() => Promise.resolve(new Response('slow', { status: 429, headers: { 'Retry-After': '42' } })))
+  try {
+    const got = await readStringStream(callProviderStream(request, config))
+    assertEquals(got, 'ERROR:rate_limited')
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProviderStream surfaces a missing-key error through the stream', async () => {
+  const got = await readStringStream(callProviderStream(request, { ...config, apiKey: '' }))
+  assertEquals(got, 'ERROR:network')
 })

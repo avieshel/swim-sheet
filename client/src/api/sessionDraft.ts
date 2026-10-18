@@ -1,4 +1,5 @@
 import { supabase, getCurrentUser } from './supabase'
+import { config } from '../config'
 import { createSessionDraftSeed } from '../../../shared/sessionDraft/seed'
 import { sanitizePrompt } from '../../../shared/sessionDraft/sanitize'
 import { buildSessionDraftContext } from '../services/sessionDraft/context'
@@ -180,6 +181,17 @@ function containsSwimmerName(result: HarnessResult, names: string[]): boolean {
   return texts.some((text) => lowered.some((name) => text.toLowerCase().includes(name)))
 }
 
+// Turn a server-validated harness result into the client-facing outcome,
+// including the privacy guard and the draft/not_actionable distinction.
+function shapeResult(value: unknown, knownSwimmerNames: string[]): SessionDraftResult {
+  const validation = validateHarnessResult(value)
+  if (!validation.ok) return { outcome: 'invalid', message: validation.error.message }
+  if (containsSwimmerName(validation.value, knownSwimmerNames)) return { outcome: 'privacy' }
+  return validation.value.outcome === 'draft'
+    ? { outcome: 'draft', draft: validation.value.draft }
+    : { outcome: 'not_actionable', message: validation.value.message }
+}
+
 export async function requestSessionDraft(prepared: PreparedSessionDraft): Promise<SessionDraftResult> {
   const body: SessionDraftRequest = {
     prompt: prepared.prompt,
@@ -200,15 +212,144 @@ export async function requestSessionDraft(prepared: PreparedSessionDraft): Promi
   const { data, error } = await supabase.functions.invoke('ai-session-harness', { body })
   if (error) return await mapInvokeError(error)
 
-  const validation = validateHarnessResult(data)
-  if (!validation.ok) return { outcome: 'invalid', message: validation.error.message }
-  if (containsSwimmerName(validation.value, prepared.knownSwimmerNames)) {
-    return { outcome: 'privacy' }
+  return shapeResult(data, prepared.knownSwimmerNames)
+}
+
+// Streaming counterpart. Negotiates `text/event-stream` so the harness returns
+// Server-Sent Events: incremental `delta` frames for a live preview, then a
+// final `done`/`error` frame. Used by the AI draft page for responsive UX; the
+// non-streaming `requestSessionDraft` remains for callers/tests that want JSON.
+export interface DraftStreamHandlers {
+  onDelta?: (text: string) => void
+  onDone?: (result: SessionDraftResult) => void
+  onError?: (result: SessionDraftResult) => void
+}
+
+interface StreamFrame {
+  type?: string
+  text?: string
+  result?: unknown
+  outcome?: string
+  retryAfterSeconds?: number
+  message?: string
+}
+
+function streamErrorToResult(frame: StreamFrame): SessionDraftResult {
+  switch (frame.outcome) {
+    case 'provider_rate_limited':
+    case 'rate_limited':
+      return {
+        outcome: frame.outcome,
+        retryAfterSeconds:
+          typeof frame.retryAfterSeconds === 'number' && frame.retryAfterSeconds > 0
+            ? frame.retryAfterSeconds
+            : defaultSessionDraftConfig.limits.rateLimitFallbackSeconds,
+      }
+    case 'invalid':
+      return { outcome: 'invalid', message: frame.message }
+    case 'timeout':
+      return { outcome: 'timeout' }
+    case 'provider':
+      return { outcome: 'provider' }
+    case 'network':
+      return { outcome: 'network' }
+    default:
+      return { outcome: 'network' }
+  }
+}
+
+export async function requestSessionDraftStream(
+  prepared: PreparedSessionDraft,
+  handlers: DraftStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const body: SessionDraftRequest = {
+    prompt: prepared.prompt,
+    seed: prepared.seed,
+    context: prepared.context,
+  }
+  const requestCheck = validateSessionDraftRequest(body)
+  if (!requestCheck.ok) {
+    handlers.onError?.({ outcome: 'invalid', message: requestCheck.message })
+    return
+  }
+  const user = getCurrentUser()
+  if (!user || user.is_anonymous) {
+    handlers.onError?.({ outcome: 'auth' })
+    return
   }
 
-  return validation.value.outcome === 'draft'
-    ? { outcome: 'draft', draft: validation.value.draft }
-    : { outcome: 'not_actionable', message: validation.value.message }
+  const url = `${config.getSupabaseUrl()}/functions/v1/ai-session-harness`
+  const anonKey = config.getSupabaseAnonKey()
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) {
+    handlers.onError?.({ outcome: 'auth' })
+    return
+  }
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${token}`,
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+  } catch {
+    handlers.onError?.({ outcome: 'network' })
+    return
+  }
+
+  if (!response.ok) {
+    handlers.onError?.(await mapInvokeError({ status: response.status, context: response }))
+    return
+  }
+
+  const resBody = response.body
+  if (!resBody) {
+    handlers.onError?.({ outcome: 'network' })
+    return
+  }
+
+  const reader = resBody.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      let sep: number
+      while ((sep = buffer.indexOf('\n\n')) >= 0) {
+        const block = buffer.slice(0, sep)
+        buffer = buffer.slice(sep + 2)
+        const line = block.split('\n').find((l) => l.startsWith('data:'))
+        if (!line) continue
+        const jsonStr = line.slice(5).trim()
+        let frame: StreamFrame
+        try {
+          frame = JSON.parse(jsonStr) as StreamFrame
+        } catch {
+          continue
+        }
+        if (frame.type === 'delta' && typeof frame.text === 'string') {
+          handlers.onDelta?.(frame.text)
+        } else if (frame.type === 'done' && frame.result !== undefined) {
+          handlers.onDone?.(shapeResult(frame.result, prepared.knownSwimmerNames))
+        } else if (frame.type === 'error') {
+          handlers.onError?.(streamErrorToResult(frame))
+        }
+      }
+    }
+  } catch {
+    handlers.onError?.({ outcome: 'network' })
+  }
 }
 
 // Persist an actionable draft as a local, unreviewed session.

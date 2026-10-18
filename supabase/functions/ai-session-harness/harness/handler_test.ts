@@ -23,10 +23,12 @@ const VALID_REQUEST = {
 const OK_BODY = JSON.stringify(VALID_REQUEST)
 
 function makeDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
+  const emptyStream = () => new ReadableStream<string>({ start(c) { c.close() } })
   return {
     verifyUser: () => Promise.resolve({ kind: 'authenticated', userId: 'u1' }),
     recordRequest: () => Promise.resolve({ allowed: true, retry_after_seconds: 0 }),
     runAgent: () => Promise.resolve({ outcome: 'draft', draft: validDraft }),
+    runAgentStream: emptyStream,
     ...overrides,
   }
 }
@@ -153,4 +155,99 @@ Deno.test('returns 502 for other agent failures', async () => {
   const res = await call(deps, makeRequest(OK_BODY))
   assertEquals(res.status, 502)
   assertEquals(res.body.error, 'provider_error')
+})
+
+// --- Streaming (SSE) path ---
+
+async function readFrames(res: Response): Promise<Array<Record<string, unknown>>> {
+  const reader = res.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  const frames: Array<Record<string, unknown>> = []
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let nl: number
+    while ((nl = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, nl)
+      buffer = buffer.slice(nl + 2)
+      const line = block.split('\n').find((l) => l.startsWith('data:'))
+      if (!line) continue
+      frames.push(JSON.parse(line.slice(5).trim()))
+    }
+  }
+  return frames
+}
+
+function streamRequest(body: string): Request {
+  return new Request('http://localhost/functions/v1/ai-session-harness', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer token',
+      Accept: 'text/event-stream',
+    },
+    body,
+  })
+}
+
+function deltaStream(parts: string[]): ReadableStream<string> {
+  return new ReadableStream<string>({
+    start(controller) {
+      for (const p of parts) controller.enqueue(p)
+      controller.close()
+    },
+  })
+}
+
+Deno.test('streams delta frames then a done frame with the validated draft', async () => {
+  const draft = { outcome: 'draft', draft: validDraft }
+  const deps = makeDeps({ runAgentStream: () => deltaStream(['{"outcome":"draft","d', 'raft":', JSON.stringify(validDraft), '}']) })
+  const res = await createHandler(deps)(streamRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  assertEquals(res.headers.get('Content-Type'), 'text/event-stream')
+  assertEquals(res.headers.get('access-control-allow-origin'), '*')
+  const frames = await readFrames(res)
+  const types = frames.map((f) => f.type)
+  assertEquals(types[0], 'delta')
+  assertEquals(types[types.length - 1], 'done')
+  const done = frames[frames.length - 1] as { result: Record<string, unknown> }
+  assertEquals(done.result.outcome, 'draft')
+  const joined = frames.filter((f) => f.type === 'delta').map((f) => (f as { text: string }).text).join('')
+  assertEquals(JSON.parse(joined), draft)
+})
+
+Deno.test('emits an error frame when the streamed text is not valid JSON', async () => {
+  const deps = makeDeps({ runAgentStream: () => deltaStream(['this is not json']) })
+  const res = await createHandler(deps)(streamRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  const frames = await readFrames(res)
+  const last = frames[frames.length - 1] as { type: string; outcome: string }
+  assertEquals(last.type, 'error')
+  assertEquals(last.outcome, 'invalid')
+})
+
+Deno.test('emits an error frame carrying the provider outcome on stream failure', async () => {
+  const deps = makeDeps({
+    runAgentStream: () =>
+      new ReadableStream<string>({
+        start(controller) {
+          controller.error(new ProviderError('unavailable', 'down'))
+        },
+      }),
+  })
+  const res = await createHandler(deps)(streamRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  const frames = await readFrames(res)
+  const last = frames[frames.length - 1] as { type: string; outcome: string }
+  assertEquals(last.type, 'error')
+  assertEquals(last.outcome, 'provider')
+})
+
+Deno.test('does not stream without the text/event-stream Accept header', async () => {
+  const deps = makeDeps({ runAgentStream: () => deltaStream(['ignored']) })
+  const res = await call(deps, makeRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  assertEquals(res.body.outcome, 'draft')
 })

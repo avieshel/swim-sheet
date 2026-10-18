@@ -37,7 +37,7 @@ function parseRetryAfterSeconds(header: string | null): number | undefined {
 // wrap the object in prose or a fenced code block. Try a strict parse first, then
 // recover the first balanced { ... } region. Anything recovered is still passed
 // through the strict draft validator, so this only tolerates formatting noise.
-function parseProviderJson(content: string): unknown {
+export function parseProviderJson(content: string): unknown {
   const trimmed = content.trim()
   try {
     return JSON.parse(trimmed)
@@ -172,4 +172,103 @@ export async function callProvider(
   } finally {
     clearTimeout(timer)
   }
+}
+
+// Streaming variant: opens an OpenAI-compatible stream (`stream: true`) and
+// yields the raw text deltas. The harness turns these into SSE frames for the
+// browser. `signal` (the request's abort signal) cancels the upstream call when
+// the client disconnects, so we never keep generating for a gone caller.
+export function callProviderStream(
+  request: SessionDraftRequest,
+  config: ProviderConfig,
+  signal?: AbortSignal,
+): ReadableStream<string> {
+  return new ReadableStream<string>({
+    async start(controller) {
+      if (!config.apiKey) {
+        controller.error(new ProviderError('network', 'provider API key is not configured'))
+        return
+      }
+      const systemPrompt = buildSystemPrompt(request.context)
+      const userContent = buildUserContent(request)
+      const body = {
+        model: config.model,
+        temperature: PROVIDER_TEMPERATURE,
+        response_format: { type: 'json_object' },
+        max_tokens: config.maxTokens,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userContent },
+        ],
+      }
+
+      const ac = new AbortController()
+      const onAbort = () => ac.abort()
+      signal?.addEventListener('abort', onAbort)
+      const timer = setTimeout(() => ac.abort(), getProviderTimeoutMs())
+      try {
+        const res = await fetch(`${config.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.apiKey}`,
+          },
+          body: JSON.stringify(body),
+          signal: ac.signal,
+        })
+        if (!res.ok) {
+          if (res.status === 429) {
+            throw new ProviderError(
+              'rate_limited',
+              'provider rate limited',
+              parseRetryAfterSeconds(res.headers.get('Retry-After')) ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
+            )
+          }
+          if (res.status === 503) throw new ProviderError('unavailable', `provider returned ${res.status}`)
+          throw new ProviderError('status', `provider returned ${res.status}`)
+        }
+        const resBody = res.body
+        if (!resBody) throw new ProviderError('network', 'provider returned no body')
+        const reader = resBody.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          let nl: number
+          while ((nl = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, nl).trim()
+            buffer = buffer.slice(nl + 1)
+            if (!line.startsWith('data:')) continue
+            const data = line.slice(5).trim()
+            if (data === '[DONE]') continue
+            try {
+              const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
+              const delta = parsed.choices?.[0]?.delta?.content
+              if (typeof delta === 'string' && delta.length > 0) controller.enqueue(delta)
+            } catch {
+              // Skip non-JSON SSE lines (comments, heartbeats, partial frames).
+            }
+          }
+        }
+        controller.close()
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          try {
+            controller.close()
+          } catch {
+            /* already closed */
+          }
+          return
+        }
+        if (err instanceof ProviderError) controller.error(err)
+        else controller.error(new ProviderError('network', err instanceof Error ? err.message : 'unknown network error'))
+      } finally {
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', onAbort)
+      }
+    },
+  })
 }

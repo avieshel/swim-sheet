@@ -7,7 +7,7 @@ import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 
 const navigate = vi.fn()
 const prepareSessionDraft = vi.fn()
-const requestSessionDraft = vi.fn()
+const requestSessionDraftStream = vi.fn()
 const applySessionDraft = vi.fn()
 const getUnreviewedSessionDraft = vi.fn()
 const keepSessionDraft = vi.fn()
@@ -23,7 +23,7 @@ vi.mock('../../context/AuthContext', () => ({
 
 vi.mock('../../api/sessionDraft', () => ({
   prepareSessionDraft: (...args: unknown[]) => prepareSessionDraft(...args),
-  requestSessionDraft: (...args: unknown[]) => requestSessionDraft(...args),
+  requestSessionDraftStream: (...args: unknown[]) => requestSessionDraftStream(...args),
   applySessionDraft: (...args: unknown[]) => applySessionDraft(...args),
   getUnreviewedSessionDraft: (...args: unknown[]) => getUnreviewedSessionDraft(...args),
   keepSessionDraft: (...args: unknown[]) => keepSessionDraft(...args),
@@ -76,7 +76,9 @@ async function generateDraft() {
 beforeEach(() => {
   navigate.mockReset()
   prepareSessionDraft.mockReset().mockResolvedValue(prepared)
-  requestSessionDraft.mockReset().mockResolvedValue({ outcome: 'draft', draft: sampleDraft })
+  requestSessionDraftStream.mockReset().mockImplementation(async (_prepared, handlers) => {
+    handlers.onDone({ outcome: 'draft', draft: sampleDraft })
+  })
   applySessionDraft.mockReset().mockResolvedValue({ outcome: 'created', sessionId: 'session-1' })
   getUnreviewedSessionDraft.mockReset().mockResolvedValue(null)
 })

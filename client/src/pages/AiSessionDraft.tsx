@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icon'
 import { DraftSessionPanel } from '../components/ai/DraftSessionPanel'
 import {
   prepareSessionDraft,
-  requestSessionDraft,
+  requestSessionDraftStream,
   applySessionDraft,
   getUnreviewedSessionDraft,
   keepSessionDraft,
@@ -58,6 +58,10 @@ export const AiSessionDraft: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<SessionDraftResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Live preview of the streamed model text, shown before the structured draft
+  // is finalized. Cleared on each new generation.
+  const [streamingText, setStreamingText] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
   // The proposal is staged here, not in the database: the coach fine-tunes it
   // beside the prompt and nothing is persisted until they confirm.
   const [draft, setDraft] = useState<SessionDraftV1 | null>(null)
@@ -164,15 +168,33 @@ export const AiSessionDraft: React.FC = () => {
     setLoading(true)
     setError(null)
     setResult(null)
+    setDraft(null)
+    setStreamingText('')
+    const ac = new AbortController()
+    abortRef.current = ac
     try {
-      const outcome = await requestSessionDraft({ ...prepared, prompt: editedPrompt })
-      setResult(outcome)
-      if (outcome.outcome === 'draft') setDraft(outcome.draft)
+      await requestSessionDraftStream(
+        { ...prepared, prompt: editedPrompt },
+        {
+          onDelta: (text) => setStreamingText((prev) => prev + text),
+          onDone: (outcome) => {
+            setResult(outcome)
+            if (outcome.outcome === 'draft') setDraft(outcome.draft)
+          },
+          onError: (outcome) => setResult(outcome),
+        },
+        ac.signal,
+      )
     } catch {
-      setError('Something went wrong reaching the AI service. Check your connection and try again.')
+      setResult({ outcome: 'network' })
     } finally {
       setLoading(false)
+      abortRef.current = null
     }
+  }
+
+  function handleCancel() {
+    abortRef.current?.abort()
   }
 
   async function handleSaveSession() {
@@ -279,6 +301,7 @@ export const AiSessionDraft: React.FC = () => {
                     setResult(null)
                     setError(null)
                     setDraft(null)
+                    setStreamingText('')
                   }}
                   disabled={loading}
                   className="px-6 py-3 border-2 border-outline text-on-surface rounded-xl font-bold"
@@ -341,6 +364,35 @@ export const AiSessionDraft: React.FC = () => {
               onDiscard={() => setDraft(null)}
               saving={loading}
             />
+          ) : loading && streamingText.length > 0 ? (
+            <div className="bg-surface-container-lowest rounded-2xl p-5 md:p-6 border border-outline-variant">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant">
+                  <Icon name="auto_awesome" size="sm" />
+                  Drafting…
+                </div>
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 border-2 border-outline text-on-surface rounded-xl font-bold text-label-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+              <pre className="whitespace-pre-wrap break-words font-mono text-label-sm text-on-surface bg-surface-container-low rounded-lg p-3 max-h-96 overflow-auto">
+                {streamingText}
+              </pre>
+            </div>
+          ) : loading ? (
+            <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-dashed border-outline-variant text-center">
+              <Icon name="hourglass_empty" size="xl" className="text-on-surface-variant animate-pulse" />
+              <p className="font-headline-md text-on-surface mt-3">Generating your draft…</p>
+              <button
+                onClick={handleCancel}
+                className="mt-4 px-5 py-2 border-2 border-outline text-on-surface rounded-xl font-bold text-label-sm"
+              >
+                Cancel
+              </button>
+            </div>
           ) : (
             <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-dashed border-outline-variant text-center">
               <Icon name="auto_awesome" size="xl" className="text-on-surface-variant" />

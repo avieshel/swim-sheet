@@ -2,7 +2,7 @@
 // Supabase and the agent; index.ts composes it with the handler.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { callProvider, getProviderConfig } from '../agent/provider.ts'
+import { callProvider, callProviderStream, getProviderConfig } from '../agent/provider.ts'
 import type { AuthOutcome, HandlerDeps, RateLimitInfo } from './handler.ts'
 
 type EnvGet = (key: string) => string | undefined
@@ -47,5 +47,7 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
     },
 
     runAgent: (request) => callProvider(request, getProviderConfig()),
+
+    runAgentStream: (request, signal) => callProviderStream(request, getProviderConfig(), signal),
   }
 }

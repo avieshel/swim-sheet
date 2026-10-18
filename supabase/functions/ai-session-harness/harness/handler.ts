@@ -6,11 +6,11 @@
 // handler_test.ts) and keeps the agent independently testable.
 
 import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from '../agent/config.ts'
-import { ProviderError } from '../agent/provider.ts'
+import { ProviderError, parseProviderJson } from '../agent/provider.ts'
 import { validateHarnessResult } from '../agent/output.ts'
 import { debugLog } from '../agent/debug.ts'
 import type { SessionDraftRequest } from '../agent/contract.ts'
-import { json, rateLimited } from './http.ts'
+import { json, rateLimited, CORS_HEADERS } from './http.ts'
 import { validateRequest } from './request.ts'
 
 export type AuthOutcome =
@@ -34,6 +34,101 @@ export interface HandlerDeps {
   // Run one structured-output agent call. The result is validated against the
   // shared contract before it is returned.
   runAgent(request: SessionDraftRequest): Promise<unknown>
+  // Streaming variant. Returns a text stream of provider deltas; the handler
+  // frames them as SSE and assembles the final validated draft on completion.
+  // `signal` lets an upstream cancel (client disconnect) stop generation.
+  runAgentStream(request: SessionDraftRequest, signal?: AbortSignal): ReadableStream<string>
+}
+
+// Map a provider failure to the client-facing outcome name used by the PWA's
+// result handler, so the SSE error frame and the JSON error body stay aligned.
+function providerErrorOutcome(err: ProviderError): { outcome: string; retryAfterSeconds?: number; message?: string } {
+  switch (err.kind) {
+    case 'timeout':
+      return { outcome: 'timeout' }
+    case 'rate_limited':
+      return { outcome: 'provider_rate_limited', retryAfterSeconds: err.retryAfterSeconds ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS }
+    case 'unavailable':
+      return { outcome: 'provider' }
+    case 'status':
+      return { outcome: 'provider' }
+    case 'network':
+      return { outcome: 'network' }
+    case 'shape':
+      return { outcome: 'invalid' }
+    default:
+      return { outcome: 'provider' }
+  }
+}
+
+// Build the SSE response. Streams provider deltas as `data: {"type":"delta",...}`
+// frames, then assembles the full text, validates it against the shared
+// contract, and emits a single `done` or `error` frame before closing.
+function streamResponse(deps: HandlerDeps, request: SessionDraftRequest, signal?: AbortSignal): Response {
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let full = ''
+      const send = (obj: unknown) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
+      }
+      try {
+        const deltas = deps.runAgentStream(request, signal)
+        const reader = deltas.getReader()
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          full += value
+          send({ type: 'delta', text: value })
+        }
+        if (signal?.aborted) {
+          // Client disconnected while we were finishing; nothing to send.
+          try {
+            controller.close()
+          } catch {
+            /* already closed */
+          }
+          return
+        }
+        const parsed = parseProviderJson(full)
+        if (parsed === undefined) {
+          send({ type: 'error', outcome: 'invalid', message: 'provider response was not valid JSON' })
+          controller.close()
+          return
+        }
+        const validation = validateHarnessResult(parsed)
+        if (!validation.ok) {
+          send({ type: 'error', outcome: 'invalid', message: validation.error.message })
+          controller.close()
+          return
+        }
+        send({ type: 'done', result: validation.value })
+        controller.close()
+      } catch (err) {
+        if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+          try {
+            controller.close()
+          } catch {
+            /* already closed */
+          }
+          return
+        }
+        const mapped = err instanceof ProviderError ? providerErrorOutcome(err) : { outcome: 'network' }
+        send({ type: 'error', ...mapped })
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      ...CORS_HEADERS,
+    },
+  })
 }
 
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {
@@ -75,6 +170,15 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     if (!rate) return deny('rate-limit-unavailable', json({ error: 'rate_limit_unavailable' }, 503))
     if (!rate.allowed) {
       return deny('rate-limited', rateLimited('rate_limited', rate.retry_after_seconds))
+    }
+
+    // 3.5. Streaming path. A caller that negotiates `text/event-stream` gets a
+    // Server-Sent-Events stream: incremental `delta` frames for a live preview,
+    // then a final `done` frame with the validated draft (or an `error` frame).
+    // The default JSON path below is unchanged, so non-streaming callers (and
+    // the eval pipeline) keep working.
+    if (req.headers.get('accept')?.includes('text/event-stream')) {
+      return streamResponse(deps, request.value, req.signal)
     }
 
     // 4. One structured-output agent call, validated before returning.
