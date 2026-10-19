@@ -39,7 +39,7 @@ Deno.test('callProvider rejects when the API key is missing', async () => {
 Deno.test('callProvider maps a non-2xx response to a status error', async () => {
   const restore = stubFetch(() => Promise.resolve(new Response('nope', { status: 500 })))
   try {
-    await assertRejects(() => callProvider(request, config), ProviderError, 'provider returned 500')
+    await assertRejects(() => callProvider(request, config), ProviderError, 'provider returned 500: nope')
   } finally {
     restore()
   }

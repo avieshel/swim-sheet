@@ -152,6 +152,11 @@ export async function callProvider(
     })
 
     if (!res.ok) {
+      // Capture the provider's error body so a 400/5xx carries the real reason
+      // ("model does not exist", "Unsupported parameter: 'temperature'", etc.)
+      // instead of an opaque status. This surfaces in the trace's error_message
+      // and the function logs, but is never sent to the client.
+      const body = await res.text().catch(() => '')
       if (res.status === 429) {
         throw new ProviderError(
           'rate_limited',
@@ -160,9 +165,9 @@ export async function callProvider(
         )
       }
       if (res.status === 503) {
-        throw new ProviderError('unavailable', `provider returned ${res.status}`)
+        throw new ProviderError('unavailable', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
       }
-      throw new ProviderError('status', `provider returned ${res.status}`)
+      throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
     }
 
     const json = (await res.json()) as ChatCompletionResponse
@@ -262,6 +267,7 @@ export function callProviderStream(
           signal: ac.signal,
         })
         if (!res.ok) {
+          const body = await res.text().catch(() => '')
           if (res.status === 429) {
             throw new ProviderError(
               'rate_limited',
@@ -269,8 +275,8 @@ export function callProviderStream(
               parseRetryAfterSeconds(res.headers.get('Retry-After')) ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
             )
           }
-          if (res.status === 503) throw new ProviderError('unavailable', `provider returned ${res.status}`)
-          throw new ProviderError('status', `provider returned ${res.status}`)
+          if (res.status === 503) throw new ProviderError('unavailable', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
+          throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
         }
         const resBody = res.body
         if (!resBody) throw new ProviderError('network', 'provider returned no body')
