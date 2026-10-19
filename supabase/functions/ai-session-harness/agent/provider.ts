@@ -168,7 +168,17 @@ export async function callProvider(
       throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`, undefined, res.status)
     }
 
-    const json = (await res.json()) as ChatCompletionResponse
+    // Read the body as text first so we can surface the raw payload when it is
+    // not usable JSON (a 200 with an error object, an empty completion, or a
+    // non-JSON body). res.json() would both hide that text and turn a bad body
+    // into an opaque network error.
+    const rawText = await res.text()
+    let json: ChatCompletionResponse
+    try {
+      json = JSON.parse(rawText) as ChatCompletionResponse
+    } catch {
+      throw new ProviderError('shape', `provider returned a non-JSON body: ${rawText.slice(0, 2000)}`, undefined, res.status)
+    }
     const content = json.choices?.[0]?.message?.content
     const elapsedMs = Math.round(performance.now() - startedAt)
 
@@ -180,13 +190,17 @@ export async function callProvider(
     })
 
     if (typeof content !== 'string' || content.trim().length === 0) {
-      throw new ProviderError('shape', 'provider response missing content')
+      // The model returned no usable text (empty completion, or the provider
+      // answered with an error object instead of choices). Surface the raw
+      // payload so the trace shows what the provider actually returned.
+      onMeta?.({ rawContent: rawText, providerStatus: res.status })
+      throw new ProviderError('shape', `provider response missing content: ${rawText.slice(0, 2000)}`, undefined, res.status)
     }
 
     const parsed = parseProviderJson(content)
     if (parsed === undefined) {
       onMeta?.({ rawContent: content, providerStatus: res.status })
-      throw new ProviderError('shape', 'provider response was not valid JSON')
+      throw new ProviderError('shape', 'provider response was not valid JSON', undefined, res.status)
     }
     onMeta?.({
       rawContent: content,

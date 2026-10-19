@@ -87,7 +87,7 @@ Four env vars control the provider, all optional and all falling back to the def
 
 | Variable | Default | Raise it when |
 |----------|---------|---------------|
-| `PROVIDER_MAX_TOKENS` | `2048` | a small model truncates the draft JSON mid-object |
+| `PROVIDER_MAX_TOKENS` | `4096` | a small model truncates the draft JSON mid-object |
 | `PROVIDER_TIMEOUT_MS` | `25000` | a large local model needs minutes to answer |
 | `PROVIDER_MODEL` | _(none — required)_ | the model is read only from this Supabase secret; the function fails if it is unset |
 | `PROVIDER_BASE_URL` | `https://api.openai.com/v1` | always set this locally |

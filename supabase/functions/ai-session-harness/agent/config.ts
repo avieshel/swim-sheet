@@ -8,7 +8,7 @@ export const PROVIDER_REQUEST_TIMEOUT_MS = 25_000
 
 // Upper bound on generated tokens. Small/local models (and some hosted defaults)
 // otherwise cap output low enough to truncate the draft JSON mid-object.
-export const PROVIDER_MAX_TOKENS = 2048
+export const PROVIDER_MAX_TOKENS = 4096
 
 // Retry delay reported to the client when the provider rate-limits us (429)
 // without its own Retry-After header. Provider tunable, not a contract limit.
