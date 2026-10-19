@@ -157,3 +157,20 @@ export function buildUserContent(request: SessionDraftRequest): string {
     JSON.stringify(request.seed),
   ].join('\n')
 }
+
+// Appended as a follow-up user turn when a prior attempt failed validation. It
+// restates the failure and the invalid response so the model can correct itself
+// instead of the harness giving up. Kept terse and free of swimmer data.
+export function buildCorrectionPrompt(error: string, priorResponse: string): string {
+  return [
+    'Your previous response could not be used, so this attempt must correct it.',
+    `Error: ${error}`,
+    'Your prior (invalid) response was:',
+    '```',
+    priorResponse,
+    '```',
+    'Return ONLY the corrected JSON object that satisfies the schema — no prose,',
+    'no commentary, no code fences. Fix the error above and keep everything else',
+    'valid.',
+  ].join('\n')
+}

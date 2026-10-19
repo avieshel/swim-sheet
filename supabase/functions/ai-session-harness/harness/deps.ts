@@ -2,7 +2,7 @@
 // Supabase and the agent; index.ts composes it with the handler.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { callProvider, callProviderStream, getProviderConfig, type ProviderMeta } from '../agent/provider.ts'
+import { ProviderError, callProvider, callProviderStream, getProviderConfig, type PriorAttempt, type ProviderMeta } from '../agent/provider.ts'
 import { createTraceEmitter } from '../analytics/emitter.ts'
 import type { AiTraceRecord } from '../analytics/types.ts'
 import type { AuthOutcome, HandlerDeps, RateLimitInfo } from './handler.ts'
@@ -35,6 +35,7 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
       p_parsed_outcome: row.parsed_outcome,
       p_error_kind: row.error_kind,
       p_error_message: row.error_message,
+      p_attempt_count: row.attempt_count,
       p_elapsed_ms: row.elapsed_ms,
       p_streamed: row.streamed,
       p_started_at: row.started_at,
@@ -81,22 +82,51 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
       return data
     },
 
-    runAgent: async (request) => {
+    runAgent: async (request, priorAttempt?: PriorAttempt) => {
       let meta: ProviderMeta = { rawContent: null }
-      const result = await callProvider(request, getProviderConfig(), undefined, (m) => {
-        meta = m
-      })
-      return {
-        result,
-        rawContent: meta.rawContent,
-        providerStatus: meta.providerStatus,
-        finishReason: meta.finishReason,
+      try {
+        const result = await callProvider(
+          request,
+          getProviderConfig(),
+          undefined,
+          (m) => {
+            meta = m
+          },
+          priorAttempt,
+        )
+        return {
+          result,
+          rawContent: meta.rawContent,
+          providerStatus: meta.providerStatus,
+          finishReason: meta.finishReason,
+          error: null,
+        }
+      } catch (err) {
+        if (err instanceof ProviderError) {
+          return {
+            result: null,
+            rawContent: meta.rawContent,
+            providerStatus: meta.providerStatus,
+            finishReason: meta.finishReason,
+            error: { kind: err.kind, message: err.message, retryAfterSeconds: err.retryAfterSeconds },
+          }
+        }
+        return {
+          result: null,
+          rawContent: meta.rawContent,
+          providerStatus: meta.providerStatus,
+          finishReason: meta.finishReason,
+          error: { kind: 'network', message: err instanceof Error ? err.message : 'network error' },
+        }
       }
     },
 
-    runAgentStream: (request, signal) => callProviderStream(request, getProviderConfig(), signal),
+    runAgentStream: (request, signal, priorAttempt?: PriorAttempt) =>
+      callProviderStream(request, getProviderConfig(), signal, priorAttempt),
 
     model: getProviderConfig().model,
+
+    maxAttempts: getProviderConfig().maxAttempts,
 
     recordTrace: (record) => emitter.record(record),
   }
