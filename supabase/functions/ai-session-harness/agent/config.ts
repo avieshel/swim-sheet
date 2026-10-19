@@ -5,7 +5,6 @@
 // so the agent and the client enforce identical boundaries.
 
 export const PROVIDER_REQUEST_TIMEOUT_MS = 25_000
-export const PROVIDER_TEMPERATURE = 0.4
 
 // Upper bound on generated tokens. Small/local models (and some hosted defaults)
 // otherwise cap output low enough to truncate the draft JSON mid-object.

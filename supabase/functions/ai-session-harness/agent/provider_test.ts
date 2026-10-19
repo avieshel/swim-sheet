@@ -103,10 +103,10 @@ Deno.test('callProvider maps a missing message to a shape error', async () => {
   }
 })
 
-Deno.test('callProvider sends a bounded max_tokens', async () => {
-  let captured: { max_tokens?: number } | undefined
+Deno.test('callProvider sends a bounded max_tokens and omits temperature', async () => {
+  let captured: { max_tokens?: number; temperature?: number } | undefined
   const restore = stubFetch((_url, init) => {
-    captured = JSON.parse(String(init?.body)) as { max_tokens?: number }
+    captured = JSON.parse(String(init?.body)) as { max_tokens?: number; temperature?: number }
     return Promise.resolve(
       new Response(JSON.stringify({ choices: [{ message: { content: '{"outcome":"not_actionable","message":"hi"}' } }] }), {
         status: 200,
@@ -117,6 +117,7 @@ Deno.test('callProvider sends a bounded max_tokens', async () => {
   try {
     await callProvider(request, config)
     assertEquals(captured?.max_tokens, config.maxTokens)
+    assertEquals(captured?.temperature, undefined)
   } finally {
     restore()
   }
@@ -237,10 +238,10 @@ Deno.test('callProviderStream yields text deltas reconstructed from OpenAI-style
   }
 })
 
-Deno.test('callProviderStream requests a stream and bounded max_tokens', async () => {
-  let captured: { stream?: boolean; max_tokens?: number } | undefined
+Deno.test('callProviderStream requests a stream with bounded max_tokens and omits temperature', async () => {
+  let captured: { stream?: boolean; max_tokens?: number; temperature?: number } | undefined
   const restore = stubFetch((_url, init) => {
-    captured = JSON.parse(String(init?.body)) as { stream?: boolean; max_tokens?: number }
+    captured = JSON.parse(String(init?.body)) as { stream?: boolean; max_tokens?: number; temperature?: number }
     return Promise.resolve(
       new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: '{"outcome":"not_actionable","message":"hi"}' } }] })}\n\n`, {
         status: 200,
@@ -251,6 +252,7 @@ Deno.test('callProviderStream requests a stream and bounded max_tokens', async (
     await readStringStream(callProviderStream(request, config))
     assertEquals(captured?.stream, true)
     assertEquals(captured?.max_tokens, config.maxTokens)
+    assertEquals(captured?.temperature, undefined)
   } finally {
     restore()
   }

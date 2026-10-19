@@ -8,7 +8,6 @@ import {
   getProviderMaxTokens,
   getProviderTimeoutMs,
   PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
-  PROVIDER_TEMPERATURE,
 } from './config.ts'
 import type { HarnessResult, SessionDraftRequest } from './contract.ts'
 import { debugLog } from './debug.ts'
@@ -125,7 +124,6 @@ export async function callProvider(
     }
     const body = {
       model: config.model,
-      temperature: PROVIDER_TEMPERATURE,
       response_format: { type: 'json_object' },
       max_tokens: config.maxTokens,
       messages,
@@ -134,7 +132,6 @@ export async function callProvider(
     debugLog('agent.provider.request', {
       url: `${config.baseUrl}/chat/completions`,
       model: config.model,
-      temperature: PROVIDER_TEMPERATURE,
       maxTokens: config.maxTokens,
       timeoutMs,
       systemPrompt,
@@ -154,9 +151,9 @@ export async function callProvider(
 
     if (!res.ok) {
       // Capture the provider's error body so a 400/5xx carries the real reason
-      // ("model does not exist", "Unsupported parameter: 'temperature'", etc.)
-      // instead of an opaque status. This surfaces in the trace's error_message
-      // and the function logs, but is never sent to the client.
+      // ("model does not exist", "Unsupported parameter", etc.) instead of an
+      // opaque status. This surfaces in the trace's error_message and the
+      // function logs, but is never sent to the client.
       const body = await res.text().catch(() => '')
       if (res.status === 429) {
         throw new ProviderError(
@@ -246,7 +243,6 @@ export function callProviderStream(
       }
       const body = {
         model: config.model,
-        temperature: PROVIDER_TEMPERATURE,
         response_format: { type: 'json_object' },
         max_tokens: config.maxTokens,
         stream: true,
