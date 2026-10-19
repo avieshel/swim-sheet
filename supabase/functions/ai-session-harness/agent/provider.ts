@@ -84,6 +84,17 @@ export function getProviderConfig(): ProviderConfig {
   }
 }
 
+// Best-effort host extraction for diagnostic messages. Never includes the API
+// key or path — just the authority — so a timeout can name the endpoint it
+// actually contacted (catching a stale or wrong PROVIDER_BASE_URL).
+function providerHost(baseUrl: string): string {
+  try {
+    return new URL(baseUrl).host
+  } catch {
+    return baseUrl
+  }
+}
+
 // Context handed back to the model on a retry: what went wrong and the (invalid)
 // response it produced. Lets the harness ask for a corrected attempt instead of
 // giving up on the first validation failure.
@@ -215,8 +226,8 @@ export async function callProvider(
       throw err
     }
     if (err instanceof DOMException && err.name === 'AbortError') {
-      debugLog('agent.provider.failed', { kind: 'timeout', message: 'provider request timed out' })
-      throw new ProviderError('timeout', 'provider request timed out')
+      debugLog('agent.provider.failed', { kind: 'timeout', message: `provider request timed out (host: ${providerHost(config.baseUrl)}, model: ${config.model})` })
+      throw new ProviderError('timeout', `provider request timed out (host: ${providerHost(config.baseUrl)}, model: ${config.model})`)
     }
     const message = err instanceof Error ? err.message : 'unknown network error'
     debugLog('agent.provider.failed', { kind: 'network', message })
@@ -235,6 +246,7 @@ export function callProviderStream(
   config: ProviderConfig,
   signal?: AbortSignal,
   priorAttempt?: PriorAttempt,
+  onMeta?: (meta: ProviderMeta) => void,
 ): ReadableStream<string> {
   return new ReadableStream<string>({
     async start(controller) {
@@ -266,7 +278,11 @@ export function callProviderStream(
       const ac = new AbortController()
       const onAbort = () => ac.abort()
       signal?.addEventListener('abort', onAbort)
-      const timer = setTimeout(() => ac.abort(), getProviderTimeoutMs())
+      let timedOut = false
+      const timer = setTimeout(() => {
+        timedOut = true
+        ac.abort()
+      }, getProviderTimeoutMs())
       try {
         const res = await fetch(`${config.baseUrl}/chat/completions`, {
           method: 'POST',
@@ -299,6 +315,8 @@ export function callProviderStream(
         // can be diagnosed from the trace instead of failing silently.
         let rawBody = ''
         let producedContent = false
+        let finishReason: string | undefined
+        let content = ''
         for (;;) {
           const { done, value } = await reader.read()
           if (done) break
@@ -313,10 +331,15 @@ export function callProviderStream(
             const data = line.slice(5).trim()
             if (data === '[DONE]') continue
             try {
-              const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
+              const parsed = JSON.parse(data) as {
+                choices?: Array<{ delta?: { content?: string }; finish_reason?: string }>
+              }
               const delta = parsed.choices?.[0]?.delta?.content
+              const fr = parsed.choices?.[0]?.finish_reason
+              if (fr) finishReason = fr
               if (typeof delta === 'string' && delta.length > 0) {
                 controller.enqueue(delta)
+                content += delta
                 producedContent = true
               }
             } catch {
@@ -329,9 +352,17 @@ export function callProviderStream(
           // the raw body so the trace shows what the provider actually sent.
           throw new ProviderError('shape', `stream produced no content: ${rawBody.slice(0, 2000)}`)
         }
+        onMeta?.({ providerStatus: res.status, finishReason, rawContent: content })
         controller.close()
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
+          if (timedOut) {
+            // The internal timeout fired: surface it as a timeout rather than
+            // masking it as an empty stream (which the caller would misread as
+            // a parse failure with a NULL raw_content).
+            controller.error(new ProviderError('timeout', `provider request timed out (host: ${providerHost(config.baseUrl)}, model: ${config.model})`))
+            return
+          }
           try {
             controller.close()
           } catch {

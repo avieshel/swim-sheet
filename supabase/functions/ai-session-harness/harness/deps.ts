@@ -135,8 +135,8 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
       }
     },
 
-    runAgentStream: (request, signal, priorAttempt?: PriorAttempt) =>
-      callProviderStream(request, getProviderConfig(), signal, priorAttempt),
+    runAgentStream: (request, signal, priorAttempt?, onMeta?) =>
+      callProviderStream(request, getProviderConfig(), signal, priorAttempt, onMeta),
 
     model: getProviderConfig().model,
 

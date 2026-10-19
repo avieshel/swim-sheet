@@ -2,7 +2,7 @@
 // network boundary is covered without any real provider or spend.
 
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1'
-import { callProvider, callProviderStream, ProviderError, type ProviderConfig } from './provider.ts'
+import { callProvider, callProviderStream, ProviderError, type ProviderConfig, type ProviderMeta } from './provider.ts'
 import { PROVIDER_MAX_ATTEMPTS, PROVIDER_MAX_TOKENS, PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
 import type { SessionDraftRequest } from './contract.ts'
 
@@ -280,4 +280,42 @@ Deno.test('callProviderStream maps an upstream 429 to rate_limited', async () =>
 Deno.test('callProviderStream surfaces a missing-key error through the stream', async () => {
   const got = await readStringStream(callProviderStream(request, { ...config, apiKey: '' }))
   assertEquals(got, 'ERROR:network')
+})
+
+Deno.test('callProviderStream reports provider status and finish reason via onMeta', async () => {
+  const payload = { outcome: 'draft', draft: { schemaVersion: 1, session: { name: 'S' }, drills: [] } }
+  const json = JSON.stringify(payload)
+  const sse =
+    `data: ${JSON.stringify({ choices: [{ delta: { role: 'assistant' } }] })}\n\n` +
+    `data: ${JSON.stringify({ choices: [{ delta: { content: json }, finish_reason: 'stop' }] })}\n\n` +
+    `data: [DONE]\n\n`
+  const metas: ProviderMeta[] = []
+  const restore = stubFetch(() => Promise.resolve(new Response(sse, { status: 200 })))
+  try {
+    await readStringStream(callProviderStream(request, config, undefined, undefined, (m) => metas.push(m)))
+    assertEquals(metas.length, 1)
+    assertEquals(metas[0].providerStatus, 200)
+    assertEquals(metas[0].finishReason, 'stop')
+  } finally {
+    restore()
+  }
+})
+
+Deno.test('callProviderStream surfaces an upstream timeout as a timeout error', async () => {
+  const prev = Deno.env.get('PROVIDER_TIMEOUT_MS')
+  Deno.env.set('PROVIDER_TIMEOUT_MS', '40')
+  const restore = stubFetch(
+    (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      }),
+  )
+  try {
+    const got = await readStringStream(callProviderStream(request, config))
+    assertEquals(got, 'ERROR:timeout')
+  } finally {
+    restore()
+    if (prev === undefined) Deno.env.delete('PROVIDER_TIMEOUT_MS')
+    else Deno.env.set('PROVIDER_TIMEOUT_MS', prev)
+  }
 })

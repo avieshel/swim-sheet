@@ -6,7 +6,7 @@
 // handler_test.ts) and keeps the agent independently testable.
 
 import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from '../agent/config.ts'
-import { PriorAttempt, ProviderError, ProviderErrorKind, parseProviderJson } from '../agent/provider.ts'
+import { PriorAttempt, ProviderError, ProviderErrorKind, ProviderMeta, parseProviderJson } from '../agent/provider.ts'
 import { buildSystemPrompt, buildUserContent } from '../agent/prompt.ts'
 import { validateHarnessResult } from '../agent/output.ts'
 import { debugLog } from '../agent/debug.ts'
@@ -59,7 +59,13 @@ export interface HandlerDeps {
   // Streaming variant. Returns a text stream of provider deltas; the handler
   // frames them as SSE and assembles the final validated draft on completion.
   // `signal` lets an upstream cancel (client disconnect) stop generation.
-  runAgentStream(request: SessionDraftRequest, signal?: AbortSignal, priorAttempt?: PriorAttempt): ReadableStream<string>
+  // `onMeta` surfaces provider metadata (status, finish reason) for the trace.
+  runAgentStream(
+    request: SessionDraftRequest,
+    signal?: AbortSignal,
+    priorAttempt?: PriorAttempt,
+    onMeta?: (meta: ProviderMeta) => void,
+  ): ReadableStream<string>
   // Provider model in use (for tracing only).
   model: string
   // Cap on validation retries (>= 1). Only JSON/contract failures are retried.
@@ -114,13 +120,20 @@ function streamResponse(
       let lastErr: ProviderError | null = null
       let lastKind = 'invalid'
       let lastMessage: string | null = null
+      let providerStatus: number | null = null
+      let finishReason: string | null = null
       while (attempt < deps.maxAttempts) {
         attempt++
         providerCalledAt = new Date().toISOString()
         let full = ''
         const deltas: string[] = []
         try {
-          const reader = deps.runAgentStream(request, signal, priorAttempt).getReader()
+          const reader = deps
+            .runAgentStream(request, signal, priorAttempt, (m) => {
+              providerStatus = m.providerStatus ?? null
+              finishReason = m.finishReason ?? null
+            })
+            .getReader()
           for (;;) {
             const { done, value } = await reader.read()
             if (done) break
@@ -140,6 +153,7 @@ function streamResponse(
           lastKind = err instanceof ProviderError ? err.kind : 'network'
           lastMessage = err instanceof Error ? err.message : null
           lastFull = full
+          providerStatus = lastErr?.status ?? providerStatus
           // A JSON-parse failure from the stream is retryable; everything else
           // (timeout/network/status/rate-limit/unavailable) is not.
           if (lastKind === 'shape') {
@@ -150,6 +164,8 @@ function streamResponse(
               parsed_outcome: null,
               error_kind: 'shape',
               error_message: lastMessage,
+              provider_status: providerStatus,
+              finish_reason: finishReason,
               attempt_count: attempt,
             })
             priorAttempt = { error: lastMessage ?? 'provider response was not valid JSON', response: full }
@@ -163,6 +179,8 @@ function streamResponse(
             parsed_outcome: null,
             error_kind: lastKind,
             error_message: lastMessage,
+            provider_status: providerStatus,
+            finish_reason: finishReason,
             attempt_count: attempt,
           })
           break
@@ -190,6 +208,8 @@ function streamResponse(
             parsed_outcome: null,
             error_kind: 'shape',
             error_message: lastMessage,
+            provider_status: providerStatus,
+            finish_reason: finishReason,
             attempt_count: attempt,
           })
           priorAttempt = { error: lastMessage, response: full }
@@ -208,6 +228,8 @@ function streamResponse(
             parsed_outcome: null,
             error_kind: 'invalid',
             error_message: validation.error.message,
+            provider_status: providerStatus,
+            finish_reason: finishReason,
             attempt_count: attempt,
           })
           priorAttempt = { error: validation.error.message, response: full }
@@ -222,6 +244,8 @@ function streamResponse(
           parsed_outcome: validation.value.outcome,
           error_kind: 'none',
           error_message: null,
+          provider_status: providerStatus,
+          finish_reason: finishReason,
           attempt_count: attempt,
         })
         send({ type: 'done', result: validation.value })
