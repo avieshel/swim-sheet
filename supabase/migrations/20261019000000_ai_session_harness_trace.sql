@@ -90,8 +90,8 @@ end;
 $$;
 
 revoke execute on function public.ai_analytics_trace_insert(
-  uuid, uuid, uuid, text, text, text, text, integer, text, text, text, text, integer, boolean, timestamptz, timestamptz, timestamptz
+  uuid, uuid, uuid, text, text, text, text, integer, text, text, text, text, integer, integer, boolean, timestamptz, timestamptz, timestamptz
 ) from public, anon, authenticated;
 grant execute on function public.ai_analytics_trace_insert(
-  uuid, uuid, uuid, text, text, text, text, integer, text, text, text, text, integer, boolean, timestamptz, timestamptz, timestamptz
+  uuid, uuid, uuid, text, text, text, text, integer, text, text, text, text, integer, integer, boolean, timestamptz, timestamptz, timestamptz
 ) to service_role;

@@ -42,7 +42,21 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
       p_provider_called_at: row.provider_called_at,
       p_completed_at: row.completed_at,
     })
-    if (error) throw error
+    if (error) {
+      // A trace-write failure must not break the AI path (the emitter swallows
+      // the rejection), but it should not be invisible either: a missing
+      // function, a grant/permission regression, or a column mismatch all show
+      // up here. Log to the function's error log with only non-sensitive
+      // identifiers — never prompt or raw model content.
+      console.error('[ai-harness] trace insert failed', {
+        code: error.code,
+        message: error.message,
+        user_id: row.user_id,
+        trace_id: row.trace_id,
+        session_id: row.session_id,
+      })
+      throw error
+    }
   }
 
   // Keep the trace write alive after the response is sent, without blocking it.
