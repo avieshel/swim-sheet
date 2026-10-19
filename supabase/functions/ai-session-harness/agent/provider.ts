@@ -294,6 +294,11 @@ export function callProviderStream(
         const reader = resBody.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
+        // Accumulate every SSE data payload so a stream that yields no usable
+        // content (an error event, an empty completion, or a non-content frame)
+        // can be diagnosed from the trace instead of failing silently.
+        let rawSse = ''
+        let producedContent = false
         for (;;) {
           const { done, value } = await reader.read()
           if (done) break
@@ -305,14 +310,23 @@ export function callProviderStream(
             if (!line.startsWith('data:')) continue
             const data = line.slice(5).trim()
             if (data === '[DONE]') continue
+            rawSse += data + '\n'
             try {
               const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
               const delta = parsed.choices?.[0]?.delta?.content
-              if (typeof delta === 'string' && delta.length > 0) controller.enqueue(delta)
+              if (typeof delta === 'string' && delta.length > 0) {
+                controller.enqueue(delta)
+                producedContent = true
+              }
             } catch {
               // Skip non-JSON SSE lines (comments, heartbeats, partial frames).
             }
           }
+        }
+        if (!producedContent) {
+          // The provider answered (200) but streamed no content deltas. Surface
+          // the raw SSE so the trace shows what the provider actually sent.
+          throw new ProviderError('shape', `stream produced no content: ${rawSse.slice(0, 2000)}`)
         }
         controller.close()
       } catch (err) {

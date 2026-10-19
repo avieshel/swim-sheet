@@ -258,6 +258,19 @@ Deno.test('callProviderStream requests a stream with bounded max_tokens and omit
   }
 })
 
+Deno.test('callProviderStream surfaces a no-content stream as a shape error with the raw SSE', async () => {
+  // A 200 stream that yields only an error event (no content deltas) must fail
+  // with a shape error rather than silently producing nothing.
+  const sse = `data: ${JSON.stringify({ error: { message: 'model overloaded' } })}\n\n`
+  const restore = stubFetch(() => Promise.resolve(new Response(sse, { status: 200 })))
+  try {
+    const got = await readStringStream(callProviderStream(request, config))
+    assertEquals(got, 'ERROR:shape')
+  } finally {
+    restore()
+  }
+})
+
 Deno.test('callProviderStream maps an upstream 429 to rate_limited', async () => {
   const restore = stubFetch(() => Promise.resolve(new Response('slow', { status: 429, headers: { 'Retry-After': '42' } })))
   try {
