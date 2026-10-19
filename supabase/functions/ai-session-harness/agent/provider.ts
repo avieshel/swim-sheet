@@ -200,7 +200,7 @@ export async function callProvider(
     const parsed = parseProviderJson(content)
     if (parsed === undefined) {
       onMeta?.({ rawContent: content, providerStatus: res.status })
-      throw new ProviderError('shape', 'provider response was not valid JSON', undefined, res.status)
+      throw new ProviderError('shape', `provider response was not valid JSON: ${content.slice(0, 1500)}`, undefined, res.status)
     }
     onMeta?.({
       rawContent: content,
@@ -294,15 +294,17 @@ export function callProviderStream(
         const reader = resBody.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
-        // Accumulate every SSE data payload so a stream that yields no usable
-        // content (an error event, an empty completion, or a non-content frame)
+        // Accumulate the entire raw stream body so a stream that yields no usable
+        // content (an empty completion, a non-SSE error body, or an error event)
         // can be diagnosed from the trace instead of failing silently.
-        let rawSse = ''
+        let rawBody = ''
         let producedContent = false
         for (;;) {
           const { done, value } = await reader.read()
           if (done) break
-          buffer += decoder.decode(value, { stream: true })
+          const chunk = decoder.decode(value, { stream: true })
+          buffer += chunk
+          rawBody += chunk
           let nl: number
           while ((nl = buffer.indexOf('\n')) >= 0) {
             const line = buffer.slice(0, nl).trim()
@@ -310,7 +312,6 @@ export function callProviderStream(
             if (!line.startsWith('data:')) continue
             const data = line.slice(5).trim()
             if (data === '[DONE]') continue
-            rawSse += data + '\n'
             try {
               const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
               const delta = parsed.choices?.[0]?.delta?.content
@@ -325,8 +326,8 @@ export function callProviderStream(
         }
         if (!producedContent) {
           // The provider answered (200) but streamed no content deltas. Surface
-          // the raw SSE so the trace shows what the provider actually sent.
-          throw new ProviderError('shape', `stream produced no content: ${rawSse.slice(0, 2000)}`)
+          // the raw body so the trace shows what the provider actually sent.
+          throw new ProviderError('shape', `stream produced no content: ${rawBody.slice(0, 2000)}`)
         }
         controller.close()
       } catch (err) {

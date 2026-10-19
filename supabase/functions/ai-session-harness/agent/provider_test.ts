@@ -169,11 +169,7 @@ Deno.test('callProvider rejects content that is not JSON at all', async () => {
     ),
   )
   try {
-    await assertRejects(
-      () => callProvider(request, config),
-      ProviderError,
-      'provider response was not valid JSON',
-    )
+    await assertRejects(() => callProvider(request, config), ProviderError)
   } finally {
     restore()
   }

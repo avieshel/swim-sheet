@@ -144,7 +144,7 @@ function streamResponse(
           // (timeout/network/status/rate-limit/unavailable) is not.
           if (lastKind === 'shape') {
             base.emit({
-              raw_content: full || null,
+              raw_content: full || lastMessage || null,
               provider_called_at: providerCalledAt,
               streamed: true,
               parsed_outcome: null,
@@ -157,7 +157,7 @@ function streamResponse(
           }
           // Hard failure: record this attempt, then stop.
           base.emit({
-            raw_content: full || null,
+            raw_content: full || lastMessage || null,
             provider_called_at: providerCalledAt,
             streamed: true,
             parsed_outcome: null,
@@ -180,7 +180,9 @@ function streamResponse(
           lastFull = full
           lastErr = null
           lastKind = 'shape'
-          lastMessage = 'provider response was not valid JSON'
+          // Include the offending text so the trace shows what the model
+          // actually returned, not just that it failed to parse.
+          lastMessage = `provider response was not valid JSON: ${full.slice(0, 1500)}`
           base.emit({
             raw_content: full || null,
             provider_called_at: providerCalledAt,
