@@ -7,8 +7,8 @@
 import {
   validateHarnessResult as validateHarnessResultFn,
   validateSessionDraft as validateSessionDraftFn,
-} from '../../../../shared/sessionDraft/validate.ts'
-import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
+} from '../shared/sessionDraft/validate.ts'
+import { defaultSessionDraftConfig } from '../shared/sessionDraft/config.ts'
 
 export function validateSessionDraft(input: unknown) {
   return validateSessionDraftFn(defaultSessionDraftConfig, input)

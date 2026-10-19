@@ -2,8 +2,8 @@
 
 import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { buildSystemPrompt, buildUserContent, buildExampleResult } from './prompt.ts'
-import { buildDraftJsonSchema } from '../../../../shared/sessionDraft/schema.ts'
-import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
+import { buildDraftJsonSchema } from '../shared/sessionDraft/schema.ts'
+import { defaultSessionDraftConfig } from '../shared/sessionDraft/config.ts'
 import { validateSessionDraft, validateHarnessResult } from './output.ts'
 import type { SessionDraftContext, SessionDraftRequest } from './contract.ts'
 

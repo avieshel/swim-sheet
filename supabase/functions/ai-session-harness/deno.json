@@ -1,5 +1,4 @@
 {
-  "nodeModulesDir": "auto",
   "tasks": {
     "check": "deno check index.ts",
     "test": "deno test --allow-env=PROVIDER_TIMEOUT_MS,PROVIDER_MAX_TOKENS,AGENT_DEBUG"

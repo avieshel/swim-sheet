@@ -19,4 +19,4 @@ export type {
   HarnessResult,
   RemovedCategory,
   SanitizedPrompt,
-} from '../../../../shared/sessionDraft/types.ts'
+} from '../shared/sessionDraft/types.ts'

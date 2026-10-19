@@ -8,9 +8,9 @@ import type {
   SessionDraftRequest,
   SessionDraftV1,
 } from './contract.ts'
-import type { IntensityV1 } from '../../../../shared/sessionDraft/types.ts'
-import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
-import { buildDraftJsonSchema } from '../../../../shared/sessionDraft/schema.ts'
+import type { IntensityV1 } from '../shared/sessionDraft/types.ts'
+import { defaultSessionDraftConfig } from '../shared/sessionDraft/config.ts'
+import { buildDraftJsonSchema } from '../shared/sessionDraft/schema.ts'
 
 // A complete, valid response built from the shared config. The system prompt
 // used to elide the inner draft as `{ ... }`, which left weaker models to guess

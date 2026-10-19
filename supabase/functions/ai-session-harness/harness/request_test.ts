@@ -2,7 +2,7 @@
 
 import { assertEquals } from 'jsr:@std/assert@1'
 import { validateRequest } from './request.ts'
-import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config.ts'
+import { defaultSessionDraftConfig } from '../shared/sessionDraft/config.ts'
 
 const baseSeed = { schemaVersion: 1, session: { name: '' }, drills: [] }
 const baseContext = { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: [], recentSessions: [] }
