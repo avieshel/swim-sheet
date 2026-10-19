@@ -223,7 +223,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     // on each outcome branch. Never blocks or throws into the request path.
     const traceBase: AiTraceRecord = {
       user_id: auth.userId,
-      analytics_session_id: validated.analyticsSessionId ?? null,
+      session_id: validated.analyticsSessionId ?? null,
       trace_id: validated.traceId ?? null,
       model: deps.model,
       system_prompt: buildSystemPrompt(validated.context),

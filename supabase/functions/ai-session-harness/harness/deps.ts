@@ -22,9 +22,9 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
   })
 
   async function insertTrace(row: AiTraceRecord): Promise<void> {
-    const { error } = await admin.rpc('ai_request_trace_insert', {
+    const { error } = await admin.rpc('ai_analytics_trace_insert', {
       p_user_id: row.user_id,
-      p_analytics_session_id: row.analytics_session_id,
+      p_session_id: row.session_id,
       p_trace_id: row.trace_id,
       p_model: row.model,
       p_system_prompt: row.system_prompt,

@@ -1,12 +1,12 @@
 // The owner-only AI-analytics trace record and sink contract.
 //
 // This is the single shape the handler emits and the emitter persists. Column
-// names are snake_case to match the `ai_private.ai_request_trace` table and the
-// `ai_request_trace_insert` RPC directly, so there is no per-call remapping.
+// names are snake_case to match the `ai_private.ai_analytics_trace` table and the
+// `ai_analytics_trace_insert` RPC directly, so there is no per-call remapping.
 
 export interface AiTraceRecord {
   user_id: string
-  analytics_session_id: string | null
+  session_id: string | null
   trace_id: string | null
   model: string
   system_prompt: string

@@ -6,7 +6,7 @@ import type { AiTraceRecord } from './types.ts'
 
 const record: AiTraceRecord = {
   user_id: 'u1',
-  analytics_session_id: null,
+  session_id: null,
   trace_id: null,
   model: 'm',
   system_prompt: 'sys',

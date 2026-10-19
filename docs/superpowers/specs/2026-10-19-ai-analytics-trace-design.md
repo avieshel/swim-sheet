@@ -30,24 +30,24 @@ handler (main logic)
    │  builds AiTraceRecord
    └─> deps.recordTrace(record)   // fire-and-forget
           └─> analytics/emitter  // schedules background write
-                 └─> RPC ai_request_trace_insert  (SECURITY DEFINER)
-                        └─> ai_private.ai_request_trace
+                 └─> RPC ai_analytics_trace_insert  (SECURITY DEFINER)
+                        └─> ai_private.ai_analytics_trace
 ```
 
 ## Data model (new migration, `ai_private` schema)
 
 Mirrors the existing `ai_private.ai_request_log` pattern: a private schema, a table, and a
 `SECURITY DEFINER` RPC executable only by `service_role`. The app owner queries
-`ai_private.ai_request_trace` directly via SQL / the Supabase dashboard.
+`ai_private.ai_analytics_trace` directly via SQL / the Supabase dashboard.
 
-`ai_private.ai_request_trace` columns:
+`ai_private.ai_analytics_trace` columns:
 
 | column | type | notes |
 |--------|------|-------|
 | id | bigint identity PK | |
 | created_at | timestamptz default now() | |
 | user_id | uuid | from auth |
-| analytics_session_id | uuid (nullable) | correlation key with the app's "regular" analytics (`analytics_events.session_id`) |
+| session_id | uuid (nullable) | correlation key with the app's "regular" analytics (`analytics_events.session_id`) |
 | trace_id | uuid (nullable) | per-request correlation id for AI-analytics insights |
 | model | text | provider model used |
 | system_prompt | text | assembled system prompt (no swimmer data by design) |
@@ -64,9 +64,9 @@ Mirrors the existing `ai_private.ai_request_log` pattern: a private schema, a ta
 | provider_called_at | timestamptz (nullable) | just before the provider call |
 | completed_at | timestamptz | request completion |
 
-Indexes: `(user_id, created_at desc)`, `(analytics_session_id)`, `(trace_id)`.
+Indexes: `(user_id, created_at desc)`, `(session_id)`, `(trace_id)`.
 
-RPC `public.ai_request_trace_insert(...)` with one parameter per column (explicit, no
+RPC `public.ai_analytics_trace_insert(...)` with one parameter per column (explicit, no
 `jsonb` plumbing), `security definer`, `set search_path = ai_private, pg_temp`; revoked
 from `public`/`anon`/`authenticated`, granted to `service_role`.
 
@@ -91,7 +91,7 @@ coach's prompt is already sanitized of swimmer data before it leaves the device.
 ## Handler integration
 
 - `HandlerDeps` gains `recordTrace: (record: AiTraceRecord) => void`.
-- After request validation, the handler builds a `traceBase` (user_id, analytics_session_id,
+- After request validation, the handler builds a `traceBase` (user_id, session_id,
   trace_id, model, system_prompt, user_content, started_at) and a local `emit(extra)` that
   finalizes elapsed_ms/completed_at and calls `recordTrace`.
 - `emit` is called on: client rate-limit denied, provider success, invalid-provider-response,
@@ -113,7 +113,7 @@ coach's prompt is already sanitized of swimmer data before it leaves the device.
 - `traceId?: string` — a fresh per-request uuid (client-generated via `uuidv7`).
 
 `validateSessionDraftRequest` permits these keys and bounds them (optional, string,
-≤ 64 chars, hex/dash only). They are not sent to the provider — only recorded for tracing.
+≤ 64 chars, a short token). They are not sent to the provider — only recorded for tracing.
 
 ## Client changes
 
@@ -135,7 +135,7 @@ coach's prompt is already sanitized of swimmer data before it leaves the device.
   success and on a timeout, with the expected fields. Update `runAgent` fakes to the new
   `{ result, rawContent, ... }` shape.
 - `client/.../validate.test.ts` — optional correlation ids are accepted; junk is rejected.
-- `supabase/tests/ai_trace_check.sql` — mirrors `ai_rate_limit_check.sql`: asserts the table
+- `supabase/tests/ai_analytics_trace_check.sql` — mirrors `ai_rate_limit_check.sql`: asserts the table
   exists in `ai_private` and the RPC is executable by `service_role` but not `anon`/`authenticated`.
 - `deno task check` + `deno task test` (Edge Function) and `npm run check` (client) must pass.
 
@@ -145,7 +145,7 @@ After deploy, the app owner can inspect AI requests with e.g.:
 
 ```sql
 select created_at, error_kind, elapsed_ms, parsed_outcome, left(raw_content, 80) as raw
-from ai_private.ai_request_trace
+from ai_private.ai_analytics_trace
 order by created_at desc
 limit 50;
 ```
