@@ -120,7 +120,7 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
           return {
             result: null,
             rawContent: meta.rawContent,
-            providerStatus: meta.providerStatus,
+            providerStatus: err.status,
             finishReason: meta.finishReason,
             error: { kind: err.kind, message: err.message, retryAfterSeconds: err.retryAfterSeconds },
           }

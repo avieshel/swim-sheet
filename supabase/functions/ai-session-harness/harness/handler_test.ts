@@ -324,9 +324,15 @@ Deno.test('retries validation failures up to the cap then succeeds', async () =>
   assertEquals(res.status, 200)
   assertEquals(res.body.outcome, 'draft')
   assertEquals(calls, 3)
-  assertEquals(traces.length, 1)
-  assertEquals(traces[0].attempt_count, 3)
-  assertEquals(traces[0].parsed_outcome, 'draft')
+  // One trace row per attempt: two validation failures, then the success.
+  assertEquals(traces.length, 3)
+  assertEquals(traces[0].error_kind, 'invalid')
+  assertEquals(traces[0].attempt_count, 1)
+  assertEquals(traces[1].error_kind, 'invalid')
+  assertEquals(traces[1].attempt_count, 2)
+  const success = traces[2]
+  assertEquals(success.attempt_count, 3)
+  assertEquals(success.parsed_outcome, 'draft')
 })
 
 Deno.test('gives up after maxAttempts validation failures', async () => {
@@ -345,10 +351,12 @@ Deno.test('gives up after maxAttempts validation failures', async () => {
   assertEquals(res.status, 502)
   assertEquals(res.body.error, 'invalid_provider_response')
   assertEquals(calls, 5)
-  assertEquals(traces.length, 1)
-  assertEquals(traces[0].attempt_count, 5)
-  assertEquals(traces[0].error_kind, 'invalid')
-  assertEquals(traces[0].raw_content, 'bad-5')
+  // One trace row per attempt (each a validation failure), sharing trace_id.
+  assertEquals(traces.length, 5)
+  const last = traces[4]
+  assertEquals(last.attempt_count, 5)
+  assertEquals(last.error_kind, 'invalid')
+  assertEquals(last.raw_content, 'bad-5')
 })
 
 Deno.test('records the raw provider response on a contract validation failure', async () => {
@@ -361,9 +369,13 @@ Deno.test('records the raw provider response on a contract validation failure', 
     },
   })
   await call(deps, makeRequest(OK_BODY))
-  assertEquals(traces.length, 1)
-  assertEquals(traces[0].raw_content, '{"outcome":"draft","draft":{"bad":true}}')
-  assertEquals(traces[0].error_kind, 'invalid')
+  // The handler retries contract validation failures up to maxAttempts, so each
+  // attempt is its own trace row (sharing trace_id). The last one carries the
+  // raw provider response that failed validation.
+  assertEquals(traces.length, 5)
+  const last = traces[4]
+  assertEquals(last.raw_content, '{"outcome":"draft","draft":{"bad":true}}')
+  assertEquals(last.error_kind, 'invalid')
 })
 
 Deno.test('retries invalid-JSON failures and records the last raw response', async () => {
@@ -381,9 +393,11 @@ Deno.test('retries invalid-JSON failures and records the last raw response', asy
   const res = await call(deps, makeRequest(OK_BODY))
   assertEquals(res.status, 502)
   assertEquals(calls, 5)
-  assertEquals(traces.length, 1)
-  assertEquals(traces[0].error_kind, 'shape')
-  assertEquals(traces[0].raw_content, 'garbage-5')
-  assertEquals(traces[0].attempt_count, 5)
+  // One trace row per invalid-JSON attempt, sharing trace_id.
+  assertEquals(traces.length, 5)
+  const last = traces[4]
+  assertEquals(last.error_kind, 'shape')
+  assertEquals(last.raw_content, 'garbage-5')
+  assertEquals(last.attempt_count, 5)
 })
 

@@ -29,6 +29,7 @@ export class ProviderError extends Error {
     public readonly kind: ProviderErrorKind,
     message: string,
     public readonly retryAfterSeconds?: number,
+    public readonly status?: number,
   ) {
     super(message)
     this.name = 'ProviderError'
@@ -165,9 +166,9 @@ export async function callProvider(
         )
       }
       if (res.status === 503) {
-        throw new ProviderError('unavailable', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
+        throw new ProviderError('unavailable', `provider returned ${res.status}: ${body.slice(0, 2000)}`, undefined, res.status)
       }
-      throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
+      throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`, undefined, res.status)
     }
 
     const json = (await res.json()) as ChatCompletionResponse
@@ -275,8 +276,8 @@ export function callProviderStream(
               parseRetryAfterSeconds(res.headers.get('Retry-After')) ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
             )
           }
-          if (res.status === 503) throw new ProviderError('unavailable', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
-          throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`)
+          if (res.status === 503) throw new ProviderError('unavailable', `provider returned ${res.status}: ${body.slice(0, 2000)}`, undefined, res.status)
+          throw new ProviderError('status', `provider returned ${res.status}: ${body.slice(0, 2000)}`, undefined, res.status)
         }
         const resBody = res.body
         if (!resBody) throw new ProviderError('network', 'provider returned no body')

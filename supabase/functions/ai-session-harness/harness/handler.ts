@@ -143,9 +143,28 @@ function streamResponse(
           // A JSON-parse failure from the stream is retryable; everything else
           // (timeout/network/status/rate-limit/unavailable) is not.
           if (lastKind === 'shape') {
+            base.emit({
+              raw_content: full || null,
+              provider_called_at: providerCalledAt,
+              streamed: true,
+              parsed_outcome: null,
+              error_kind: 'shape',
+              error_message: lastMessage,
+              attempt_count: attempt,
+            })
             priorAttempt = { error: lastMessage ?? 'provider response was not valid JSON', response: full }
             continue
           }
+          // Hard failure: record this attempt, then stop.
+          base.emit({
+            raw_content: full || null,
+            provider_called_at: providerCalledAt,
+            streamed: true,
+            parsed_outcome: null,
+            error_kind: lastKind,
+            error_message: lastMessage,
+            attempt_count: attempt,
+          })
           break
         }
         if (signal?.aborted) {
@@ -162,6 +181,15 @@ function streamResponse(
           lastErr = null
           lastKind = 'shape'
           lastMessage = 'provider response was not valid JSON'
+          base.emit({
+            raw_content: full || null,
+            provider_called_at: providerCalledAt,
+            streamed: true,
+            parsed_outcome: null,
+            error_kind: 'shape',
+            error_message: lastMessage,
+            attempt_count: attempt,
+          })
           priorAttempt = { error: lastMessage, response: full }
           continue
         }
@@ -171,6 +199,15 @@ function streamResponse(
           lastErr = null
           lastKind = 'invalid'
           lastMessage = validation.error.message
+          base.emit({
+            raw_content: full || null,
+            provider_called_at: providerCalledAt,
+            streamed: true,
+            parsed_outcome: null,
+            error_kind: 'invalid',
+            error_message: validation.error.message,
+            attempt_count: attempt,
+          })
           priorAttempt = { error: validation.error.message, response: full }
           continue
         }
@@ -189,15 +226,8 @@ function streamResponse(
         controller.close()
         return
       }
-      base.emit({
-        raw_content: lastFull || null,
-        provider_called_at: providerCalledAt,
-        streamed: true,
-        parsed_outcome: null,
-        error_kind: lastErr ? lastErr.kind : lastKind,
-        error_message: lastMessage,
-        attempt_count: attempt,
-      })
+      // Each attempt above already landed its own trace row; send the final
+      // error frame to the client without a redundant terminal emit.
       const mapped = lastErr ? providerErrorOutcome(lastErr) : { outcome: 'invalid' }
       send({ type: 'error', ...mapped })
       controller.close()
@@ -319,8 +349,18 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       const agent = await deps.runAgent(validated, priorAttempt)
       lastAgent = agent
       if (agent.error) {
-        // A provider-level error. Only an invalid-JSON (`shape`) response is
-        // worth re-prompting; the rest are hard failures.
+        // A provider-level error. Record this attempt as its own trace row, then
+        // either re-prompt on invalid JSON (`shape`) or stop on a hard failure.
+        emit({
+          raw_content: agent.rawContent,
+          provider_status: agent.providerStatus ?? null,
+          finish_reason: agent.finishReason ?? null,
+          parsed_outcome: null,
+          error_kind: agent.error.kind,
+          error_message: agent.error.message,
+          provider_called_at: providerCalledAt,
+          attempt_count: attempt,
+        })
         if (agent.error.kind === 'shape') {
           priorAttempt = { error: agent.error.message, response: agent.rawContent ?? '' }
           continue
@@ -343,22 +383,25 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       }
       lastContractError = validation.error.message
       priorAttempt = { error: validation.error.message, response: agent.rawContent ?? '' }
+      // The model answered but the contract rejected it. Record this attempt as
+      // its own trace row so a retry chain shows one row per call (sharing the
+      // request's trace_id), then re-prompt with the failure context.
+      emit({
+        raw_content: agent.rawContent,
+        provider_status: agent.providerStatus ?? null,
+        finish_reason: agent.finishReason ?? null,
+        parsed_outcome: null,
+        error_kind: 'invalid',
+        error_message: validation.error.message,
+        provider_called_at: providerCalledAt,
+        attempt_count: attempt,
+      })
     }
-    // Exhausted retries, or a hard provider error. The trace carries the last
-    // attempt's raw output and the failure that ended the run.
+    // Every attempt above already landed its own trace row (one per LLM call),
+    // so there is nothing further to emit — only the HTTP reply to shape.
     const lastError = lastAgent?.error
     const kind = lastError?.kind ?? 'invalid'
     const message = lastError?.message ?? lastContractError
-    emit({
-      raw_content: lastAgent?.rawContent ?? null,
-      provider_status: lastAgent?.providerStatus ?? null,
-      finish_reason: lastAgent?.finishReason ?? null,
-      parsed_outcome: null,
-      error_kind: kind === 'invalid' ? 'invalid' : kind,
-      error_message: message,
-      provider_called_at: providerCalledAt,
-      attempt_count: attempt,
-    })
     if (kind === 'timeout') return deny('provider-timeout', json({ error: 'provider_timeout' }, 408))
     if (kind === 'rate_limited') {
       return deny('provider-rate-limited', rateLimited('provider_rate_limited', lastError?.retryAfterSeconds ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS))
