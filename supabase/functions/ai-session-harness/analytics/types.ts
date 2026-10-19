@@ -17,6 +17,7 @@ export interface AiTraceRecord {
   parsed_outcome: string | null
   error_kind: string | null
   error_message: string | null
+  attempt_count: number
   elapsed_ms: number
   streamed: boolean
   started_at: string

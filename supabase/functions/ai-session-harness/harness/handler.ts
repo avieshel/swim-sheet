@@ -6,7 +6,7 @@
 // handler_test.ts) and keeps the agent independently testable.
 
 import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from '../agent/config.ts'
-import { ProviderError, parseProviderJson } from '../agent/provider.ts'
+import { PriorAttempt, ProviderError, ProviderErrorKind, parseProviderJson } from '../agent/provider.ts'
 import { buildSystemPrompt, buildUserContent } from '../agent/prompt.ts'
 import { validateHarnessResult } from '../agent/output.ts'
 import { debugLog } from '../agent/debug.ts'
@@ -15,11 +15,23 @@ import type { AiTraceRecord } from '../analytics/types.ts'
 import { json, rateLimited, CORS_HEADERS } from './http.ts'
 import { validateRequest } from './request.ts'
 
+// What `runAgent` returns. `error` is set (and `result` is null) when the
+// provider call itself failed; a response that parses but fails the contract is a
+// *successful* provider call with `error: null` — the handler validates it and
+// decides whether to retry. Surfacing `rawContent` even on failure is what lets
+// the trace record the raw model output that caused a JSON/contract error.
+export interface RunAgentError {
+  kind: ProviderErrorKind
+  message: string
+  retryAfterSeconds?: number
+}
+
 export interface RunAgentResult {
   result: unknown
   rawContent: string | null
   providerStatus?: number
   finishReason?: string
+  error: RunAgentError | null
 }
 
 export type AuthOutcome =
@@ -41,14 +53,17 @@ export interface HandlerDeps {
   // rate-limit store is unavailable.
   recordRequest(userId: string): Promise<RateLimitInfo | null>
   // Run one structured-output agent call. The result is validated against the
-  // shared contract before it is returned.
-  runAgent(request: SessionDraftRequest): Promise<RunAgentResult>
+  // shared contract by the caller; `error` is set only on a provider-level
+  // failure. `priorAttempt` carries the previous failure context for a retry.
+  runAgent(request: SessionDraftRequest, priorAttempt?: PriorAttempt): Promise<RunAgentResult>
   // Streaming variant. Returns a text stream of provider deltas; the handler
   // frames them as SSE and assembles the final validated draft on completion.
   // `signal` lets an upstream cancel (client disconnect) stop generation.
-  runAgentStream(request: SessionDraftRequest, signal?: AbortSignal): ReadableStream<string>
+  runAgentStream(request: SessionDraftRequest, signal?: AbortSignal, priorAttempt?: PriorAttempt): ReadableStream<string>
   // Provider model in use (for tracing only).
   model: string
+  // Cap on validation retries (>= 1). Only JSON/contract failures are retried.
+  maxAttempts: number
   // Fire-and-forget owner-only AI-analytics trace. Never blocks or throws.
   recordTrace(record: AiTraceRecord): void
 }
@@ -74,9 +89,12 @@ function providerErrorOutcome(err: ProviderError): { outcome: string; retryAfter
   }
 }
 
-// Build the SSE response. Streams provider deltas as `data: {"type":"delta",...}`
-// frames, then assembles the full text, validates it against the shared
-// contract, and emits a single `done` or `error` frame before closing.
+// Build the SSE response. The harness retries validation failures (invalid JSON,
+// or a response that fails the contract) by re-calling the provider with the
+// failure context, up to `deps.maxAttempts` times. Each attempt's deltas are
+// buffered and only flushed to the client once an attempt validates, so the
+// browser never sees a failed attempt — it gets one `done` (on success) or one
+// `error` frame (after retries are exhausted or a hard failure).
 function streamResponse(
   deps: HandlerDeps,
   request: SessionDraftRequest,
@@ -86,22 +104,51 @@ function streamResponse(
   const encoder = new TextEncoder()
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let full = ''
-      const providerCalledAt = new Date().toISOString()
       const send = (obj: unknown) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
       }
-      try {
-        const deltas = deps.runAgentStream(request, signal)
-        const reader = deltas.getReader()
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          full += value
-          send({ type: 'delta', text: value })
+      let attempt = 0
+      let priorAttempt: PriorAttempt | undefined = undefined
+      let providerCalledAt = new Date().toISOString()
+      let lastFull = ''
+      let lastErr: ProviderError | null = null
+      let lastKind = 'invalid'
+      let lastMessage: string | null = null
+      while (attempt < deps.maxAttempts) {
+        attempt++
+        providerCalledAt = new Date().toISOString()
+        let full = ''
+        const deltas: string[] = []
+        try {
+          const reader = deps.runAgentStream(request, signal, priorAttempt).getReader()
+          for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            full += value
+            deltas.push(value)
+          }
+        } catch (err) {
+          if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+            try {
+              controller.close()
+            } catch {
+              /* already closed */
+            }
+            return
+          }
+          lastErr = err instanceof ProviderError ? err : null
+          lastKind = err instanceof ProviderError ? err.kind : 'network'
+          lastMessage = err instanceof Error ? err.message : null
+          lastFull = full
+          // A JSON-parse failure from the stream is retryable; everything else
+          // (timeout/network/status/rate-limit/unavailable) is not.
+          if (lastKind === 'shape') {
+            priorAttempt = { error: lastMessage ?? 'provider response was not valid JSON', response: full }
+            continue
+          }
+          break
         }
         if (signal?.aborted) {
-          // Client disconnected while we were finishing; nothing to record.
           try {
             controller.close()
           } catch {
@@ -111,64 +158,49 @@ function streamResponse(
         }
         const parsed = parseProviderJson(full)
         if (parsed === undefined) {
-          base.emit({
-            raw_content: full || null,
-            provider_called_at: providerCalledAt,
-            streamed: true,
-            parsed_outcome: null,
-            error_kind: 'invalid',
-            error_message: 'provider response was not valid JSON',
-          })
-          send({ type: 'error', outcome: 'invalid', message: 'provider response was not valid JSON' })
-          controller.close()
-          return
+          lastFull = full
+          lastErr = null
+          lastKind = 'shape'
+          lastMessage = 'provider response was not valid JSON'
+          priorAttempt = { error: lastMessage, response: full }
+          continue
         }
         const validation = validateHarnessResult(parsed)
         if (!validation.ok) {
-          base.emit({
-            raw_content: full || null,
-            provider_called_at: providerCalledAt,
-            streamed: true,
-            parsed_outcome: null,
-            error_kind: 'invalid',
-            error_message: validation.error.message,
-          })
-          send({ type: 'error', outcome: 'invalid', message: validation.error.message })
-          controller.close()
-          return
+          lastFull = full
+          lastErr = null
+          lastKind = 'invalid'
+          lastMessage = validation.error.message
+          priorAttempt = { error: validation.error.message, response: full }
+          continue
         }
+        // Success: flush the buffered deltas, then the validated result.
+        for (const d of deltas) send({ type: 'delta', text: d })
         base.emit({
-          raw_content: full || null,
+          raw_content: full,
           provider_called_at: providerCalledAt,
           streamed: true,
           parsed_outcome: validation.value.outcome,
           error_kind: 'none',
           error_message: null,
+          attempt_count: attempt,
         })
         send({ type: 'done', result: validation.value })
         controller.close()
-      } catch (err) {
-        if (signal?.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
-          try {
-            controller.close()
-          } catch {
-            /* already closed */
-          }
-          return
-        }
-        const kind = err instanceof ProviderError ? err.kind : 'network'
-        base.emit({
-          raw_content: full || null,
-          provider_called_at: providerCalledAt,
-          streamed: true,
-          parsed_outcome: null,
-          error_kind: kind,
-          error_message: err instanceof Error ? err.message : null,
-        })
-        const mapped = err instanceof ProviderError ? providerErrorOutcome(err) : { outcome: 'network' }
-        send({ type: 'error', ...mapped })
-        controller.close()
+        return
       }
+      base.emit({
+        raw_content: lastFull || null,
+        provider_called_at: providerCalledAt,
+        streamed: true,
+        parsed_outcome: null,
+        error_kind: lastErr ? lastErr.kind : lastKind,
+        error_message: lastMessage,
+        attempt_count: attempt,
+      })
+      const mapped = lastErr ? providerErrorOutcome(lastErr) : { outcome: 'invalid' }
+      send({ type: 'error', ...mapped })
+      controller.close()
     },
   })
 
@@ -234,6 +266,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       parsed_outcome: null,
       error_kind: null,
       error_message: null,
+      attempt_count: 0,
       elapsed_ms: 0,
       streamed: false,
       started_at: new Date(startedAtWall).toISOString(),
@@ -269,54 +302,70 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       return streamResponse(deps, validated, { emit }, req.signal)
     }
 
-    // 4. One structured-output agent call, validated before returning.
+    // 4. Run the agent, retrying validation failures (invalid JSON, or a
+    // response that fails the contract) by feeding the failure and the invalid
+    // response back to the model. Hard failures (timeout, network, rate-limit,
+    // unavailable, bad status) are not fixed by re-prompting, so they stop
+    // immediately. The raw model output is captured on every attempt so the
+    // trace records what actually caused each failure.
+    let attempt = 0
+    let priorAttempt: PriorAttempt | undefined = undefined
     let providerCalledAt: string | null = null
-    try {
+    let lastAgent: RunAgentResult | null = null
+    let lastContractError: string | null = null
+    while (attempt < deps.maxAttempts) {
+      attempt++
       providerCalledAt = new Date().toISOString()
-      const agent = await deps.runAgent(validated)
+      const agent = await deps.runAgent(validated, priorAttempt)
+      lastAgent = agent
+      if (agent.error) {
+        // A provider-level error. Only an invalid-JSON (`shape`) response is
+        // worth re-prompting; the rest are hard failures.
+        if (agent.error.kind === 'shape') {
+          priorAttempt = { error: agent.error.message, response: agent.rawContent ?? '' }
+          continue
+        }
+        break
+      }
       const validation = validateHarnessResult(agent.result)
-      if (!validation.ok) {
+      if (validation.ok) {
         emit({
           raw_content: agent.rawContent,
           provider_status: agent.providerStatus ?? null,
           finish_reason: agent.finishReason ?? null,
-          parsed_outcome: null,
-          error_kind: 'invalid',
-          error_message: validation.error.message,
+          parsed_outcome: validation.value.outcome,
+          error_kind: 'none',
+          error_message: null,
           provider_called_at: providerCalledAt,
+          attempt_count: attempt,
         })
-        return deny('invalid-provider-response', json({ error: 'invalid_provider_response' }, 502))
+        return json(validation.value, 200)
       }
-      emit({
-        raw_content: agent.rawContent,
-        provider_status: agent.providerStatus ?? null,
-        finish_reason: agent.finishReason ?? null,
-        parsed_outcome: validation.value.outcome,
-        error_kind: 'none',
-        error_message: null,
-        provider_called_at: providerCalledAt,
-      })
-      return json(validation.value, 200)
-    } catch (err) {
-      const kind = err instanceof ProviderError ? err.kind : 'network'
-      const message = err instanceof Error ? err.message : null
-      emit({
-        raw_content: null,
-        provider_status: null,
-        finish_reason: null,
-        parsed_outcome: null,
-        error_kind: kind,
-        error_message: message,
-        provider_called_at: providerCalledAt,
-      })
-      if (err instanceof ProviderError) {
-        if (err.kind === 'timeout') return deny('provider-timeout', json({ error: 'provider_timeout' }, 408))
-        if (err.kind === 'rate_limited') {
-          return deny('provider-rate-limited', rateLimited('provider_rate_limited', err.retryAfterSeconds ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS))
-        }
-        if (err.kind === 'unavailable') return deny('provider-unavailable', json({ error: 'provider_unavailable' }, 503))
-      }
-      return deny('provider-error', json({ error: 'provider_error' }, 502))
+      lastContractError = validation.error.message
+      priorAttempt = { error: validation.error.message, response: agent.rawContent ?? '' }
     }
+    // Exhausted retries, or a hard provider error. The trace carries the last
+    // attempt's raw output and the failure that ended the run.
+    const lastError = lastAgent?.error
+    const kind = lastError?.kind ?? 'invalid'
+    const message = lastError?.message ?? lastContractError
+    emit({
+      raw_content: lastAgent?.rawContent ?? null,
+      provider_status: lastAgent?.providerStatus ?? null,
+      finish_reason: lastAgent?.finishReason ?? null,
+      parsed_outcome: null,
+      error_kind: kind === 'invalid' ? 'invalid' : kind,
+      error_message: message,
+      provider_called_at: providerCalledAt,
+      attempt_count: attempt,
+    })
+    if (kind === 'timeout') return deny('provider-timeout', json({ error: 'provider_timeout' }, 408))
+    if (kind === 'rate_limited') {
+      return deny('provider-rate-limited', rateLimited('provider_rate_limited', lastError?.retryAfterSeconds ?? PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS))
+    }
+    if (kind === 'unavailable') return deny('provider-unavailable', json({ error: 'provider_unavailable' }, 503))
+    if (kind === 'shape') return deny('provider-error', json({ error: 'provider_error' }, 502))
+    if (kind === 'invalid') return deny('invalid-provider-response', json({ error: 'invalid_provider_response' }, 502))
+    return deny('provider-error', json({ error: 'provider_error' }, 502))
   }
 }

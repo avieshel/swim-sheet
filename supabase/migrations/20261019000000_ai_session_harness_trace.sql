@@ -28,6 +28,7 @@ create table if not exists ai_private.ai_analytics_trace (
   parsed_outcome text,
   error_kind text,
   error_message text,
+  attempt_count integer not null default 1,
   elapsed_ms integer not null,
   streamed boolean not null,
   started_at timestamptz not null,
@@ -58,6 +59,7 @@ create or replace function public.ai_analytics_trace_insert(
   p_parsed_outcome text,
   p_error_kind text,
   p_error_message text,
+  p_attempt_count integer,
   p_elapsed_ms integer,
   p_streamed boolean,
   p_started_at timestamptz,
@@ -78,11 +80,11 @@ begin
   insert into ai_private.ai_analytics_trace (
     user_id, session_id, trace_id, model, system_prompt, user_content,
     raw_content, provider_status, finish_reason, parsed_outcome, error_kind,
-    error_message, elapsed_ms, streamed, started_at, provider_called_at, completed_at
+    error_message, attempt_count, elapsed_ms, streamed, started_at, provider_called_at, completed_at
   ) values (
     p_user_id, p_session_id, p_trace_id, p_model, p_system_prompt, p_user_content,
     p_raw_content, p_provider_status, p_finish_reason, p_parsed_outcome, p_error_kind,
-    p_error_message, p_elapsed_ms, p_streamed, p_started_at, p_provider_called_at, p_completed_at
+    p_error_message, p_attempt_count, p_elapsed_ms, p_streamed, p_started_at, p_provider_called_at, p_completed_at
   );
 end;
 $$;

@@ -15,6 +15,12 @@ export const PROVIDER_MAX_TOKENS = 2048
 // without its own Retry-After header. Provider tunable, not a contract limit.
 export const PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS = 30
 
+// How many provider attempts the harness makes before giving up on a request.
+// Only validation failures (invalid JSON, or a response that fails the contract)
+// are retried — a bad status / timeout / network error is not fixed by
+// re-prompting, so those stop immediately. Overridable per deployment.
+export const PROVIDER_MAX_ATTEMPTS = 5
+
 function positiveIntFromEnv(key: string, fallback: number): number {
   const raw = Deno.env.get(key)
   const parsed = raw ? Number.parseInt(raw, 10) : NaN
@@ -31,4 +37,10 @@ export function getProviderMaxTokens(): number {
 // the default rather than disabling the timeout.
 export function getProviderTimeoutMs(): number {
   return positiveIntFromEnv('PROVIDER_TIMEOUT_MS', PROVIDER_REQUEST_TIMEOUT_MS)
+}
+
+// Overridable cap on validation retries (>= 1). Unusable values fall back to the
+// default rather than disabling retries entirely.
+export function getProviderMaxAttempts(): number {
+  return positiveIntFromEnv('PROVIDER_MAX_ATTEMPTS', PROVIDER_MAX_ATTEMPTS)
 }

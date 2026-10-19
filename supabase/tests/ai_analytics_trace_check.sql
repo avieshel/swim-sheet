@@ -1,1 +1,65 @@
--- Local verification for the owner-only AI-analytics trace.\n--\n-- Run against the local Supabase Postgres, e.g.:\n--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/ai_analytics_trace_check.sql\n--\n-- Exits non-zero (ON_ERROR_STOP) if any assertion fails.\n\ndo $$\ndeclare\n  v_user uuid := '22222222-2222-2222-2222-222222222222';\n  v_anon_ok boolean;\n  v_auth_ok boolean;\n  v_svc_ok boolean;\n  v_trace_id uuid := '33333333-3333-3333-3333-333333333333';\nbegin\n  -- Ensure a clean slate for the test user.\n  delete from ai_private.ai_analytics_trace where user_id = v_user;\n\n  -- Insert one row via the RPC (as the service_role caller would).\n  perform public.ai_analytics_trace_insert(\n    v_user, null, v_trace_id,\n    'gpt-4o-mini',\n    'system prompt',\n    'Prompt: a set',\n    '{\"outcome\":\"draft\"}',\n    200, null, 'draft', 'none', null,\n    1234, false,\n    now(), now(), now()\n  );\n\n  assert (\n    select count(*) = 1 from ai_private.ai_analytics_trace where user_id = v_user\n  ), 'expected exactly one trace row to be inserted';\n\n  assert (\n    select count(*) = 0 from ai_private.ai_analytics_trace where id is null\n  ), 'trace row must have an identity id';\n\n  -- Permission checks: anon/authenticated cannot call it; service_role can.\n  select has_function_privilege('anon', 'public.ai_analytics_trace_insert(uuid,uuid,uuid,text,text,text,text,integer,text,text,text,text,integer,boolean,timestamptz,timestamptz,timestamptz)'::regprocedure, 'execute')\n    into v_anon_ok;\n  select has_function_privilege('authenticated', 'public.ai_analytics_trace_insert(uuid,uuid,uuid,text,text,text,text,integer,text,text,text,text,integer,boolean,timestamptz,timestamptz,timestamptz)'::regprocedure, 'execute')\n    into v_auth_ok;\n  select has_function_privilege('service_role', 'public.ai_analytics_trace_insert(uuid,uuid,uuid,text,text,text,text,integer,text,text,text,text,integer,boolean,timestamptz,timestamptz,timestamptz)'::regprocedure, 'execute')\n    into v_svc_ok;\n\n  assert not v_anon_ok, 'anon must NOT be able to execute ai_analytics_trace_insert';\n  assert not v_auth_ok, 'authenticated must NOT be able to execute ai_analytics_trace_insert';\n  assert v_svc_ok, 'service_role must be able to execute ai_analytics_trace_insert';\n\n  -- The private table must not live in the public (API-exposed) schema.\n  assert (\n    select count(*) = 0 from pg_class c join pg_namespace n on n.oid = c.relnamespace\n    where n.nspname = 'public' and c.relname = 'ai_analytics_trace'\n  ), 'ai_analytics_trace must not be exposed in the public schema';\n\n  raise notice 'ai_analytics_trace_check: all assertions passed';\nend $$;\n
+-- Local verification for the owner-only AI-analytics trace.
+--
+-- Run against the local Supabase Postgres, e.g.:
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/ai_analytics_trace_check.sql
+--
+-- Exits non-zero (ON_ERROR_STOP) if any assertion fails.
+
+do $$
+declare
+  v_user uuid := '22222222-2222-2222-2222-222222222222';
+  v_anon_ok boolean;
+  v_auth_ok boolean;
+  v_svc_ok boolean;
+  v_trace_id uuid := '33333333-3333-3333-3333-333333333333';
+  v_attempt_count integer;
+begin
+  -- Ensure a clean slate for the test user.
+  delete from ai_private.ai_analytics_trace where user_id = v_user;
+
+  -- Insert one row via the RPC (as the service_role caller would).
+  perform public.ai_analytics_trace_insert(
+    v_user, null, v_trace_id,
+    'gpt-4o-mini',
+    'system prompt',
+    'Prompt: a set',
+    '{"outcome":"draft"}',
+    200, null, 'draft', 'none', null,
+    1,
+    1234, false,
+    now(), now(), now()
+  );
+
+  assert (
+    select count(*) = 1 from ai_private.ai_analytics_trace where user_id = v_user
+  ), 'expected exactly one trace row to be inserted';
+
+  assert (
+    select count(*) = 0 from ai_private.ai_analytics_trace where id is null
+  ), 'trace row must have an identity id';
+
+  -- attempt_count must be persisted.
+  select attempt_count into v_attempt_count
+    from ai_private.ai_analytics_trace where user_id = v_user;
+  assert v_attempt_count = 1, 'expected attempt_count to be persisted as 1';
+
+  -- Permission checks: anon/authenticated cannot call it; service_role can.
+  select has_function_privilege('anon', 'public.ai_analytics_trace_insert(uuid,uuid,uuid,text,text,text,text,integer,text,text,text,text,integer,integer,boolean,timestamptz,timestamptz,timestamptz)'::regprocedure, 'execute')
+    into v_anon_ok;
+  select has_function_privilege('authenticated', 'public.ai_analytics_trace_insert(uuid,uuid,uuid,text,text,text,text,integer,text,text,text,text,integer,integer,boolean,timestamptz,timestamptz,timestamptz)'::regprocedure, 'execute')
+    into v_auth_ok;
+  select has_function_privilege('service_role', 'public.ai_analytics_trace_insert(uuid,uuid,uuid,text,text,text,text,integer,text,text,text,text,integer,integer,boolean,timestamptz,timestamptz,timestamptz)'::regprocedure, 'execute')
+    into v_svc_ok;
+
+  assert not v_anon_ok, 'anon must NOT be able to execute ai_analytics_trace_insert';
+  assert not v_auth_ok, 'authenticated must NOT be able to execute ai_analytics_trace_insert';
+  assert v_svc_ok, 'service_role must be able to execute ai_analytics_trace_insert';
+
+  -- The private table must not live in the public (API-exposed) schema.
+  assert (
+    select count(*) = 0 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relname = 'ai_analytics_trace'
+  ), 'ai_analytics_trace must not be exposed in the public schema';
+
+  raise notice 'ai_analytics_trace_check: all assertions passed';
+end $$;

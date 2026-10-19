@@ -2,8 +2,9 @@
 // with JSON mode. The provider key is a Supabase secret and never reaches the
 // browser. Swapping providers later must keep the same HarnessResult shape.
 
-import { buildSystemPrompt, buildUserContent } from './prompt.ts'
+import { buildCorrectionPrompt, buildSystemPrompt, buildUserContent } from './prompt.ts'
 import {
+  getProviderMaxAttempts,
   getProviderMaxTokens,
   getProviderTimeoutMs,
   PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS,
@@ -70,6 +71,7 @@ export interface ProviderConfig {
   apiKey: string
   model: string
   maxTokens: number
+  maxAttempts: number
 }
 
 export function getProviderConfig(): ProviderConfig {
@@ -78,7 +80,16 @@ export function getProviderConfig(): ProviderConfig {
     apiKey: Deno.env.get('PROVIDER_API_KEY') ?? '',
     model: Deno.env.get('PROVIDER_MODEL') ?? 'gpt-4o-mini',
     maxTokens: getProviderMaxTokens(),
+    maxAttempts: getProviderMaxAttempts(),
   }
+}
+
+// Context handed back to the model on a retry: what went wrong and the (invalid)
+// response it produced. Lets the harness ask for a corrected attempt instead of
+// giving up on the first validation failure.
+export interface PriorAttempt {
+  error: string
+  response: string
 }
 
 interface ChatCompletionResponse {
@@ -90,6 +101,7 @@ export async function callProvider(
   config: ProviderConfig,
   timeoutMs = getProviderTimeoutMs(),
   onMeta?: (meta: ProviderMeta) => void,
+  priorAttempt?: PriorAttempt,
 ): Promise<HarnessResult> {
   if (!config.apiKey) {
     throw new ProviderError('network', 'provider API key is not configured')
@@ -100,15 +112,19 @@ export async function callProvider(
   try {
     const systemPrompt = buildSystemPrompt(request.context)
     const userContent = buildUserContent(request)
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ]
+    if (priorAttempt) {
+      messages.push({ role: 'user', content: buildCorrectionPrompt(priorAttempt.error, priorAttempt.response) })
+    }
     const body = {
       model: config.model,
       temperature: PROVIDER_TEMPERATURE,
       response_format: { type: 'json_object' },
       max_tokens: config.maxTokens,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
-      ],
+      messages,
     }
 
     debugLog('agent.provider.request', {
@@ -198,6 +214,7 @@ export function callProviderStream(
   request: SessionDraftRequest,
   config: ProviderConfig,
   signal?: AbortSignal,
+  priorAttempt?: PriorAttempt,
 ): ReadableStream<string> {
   return new ReadableStream<string>({
     async start(controller) {
@@ -207,16 +224,20 @@ export function callProviderStream(
       }
       const systemPrompt = buildSystemPrompt(request.context)
       const userContent = buildUserContent(request)
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ]
+      if (priorAttempt) {
+        messages.push({ role: 'user', content: buildCorrectionPrompt(priorAttempt.error, priorAttempt.response) })
+      }
       const body = {
         model: config.model,
         temperature: PROVIDER_TEMPERATURE,
         response_format: { type: 'json_object' },
         max_tokens: config.maxTokens,
         stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
+        messages,
       }
 
       const ac = new AbortController()

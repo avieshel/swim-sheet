@@ -3,7 +3,7 @@
 
 import { assertEquals, assertRejects } from 'jsr:@std/assert@1'
 import { callProvider, callProviderStream, ProviderError, type ProviderConfig } from './provider.ts'
-import { PROVIDER_MAX_TOKENS, PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
+import { PROVIDER_MAX_ATTEMPTS, PROVIDER_MAX_TOKENS, PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from './config.ts'
 import type { SessionDraftRequest } from './contract.ts'
 
 const request: SessionDraftRequest = {
@@ -18,7 +18,7 @@ const request: SessionDraftRequest = {
   },
 }
 
-const config: ProviderConfig = { baseUrl: 'https://example.test/v1', apiKey: 'k', model: 'm', maxTokens: PROVIDER_MAX_TOKENS }
+const config: ProviderConfig = { baseUrl: 'https://example.test/v1', apiKey: 'k', model: 'm', maxTokens: PROVIDER_MAX_TOKENS, maxAttempts: PROVIDER_MAX_ATTEMPTS }
 
 function stubFetch(impl: typeof fetch): () => void {
   const original = globalThis.fetch

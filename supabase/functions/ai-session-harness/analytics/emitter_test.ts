@@ -17,6 +17,7 @@ const record: AiTraceRecord = {
   parsed_outcome: null,
   error_kind: 'none',
   error_message: null,
+  attempt_count: 1,
   elapsed_ms: 1,
   streamed: false,
   started_at: new Date().toISOString(),

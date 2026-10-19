@@ -28,9 +28,10 @@ function makeDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
     verifyUser: () => Promise.resolve({ kind: 'authenticated', userId: 'u1' }),
     recordRequest: () => Promise.resolve({ allowed: true, retry_after_seconds: 0 }),
     runAgent: () =>
-      Promise.resolve({ result: { outcome: 'draft', draft: validDraft }, rawContent: null, providerStatus: 200, finishReason: 'stop' }),
+      Promise.resolve({ result: { outcome: 'draft', draft: validDraft }, rawContent: null, providerStatus: 200, finishReason: 'stop', error: null }),
     runAgentStream: emptyStream,
     model: 'gpt-4o-mini',
+    maxAttempts: 5,
     recordTrace: () => {},
     ...overrides,
   }
@@ -127,7 +128,7 @@ Deno.test('returns the agent draft on success', async () => {
 
 Deno.test('returns 502 when the agent output fails validation', async () => {
   const res = await call(
-    makeDeps({ runAgent: () => Promise.resolve({ result: { outcome: 'nope' }, rawContent: null }) }),
+    makeDeps({ runAgent: () => Promise.resolve({ result: { outcome: 'nope' }, rawContent: null, providerStatus: 200, finishReason: 'stop', error: null }) }),
     makeRequest(OK_BODY),
   )
   assertEquals(res.status, 502)
@@ -135,14 +136,14 @@ Deno.test('returns 502 when the agent output fails validation', async () => {
 })
 
 Deno.test('returns 408 when the agent times out', async () => {
-  const deps = makeDeps({ runAgent: () => Promise.reject(new ProviderError('timeout', 'slow')) })
+  const deps = makeDeps({ runAgent: () => Promise.resolve({ result: null, rawContent: null, error: { kind: 'timeout', message: 'slow' } }) })
   const res = await call(deps, makeRequest(OK_BODY))
   assertEquals(res.status, 408)
   assertEquals(res.body.error, 'provider_timeout')
 })
 
 Deno.test('returns 429 with the provider retry hint when the upstream rate-limits', async () => {
-  const deps = makeDeps({ runAgent: () => Promise.reject(new ProviderError('rate_limited', 'slow', 33)) })
+  const deps = makeDeps({ runAgent: () => Promise.resolve({ result: null, rawContent: null, error: { kind: 'rate_limited', message: 'slow', retryAfterSeconds: 33 } }) })
   const res = await createHandler(deps)(makeRequest(OK_BODY))
   assertEquals(res.status, 429)
   assertEquals(res.headers.get('Retry-After'), '33')
@@ -150,14 +151,14 @@ Deno.test('returns 429 with the provider retry hint when the upstream rate-limit
 })
 
 Deno.test('returns 503 when the provider is unavailable', async () => {
-  const deps = makeDeps({ runAgent: () => Promise.reject(new ProviderError('unavailable', 'down')) })
+  const deps = makeDeps({ runAgent: () => Promise.resolve({ result: null, rawContent: null, error: { kind: 'unavailable', message: 'down' } }) })
   const res = await call(deps, makeRequest(OK_BODY))
   assertEquals(res.status, 503)
   assertEquals(res.body.error, 'provider_unavailable')
 })
 
 Deno.test('returns 502 for other agent failures', async () => {
-  const deps = makeDeps({ runAgent: () => Promise.reject(new ProviderError('status', 'boom')) })
+  const deps = makeDeps({ runAgent: () => Promise.resolve({ result: null, rawContent: null, error: { kind: 'status', message: 'boom' } }) })
   const res = await call(deps, makeRequest(OK_BODY))
   assertEquals(res.status, 502)
   assertEquals(res.body.error, 'provider_error')
@@ -278,7 +279,7 @@ Deno.test('records a trace on success with the parsed outcome', async () => {
 Deno.test('records a trace on timeout', async () => {
   const traces: Array<Record<string, unknown>> = []
   const deps = makeDeps({
-    runAgent: () => Promise.reject(new ProviderError('timeout', 'slow')),
+    runAgent: () => Promise.resolve({ result: null, rawContent: null, error: { kind: 'timeout', message: 'slow' } }),
     recordTrace: (record) => {
       traces.push(record as unknown as Record<string, unknown>)
     },
@@ -300,5 +301,89 @@ Deno.test('records a trace on client rate-limit denial', async () => {
   await call(deps, makeRequest(OK_BODY))
   assertEquals(traces.length, 1)
   assertEquals(traces[0].error_kind, 'rate_limited')
+})
+
+// --- Retry loop ---
+
+Deno.test('retries validation failures up to the cap then succeeds', async () => {
+  let calls = 0
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    runAgent: () => {
+      calls++
+      if (calls < 3) {
+        return Promise.resolve({ result: { outcome: 'nope' }, rawContent: `bad-${calls}`, providerStatus: 200, finishReason: 'stop', error: null })
+      }
+      return Promise.resolve({ result: { outcome: 'draft', draft: validDraft }, rawContent: 'good', providerStatus: 200, finishReason: 'stop', error: null })
+    },
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  const res = await call(deps, makeRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  assertEquals(res.body.outcome, 'draft')
+  assertEquals(calls, 3)
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].attempt_count, 3)
+  assertEquals(traces[0].parsed_outcome, 'draft')
+})
+
+Deno.test('gives up after maxAttempts validation failures', async () => {
+  let calls = 0
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    runAgent: () => {
+      calls++
+      return Promise.resolve({ result: { outcome: 'nope' }, rawContent: `bad-${calls}`, providerStatus: 200, finishReason: 'stop', error: null })
+    },
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  const res = await call(deps, makeRequest(OK_BODY))
+  assertEquals(res.status, 502)
+  assertEquals(res.body.error, 'invalid_provider_response')
+  assertEquals(calls, 5)
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].attempt_count, 5)
+  assertEquals(traces[0].error_kind, 'invalid')
+  assertEquals(traces[0].raw_content, 'bad-5')
+})
+
+Deno.test('records the raw provider response on a contract validation failure', async () => {
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    runAgent: () =>
+      Promise.resolve({ result: { outcome: 'nope' }, rawContent: '{"outcome":"draft","draft":{"bad":true}}', providerStatus: 200, finishReason: 'stop', error: null }),
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  await call(deps, makeRequest(OK_BODY))
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].raw_content, '{"outcome":"draft","draft":{"bad":true}}')
+  assertEquals(traces[0].error_kind, 'invalid')
+})
+
+Deno.test('retries invalid-JSON failures and records the last raw response', async () => {
+  let calls = 0
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    runAgent: () => {
+      calls++
+      return Promise.resolve({ result: null, rawContent: `garbage-${calls}`, error: { kind: 'shape', message: 'provider response was not valid JSON' } })
+    },
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  const res = await call(deps, makeRequest(OK_BODY))
+  assertEquals(res.status, 502)
+  assertEquals(calls, 5)
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].error_kind, 'shape')
+  assertEquals(traces[0].raw_content, 'garbage-5')
+  assertEquals(traces[0].attempt_count, 5)
 })
 
