@@ -89,7 +89,7 @@ Four env vars control the provider, all optional and all falling back to the def
 |----------|---------|---------------|
 | `PROVIDER_MAX_TOKENS` | `2048` | a small model truncates the draft JSON mid-object |
 | `PROVIDER_TIMEOUT_MS` | `25000` | a large local model needs minutes to answer |
-| `PROVIDER_MODEL` | `gpt-4o-mini` | always set this locally |
+| `PROVIDER_MODEL` | _(none — required)_ | the model is read only from this Supabase secret; the function fails if it is unset |
 | `PROVIDER_BASE_URL` | `https://api.openai.com/v1` | always set this locally |
 
 For **Ollama**, the base URL must be `http://host.docker.internal:11434/v1`, not

@@ -78,7 +78,7 @@ export function getProviderConfig(): ProviderConfig {
   return {
     baseUrl: (Deno.env.get('PROVIDER_BASE_URL') ?? 'https://api.openai.com/v1').replace(/\/+$/, ''),
     apiKey: Deno.env.get('PROVIDER_API_KEY') ?? '',
-    model: Deno.env.get('PROVIDER_MODEL') ?? 'gpt-4o-mini',
+    model: Deno.env.get('PROVIDER_MODEL') ?? '',
     maxTokens: getProviderMaxTokens(),
     maxAttempts: getProviderMaxAttempts(),
   }
@@ -105,6 +105,9 @@ export async function callProvider(
 ): Promise<HarnessResult> {
   if (!config.apiKey) {
     throw new ProviderError('network', 'provider API key is not configured')
+  }
+  if (!config.model) {
+    throw new ProviderError('network', 'provider model is not configured')
   }
 
   const controller = new AbortController()
@@ -220,6 +223,10 @@ export function callProviderStream(
     async start(controller) {
       if (!config.apiKey) {
         controller.error(new ProviderError('network', 'provider API key is not configured'))
+        return
+      }
+      if (!config.model) {
+        controller.error(new ProviderError('network', 'provider model is not configured'))
         return
       }
       const systemPrompt = buildSystemPrompt(request.context)
