@@ -27,8 +27,11 @@ function makeDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
   return {
     verifyUser: () => Promise.resolve({ kind: 'authenticated', userId: 'u1' }),
     recordRequest: () => Promise.resolve({ allowed: true, retry_after_seconds: 0 }),
-    runAgent: () => Promise.resolve({ outcome: 'draft', draft: validDraft }),
+    runAgent: () =>
+      Promise.resolve({ result: { outcome: 'draft', draft: validDraft }, rawContent: null, providerStatus: 200, finishReason: 'stop' }),
     runAgentStream: emptyStream,
+    model: 'gpt-4o-mini',
+    recordTrace: () => {},
     ...overrides,
   }
 }
@@ -123,7 +126,10 @@ Deno.test('returns the agent draft on success', async () => {
 })
 
 Deno.test('returns 502 when the agent output fails validation', async () => {
-  const res = await call(makeDeps({ runAgent: () => Promise.resolve({ outcome: 'nope' }) }), makeRequest(OK_BODY))
+  const res = await call(
+    makeDeps({ runAgent: () => Promise.resolve({ result: { outcome: 'nope' }, rawContent: null }) }),
+    makeRequest(OK_BODY),
+  )
   assertEquals(res.status, 502)
   assertEquals(res.body.error, 'invalid_provider_response')
 })
@@ -251,3 +257,48 @@ Deno.test('does not stream without the text/event-stream Accept header', async (
   assertEquals(res.status, 200)
   assertEquals(res.body.outcome, 'draft')
 })
+
+// --- AI-analytics trace ---
+
+Deno.test('records a trace on success with the parsed outcome', async () => {
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  await call(deps, makeRequest(OK_BODY))
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].parsed_outcome, 'draft')
+  assertEquals(traces[0].error_kind, 'none')
+  assertEquals(traces[0].raw_content, null)
+  assertEquals(traces[0].streamed, false)
+})
+
+Deno.test('records a trace on timeout', async () => {
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    runAgent: () => Promise.reject(new ProviderError('timeout', 'slow')),
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  await call(deps, makeRequest(OK_BODY))
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].error_kind, 'timeout')
+  assertEquals(traces[0].parsed_outcome, null)
+})
+
+Deno.test('records a trace on client rate-limit denial', async () => {
+  const traces: Array<Record<string, unknown>> = []
+  const deps = makeDeps({
+    recordRequest: () => Promise.resolve({ allowed: false, retry_after_seconds: 7 }),
+    recordTrace: (record) => {
+      traces.push(record as unknown as Record<string, unknown>)
+    },
+  })
+  await call(deps, makeRequest(OK_BODY))
+  assertEquals(traces.length, 1)
+  assertEquals(traces[0].error_kind, 'rate_limited')
+})
+

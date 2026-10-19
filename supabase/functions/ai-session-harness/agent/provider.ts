@@ -14,6 +14,15 @@ import { debugLog } from './debug.ts'
 
 export type ProviderErrorKind = 'timeout' | 'status' | 'shape' | 'network' | 'rate_limited' | 'unavailable'
 
+// Side-channel metadata about a provider call, surfaced via the injected `onMeta`
+// callback so the harness can trace the raw model output without changing the
+// function's return type (the eval pipeline consumes the `HarnessResult` directly).
+export interface ProviderMeta {
+  rawContent: string | null
+  providerStatus?: number
+  finishReason?: string
+}
+
 export class ProviderError extends Error {
   constructor(
     public readonly kind: ProviderErrorKind,
@@ -80,6 +89,7 @@ export async function callProvider(
   request: SessionDraftRequest,
   config: ProviderConfig,
   timeoutMs = getProviderTimeoutMs(),
+  onMeta?: (meta: ProviderMeta) => void,
 ): Promise<HarnessResult> {
   if (!config.apiKey) {
     throw new ProviderError('network', 'provider API key is not configured')
@@ -153,8 +163,14 @@ export async function callProvider(
 
     const parsed = parseProviderJson(content)
     if (parsed === undefined) {
+      onMeta?.({ rawContent: content, providerStatus: res.status })
       throw new ProviderError('shape', 'provider response was not valid JSON')
     }
+    onMeta?.({
+      rawContent: content,
+      providerStatus: res.status,
+      finishReason: json.choices?.[0]?.finish_reason,
+    })
     debugLog('agent.provider.parsed', { outcome: (parsed as HarnessResult).outcome, elapsedMs })
     return parsed as HarnessResult
   } catch (err) {

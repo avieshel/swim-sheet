@@ -399,6 +399,33 @@ function validateRequestContext(config: SessionDraftConfig, value: unknown): Val
   }
 }
 
+// Correlation ids are owner-only tracing metadata, not model input. They are
+// optional and, when present, must be a short token. The bound is a defense
+// against payload abuse; the RPC insert is parameterized, so the check is about
+// size, not injection. A client may send a UUID (the normal case, enabling joins
+// with the app's regular analytics) or a non-UUID fallback such as the
+// analytics service's storage-unavailable sentinel.
+const CORRELATION_RE = /^[A-Za-z0-9_-]{1,64}$/
+
+function validateCorrelationId(value: unknown): ValidationOutcome<string | undefined> {
+  if (isAbsent(value)) return { ok: true, value: undefined }
+  if (typeof value !== 'string' || value.length === 0 || !CORRELATION_RE.test(value)) {
+    return fail('invalid_shape', 'correlation id must be a short hex/dash string')
+  }
+  return { ok: true, value }
+}
+
+function validateCorrelationIds(
+  sessionId: unknown,
+  traceId: unknown,
+): ValidationOutcome<{ analyticsSessionId?: string; traceId?: string }> {
+  const session = validateCorrelationId(sessionId)
+  if (!session.ok) return session
+  const trace = validateCorrelationId(traceId)
+  if (!trace.ok) return trace
+  return { ok: true, value: { analyticsSessionId: session.value, traceId: trace.value } }
+}
+
 export function validateSessionDraftRequest(
   config: SessionDraftConfig,
   input: unknown,
@@ -408,7 +435,7 @@ export function validateSessionDraftRequest(
   if (!isPlainObject(input)) {
     return { ok: false, reason: 'invalid_request', message: 'request must be an object' }
   }
-  if (!hasOnlyKeys(input, ['prompt', 'seed', 'context'])) {
+  if (!hasOnlyKeys(input, ['prompt', 'seed', 'context', 'analyticsSessionId', 'traceId'])) {
     return { ok: false, reason: 'invalid_request', message: 'request has an unsupported field' }
   }
   const prompt = input.prompt
@@ -422,9 +449,14 @@ export function validateSessionDraftRequest(
       message: `request.prompt exceeds ${config.limits.maxPromptLength} characters`,
     }
   }
+  const correlation = validateCorrelationIds(input.analyticsSessionId, input.traceId)
+  if (!correlation.ok) return { ok: false, reason: 'invalid_request', message: correlation.error.message }
   const seed = validateSeed(config, input.seed)
   if (!seed.ok) return { ok: false, reason: 'invalid_request', message: seed.error.message }
   const context = validateRequestContext(config, input.context)
   if (!context.ok) return { ok: false, reason: 'invalid_request', message: context.error.message }
-  return { ok: true, value: { prompt, seed: seed.value, context: context.value } }
+  return {
+    ok: true,
+    value: { prompt, seed: seed.value, context: context.value, ...correlation.value },
+  }
 }

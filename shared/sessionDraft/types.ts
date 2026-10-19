@@ -69,6 +69,11 @@ export interface SessionDraftRequest {
   prompt: string
   seed: SessionDraftSeedV1
   context: SessionDraftContext
+  // Correlation ids for the owner-only AI-analytics trace. `analyticsSessionId`
+  // joins this request to the app's "regular" analytics stream; `traceId` is a
+  // per-request key for AI-analytics insights. Neither is sent to the provider.
+  analyticsSessionId?: string
+  traceId?: string
 }
 
 export type HarnessResult =
