@@ -103,6 +103,10 @@ function getSessionLastActivity(): number {
   return 0
 }
 
+export function getAnalyticsSessionId(): string {
+  return getOrCreateSessionId()
+}
+
 export function isNewSession(): boolean {
   try {
     const sessionId = localStorage.getItem(SESSION_ID_KEY)

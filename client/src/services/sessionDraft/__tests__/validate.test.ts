@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateSessionDraft, validateHarnessResult, isValidPromptLength } from '../validate'
+import { validateSessionDraft, validateHarnessResult, isValidPromptLength, validateSessionDraftRequest } from '../validate'
 import type { SessionDraftV1 } from '../../../../../shared/sessionDraft/types'
 
 function validDrill() {
@@ -315,3 +315,51 @@ describe('isValidPromptLength', () => {
     expect(isValidPromptLength('x'.repeat(4001))).toBe(false)
   })
 })
+
+describe('validateSessionDraftRequest', () => {
+  function validRequest(overrides: Record<string, unknown> = {}): unknown {
+    return {
+      prompt: 'Plan a set',
+      seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
+      context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: [], recentSessions: [] },
+      ...overrides,
+    }
+  }
+
+  it('accepts a request without correlation ids', () => {
+    const result = validateSessionDraftRequest(validRequest())
+    expect(result.ok).toBe(true)
+  })
+
+  it('accepts a request with well-formed correlation ids', () => {
+    const result = validateSessionDraftRequest(
+      validRequest({
+        analyticsSessionId: '11111111-1111-1111-1111-111111111111',
+        traceId: '22222222-2222-2222-2222-222222222222',
+      }),
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.analyticsSessionId).toBe('11111111-1111-1111-1111-111111111111')
+      expect(result.value.traceId).toBe('22222222-2222-2222-2222-222222222222')
+    }
+  })
+
+  it('rejects an unknown top-level field', () => {
+    const result = validateSessionDraftRequest(validRequest({ extra: true }))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('invalid_request')
+  })
+
+  it('rejects a malformed correlation id', () => {
+    const result = validateSessionDraftRequest(validRequest({ traceId: 'not-a-uuid!!' }))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('invalid_request')
+  })
+
+  it('rejects an oversized correlation id', () => {
+    const result = validateSessionDraftRequest(validRequest({ traceId: 'a'.repeat(65) }))
+    expect(result.ok).toBe(false)
+  })
+})
+

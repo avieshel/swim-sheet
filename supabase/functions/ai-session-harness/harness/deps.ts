@@ -2,7 +2,9 @@
 // Supabase and the agent; index.ts composes it with the handler.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { callProvider, callProviderStream, getProviderConfig } from '../agent/provider.ts'
+import { callProvider, callProviderStream, getProviderConfig, type ProviderMeta } from '../agent/provider.ts'
+import { createTraceEmitter } from '../analytics/emitter.ts'
+import type { AiTraceRecord } from '../analytics/types.ts'
 import type { AuthOutcome, HandlerDeps, RateLimitInfo } from './handler.ts'
 
 type EnvGet = (key: string) => string | undefined
@@ -13,10 +15,43 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
   const serviceKey = env('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !supabaseAnonKey || !serviceKey) return null
 
-  // Service-role client for the private rate-limit store; never exposed.
+  // Service-role client for the private rate-limit store and the AI-analytics
+  // trace; never exposed.
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+  async function insertTrace(row: AiTraceRecord): Promise<void> {
+    const { error } = await admin.rpc('ai_analytics_trace_insert', {
+      p_user_id: row.user_id,
+      p_session_id: row.session_id,
+      p_trace_id: row.trace_id,
+      p_model: row.model,
+      p_system_prompt: row.system_prompt,
+      p_user_content: row.user_content,
+      p_raw_content: row.raw_content,
+      p_provider_status: row.provider_status,
+      p_finish_reason: row.finish_reason,
+      p_parsed_outcome: row.parsed_outcome,
+      p_error_kind: row.error_kind,
+      p_error_message: row.error_message,
+      p_elapsed_ms: row.elapsed_ms,
+      p_streamed: row.streamed,
+      p_started_at: row.started_at,
+      p_provider_called_at: row.provider_called_at,
+      p_completed_at: row.completed_at,
+    })
+    if (error) throw error
+  }
+
+  // Keep the trace write alive after the response is sent, without blocking it.
+  // `EdgeRuntime.waitUntil` is provided by the Supabase Edge Functions runtime.
+  function schedule(task: Promise<void>): void {
+    const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime
+    rt?.waitUntil?.(task)
+  }
+
+  const emitter = createTraceEmitter({ insertTrace, schedule })
 
   return {
     async verifyUser(input: { token: string; gatewayUserId?: string | null }): Promise<AuthOutcome> {
@@ -46,8 +81,23 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
       return data
     },
 
-    runAgent: (request) => callProvider(request, getProviderConfig()),
+    runAgent: async (request) => {
+      let meta: ProviderMeta = { rawContent: null }
+      const result = await callProvider(request, getProviderConfig(), undefined, (m) => {
+        meta = m
+      })
+      return {
+        result,
+        rawContent: meta.rawContent,
+        providerStatus: meta.providerStatus,
+        finishReason: meta.finishReason,
+      }
+    },
 
     runAgentStream: (request, signal) => callProviderStream(request, getProviderConfig(), signal),
+
+    model: getProviderConfig().model,
+
+    recordTrace: (record) => emitter.record(record),
   }
 }

@@ -22,6 +22,8 @@ import { settingsService } from '../services/settingsService'
 import { getAllSwimmers } from '../db/dao'
 import { sessionService } from '../services/sessionService'
 import { getSessionDrills } from './drills'
+import { getAnalyticsSessionId } from '../services/analyticsService'
+import { v7 as uuidv7 } from 'uuid'
 
 // The only client network boundary for the AI draft. Pages never call the Edge
 // Function directly.
@@ -197,6 +199,8 @@ export async function requestSessionDraft(prepared: PreparedSessionDraft): Promi
     prompt: prepared.prompt,
     seed: prepared.seed,
     context: prepared.context,
+    analyticsSessionId: getAnalyticsSessionId(),
+    traceId: uuidv7(),
   }
   // Validate the request we are about to send; the harness validates it again.
   const requestCheck = validateSessionDraftRequest(body)
@@ -267,6 +271,8 @@ export async function requestSessionDraftStream(
     prompt: prepared.prompt,
     seed: prepared.seed,
     context: prepared.context,
+    analyticsSessionId: getAnalyticsSessionId(),
+    traceId: uuidv7(),
   }
   const requestCheck = validateSessionDraftRequest(body)
   if (!requestCheck.ok) {
