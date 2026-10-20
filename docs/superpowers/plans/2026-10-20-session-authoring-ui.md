@@ -130,9 +130,7 @@
 - [ ] **Step 2: Run the focused Playwright tests** and confirm the responsive checks fail if an authoring surface overflows or hides its primary actions.
 - [ ] **Step 3: Make only layout/presentation corrections** needed to pass the responsive and theme checks; do not remove or change any session/drill behavior.
 - [ ] **Step 4: Update `UI-Context.md`** to describe the shared session authoring visual treatment, two focused modals, and preserved manual/AI flow boundaries.
-- [ ] **Step 5: Run final verification** from the repository root:
-  - `npm run check`
-  - `npm run test:e2e -- tests/session-authoring-ui.spec.ts`
+- [ ] **Step 5: Run final verification:** `npm run check` from `client/`, then `npm run test:e2e -- tests/session-authoring-ui.spec.ts` from the repository root.
 - [ ] **Step 6: Review the final diff** for API/service/schema changes, missing controls, unused presentation components, and unintended behavior changes; commit as `test: verify session authoring UI refresh`.
 
 ## Completion Criteria
