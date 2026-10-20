@@ -397,7 +397,10 @@ export const SessionDetail: React.FC = () => {
               {activeRun?.sessionId === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
             </button>
             <button
-              onClick={() => setEditingMeta(true)}
+              onClick={(event) => {
+                event.currentTarget.focus()
+                setEditingMeta(true)
+              }}
               aria-label="Edit template name and notes"
               className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
             >
@@ -561,13 +564,19 @@ export const SessionDetail: React.FC = () => {
             <>
               <button
                 onClick={() => setShowDrillBank(!showDrillBank)}
+                aria-label="Toggle drill bank"
+                aria-expanded={showDrillBank}
                 className="h-10 md:h-12 px-3 md:px-4 bg-surface-container-high text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container-highest active:scale-95 transition-all cursor-pointer"
               >
                 <Icon name="library_books" size="lg" />
                 <span className="hidden sm:inline">Drills</span>
               </button>
               <button
-                onClick={() => openRichEditor()}
+                onClick={(event) => {
+                  event.currentTarget.focus()
+                  openRichEditor()
+                }}
+                aria-label="Add Drill"
                 className="h-10 md:h-12 px-3 md:px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
                 <Icon name="add" size="lg" />
@@ -654,7 +663,10 @@ export const SessionDetail: React.FC = () => {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => openRichEditor(d)}
+                      onClick={(event) => {
+                        event.currentTarget.focus()
+                        openRichEditor(d)
+                      }}
                       aria-label="Edit drill"
                       className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
@@ -774,7 +786,10 @@ export const SessionDetail: React.FC = () => {
                           <Icon name="add_circle" color="primary" />
                         </button>
                         <button
-                          onClick={() => openRichEditor(libDrill, true)}
+                          onClick={(event) => {
+                            event.currentTarget.focus()
+                            openRichEditor(libDrill, true)
+                          }}
                           aria-label="Edit bank drill"
                           className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                         >

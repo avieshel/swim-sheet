@@ -219,7 +219,11 @@ export const DrillBank: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => openEditor()}
+            onClick={(event) => {
+              event.currentTarget.focus()
+              openEditor()
+            }}
+            aria-label="New Library Drill"
             className="h-10 md:h-12 px-4 md:px-6 bg-primary text-on-primary rounded-xl font-bold flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-primary/20 text-xs md:text-sm"
           >
             <Icon name="add" className="md:text-lg" />
@@ -339,8 +343,11 @@ export const DrillBank: React.FC = () => {
                    <Icon name="playlist_add" size="sm" />
                    Add to Session
                  </button>
-                 <button
-                   onClick={() => openEditor(d)}
+                  <button
+                    onClick={(event) => {
+                      event.currentTarget.focus()
+                      openEditor(d)
+                    }}
                    aria-label={`Edit ${d.name}`}
                    className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                  >
@@ -508,7 +515,11 @@ export const DrillBank: React.FC = () => {
               {/* Actions */}
               <div className="flex flex-col gap-2 pt-2 border-t border-outline-variant/30">
                 <button
-                  onClick={() => { setDetailDrill(null); openEditor(detailDrill) }}
+                  onClick={(event) => {
+                    event.currentTarget.focus()
+                    setDetailDrill(null)
+                    openEditor(detailDrill)
+                  }}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                 >
                   <Icon name="edit" />
