@@ -140,6 +140,10 @@
 - [ ] **Step 5: Run final verification:** `npm run check` from `client/`, then `npm run test:e2e -- tests/session-authoring-ui.spec.ts` from the repository root.
 - [ ] **Step 6: Review the final diff** for API/service/schema changes, missing controls, unused presentation components, and unintended behavior changes; commit as `test: verify session authoring UI refresh`.
 
+## Measured code-size result
+
+Compared with the implementation branch base (`005d28b`), the final client production-source diff contains approximately 657 inserted and 418 removed lines, for a net increase of **239 lines** (tests and docs excluded). The pre-implementation estimate of a 20–80-line net reduction was not met. The work consolidates common panel/modal presentation and removes duplicated modal framing, but the new shared shell, metadata editor, and keyboard/focus handling outweigh those removals in total line count. No functionality was removed to chase a lower count.
+
 ## Completion Criteria
 
 - Manual creation still creates the same session shell and opens the same editor route when the coach selects it.
