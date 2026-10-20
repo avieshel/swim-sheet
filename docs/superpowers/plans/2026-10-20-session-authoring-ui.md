@@ -43,6 +43,7 @@
 - `client/src/components/ai/DraftDrillCard.tsx` and `DraftItemRow.tsx` — AI-only controls and draft-specific editing behavior.
 - `client/src/components/ai/DraftNumberInput.tsx` — numeric draft field styling; value parsing and bounds remain unchanged.
 - `client/src/components/DrillEditorModal.tsx` — existing manual drill editor layout and modal presentation.
+- `client/src/pages/DrillBank.tsx` — existing caller of the shared drill modal; its open controls provide the focus return target.
 - `tests/session-authoring-ui.spec.ts` — end-to-end manual flow, modal behavior, and responsive visual behavior.
 - `docs/context/UI-Context.md` — update the session authoring UI description after the implementation.
 
@@ -129,9 +130,10 @@
 **Files:**
 - Modify: `tests/session-authoring-ui.spec.ts`
 - Modify: `docs/context/UI-Context.md`
+- Modify: `client/src/pages/SessionDetail.tsx` and `client/src/pages/DrillBank.tsx` only if cross-browser focus/viewport checks expose a presentation issue.
 - Verify: manual, AI, and modal UI files from Tasks 1–4
 
-- [ ] **Step 1: Add failing Playwright checks** for narrow viewport overflow and primary-action visibility, plus legibility and control visibility in the supported light and dark themes.
+- [ ] **Step 1: Add failing Playwright checks** for narrow viewport overflow and primary-action visibility, legibility/control visibility in both themes, and drill-modal focus return in Mobile Safari.
 - [ ] **Step 2: Run the focused Playwright tests** and confirm the responsive checks fail if an authoring surface overflows or hides its primary actions.
 - [ ] **Step 3: Make only layout/presentation corrections** needed to pass the responsive and theme checks; do not remove or change any session/drill behavior.
 - [ ] **Step 4: Update `UI-Context.md`** to describe the shared session authoring visual treatment, two focused modals, and preserved manual/AI flow boundaries.
