@@ -1,4 +1,5 @@
 import { Icon } from '../Icon'
+import { SessionEditorSection } from '../session/SessionEditorSection'
 import { DraftDrillCard } from './DraftDrillCard'
 import { draftTotalDistance } from '../../services/sessionDraft/apply'
 import { validateSessionDraft } from '../../services/sessionDraft/validate'
@@ -48,25 +49,28 @@ export function DraftSessionPanel({ draft, onChange, onSave, onDiscard, saving =
   }
 
   return (
-    <div className="bg-surface-container-lowest rounded-2xl p-5 md:p-6 border border-outline-variant flex flex-col">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-headline-md text-on-surface mb-2">Proposed session</h3>
-          <label htmlFor="draft-session-name" className="block font-label-caps text-on-surface-variant mb-1">
-            Session name
-          </label>
-          <input
-            id="draft-session-name"
-            type="text"
-            value={draft.session.name}
-            onChange={(e) => onChange({ ...draft, session: { name: e.target.value } })}
-            className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-2 py-1.5 text-sm outline-none rounded-t-lg transition-colors"
-          />
+    <SessionEditorSection
+      title="Proposed session"
+      summary={`${draft.drills.length} drills`}
+      actions={
+        <div className="rounded-xl bg-primary/5 px-3 py-2 text-right">
+          <span className="block font-label-caps text-on-surface-variant mb-0.5">Total distance</span>
+          <span className="font-headline-md text-primary font-bold tabular-nums">{draftTotalDistance(draft)}m</span>
         </div>
-        <div className="text-right shrink-0">
-          <span className="block font-label-caps text-on-surface-variant mb-1">Total</span>
-          <span className="font-headline-md text-primary font-bold">{draftTotalDistance(draft)}m</span>
-        </div>
+      }
+      className="flex flex-col p-4 md:p-5"
+    >
+      <div className="mb-4">
+        <label htmlFor="draft-session-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
+          Session name
+        </label>
+        <input
+          id="draft-session-name"
+          type="text"
+          value={draft.session.name}
+          onChange={(e) => onChange({ ...draft, session: { name: e.target.value } })}
+          className="w-full min-h-12 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
+        />
       </div>
 
       <div className="flex-1 space-y-3">
@@ -88,25 +92,25 @@ export function DraftSessionPanel({ draft, onChange, onSave, onDiscard, saving =
         aria-label="Add drill"
         onClick={addDrill}
         disabled={draft.drills.length >= maxDrills}
-        className="mt-3 self-start text-xs text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none disabled:opacity-40"
+        className="mt-3 h-11 min-w-[44px] self-start text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none disabled:opacity-40"
       >
         <Icon name="add_circle" size="sm" />
         Add drill
       </button>
 
       {problem && (
-        <div className="mt-4 flex items-center gap-2 text-label-sm text-error bg-error-container/20 px-3 py-2 rounded-lg">
+        <div className="mt-4 flex items-center gap-2 text-label-sm text-error bg-error-container/20 px-3 py-2 rounded-xl" role="alert">
           <Icon name="error" size="sm" />
           {problem}
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 mt-5 pt-4 border-t border-outline-variant">
+      <div className="flex flex-col-reverse sm:flex-row gap-2 mt-5 pt-4 border-t border-outline-variant">
         <button
           type="button"
           onClick={onSave}
           disabled={saving || validation.ok === false}
-          className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
+          className="h-12 min-w-[44px] flex items-center justify-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
         >
           {saving ? <Icon name="hourglass_empty" /> : <Icon name="check" />}
           Save session
@@ -116,11 +120,11 @@ export function DraftSessionPanel({ draft, onChange, onSave, onDiscard, saving =
           aria-label="Discard proposal"
           onClick={onDiscard}
           disabled={saving}
-          className="px-6 py-3 border-2 border-outline text-on-surface rounded-xl font-bold disabled:opacity-50"
+          className="h-12 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors disabled:opacity-50"
         >
           Discard
         </button>
       </div>
-    </div>
+    </SessionEditorSection>
   )
 }

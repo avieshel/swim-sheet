@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icon'
+import { SessionEditorSection } from '../components/session/SessionEditorSection'
 import { DraftSessionPanel } from '../components/ai/DraftSessionPanel'
 import {
   prepareSessionDraft,
@@ -216,9 +217,9 @@ export const AiSessionDraft: React.FC = () => {
   }
 
   return (
-    <div>
+    <section aria-labelledby="ai-session-heading">
       <div className="mb-6">
-        <h2 className="font-headline-lg text-on-surface">Create with AI</h2>
+        <h2 id="ai-session-heading" className="font-headline-lg text-on-surface m-0">Create with AI</h2>
         <p className="text-on-surface-variant mt-1">
           Describe a session in plain language. We redact swimmer names and send only a sanitized
           description plus structural context (pool length, units, equipment, recent session shapes).
@@ -229,7 +230,10 @@ export const AiSessionDraft: React.FC = () => {
         className="r-grid items-start"
         style={{ '--grid-min': 'min(100%, 440px)' } as React.CSSProperties}
       >
-        <div className="bg-surface-container-lowest rounded-2xl p-5 md:p-6 border border-outline-variant">
+        <SessionEditorSection
+          title={phase === 'compose' ? 'Describe your session' : 'Review your prompt'}
+          className="p-4 md:p-5"
+        >
           {phase === 'compose' && (
             <>
               <label
@@ -244,7 +248,7 @@ export const AiSessionDraft: React.FC = () => {
                 onChange={(e) => setRaw(e.target.value)}
                 rows={6}
                 placeholder="e.g. A 2000m aerobic set: 200 free warmup, then 10x100 on 1:30 at v2, finish with 4x50 kick"
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-3 py-2 text-sm outline-none rounded-t-lg resize-y"
+                className="w-full min-h-36 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none resize-y transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
               <p className="text-caption text-on-surface-variant mt-2">
                 Do not include swimmer names, health details, or anything personal. Anything we detect is removed before sending.
@@ -253,7 +257,7 @@ export const AiSessionDraft: React.FC = () => {
                 <button
                   onClick={handleContinue}
                   disabled={loading || !raw.trim()}
-                  className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
+                  className="h-12 min-w-[44px] inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
                 >
                   <Icon name="arrow_forward" />
                   Review
@@ -281,7 +285,7 @@ export const AiSessionDraft: React.FC = () => {
                 value={editedPrompt}
                 onChange={(e) => setEditedPrompt(e.target.value)}
                 rows={6}
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-3 py-2 text-sm outline-none rounded-t-lg resize-y"
+                className="w-full min-h-36 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none resize-y transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
               <p className="text-caption text-on-surface-variant mt-2">
                 Review the text above. If it is empty, nothing will be sent.
@@ -290,7 +294,7 @@ export const AiSessionDraft: React.FC = () => {
                 <button
                   onClick={handleGenerate}
                   disabled={loading || !editedPrompt.trim()}
-                  className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold disabled:opacity-50"
+                  className="h-12 min-w-[44px] inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
                 >
                   {loading ? <Icon name="hourglass_empty" /> : <Icon name="auto_awesome" />}
                   Generate draft
@@ -304,7 +308,7 @@ export const AiSessionDraft: React.FC = () => {
                     setStreamingText('')
                   }}
                   disabled={loading}
-                  className="px-6 py-3 border-2 border-outline text-on-surface rounded-xl font-bold"
+                  className="h-12 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors"
                 >
                   Back
                 </button>
@@ -353,7 +357,7 @@ export const AiSessionDraft: React.FC = () => {
           {result && problemMessage(result) && (
             <div className="mt-4 text-label-sm text-on-surface-variant">{problemMessage(result)}</div>
           )}
-        </div>
+        </SessionEditorSection>
 
         <div>
           {draft ? (
@@ -365,7 +369,7 @@ export const AiSessionDraft: React.FC = () => {
               saving={loading}
             />
           ) : loading && streamingText.length > 0 ? (
-            <div className="bg-surface-container-lowest rounded-2xl p-5 md:p-6 border border-outline-variant">
+            <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant">
                   <Icon name="auto_awesome" size="sm" />
@@ -373,7 +377,7 @@ export const AiSessionDraft: React.FC = () => {
                 </div>
                 <button
                   onClick={handleCancel}
-                  className="px-4 py-2 border-2 border-outline text-on-surface rounded-xl font-bold text-label-sm"
+                  className="h-11 min-w-[44px] px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors"
                 >
                   Cancel
                 </button>
@@ -383,18 +387,18 @@ export const AiSessionDraft: React.FC = () => {
               </pre>
             </div>
           ) : loading ? (
-            <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-dashed border-outline-variant text-center">
+            <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant text-center">
               <Icon name="hourglass_empty" size="xl" className="text-on-surface-variant animate-pulse" />
               <p className="font-headline-md text-on-surface mt-3">Generating your draft…</p>
               <button
                 onClick={handleCancel}
-                className="mt-4 px-5 py-2 border-2 border-outline text-on-surface rounded-xl font-bold text-label-sm"
+                className="mt-4 h-11 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors"
               >
                 Cancel
               </button>
             </div>
           ) : (
-            <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-dashed border-outline-variant text-center">
+            <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant text-center">
               <Icon name="auto_awesome" size="xl" className="text-on-surface-variant" />
               <p className="font-headline-md text-on-surface mt-3">Nothing proposed yet</p>
               <p className="text-label-sm text-on-surface-variant mt-1">
@@ -405,6 +409,6 @@ export const AiSessionDraft: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
+    </section>
   )
 }

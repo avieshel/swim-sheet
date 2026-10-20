@@ -33,10 +33,10 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
   const { maxDistance, maxRepeatCount } = defaultSessionDraftConfig.limits
 
   return (
-    <div className="p-3 md:p-4 bg-surface-container-low rounded-xl border border-outline-variant/30">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="w-16 shrink-0">
-          <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Reps</label>
+    <div className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-3 md:p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end">
+        <div className="min-w-0">
+          <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Reps</label>
           <DraftNumberInput
             value={item.repeatCount}
             min={1}
@@ -46,8 +46,8 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
           />
         </div>
 
-        <div className="w-20 shrink-0">
-          <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Dist</label>
+        <div className="min-w-0">
+          <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Dist</label>
           <DraftNumberInput
             value={item.distance}
             min={1}
@@ -57,7 +57,7 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
           />
         </div>
 
-        <div className="w-32 shrink-0">
+        <div className="min-w-0">
           <CustomSelect
             label="Stroke"
             value={item.stroke}
@@ -66,7 +66,7 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
           />
         </div>
 
-        <div className="w-16 shrink-0">
+        <div className="min-w-0">
           <CustomSelect
             label="Int"
             value={item.intensity ?? ''}
@@ -77,19 +77,19 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
           />
         </div>
 
-        <div className="w-20 shrink-0">
-          <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Interval</label>
+        <div className="col-span-2 sm:col-span-1 min-w-0">
+          <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Interval</label>
           <input
             type="text"
             aria-label={`Interval for ${drillName}`}
             placeholder="2:00"
             value={item.interval ?? ''}
             onChange={(e) => onChange({ ...item, interval: e.target.value })}
-            className="w-full bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-1.5 py-1.5 text-sm outline-none rounded-t-md transition-colors"
+            className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 pb-1 flex-wrap">
+        <div className="col-span-2 sm:col-span-3 flex flex-wrap items-center gap-2">
           {EQUIPMENT_CHOICES.map((option) => {
             const active = item.equipment?.includes(option.id)
             return (
@@ -106,7 +106,7 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
                       : [...(item.equipment ?? []), option.id],
                   })
                 }
-                className={`rounded-lg flex flex-col items-center justify-center transition-all border cursor-pointer ${
+                className={`min-h-11 min-w-[48px] px-2 rounded-xl flex flex-col items-center justify-center transition-all border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   active
                     ? 'bg-secondary text-on-secondary border-secondary shadow-sm'
                     : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'
@@ -119,13 +119,13 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
           })}
         </div>
 
-        <div className="shrink-0 pb-1 ml-auto">
+        <div className="col-span-2 sm:col-span-3 flex justify-end">
           <button
             type="button"
             aria-label={`Remove step ${stepNumber} from ${drillName}`}
             onClick={onRemove}
             disabled={stepCount === 1}
-            className="w-8 h-8 flex items-center justify-center text-outline hover:text-error disabled:opacity-0 transition-all cursor-pointer bg-transparent border-none"
+            className="h-11 w-11 flex items-center justify-center rounded-xl text-outline hover:text-error hover:bg-error-container/20 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
           >
             <Icon name="delete" size="lg" />
           </button>

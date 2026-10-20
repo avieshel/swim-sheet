@@ -86,6 +86,12 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('AiSessionDraft', () => {
+  it('exposes the AI composer inside a named editor section', async () => {
+    renderPage()
+    await screen.findByRole('heading', { name: 'Create with AI' })
+    expect(screen.getByRole('region', { name: 'Create with AI' })).toBeTruthy()
+  })
+
   it('shows the proposal beside the prompt without saving anything', async () => {
     renderPage()
     await generateDraft()
