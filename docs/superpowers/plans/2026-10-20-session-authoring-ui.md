@@ -35,6 +35,7 @@
 
 - `client/src/components/session/SessionEditorSection.tsx` — shared, presentational editor panel framing (heading, optional summary/actions, children).
 - `client/src/components/session/SessionMetadataModal.tsx` — focused name/notes editor; emits form values and owns no API calls.
+- `client/src/components/session/SessionModalShell.tsx` — shared visual and keyboard/focus framing for the two focused modals.
 - `client/src/pages/SessionDetail.tsx` — session editor composition, metadata modal wiring, existing drill/session API handlers.
 - `client/src/pages/SessionsList.tsx` — existing manual create entry, template cards, and list-level visual alignment.
 - `client/src/pages/AiSessionDraft.tsx` — existing AI flow composition and privacy/loading/error states.
@@ -106,8 +107,10 @@
 ## Task 4: Refresh the existing drill editor modal
 
 **Files:**
+- Create: `client/src/components/session/SessionModalShell.tsx`
+- Modify: `client/src/components/session/SessionMetadataModal.tsx`
 - Modify: `client/src/components/DrillEditorModal.tsx`
-- Reuse: shared session/editor presentation styles from Task 1
+- Reuse: `client/src/components/session/SessionEditorSection.tsx`
 - Test: `client/src/components/__tests__/DrillEditorModal.test.tsx`
 - Test: `tests/session-authoring-ui.spec.ts`
 
