@@ -6,6 +6,7 @@ interface SessionModalShellProps {
   children: ReactNode
   onClose: () => void
   initialFocusRef?: RefObject<HTMLElement | null>
+  restoreFocusRef?: RefObject<HTMLElement | null>
   size?: 'compact' | 'wide'
   layer?: 'base' | 'raised'
   dismissOnBackdrop?: boolean
@@ -16,6 +17,7 @@ export function SessionModalShell({
   children,
   onClose,
   initialFocusRef,
+  restoreFocusRef,
   size = 'compact',
   layer = 'base',
   dismissOnBackdrop = false,
@@ -25,14 +27,15 @@ export function SessionModalShell({
 
   useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const focusTarget = restoreFocusRef?.current ?? previousFocus
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     initialFocusRef?.current?.focus()
     return () => {
       document.body.style.overflow = previousOverflow
-      previousFocus?.focus()
+      focusTarget?.focus()
     }
-  }, [initialFocusRef])
+  }, [initialFocusRef, restoreFocusRef])
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Escape') {

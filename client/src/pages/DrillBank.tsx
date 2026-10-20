@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
@@ -18,6 +18,9 @@ export const DrillBank: React.FC = () => {
   const [filter, setFilter] = useState('')
   const [activeLabel, setActiveLabel] = useState<string | null>(null)
   const [sortByPopularity, setSortByPopularity] = useState(false)
+  const modalReturnFocusRef = useRef<HTMLElement | null>(null)
+  const libraryDrillEditRefs = useRef(new Map<string, HTMLButtonElement>())
+  const newLibraryDrillRef = useRef<HTMLButtonElement>(null)
 
   const quickLabels = ['Technique', 'Kick', 'Speed', 'Endurance', 'Rotation']
 
@@ -103,7 +106,8 @@ export const DrillBank: React.FC = () => {
     navigate(`/sessions/${session.id}`)
   }
 
-  const openEditor = (drill?: LibraryDrill) => {
+  const openEditor = (drill?: LibraryDrill, returnFocusTarget?: HTMLElement | null) => {
+    modalReturnFocusRef.current = returnFocusTarget ?? null
     if (drill) {
       setEditingDrill({ ...drill })
     } else {
@@ -219,9 +223,10 @@ export const DrillBank: React.FC = () => {
         </div>
         <div className="flex gap-2">
           <button
+            ref={newLibraryDrillRef}
             onClick={(event) => {
               event.currentTarget.focus()
-              openEditor()
+              openEditor(undefined, event.currentTarget)
             }}
             aria-label="New Library Drill"
             className="h-10 md:h-12 px-4 md:px-6 bg-primary text-on-primary rounded-xl font-bold flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-primary/20 text-xs md:text-sm"
@@ -346,7 +351,11 @@ export const DrillBank: React.FC = () => {
                   <button
                     onClick={(event) => {
                       event.currentTarget.focus()
-                      openEditor(d)
+                      openEditor(d, event.currentTarget)
+                    }}
+                    ref={(element) => {
+                      if (d.id && element) libraryDrillEditRefs.current.set(d.id, element)
+                      else if (d.id) libraryDrillEditRefs.current.delete(d.id)
                     }}
                    aria-label={`Edit ${d.name}`}
                    className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors cursor-pointer bg-transparent border-none"
@@ -418,6 +427,7 @@ export const DrillBank: React.FC = () => {
         open={showEditor}
         title={editingDrill.id ? 'Edit Bank Drill' : 'New Bank Drill'}
         initialData={showEditor ? editingDrill as DrillFormData : undefined}
+        restoreFocusRef={modalReturnFocusRef}
          onSave={async (data, asVariant) => {
            const save = async () => {
              if (editingDrill.id) {
@@ -517,8 +527,9 @@ export const DrillBank: React.FC = () => {
                 <button
                   onClick={(event) => {
                     event.currentTarget.focus()
+                    const returnFocusTarget = libraryDrillEditRefs.current.get(detailDrill.id!) ?? newLibraryDrillRef.current
+                    openEditor(detailDrill, returnFocusTarget)
                     setDetailDrill(null)
-                    openEditor(detailDrill)
                   }}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                 >

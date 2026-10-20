@@ -105,6 +105,25 @@ test.describe('Session authoring UI', () => {
     expect(activeElement).toEqual({ tagName: 'BUTTON', ariaLabel: 'New Library Drill' })
   })
 
+  test('drill bank detail editor restores focus to the matching card action', async ({ page }) => {
+    const drillName = `Focus target ${Date.now()}`
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/drills')
+    await page.getByRole('button', { name: 'New Library Drill' }).click()
+    const createDialog = page.getByRole('dialog', { name: 'New Bank Drill' })
+    await createDialog.getByPlaceholder(/Pyramid Set or 8x100m Progression/).fill(drillName)
+    await createDialog.getByRole('button', { name: 'Create Drill' }).click()
+    await expect(page.getByRole('heading', { name: drillName })).toBeVisible()
+    await page.getByRole('heading', { name: drillName }).click()
+    await page.getByRole('button', { name: 'Edit Drill' }).click()
+
+    const editDialog = page.getByRole('dialog', { name: 'Edit Bank Drill' })
+    await expect(editDialog).toBeVisible()
+    await editDialog.getByPlaceholder(/Pyramid Set or 8x100m Progression/).press('Escape')
+    await expect(editDialog).not.toBeVisible()
+    await expect(page.getByRole('button', { name: `Edit ${drillName}` })).toBeFocused()
+  })
+
   test('session editor and both modals remain usable on narrow light and dark screens', async ({ page }) => {
     const name = `Responsive authoring ${Date.now()}`
     await page.setViewportSize({ width: 375, height: 812 })

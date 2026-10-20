@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type KeyboardEvent, type RefObject } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EquipmentIcons, type EquipmentType } from './EquipmentIcons'
 import { CustomSelect } from './CustomSelect'
@@ -41,6 +41,7 @@ interface DrillEditorModalProps {
   onSave: (data: DrillFormData, asVariant?: boolean) => void
   onDelete?: () => void
   onClose: () => void
+  restoreFocusRef?: RefObject<HTMLElement | null>
 }
 
 const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
@@ -65,7 +66,7 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
   }
 }
 
-export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose }) => {
+export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose, restoreFocusRef }) => {
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
@@ -99,11 +100,18 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
     setPendingSave(null)
   }
 
+  const handleContentKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (showStrokeConfirm && event.key === 'Escape') {
+      event.stopPropagation()
+      handleStrokeSkip()
+    }
+  }
+
   if (!open) return null
 
   return (
-    <SessionModalShell title={title} onClose={onClose} initialFocusRef={nameInputRef} size="wide">
-        <div className="p-4 md:p-6 lg:p-8">
+    <SessionModalShell title={title} onClose={onClose} initialFocusRef={nameInputRef} restoreFocusRef={restoreFocusRef} size="wide">
+        <div className="p-4 md:p-6 lg:p-8" onKeyDown={handleContentKeyDown}>
           <div className="space-y-6">
             {/* Basic Info */}
             <div>
@@ -257,8 +265,9 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                   <div key={item.id} className="p-3 md:p-4 bg-surface-container-low/70 rounded-2xl border border-outline-variant/40 relative group">
                     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-8 items-end gap-3">
                       <div className="min-w-0">
-                        <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Reps</label>
+                        <label htmlFor={`drill-step-reps-${idx}`} className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Reps</label>
                         <input
+                          id={`drill-step-reps-${idx}`}
                           type="number"
                           min="1"
                           value={item.repeatCount}
@@ -321,8 +330,9 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         />
                       </div>
                       <div className="col-span-2 sm:col-span-1 min-w-0">
-                        <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Interval</label>
+                        <label htmlFor={`drill-step-interval-${idx}`} className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Interval</label>
                         <input
+                          id={`drill-step-interval-${idx}`}
                           type="text"
                           value={item.interval || ''}
                           onChange={e => {

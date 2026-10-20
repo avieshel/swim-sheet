@@ -116,7 +116,7 @@
 - Test: `tests/session-authoring-ui.spec.ts`
 
 **Interfaces:**
-- Keep `DrillEditorModal` props and `DrillFormData` shape unchanged, including `open`, `title`, `initialData`, `onSave`, optional `onDelete`, and `onClose`.
+- Keep the existing `DrillEditorModal` props and `DrillFormData` shape; add only an optional presentation prop `restoreFocusRef` for a stable focus target when a modal opener is unmounted during the transition.
 - Keep all current form fields, stroke-change confirmation, deletion, and save behavior.
 
 - [ ] **Step 1: Extend the Playwright authoring flow** to open an existing drill, edit representative fields, save, and verify the updated drill remains visible in the session.
