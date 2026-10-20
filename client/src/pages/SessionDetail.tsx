@@ -249,7 +249,7 @@ export const SessionDetail: React.FC = () => {
         <div className="h-4 w-4 bg-surface-variant rounded" />
         <div className="h-4 w-32 bg-surface-variant rounded" />
       </div>
-      <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant mb-6">
+      <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant shadow-sm mb-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="h-7 w-48 bg-surface-variant rounded mb-2" />
@@ -582,22 +582,22 @@ export const SessionDetail: React.FC = () => {
           ) : (
             <div className="space-y-2">
               {drills.map((d, i) => (
-                <div key={d.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl gap-3">
+                <div key={d.id} className="flex items-center justify-between p-3 md:p-4 bg-surface-container-low/70 hover:bg-surface-container-low rounded-xl border border-outline-variant/30 gap-3 transition-colors">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 shrink-0">
                       <button
                         onClick={() => moveDrill(d, -1)}
                         disabled={i === 0}
-                        aria-label="Move drill up"
-                        className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
+                        aria-label={`Move ${d.name} up`}
+                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <Icon name="keyboard_arrow_up" />
                       </button>
                       <button
                         onClick={() => moveDrill(d, 1)}
                         disabled={i === drills.length - 1}
-                        aria-label="Move drill down"
-                        className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
+                        aria-label={`Move ${d.name} down`}
+                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <Icon name="keyboard_arrow_down" />
                       </button>
@@ -656,14 +656,14 @@ export const SessionDetail: React.FC = () => {
                     <button
                       onClick={() => openRichEditor(d)}
                       aria-label="Edit drill"
-                      className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                      className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <Icon name="edit" color="primary" />
                     </button>
                     <button
                       onClick={() => handleDeleteDrill(d.id)}
                       aria-label="Remove drill"
-                      className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                      className="h-11 w-11 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                     >
                       <Icon name="delete" color="error" />
                     </button>

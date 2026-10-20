@@ -10,6 +10,28 @@ async function createAndOpenSession(page: Page, name: string) {
 }
 
 test.describe('Session authoring UI', () => {
+  test('manual template creation keeps editor sections and drill controls available', async ({ page }) => {
+    const name = `Manual authoring ${Date.now()}`
+    await page.goto('/sessions')
+    await expect(page.getByRole('region', { name: 'Session Templates' })).toBeVisible()
+    await page.getByRole('button', { name: 'New Template' }).click()
+    await page.getByPlaceholder('e.g. Tuesday Endurance').fill(name)
+    await page.getByRole('button', { name: 'Create Template' }).click()
+    await page.getByRole('heading', { name, exact: true }).click()
+
+    await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Drills' })).toBeVisible()
+    await page.getByRole('button', { name: 'Add Drill' }).click()
+    await page.getByPlaceholder(/Pyramid Set or 8x100m Progression/).fill('Aerobic warmup')
+    await page.getByRole('button', { name: 'Create Drill' }).click()
+
+    await expect(page.getByRole('region', { name: 'Drills' }).getByText('Aerobic warmup')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Edit drill' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Remove drill' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Move Aerobic warmup up' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Move Aerobic warmup down' })).toBeVisible()
+  })
+
   test('opens a named metadata dialog and restores focus when dismissed', async ({ page }) => {
     const name = `Metadata dialog ${Date.now()}`
     await createAndOpenSession(page, name)
