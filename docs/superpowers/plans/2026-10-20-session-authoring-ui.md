@@ -40,6 +40,7 @@
 - `client/src/pages/AiSessionDraft.tsx` — existing AI flow composition and privacy/loading/error states.
 - `client/src/components/ai/DraftSessionPanel.tsx` — shared presentation framing around the staged draft.
 - `client/src/components/ai/DraftDrillCard.tsx` and `DraftItemRow.tsx` — AI-only controls and draft-specific editing behavior.
+- `client/src/components/ai/DraftNumberInput.tsx` — numeric draft field styling; value parsing and bounds remain unchanged.
 - `client/src/components/DrillEditorModal.tsx` — existing manual drill editor layout and modal presentation.
 - `tests/session-authoring-ui.spec.ts` — end-to-end manual flow, modal behavior, and responsive visual behavior.
 - `docs/context/UI-Context.md` — update the session authoring UI description after the implementation.
@@ -88,6 +89,7 @@
 - Modify: `client/src/components/ai/DraftSessionPanel.tsx`
 - Modify: `client/src/components/ai/DraftDrillCard.tsx`
 - Modify: `client/src/components/ai/DraftItemRow.tsx`
+- Modify: `client/src/components/ai/DraftNumberInput.tsx`
 - Reuse: `client/src/components/session/SessionEditorSection.tsx`
 - Test: `client/src/pages/__tests__/AiSessionDraft.test.tsx`
 - Test: `client/src/components/__tests__/DraftSessionPanel.test.tsx`
