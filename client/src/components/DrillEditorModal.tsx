@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useRef, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog'
 import { EquipmentIcons, type EquipmentType } from './EquipmentIcons'
 import { CustomSelect } from './CustomSelect'
+import { SessionModalShell } from './session/SessionModalShell'
 import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, strokeOptions } from '../constants/drill'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 import { emptyDrillForm } from '../utils/drillHelpers'
@@ -68,13 +69,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
-
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    }
-    return () => { document.body.style.overflow = '' }
-  }, [open])
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   const hasStrokeChanged = (): boolean => {
     if (!initialData?.stroke) return false
@@ -107,69 +102,67 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-surface-container-lowest rounded-2xl w-full max-w-[min(95vw, 56rem)] max-h-[95vh] overflow-y-auto shadow-2xl border border-outline-variant animate-fade-in">
+    <SessionModalShell title={title} onClose={onClose} initialFocusRef={nameInputRef} size="wide">
         <div className="p-4 md:p-6 lg:p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="font-headline-md text-on-surface m-0">{title}</h2>
-            <button onClick={onClose} className="p-2 text-on-surface-variant hover:bg-surface-variant rounded-full transition-colors cursor-pointer bg-transparent border-none">
-              <Icon name="close" />
-            </button>
-          </div>
-
           <div className="space-y-6">
             {/* Basic Info */}
             <div>
-              <label className="block font-label-caps text-on-surface-variant mb-2">Drill Name</label>
+              <label htmlFor="drill-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Drill Name</label>
               <input
+                ref={nameInputRef}
+                id="drill-name"
                 type="text"
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
                 placeholder="e.g. Pyramid Set or 8x100m Progression"
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary p-3 font-body-lg outline-none rounded-t-lg"
-                autoFocus
+                className="w-full min-h-12 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
             </div>
 
             <div>
-              <label className="block font-label-caps text-on-surface-variant mb-2">Description / Instructions</label>
+              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Description / Instructions</label>
               <textarea
+                id="drill-description"
                 value={form.description || ''}
                 onChange={e => setForm({ ...form, description: e.target.value })}
                 placeholder="e.g. 6-1-6 breathing: 6 kicks on side, 1 stroke, 6 kicks on other side..."
                 rows={2}
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary p-3 font-body-md outline-none rounded-t-lg resize-none"
+                className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block font-label-caps text-on-surface-variant mb-2">Total Set Repeats</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Total Set Repeats</label>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setForm({ ...form, repeatCount: Math.max(1, (form.repeatCount || 1) - 1) })} className="w-10 h-10 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors">-</button>
+                  <button type="button" aria-label="Decrease total set repeats" onClick={() => setForm({ ...form, repeatCount: Math.max(1, (form.repeatCount || 1) - 1) })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">-</button>
                   <span className="font-bold text-lg w-8 text-center">{form.repeatCount}x</span>
-                  <button onClick={() => setForm({ ...form, repeatCount: (form.repeatCount || 1) + 1 })} className="w-10 h-10 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors">+</button>
+                  <button type="button" aria-label="Increase total set repeats" onClick={() => setForm({ ...form, repeatCount: (form.repeatCount || 1) + 1 })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">+</button>
                 </div>
               </div>
               <div>
-                <label className="block font-label-caps text-on-surface-variant mb-2">Timing Mode</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Timing Mode</label>
                 <div className="flex bg-surface-container-low p-1 rounded-lg">
                   <button
+                    type="button"
                     onClick={() => setForm({ ...form, timingMode: 'individual' })}
-                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${form.timingMode === 'individual' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    aria-pressed={form.timingMode === 'individual'}
+                    className={`flex-1 min-h-11 text-label-sm font-bold rounded-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.timingMode === 'individual' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
                   >
                     Individual
                   </button>
                   <button
+                    type="button"
                     onClick={() => setForm({ ...form, timingMode: 'continuous' })}
-                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all cursor-pointer ${form.timingMode === 'continuous' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+                    aria-pressed={form.timingMode === 'continuous'}
+                    className={`flex-1 min-h-11 text-label-sm font-bold rounded-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.timingMode === 'continuous' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
                   >
                     Continuous
                   </button>
                 </div>
               </div>
               <div className="flex flex-col justify-center items-center sm:items-end">
-                <span className="font-label-caps text-on-surface-variant mb-1">Set Distance</span>
+                <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Set Distance</span>
                 <span className="font-headline-md text-primary font-bold">{getDrillTotalDistance(form)}m</span>
               </div>
             </div>
@@ -177,13 +170,15 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             {/* Phase & Focus */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block font-label-caps text-on-surface-variant mb-2">Session Phase</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Session Phase</label>
                 <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
                   {PHASE_LABELS.map(label => {
                     const active = form.labels?.includes(label)
                     return (
                       <button
                         key={label}
+                        type="button"
+                        aria-pressed={active}
                         onClick={() => {
                           const labels = form.labels || []
                           setForm({
@@ -191,7 +186,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                             labels: active ? labels.filter(l => l !== label) : [...labels, label]
                           })
                         }}
-                        className={`px-3 py-1 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                        className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
                       >
                         {label}
                       </button>
@@ -200,13 +195,15 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                 </div>
               </div>
               <div>
-                <label className="block font-label-caps text-on-surface-variant mb-2">Primary Focus</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Primary Focus</label>
                 <div className="flex gap-2 mb-3">
                   {['none', 'technique', 'fitness'].map(f => (
                     <button
                       key={f}
+                      type="button"
+                      aria-pressed={form.focus === f}
                       onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
-                      className={`flex-1 py-2 rounded-full border text-xs font-bold capitalize transition-all cursor-pointer ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
+                      className={`flex-1 min-h-11 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
                     >
                       {f}
                     </button>
@@ -219,6 +216,8 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                       return (
                         <button
                           key={label}
+                          type="button"
+                          aria-pressed={active}
                           onClick={() => {
                             const labels = form.labels || []
                             setForm({
@@ -226,7 +225,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                               labels: active ? labels.filter(l => l !== label) : [...labels, label]
                             })
                           }}
-                          className={`px-3 py-1 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                          className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
                         >
                           {label}
                         </button>
@@ -240,13 +239,14 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             {/* Items List */}
             <div>
               <div className="flex justify-between items-center mb-2">
-                <label className="block font-label-caps text-on-surface-variant">Set Components</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant">Set Components</label>
                 <button
+                  type="button"
                   onClick={() => setForm({
                     ...form,
                     items: [...(form.items || []), { id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }]
                   })}
-                  className="text-xs text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none"
+                  className="h-11 min-w-[44px] text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon name="add_circle" size="sm" />
                   Add Step
@@ -254,10 +254,10 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               </div>
               <div className="space-y-3">
                 {(form.items || []).map((item, idx) => (
-                  <div key={item.id} className="p-4 bg-surface-container-low rounded-xl border border-outline-variant/30 relative group">
-                    <div className="flex flex-wrap md:flex-nowrap items-end gap-3">
-                      <div className="w-16 shrink-0">
-                        <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Reps</label>
+                  <div key={item.id} className="p-3 md:p-4 bg-surface-container-low/70 rounded-2xl border border-outline-variant/40 relative group">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-8 items-end gap-3">
+                      <div className="min-w-0">
+                        <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Reps</label>
                         <input
                           type="number"
                           min="1"
@@ -267,10 +267,10 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                             newItems[idx] = { ...item, repeatCount: parseInt(e.target.value) || 1 }
                             setForm({ ...form, items: newItems })
                           }}
-                          className="w-full bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-1.5 py-1.5 text-sm outline-none rounded-t-md transition-colors"
+                          className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
-                      <div className="w-24 shrink-0">
+                      <div className="min-w-0">
                         <CustomSelect
                           label="Dist (m)"
                           value={item.distance > 600 ? 'custom' : item.distance}
@@ -290,7 +290,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                           }}
                         />
                       </div>
-                      <div className="flex-1 min-w-[100px]">
+                      <div className="min-w-0">
                         <CustomSelect
                           label="Stroke"
                           value={item.stroke}
@@ -302,7 +302,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                           }}
                         />
                       </div>
-                      <div className="w-20 shrink-0">
+                      <div className="min-w-0">
                         <CustomSelect
                           label="Int"
                           value={item.intensity || ''}
@@ -320,8 +320,8 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                           }}
                         />
                       </div>
-                      <div className="w-20 shrink-0">
-                        <label className="block text-label-sm font-bold text-on-surface-variant uppercase mb-1">Interval</label>
+                      <div className="col-span-2 sm:col-span-1 min-w-0">
+                        <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Interval</label>
                         <input
                           type="text"
                           value={item.interval || ''}
@@ -331,17 +331,19 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                             setForm({ ...form, items: newItems })
                           }}
                           placeholder="2:00"
-                          className="w-full bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-1.5 py-1.5 text-sm outline-none rounded-t-md transition-colors"
+                          className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
 
-                      <div className="grid grid-cols-4 gap-1 pb-1">
+                      <div className="col-span-2 sm:col-span-3 xl:col-span-2 grid grid-cols-4 gap-1 pb-1">
                         {EQUIPMENT_OPTIONS.map(opt => {
                           const active = item.equipment?.includes(opt.id)
                           return (
                             <button
                               key={opt.id}
+                              type="button"
                               title={opt.label}
+                              aria-pressed={Boolean(active)}
                               onClick={() => {
                                 const newItems = [...(form.items || [])]
                                 const equipment = item.equipment || []
@@ -351,7 +353,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                                 }
                                 setForm({ ...form, items: newItems })
                               }}
-                              className={`rounded-lg flex flex-col items-center justify-center transition-all border cursor-pointer ${active ? 'bg-secondary text-on-secondary border-secondary shadow-sm' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'}`}
+                              className={`min-h-11 min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary border-secondary shadow-sm' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'}`}
                             >
                               <EquipmentIcons type={opt.id as EquipmentType} className="w-4 h-4 mb-0.5" />
                               <span className="text-caption font-bold uppercase tracking-tighter leading-none">{opt.label}</span>
@@ -360,14 +362,15 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         })}
                       </div>
 
-                      <div className="shrink-0 pb-1">
+                      <div className="col-span-2 sm:col-span-3 xl:col-span-1 flex justify-end">
                         <button
+                          type="button"
                           onClick={() => {
                             const newItems = (form.items || []).filter((_, i) => i !== idx)
                             setForm({ ...form, items: newItems })
                           }}
                           disabled={(form.items || []).length === 1}
-                          className="w-8 h-8 flex items-center justify-center text-outline hover:text-error disabled:opacity-0 transition-all cursor-pointer bg-transparent border-none"
+                          className="h-11 w-11 flex items-center justify-center rounded-xl text-outline hover:text-error hover:bg-error-container/20 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                         >
                           <Icon name="delete" size="lg" />
                         </button>
@@ -381,13 +384,13 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             <div className="flex gap-3 pt-4 border-t border-outline-variant">
                <button
                  onClick={handleSave}
-                 className="flex-1 h-14 bg-primary text-on-primary rounded-xl font-bold text-lg hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-primary/20 cursor-pointer"
+                className="flex-1 min-h-12 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none"
                >
                  {form.id ? 'Save Changes' : 'Create Drill'}
                </button>
                <button
                  onClick={onClose}
-                 className="px-6 h-14 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-variant transition-all cursor-pointer"
+                  className="h-12 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors cursor-pointer bg-transparent"
                >
                  Cancel
                </button>
@@ -417,7 +420,6 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </SessionModalShell>
   )
 }

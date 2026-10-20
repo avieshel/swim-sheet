@@ -30,6 +30,27 @@ test.describe('Session authoring UI', () => {
     await expect(page.getByRole('button', { name: 'Remove drill' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Move Aerobic warmup up' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Move Aerobic warmup down' })).toBeVisible()
+
+    const drillEditorOpener = page.getByRole('button', { name: 'Edit drill' })
+    await drillEditorOpener.click()
+    const editDialog = page.getByRole('dialog', { name: 'Edit Drill' })
+    await expect(editDialog).toBeVisible()
+    await editDialog.getByPlaceholder(/Pyramid Set or 8x100m Progression/).fill('Aerobic ladder')
+    await editDialog.getByRole('button', { name: 'Save Changes' }).click()
+    await expect(page.getByRole('region', { name: 'Drills' }).getByText('Aerobic ladder')).toBeVisible()
+  })
+
+  test('drill editor closes on Escape and restores focus to its opener', async ({ page }) => {
+    const name = `Drill modal focus ${Date.now()}`
+    await createAndOpenSession(page, name)
+    const opener = page.getByRole('button', { name: 'Add Drill' })
+    await opener.click()
+
+    const dialog = page.getByRole('dialog', { name: 'New Drill' })
+    await expect(dialog).toBeVisible()
+    await dialog.getByPlaceholder(/Pyramid Set or 8x100m Progression/).press('Escape')
+    await expect(dialog).not.toBeVisible()
+    await expect(opener).toBeFocused()
   })
 
   test('opens a named metadata dialog and restores focus when dismissed', async ({ page }) => {
