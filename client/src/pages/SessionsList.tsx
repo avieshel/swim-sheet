@@ -242,220 +242,222 @@ export const SessionsList: React.FC = () => {
 
   return (
     <div>
-      {/* Session Templates Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-        <div>
-          <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Session Templates</h2>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
+      <section aria-labelledby="session-templates-heading" className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
+          <div>
+            <h2 id="session-templates-heading" className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">Session Templates</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/sessions/catalog"
+              className="h-11 inline-flex items-center gap-2 px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-all no-underline"
+            >
+              <Icon name="storefront" />
+              Browse Catalog
+            </Link>
+            <button
+              onClick={() => setShowNewForm(true)}
+              className="h-11 inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold shadow-sm hover:brightness-110 active:scale-[0.98] transition-all"
+            >
+              <Icon name="add" />
+              New Template
+            </button>
+            <Link
+              to="/sessions/ai"
+              className="h-11 inline-flex items-center gap-2 px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-all no-underline"
+            >
+              <Icon name="auto_awesome" />
+              Create with AI
+            </Link>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/sessions/catalog"
-            className="flex items-center gap-2 px-4 py-3 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-all no-underline"
-          >
-            <Icon name="storefront" />
-            Browse Catalog
-          </Link>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
-          >
-            <Icon name="add" />
-            New Template
-          </button>
-          <Link
-            to="/sessions/ai"
-            className="flex items-center gap-2 px-4 py-3 border-2 border-outline text-on-surface rounded-xl font-bold hover:bg-surface-container-low transition-all no-underline"
-          >
-            <Icon name="auto_awesome" />
-            Create with AI
-          </Link>
-        </div>
-      </div>
 
-      {showNewForm && (
-        <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 mb-6 md:mb-8 border border-outline-variant shadow-sm">
-          <h3 className="font-headline-md text-on-surface mb-3 md:mb-4">Create New Template</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-            <div>
-              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Template Name</label>
-              <input
-                type="text"
-                value={formName}
-                onChange={e => setFormName(e.target.value)}
-                placeholder="e.g. Tuesday Endurance"
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
-              />
+        {showNewForm && (
+          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 mb-6 border border-outline-variant shadow-sm">
+            <h3 className="font-headline-md text-on-surface mb-3 md:mb-4">Create New Template</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+              <div>
+                <label htmlFor="new-template-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Template Name</label>
+                <input
+                  id="new-template-name"
+                  type="text"
+                  value={formName}
+                  onChange={e => setFormName(e.target.value)}
+                  placeholder="e.g. Tuesday Endurance"
+                  className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleCreate}
+                className="h-11 bg-primary text-on-primary px-5 rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all"
+              >
+                Create Template
+              </button>
+              <button
+                onClick={() => setShowNewForm(false)}
+                className="h-11 border border-outline text-on-surface px-5 rounded-xl font-label-sm hover:bg-surface-container-low transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-          <div className="flex gap-3 mt-6">
+        )}
+
+        {/* Templates Search */}
+        {sessions.length > 0 && (
+          <div className="bg-surface-container-lowest rounded-2xl p-3.5 md:p-4 border border-outline-variant mb-6 flex items-center gap-3 shadow-sm">
+            <Icon name="search" color="on-surface-variant" />
+            <input
+              type="text"
+              value={templateSearch}
+              onChange={e => setTemplateSearch(e.target.value)}
+              placeholder="Search templates by name..."
+              className="flex-1 bg-transparent border-none outline-none font-body-md text-on-surface"
+            />
+            {templateSearch && (
+              <button onClick={() => setTemplateSearch('')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
+                <Icon name="close" size="lg" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Templates Grid */}
+        {sessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
+            <Icon name="event_note" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
+            <p className="text-on-surface-variant font-body-md mb-2">No session templates yet.</p>
+            <p className="text-label-sm text-on-surface-variant mb-6">Create a template to start building your drill library.</p>
             <button
-              onClick={handleCreate}
-              className="bg-primary text-on-primary px-6 py-2 rounded-xl font-label-sm text-label-sm hover:brightness-110 active:scale-95 transition-all"
+              onClick={() => setShowNewForm(true)}
+              className="bg-primary text-on-primary px-6 py-3 h-11 rounded-xl font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
             >
-              Create Template
-            </button>
-            <button
-              onClick={() => setShowNewForm(false)}
-              className="border-2 border-outline text-on-surface px-6 py-2 rounded-xl font-label-sm text-label-sm"
-            >
-              Cancel
+              Create First Template
             </button>
           </div>
-        </div>
-      )}
+        ) : filteredTemplates.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
+            <Icon name="search_off" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
+            <p className="text-on-surface-variant font-body-md">No templates match "{templateSearch}".</p>
+          </div>
+        ) : (
+          <>
+          <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
+            {visibleTemplates.map(s => {
+              const isLive = activeRun?.sessionId === s.id
+              return (
+              <div
+                key={s.id}
+                className={`bg-surface-container-lowest rounded-2xl p-4 md:p-5 border transition-all cursor-pointer shadow-sm hover:shadow-md group ${
+                  isLive
+                    ? 'border-green-500/70 ring-2 ring-green-500/20'
+                    : 'border-outline-variant hover:border-primary/40'
+                }`}
+                onClick={() => navigate(`/sessions/${s.id}`)}
+              >
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center flex-shrink-0">
+                    <Icon name="description" size="xl" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h3 className="font-headline-md text-headline-md text-on-surface font-bold truncate">{s.name}</h3>
+                        {isLive && (
+                          <span className="shrink-0 flex items-center gap-1 text-label-caps text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+                            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            Live
+                          </span>
+                        )}
+                        {s.aiDraftStatus === 'unreviewed' && (
+                          <span className="shrink-0 flex items-center gap-1 text-label-caps text-tertiary bg-tertiary-container px-2 py-0.5 rounded-full">
+                            <Icon name="auto_awesome" size="sm" />
+                            AI draft
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
+                        aria-label={`Delete ${s.name}`}
+                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <Icon name="delete" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
+                      <span className="flex items-center gap-1">
+                        <Icon name="fitness_center" size="sm" />
+                        {s.drillCount} drills
+                      </span>
+                      <span className="text-outline">·</span>
+                      <span className="flex items-center gap-1">
+                        <Icon name="distance" size="sm" />
+                        {s.totalDistance}m
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-      {/* Templates Search */}
-      {sessions.length > 0 && (
-        <div className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant mb-6 flex items-center gap-3 shadow-sm">
-          <Icon name="search" color="on-surface-variant" />
-          <input
-            type="text"
-            value={templateSearch}
-            onChange={e => setTemplateSearch(e.target.value)}
-            placeholder="Search templates by name..."
-            className="flex-1 bg-transparent border-none outline-none font-body-md text-on-surface"
-          />
-          {templateSearch && (
-            <button onClick={() => setTemplateSearch('')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
-              <Icon name="close" size="lg" />
+                {s.notes && (
+                  <p className="text-label-sm text-on-surface-variant italic mb-2 truncate">{s.notes}</p>
+                )}
+
+                {/* Chips row */}
+                <div className="flex flex-wrap gap-1 items-center mb-3">
+                  {s.strokeBreakdown.map(b => (
+                    <span
+                      key={b.stroke}
+                      className={`${strokeColorsSolid[b.stroke] || 'bg-surface-variant'} text-white text-label-sm font-bold px-2 py-0.5 rounded-full`}
+                    >
+                      {b.stroke} {b.meters}m
+                    </span>
+                  ))}
+                  {s.focusAreas.map(f => (
+                    <span key={f} className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Action buttons */}
+                <div className="pt-3 border-t border-outline-variant/30">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void handleStartLive(s) }}
+                      disabled={startingSessionId !== null && startingSessionId !== s.id}
+                      className="flex items-center gap-1.5 h-11 min-w-[44px] px-3 rounded-lg bg-primary text-on-primary font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
+                    >
+                      <Icon name={isLive ? 'visibility' : 'play_arrow'} size="sm" />
+                      {isLive ? 'View Live' : startingSessionId === s.id ? 'Starting...' : 'Start Live'}
+                    </button>
+                    <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
+                      Open Template
+                      <Icon name="arrow_forward" size="sm" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+              )
+            })}
+          </div>
+
+          {filteredTemplates.length > 6 && !templateSearch.trim() && (
+            <button
+              onClick={() => setShowAllTemplates(!showAllTemplates)}
+              className="flex items-center gap-2 mx-auto mt-6 text-label-sm text-primary font-bold hover:gap-3 transition-all bg-transparent border-none cursor-pointer p-0"
+              aria-expanded={showAllTemplates}
+            >
+              {showAllTemplates ? 'Show fewer' : `Show all (${filteredTemplates.length})`}
+              <Icon name={showAllTemplates ? 'expand_less' : 'expand_more'} size="lg" />
             </button>
           )}
-        </div>
-      )}
-
-      {/* Templates Grid */}
-      {sessions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
-          <Icon name="event_note" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
-          <p className="text-on-surface-variant font-body-md mb-2">No session templates yet.</p>
-          <p className="text-label-sm text-on-surface-variant mb-6">Create a template to start building your drill library.</p>
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="bg-primary text-on-primary px-6 py-3 h-11 rounded-xl font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-          >
-            Create First Template
-          </button>
-        </div>
-      ) : filteredTemplates.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
-          <Icon name="search_off" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
-          <p className="text-on-surface-variant font-body-md">No templates match "{templateSearch}".</p>
-        </div>
-      ) : (
-        <>
-        <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>
-          {visibleTemplates.map(s => {
-            const isLive = activeRun?.sessionId === s.id
-            return (
-            <div
-              key={s.id}
-              className={`bg-surface-container-lowest rounded-2xl p-5 border transition-all cursor-pointer shadow-sm hover:shadow-md group ${
-                isLive
-                  ? 'border-green-500/70 ring-2 ring-green-500/20'
-                  : 'border-outline-variant hover:border-primary/40'
-              }`}
-              onClick={() => navigate(`/sessions/${s.id}`)}
-            >
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center flex-shrink-0">
-                  <Icon name="description" size="xl" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <h3 className="font-headline-md text-headline-md text-on-surface font-bold truncate">{s.name}</h3>
-                      {isLive && (
-                        <span className="shrink-0 flex items-center gap-1 text-label-caps text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                          Live
-                        </span>
-                      )}
-                      {s.aiDraftStatus === 'unreviewed' && (
-                        <span className="shrink-0 flex items-center gap-1 text-label-caps text-tertiary bg-tertiary-container px-2 py-0.5 rounded-full">
-                          <Icon name="auto_awesome" size="sm" />
-                          AI draft
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                      aria-label={`Delete ${s.name}`}
-                      className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
-                    >
-                      <Icon name="delete" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <Icon name="fitness_center" size="sm" />
-                      {s.drillCount} drills
-                    </span>
-                    <span className="text-outline">·</span>
-                    <span className="flex items-center gap-1">
-                      <Icon name="distance" size="sm" />
-                      {s.totalDistance}m
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {s.notes && (
-                <p className="text-label-sm text-on-surface-variant italic mb-2 truncate">{s.notes}</p>
-              )}
-
-              {/* Chips row */}
-              <div className="flex flex-wrap gap-1 items-center mb-3">
-                {s.strokeBreakdown.map(b => (
-                  <span
-                    key={b.stroke}
-                    className={`${strokeColorsSolid[b.stroke] || 'bg-surface-variant'} text-white text-label-sm font-bold px-2 py-0.5 rounded-full`}
-                  >
-                    {b.stroke} {b.meters}m
-                  </span>
-                ))}
-                {s.focusAreas.map(f => (
-                  <span key={f} className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">
-                    {f}
-                  </span>
-                ))}
-              </div>
-
-              {/* Action buttons */}
-              <div className="pt-3 border-t border-outline-variant/30">
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); void handleStartLive(s) }}
-                    disabled={startingSessionId !== null && startingSessionId !== s.id}
-                    className="flex items-center gap-1.5 h-11 min-w-[44px] px-3 rounded-lg bg-primary text-on-primary font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
-                  >
-                    <Icon name={isLive ? 'visibility' : 'play_arrow'} size="sm" />
-                    {isLive ? 'View Live' : startingSessionId === s.id ? 'Starting...' : 'Start Live'}
-                  </button>
-                  <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
-                    Open Template
-                    <Icon name="arrow_forward" size="sm" />
-                  </span>
-                </div>
-              </div>
-            </div>
-            )
-          })}
-        </div>
-
-        {filteredTemplates.length > 6 && !templateSearch.trim() && (
-          <button
-            onClick={() => setShowAllTemplates(!showAllTemplates)}
-            className="flex items-center gap-2 mx-auto mt-6 text-label-sm text-primary font-bold hover:gap-3 transition-all bg-transparent border-none cursor-pointer p-0"
-            aria-expanded={showAllTemplates}
-          >
-            {showAllTemplates ? 'Show fewer' : `Show all (${filteredTemplates.length})`}
-            <Icon name={showAllTemplates ? 'expand_less' : 'expand_more'} size="lg" />
-          </button>
+          </>
         )}
-        </>
-      )}
+      </section>
 
       {/* Recently Completed Section */}
       <div className="mt-8 md:mt-12">

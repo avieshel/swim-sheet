@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { EquipmentIcons, type EquipmentType } from '../components/EquipmentIcons'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
+import { SessionEditorSection } from '../components/session/SessionEditorSection'
+import { SessionMetadataModal } from '../components/session/SessionMetadataModal'
 import { Icon } from '../components/Icon'
 import { getSession, updateSession, deleteSession } from '../api/sessions'
 import { keepSessionDraft } from '../api/sessionDraft'
@@ -24,8 +26,6 @@ export const SessionDetail: React.FC = () => {
   const [drills, setDrills] = useState<Drill[]>([])
   const [loading, setLoading] = useState(true)
   const [editingMeta, setEditingMeta] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [editNotes, setEditNotes] = useState('')
 
   // Drill bank
   const [libraryDrills, setLibraryDrills] = useState<LibraryDrill[]>([])
@@ -65,8 +65,6 @@ export const SessionDetail: React.FC = () => {
     if (isCancelled?.()) return
     if (!s) { setLoading(false); return }
     setSession(s)
-    setEditName(s.name)
-    setEditNotes(s.notes || '')
     const d = await getSessionDrills(id)
     if (isCancelled?.()) return
     setDrills(d.sort((a, b) => a.order - b.order))
@@ -84,8 +82,6 @@ export const SessionDetail: React.FC = () => {
   const applySessionData = (data: [Session, Drill[]]) => {
     const [s, d] = data
     setSession(s)
-    setEditName(s.name)
-    setEditNotes(s.notes || '')
     setDrills(d)
     setLoading(false)
   }
@@ -118,12 +114,12 @@ export const SessionDetail: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  const handleSaveMeta = async () => {
-    if (!id || !editName.trim()) return
-    await updateSession(id, { name: editName.trim(), notes: editNotes })
+  const handleSaveMeta = async (data: { name: string; notes: string }) => {
+    if (!id || !data.name.trim()) return
+    await updateSession(id, { name: data.name.trim(), notes: data.notes })
     analytics.track(Events.SessionUpdated())
     setEditingMeta(false)
-    loadData()
+    await loadData()
   }
 
   const handleStartLive = async () => {
@@ -253,7 +249,7 @@ export const SessionDetail: React.FC = () => {
         <div className="h-4 w-4 bg-surface-variant rounded" />
         <div className="h-4 w-32 bg-surface-variant rounded" />
       </div>
-      <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant mb-6">
+      <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant shadow-sm mb-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="h-7 w-48 bg-surface-variant rounded mb-2" />
@@ -375,72 +371,52 @@ export const SessionDetail: React.FC = () => {
 
       {/* Template Metadata */}
       <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant mb-6">
-        {editingMeta ? (
-          <div>
-            <div className="r-grid" style={{ '--grid-min': '240px' } as React.CSSProperties}>
-              <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Template Name</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
-                  autoFocus
-                />
-              </div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">{session.name}</h1>
+              {focusAreas.length > 0 && focusAreas.map(f => (
+                <span key={f} className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">
+                  {f}
+                </span>
+              ))}
             </div>
-            <div className="mt-4">
-              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Focus / Notes</label>
-              <textarea
-                value={editNotes}
-                onChange={e => setEditNotes(e.target.value)}
-                placeholder="e.g. Endurance focus, pre-meet taper, technique work..."
-                rows={2}
-                className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg resize-none"
-              />
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={handleSaveMeta} className="h-12 px-4 bg-primary text-on-primary rounded-lg font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer">Save</button>
-              <button onClick={() => setEditingMeta(false)} className="h-12 px-4 border-2 border-outline text-on-surface rounded-lg font-label-sm cursor-pointer">Cancel</button>
-            </div>
+            {session.notes && (
+              <p className="font-body-md text-body-md text-on-surface-variant mt-1 italic">{session.notes}</p>
+            )}
           </div>
-        ) : (
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">{session.name}</h1>
-                {focusAreas.length > 0 && focusAreas.map(f => (
-                  <span key={f} className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">
-                    {f}
-                  </span>
-                ))}
-              </div>
-              {session.notes && (
-                <p className="font-body-md text-body-md text-on-surface-variant mt-1 italic">{session.notes}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => { void handleStartLive() }}
-                disabled={drills.length === 0 || startingStart}
-                className="flex items-center gap-1.5 h-11 min-w-[44px] px-4 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
-                title={drills.length === 0 ? 'Add at least one drill before starting this session' : undefined}
-              >
-                <Icon name={activeRun?.sessionId === session.id ? 'visibility' : 'play_arrow'} size="sm" />
-                {activeRun?.sessionId === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
-              </button>
-              <button
-                onClick={() => { setEditingMeta(true); setEditNotes(session.notes || '') }}
-                aria-label="Edit template name and notes"
-                className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-              >
-                <Icon name="edit" color="primary" />
-              </button>
-            </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => { void handleStartLive() }}
+              disabled={drills.length === 0 || startingStart}
+              className="flex items-center gap-1.5 h-11 min-w-[44px] px-4 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
+              title={drills.length === 0 ? 'Add at least one drill before starting this session' : undefined}
+            >
+              <Icon name={activeRun?.sessionId === session.id ? 'visibility' : 'play_arrow'} size="sm" />
+              {activeRun?.sessionId === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
+            </button>
+            <button
+              onClick={(event) => {
+                event.currentTarget.focus()
+                setEditingMeta(true)
+              }}
+              aria-label="Edit template name and notes"
+              className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+            >
+              <Icon name="edit" color="primary" />
+            </button>
           </div>
-        )}
+        </div>
       </div>
+
+      {editingMeta && (
+        <SessionMetadataModal
+          initialData={{ name: session.name, notes: session.notes || '' }}
+          onSave={handleSaveMeta}
+          onClose={() => setEditingMeta(false)}
+        />
+      )}
 
       {/* Similar Drill Warning Dialog — rendered above the DrillEditorModal overlay */}
       {similarWarning && (
@@ -581,48 +557,56 @@ export const SessionDetail: React.FC = () => {
       {/* Main content: Drills + Drills panel (responsive two-column) */}
       <div className="r-grid" style={{ '--grid-min': 'min(100%, 400px)' } as React.CSSProperties}>
         {/* Drill List */}
-        <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant min-h-[40vh] md:min-h-[60vh]">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <h3 className="font-headline-md text-on-surface m-0">Drills</h3>
-            <div className="flex gap-2">
+        <SessionEditorSection
+          title="Drills"
+          className="min-h-[40vh] md:min-h-[60vh] p-4 md:p-6"
+          actions={
+            <>
               <button
                 onClick={() => setShowDrillBank(!showDrillBank)}
+                aria-label="Toggle drill bank"
+                aria-expanded={showDrillBank}
                 className="h-10 md:h-12 px-3 md:px-4 bg-surface-container-high text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container-highest active:scale-95 transition-all cursor-pointer"
               >
                 <Icon name="library_books" size="lg" />
                 <span className="hidden sm:inline">Drills</span>
               </button>
               <button
-                onClick={() => openRichEditor()}
+                onClick={(event) => {
+                  event.currentTarget.focus()
+                  openRichEditor()
+                }}
+                aria-label="Add Drill"
                 className="h-10 md:h-12 px-3 md:px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
                 <Icon name="add" size="lg" />
                 <span className="hidden sm:inline">Add Drill</span>
               </button>
-            </div>
-          </div>
+            </>
+          }
+        >
 
           {drills.length === 0 ? (
             <p className="font-body-md text-body-md text-on-surface-variant py-8 text-center">No drills yet. Use the <strong>Drills</strong> panel or add a custom drill.</p>
           ) : (
             <div className="space-y-2">
               {drills.map((d, i) => (
-                <div key={d.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-xl gap-3">
+                <div key={d.id} className="flex items-center justify-between p-3 md:p-4 bg-surface-container-low/70 hover:bg-surface-container-low rounded-xl border border-outline-variant/30 gap-3 transition-colors">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex flex-col gap-0.5">
+                    <div className="flex flex-col gap-0.5 shrink-0">
                       <button
                         onClick={() => moveDrill(d, -1)}
                         disabled={i === 0}
-                        aria-label="Move drill up"
-                        className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
+                        aria-label={`Move ${d.name} up`}
+                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <Icon name="keyboard_arrow_up" />
                       </button>
                       <button
                         onClick={() => moveDrill(d, 1)}
                         disabled={i === drills.length - 1}
-                        aria-label="Move drill down"
-                        className="h-9 w-9 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-20 transition-colors cursor-pointer bg-transparent border-none"
+                        aria-label={`Move ${d.name} down`}
+                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <Icon name="keyboard_arrow_down" />
                       </button>
@@ -679,16 +663,19 @@ export const SessionDetail: React.FC = () => {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => openRichEditor(d)}
+                      onClick={(event) => {
+                        event.currentTarget.focus()
+                        openRichEditor(d)
+                      }}
                       aria-label="Edit drill"
-                      className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                      className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <Icon name="edit" color="primary" />
                     </button>
                     <button
                       onClick={() => handleDeleteDrill(d.id)}
                       aria-label="Remove drill"
-                      className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
+                      className="h-11 w-11 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
                     >
                       <Icon name="delete" color="error" />
                     </button>
@@ -697,7 +684,7 @@ export const SessionDetail: React.FC = () => {
               ))}
             </div>
           )}
-        </div>
+        </SessionEditorSection>
 
         {/* Drills Panel — hidden on mobile unless toggled, always visible on wider screens */}
         <div className={`${showDrillBank ? 'block' : 'hidden lg:block'}`}>
@@ -799,7 +786,10 @@ export const SessionDetail: React.FC = () => {
                           <Icon name="add_circle" color="primary" />
                         </button>
                         <button
-                          onClick={() => openRichEditor(libDrill, true)}
+                          onClick={(event) => {
+                            event.currentTarget.focus()
+                            openRichEditor(libDrill, true)
+                          }}
                           aria-label="Edit bank drill"
                           className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                         >

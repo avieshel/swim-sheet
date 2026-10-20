@@ -242,7 +242,7 @@ Individual swimmer profile.
 ### SessionsList (`/sessions`)
 Template manager — grid of saved session templates.
 
-- Header with "Session Templates" + "New Template" button + **"Create with AI"** link (routes to `/sessions/ai`)
+- The "Session Templates" area is a named section with consistent primary/secondary actions and responsive template cards. **New Template** still creates the same empty session shell inline; **Create with AI** still routes to `/sessions/ai`.
 - Template cards: name, drill count, total distance, focus label
 - Card chip `AI draft` when `session.aiDraftStatus === 'unreviewed'` (local-only marker; not synced)
 - Click to navigate to editor (`/sessions/:id`)
@@ -254,7 +254,7 @@ Template manager — grid of saved session templates.
 The AI drafting entry point. The only sign-in-gated feature in the app.
 
 - Shows a sign-in-required state (with a Settings link) for anonymous / signed-out users — no request is made.
-- **Two-column layout** on wide screens: the compose/review card on the left, the proposed session on the right. Uses `r-grid` with `--grid-min: min(100%, 440px)`, so the columns split around ~880px of container width (tablet landscape and desktop) and stack on narrow screens. No media-query hook — the app is entirely CSS-responsive.
+- **Two-column layout** on wide screens: the compose/review section on the left, the proposed session on the right. Both use the shared `SessionEditorSection` presentation; the proposed-session panel has compact drill cards and consistent form controls. Uses `r-grid` with `--grid-min: min(100%, 440px)`, so the columns split around ~880px of container width (tablet landscape and desktop) and stack on narrow screens. No media-query hook — the app is entirely CSS-responsive.
 - Two-step compose → review: the coach enters a plain-language description; the app sanitizes it locally (redacting swimmer names / emails / phones), then shows the sanitized prompt (editable) plus a notice of removed categories. "Generate draft" is disabled when the sanitized prompt is empty.
 - Sends only the sanitized prompt + structural context (pool length, units, equipment options, recent-session shapes) to the harness Edge Function via `api/sessionDraft`. `not_actionable` shows the model's message; `auth`/`rate_limited`/`provider_rate_limited`/`provider`/`timeout`/`network`/`privacy` map to distinct, recoverable messages that preserve the coach's input. Rate-limit outcomes (`rate_limited` for the per-user quota, `provider_rate_limited` when the upstream provider throttles) show a human-readable wait derived from the harness's `Retry-After` / `retry_after_seconds`; `provider`/`timeout`/`network`/`auth`/`invalid` each show a recoverable message. The client validates the request against the shared bounds before sending (defense in depth); the harness validates it again.
 - **The proposal is staged in memory, not persisted.** On a `draft` outcome the draft lands in component state and renders in the right column; nothing is written to Dexie and the app does not navigate away. **Save session** is the only thing that calls `applySessionDraft` and navigates to `/sessions/:id`. **Discard** (and **Back**) clear the proposal. This keeps the single-unreviewed-draft-per-device guarantee intact and makes the right column authoritative — what the coach sees is exactly what gets persisted.
@@ -269,18 +269,22 @@ The AI drafting entry point. The only sign-in-gated feature in the app.
 Template editor.
 
 - When `session.aiDraftStatus === 'unreviewed'`, shows an **"AI draft — review"** banner with **Keep session** (clears the local marker via `keepSessionDraft`) and **Discard** (deletes the draft via `deleteSession`).
-- Editable template name and default pool length
-- Drill list with order, stroke badge, distance — reorderable via drag handle
-- "Add Drill" form (name, stroke, distance) or drill library sidebar
-- **Totals View**: Total distance, stroke breakdown (meters per stroke), drill count
-- Drill inline editing: pencil icon to edit name/stroke/distance in-place
+- Session name, notes, and focus badges appear in a compact summary; **Edit template name and notes** opens the metadata modal and saves through the existing session API.
+- **Totals View**: Total distance, stroke breakdown (meters per stroke), drill count.
+- The ordered drill list and responsive drill-bank panel remain the session workspace. Drill rows retain add, edit, remove, and reorder actions with larger touch targets.
+- Add/edit drills uses the full `DrillEditorModal` field set. It shares `SessionModalShell` with session metadata editing; the shell supplies the named dialog, Escape dismissal, focus containment/restoration, and consistent surface styling. The drill save, delete, stroke-change confirmation, and session API paths are unchanged.
+
+### Session authoring presentation
+
+- Manual session editing and AI draft review use `SessionEditorSection` for consistent headings, summaries, card surfaces, spacing, and action placement. AI draft types, validation, contract limits, privacy review, and staged persistence remain separate from the manual editor.
+- The session list, manual editor, AI draft editor, and focused modals use existing semantic color/typography tokens and responsive layouts. No session-authoring API, service, DAO, or schema changes are involved.
 
 ### DrillBank (`/drills`)
 Global drill library.
 
 - Search with filter chips
 - Drill cards with stroke badge, distance, focus labels
-- Rich drill editor modal (sets, intervals, equipment)
+- Rich drill editor modal (sets, intervals, equipment) using the shared `SessionModalShell` presentation and keyboard/focus behavior.
 - Seed defaults and reset capability
 
 ### LiveDeck (`/`)

@@ -40,7 +40,7 @@ export function DraftNumberInput({ value, min, max, label, onChange }: DraftNumb
         onChange(Math.min(max, Math.max(min, parsed)))
       }}
       onBlur={() => setText(String(value))}
-      className="w-full bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-1.5 py-1.5 text-sm outline-none rounded-t-md transition-colors"
+      className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
     />
   )
 }

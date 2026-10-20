@@ -34,25 +34,26 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
   }
 
   return (
-    <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-4">
-      <div className="flex items-start gap-2 mb-3">
+    <div className="bg-surface-container-low/50 rounded-2xl border border-outline-variant/70 p-3 md:p-4">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-2 mb-3">
         <div className="flex-1 min-w-0">
-          <label className="block font-label-caps text-on-surface-variant mb-1">Drill {index + 1} name</label>
+          <label htmlFor={`draft-drill-name-${index}`} className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Drill {index + 1} name</label>
           <input
+            id={`draft-drill-name-${index}`}
             type="text"
             aria-label={`Drill name ${index + 1}`}
             value={drill.name}
             onChange={(e) => onChange({ ...drill, name: e.target.value })}
-            className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary px-2 py-1.5 text-sm outline-none rounded-t-lg transition-colors"
+            className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
           />
         </div>
-        <div className="flex items-center gap-1 pt-5">
+        <div className="flex items-center gap-1 self-end sm:self-auto">
           <button
             type="button"
             aria-label={`Move drill ${index + 1} up`}
             onClick={() => onMove(-1)}
             disabled={index === 0}
-            className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-0 transition-all cursor-pointer bg-transparent border-none"
+            className="h-11 w-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/5 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Icon name="arrow_upward" size="sm" />
           </button>
@@ -61,7 +62,7 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
             aria-label={`Move drill ${index + 1} down`}
             onClick={() => onMove(1)}
             disabled={index === count - 1}
-            className="w-8 h-8 flex items-center justify-center text-on-surface-variant hover:text-primary disabled:opacity-0 transition-all cursor-pointer bg-transparent border-none"
+            className="h-11 w-11 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-primary hover:bg-primary/5 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Icon name="arrow_downward" size="sm" />
           </button>
@@ -70,7 +71,7 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
             aria-label={`Remove drill ${index + 1}`}
             onClick={onRemove}
             disabled={count === 1}
-            className="w-8 h-8 flex items-center justify-center text-outline hover:text-error disabled:opacity-0 transition-all cursor-pointer bg-transparent border-none"
+            className="h-11 w-11 flex items-center justify-center rounded-lg text-outline hover:text-error hover:bg-error-container/20 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
           >
             <Icon name="delete" size="lg" />
           </button>
@@ -85,7 +86,7 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
               type="button"
               aria-label={`Decrease set repeats for ${drill.name}`}
               onClick={() => onChange({ ...drill, repeatCount: Math.max(1, drill.repeatCount - 1) })}
-              className="w-9 h-9 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors bg-transparent"
+              className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <Icon name="remove" size="sm" />
             </button>
@@ -96,7 +97,7 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
               onClick={() =>
                 onChange({ ...drill, repeatCount: Math.min(maxRepeatCount, drill.repeatCount + 1) })
               }
-              className="w-9 h-9 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors bg-transparent"
+              className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <Icon name="add" size="sm" />
             </button>
@@ -129,7 +130,7 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
         aria-label={`Add step to ${drill.name}`}
         onClick={addItem}
         disabled={drill.items.length >= maxItemsPerDrill}
-        className="mt-3 text-xs text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none disabled:opacity-40"
+          className="mt-3 h-11 min-w-[44px] text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <Icon name="add_circle" size="sm" />
         Add step

@@ -65,6 +65,11 @@ function valueOf(label: string): string {
 }
 
 describe('DraftSessionPanel', () => {
+  it('exposes the proposal inside a named editor section', () => {
+    renderPanel()
+    expect(screen.getByRole('region', { name: 'Proposed session' })).toBeTruthy()
+  })
+
   it('shows the session name and a total that spans every drill', () => {
     renderPanel(
       fixture({

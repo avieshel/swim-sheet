@@ -71,4 +71,42 @@ describe('DrillEditorModal', () => {
     const descInput = screen.getByPlaceholderText(/6-1-6 breathing/) as HTMLTextAreaElement
     expect(descInput.value).toBe('Some description')
   })
+
+  it('keeps the drill editor open when Escape dismisses the stroke confirmation', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <DrillEditorModal
+        open={true}
+        title="Edit Drill"
+        initialData={{
+          id: 'drill-1',
+          name: 'Stroke set',
+          stroke: 'freestyle',
+          items: [{ id: 'step-1', distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+        }}
+        onSave={vi.fn()}
+        onClose={onClose}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /Freestyle/ }))
+    await user.click(screen.getByRole('button', { name: 'Breaststroke' }))
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+    expect(screen.getByText('Stroke Changed')).toBeTruthy()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByText('Stroke Changed')).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Edit Drill' })).toBeTruthy()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Breaststroke/ })).toBeTruthy()
+  })
+
+  it('associates visible labels with the step reps and interval controls', () => {
+    render(<DrillEditorModal open={true} title="Create Drill" onSave={vi.fn()} onClose={vi.fn()} />)
+
+    expect(screen.getByLabelText('Reps')).toBeTruthy()
+    expect(screen.getByLabelText('Interval')).toBeTruthy()
+  })
 })
