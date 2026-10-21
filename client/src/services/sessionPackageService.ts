@@ -1,5 +1,5 @@
 import {
-  addSessionWithDrills,
+  addSessionWithDrillsIf,
   getAllSessions,
   getDrillsForSession,
   getSession,
@@ -49,8 +49,8 @@ function mapItem(item: Drill['items'][number]): SessionPackageItemV1 {
 }
 
 function mapDrill(drill: Drill): SessionPackageDrillV1 {
-  const stroke = drill.stroke || drill.items[0]?.stroke
-  if (!stroke) throw new Error(`Drill "${drill.name}" has no stroke to export`)
+  const stroke = drill.stroke ?? drill.items[0]?.stroke
+  if (stroke === undefined) throw new Error(`Drill "${drill.name}" has no stroke to export`)
   return {
     name: drill.name,
     stroke,
@@ -164,11 +164,6 @@ export async function importSessionPackage(
   }
 
   const importName = name.trim()
-  const existingNames = (await getAllSessions()).map((session) => session.name)
-  if (isNameTaken(importName, existingNames)) {
-    return { outcome: 'name_conflict', suggestedName: suggestName(importName, existingNames) }
-  }
-
   const session: SafeSession = {
     name: importName,
     notes: validation.value.session.notes,
@@ -176,7 +171,15 @@ export async function importSessionPackage(
     assignedTo: null,
   }
   const drills = validation.value.drills.map(mapImportedDrill)
-  const sessionId = await addSessionWithDrills(session, drills)
+  const sessionId = await addSessionWithDrillsIf(
+    session,
+    drills,
+    (existingSessions) => !isNameTaken(importName, existingSessions.map((existing) => existing.name)),
+  )
+  if (sessionId === null) {
+    const existingNames = (await getAllSessions()).map((existing) => existing.name)
+    return { outcome: 'name_conflict', suggestedName: suggestName(importName, existingNames) }
+  }
   return { outcome: 'created', sessionId }
 }
 

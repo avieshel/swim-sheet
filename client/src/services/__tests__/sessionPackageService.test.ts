@@ -166,6 +166,7 @@ describe('session package service export', () => {
 
     expect(result.drills[0]).toMatchObject({ stroke: 'butterfly', distance: 100 })
   })
+
 })
 
 describe('session package service inspection', () => {
@@ -260,6 +261,18 @@ describe('session package service import', () => {
 
     expect(result.outcome).toBe('created')
     expect(await db.libraryDrills.count()).toBe(0)
+  })
+
+  it('returns a name conflict when concurrent imports request the same name', async () => {
+    const [first, second] = await Promise.all([
+      importSessionPackage(packageFixture(), 'Concurrent Copy'),
+      importSessionPackage(packageFixture(), 'Concurrent Copy'),
+    ])
+
+    expect([first, second].filter((result) => result.outcome === 'created')).toHaveLength(1)
+    expect([first, second].filter((result) => result.outcome === 'name_conflict')).toHaveLength(1)
+    expect(await db.sessions.filter((entry) => entry.name === 'Concurrent Copy').count()).toBe(1)
+    expect(await db.drills.count()).toBe(1)
   })
 
   it('rolls back session and drills if a drill insert fails', async () => {

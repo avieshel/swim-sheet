@@ -22,7 +22,7 @@
 - Imported drills stay embedded in the session. Do not call `addDrill()` or write/merge `libraryDrills` during import.
 - Session management uses a toolbar import icon (`file_upload`) and a per-session export icon (`file_download`). Icon-only controls have visible focus rings, at least 44×44px targets, and descriptive accessible labels/tooltips.
 - File import/export works signed out and offline. A signed-in import is owned by the recipient and follows normal sync; it must not access the sender's account.
-- Pages/components cannot import `db/` directly. DAO remains CRUD-only. Tunable limits are not inlined at use sites. Do not add dependencies or weaken project hard gates.
+- Pages/components cannot import `db/` directly. DAO owns Dexie transaction mechanics; name policy remains in the service-supplied guard. Tunable limits are not inlined at use sites. Do not add dependencies or weaken project hard gates.
 - Share-link publishing/table, admin copy RPC, live collaboration, and result sharing are out of scope for this plan.
 
 ## Review Focus
@@ -42,6 +42,7 @@
 - `shared/sessionPackage/validate.ts` — runtime-neutral strict validator and normalized output.
 - `client/src/services/sessionPackageService.ts` — session-to-package mapping, preview/name conflict logic, and atomic package import.
 - `client/src/api/sessionPackages.ts` — API-layer wrappers; UI does not call services/DAO directly.
+- `client/src/db/dao.ts` — transactionally evaluates the supplied session predicate before inserting the parent and drill rows.
 - `client/src/utils/sessionPackageFile.ts` — browser file read/size check and JSON download/filename handling.
 - `client/src/components/SessionPackageImportModal.tsx` — accessible file select, preview, conflict choice, and completion state.
 - `client/src/pages/SessionsList.tsx` — Import action and per-template Export action.
@@ -120,15 +121,15 @@ git commit -m "feat: define portable session package contract"
 - Create: `client/src/services/__tests__/sessionPackageService.test.ts`
 - Create: `client/src/api/sessionPackages.ts`
 - Create: `client/src/api/__tests__/sessionPackages.test.ts`
-- Reuse: `client/src/db/dao.ts` (`getSession`, `getDrillsForSession`, `getAllSessions`, `addSessionWithDrills`)
+- Modify: `client/src/db/dao.ts` to add `addSessionWithDrillsIf(session, drills, canCreate)` alongside `addSessionWithDrills`.
 
 **Interfaces:**
-- Consumes: `SessionPackageV1` and `validateSessionPackage()` from Task 1; atomic `addSessionWithDrills(session, drills)`.
+- Consumes: `SessionPackageV1` and `validateSessionPackage()` from Task 1; `addSessionWithDrillsIf(session, drills, canCreate: (existingSessions: Session[]) => boolean): Promise<string | null>`.
 - Produces: `exportSessionPackage`, `inspectSessionPackage`, and `importSessionPackage` with the result unions defined above; API wrappers with matching names/signatures.
 
 - [x] **Step 1: Write failing service tests**
 
-Use fake IndexedDB for service integration tests. Add these tests: `exportMapsAuthoredFieldsAndSortsDrills` asserts every authored field and order; `exportOmitsIdsOwnershipAndLocalMarkers`; `exportRejectsUnrepresentableSourceContent`; `inspectionRejectsInvalidPackageWithoutWrites`; `inspectionFindsTrimmedCaseInsensitiveNameConflict`; `suggestedCopyNameUsesNumberedSuffixAndFitsLimit`; `importCreatesFreshPrivateSessionAndNestedIds`; `importPreservesEmptyTemplateAndRichFields`; `importDoesNotWriteLibraryDrills`; and `importRollsBackOnDrillInsertFailure` asserts sessions/drills/library remain unchanged after a failed transaction.
+Use fake IndexedDB for service integration tests. Add these tests: `exportMapsAuthoredFieldsAndSortsDrills` asserts every authored field and order; `exportOmitsIdsOwnershipAndLocalMarkers`; `exportRejectsUnrepresentableSourceContent`; `exportDerivesMissingSummaryFields`; `inspectionRejectsInvalidPackageWithoutWrites`; `inspectionFindsTrimmedCaseInsensitiveNameConflict`; `suggestedCopyNameUsesNumberedSuffixAndFitsLimit`; `importCreatesFreshPrivateSessionAndNestedIds`; `importPreservesEmptyTemplateAndRichFields`; `importDoesNotWriteLibraryDrills`; `parallelImportsSerializeNameCheckAndCreate`; and `importRollsBackOnDrillInsertFailure` asserts sessions/drills/library remain unchanged after a failed transaction.
 
 - [x] **Step 2: Run service tests and verify the expected failures**
 
@@ -137,7 +138,7 @@ Expected: FAIL because the package service is not implemented.
 
 - [x] **Step 3: Implement the service mapper and transactional import**
 
-Export from `getSession` plus `getDrillsForSession`, sort drills by order, map only package fields, and omit `creator` unless a supported label source exists. Preserve present summary fields; derive absent summary stroke from the first item and distance with `getDrillTotalDistance`. Validate the export before returning it and fail rather than dropping unsupported source data. Inspection validates and computes whether a trimmed/case-insensitive session name exists. Generate `<name> (imported)` and then numbered suffixes until a free name is found, truncating only the base to fit the configured name length. Import validates again, validates the requested name, rejects a still-conflicting name, maps package data to `SafeSession` and drills, regenerates every nested item ID with `crypto.randomUUID()`, sets the new session private/unassigned, and calls `addSessionWithDrills`. Never call `addDrill()`.
+Export from `getSession` plus `getDrillsForSession`, sort drills by order, map only package fields, and omit `creator` unless a supported label source exists. Preserve present summary fields; derive absent summary stroke from the first item and distance with `getDrillTotalDistance`; do not replace invalid present values. Validate the export before returning it and fail rather than dropping unsupported source data. Inspection validates and computes whether a trimmed/case-insensitive session name exists. Generate `<name> (imported)` and then numbered suffixes until a free name is found, truncating only the base to fit the configured name length. Import validates again and passes a case-insensitive name-conflict predicate to `addSessionWithDrillsIf`, which checks names and inserts session/drills in one transaction. If another import won the race, return `name_conflict` with a fresh suggestion. Map package data to `SafeSession` and drills, regenerate every nested item ID with `crypto.randomUUID()`, set the new session private/unassigned, and never call `addDrill()`.
 
 - [x] **Step 4: Run service tests and verify they pass**
 

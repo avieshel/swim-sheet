@@ -191,8 +191,10 @@ partial or misleading file; show an error and leave the source unchanged.
    fields.
 6. Show success and a **View session** action.
 
-Use the existing atomic `addSessionWithDrills` DAO primitive (or an equivalent
-transactional writer). Do **not** route imported drills through `addDrill`:
+Use the DAO's conditional session-and-drills writer: it evaluates the service's
+name-conflict predicate and inserts the session plus drills inside the same
+Dexie read-write transaction. This prevents concurrent imports from both
+passing a stale preflight check. Do **not** route imported drills through `addDrill`:
 that method also writes to the drill bank, where current name-based upsert can
 collide with a recipient's native/builtin entry. Import creates only the session
 and its embedded drills. A later promotion-to-library feature is separate.
@@ -220,7 +222,8 @@ create `SessionRun`, `RunDrill`, swimmers, laps, or timing data.
   and mapping helpers shared with the future backend endpoint.
 - Client UI: file picker/download, preview, duplicate-name choice, and messages.
 - Client API/service: export a validated package; validate and import a package.
-- DAO: pure reads plus atomic session-and-drills creation; no business rules or
+- DAO: pure reads plus atomic session-and-drills creation. The service supplies
+  the name-conflict predicate; the DAO owns only the Dexie transaction. No
   library side effects.
 - Future share delivery: retrieves the same package format and calls the same
   import service as file import.
