@@ -97,6 +97,21 @@ async function dbName(page: Page, table: string, id: string): Promise<string | n
   )
 }
 
+async function dbSessionDetailsByName(page: Page, name: string): Promise<{ id: string; drills: string[] } | null> {
+  return page.evaluate(async (sessionName) => {
+    const database = (window as unknown as {
+      db: {
+        sessions: { toArray: () => Promise<{ id: string; name: string }[]> }
+        drills: { where: (field: string) => { equals: (value: string) => { toArray: () => Promise<{ name: string }[]> } } }
+      }
+    }).db
+    const session = (await database.sessions.toArray()).find((row) => row.name === sessionName)
+    if (!session) return null
+    const drills = await database.drills.where('sessionId').equals(session.id).toArray()
+    return { id: session.id, drills: drills.map((drill) => drill.name) }
+  }, name)
+}
+
 async function dbHasSwimmerName(page: Page, name: string): Promise<boolean> {
   return page.evaluate(
     (n) => (window as unknown as { db: { swimmers: { where: (k: string) => { equals: (v: string) => { toArray: () => Promise<{ name?: string }[]> } } } } }).db.swimmers.where('name').equals(n).toArray().then((r) => r.length > 0),
@@ -111,6 +126,8 @@ const runnable =
   !!process.env.VITE_AUTH_TEST_PASSWORD
 
 test.describe('cross-device cloud sync', () => {
+  test.describe.configure({ mode: 'serial' })
+
   // Playwright has no describe.skipIf (that is Vitest); test.skip inside the
   // describe body applies the condition to every test in the block.
   test.skip(!runnable, 'requires a reachable Supabase project with the sync foundation applied')
@@ -230,5 +247,64 @@ test.describe('cross-device cloud sync', () => {
 
     await device1.context.close()
     await device2.context.close()
+  })
+
+  test('a signed-in recipient syncs an imported session to another device', async ({ browser }) => {
+    const device1 = await newDevice(browser)
+    const device2 = await newDevice(browser)
+    const sessionName = `Package Sync ${Date.now()}`
+    const packageFile = {
+      format: 'swimsheet-session',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      session: { name: sessionName, notes: 'Imported to recipient account' },
+      drills: [
+        {
+          name: 'Imported Freestyle',
+          stroke: 'freestyle',
+          distance: 100,
+          order: 0,
+          items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+          repeatCount: 1,
+          timingMode: 'individual',
+          focus: 'fitness',
+          labels: ['aerobic'],
+          description: '',
+        },
+      ],
+    }
+
+    try {
+      await injectSession(device1.context)
+      await openApp(device1.page)
+      await device1.page.goto('/sessions')
+      await device1.page.getByRole('button', { name: 'Import session' }).click()
+      const dialog = device1.page.getByRole('dialog', { name: 'Import session' })
+      await dialog.getByLabel('Session file').setInputFiles({
+        name: 'recipient-session.swimsheet',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(packageFile)),
+      })
+      await expect(dialog.getByRole('heading', { name: sessionName })).toBeVisible()
+      await dialog.getByRole('button', { name: 'Import session' }).click()
+      await expect(dialog.getByRole('heading', { name: 'Import Complete' })).toBeVisible()
+      await device1.page.goto('/settings')
+      const mergeButton = device1.page.getByRole('button', { name: /merge & sync/i })
+      await expect(mergeButton).toBeVisible()
+      await mergeButton.click()
+      await clickSyncNow(device1.page)
+
+      await injectSession(device2.context)
+      await openApp(device2.page)
+      await expect
+        .poll(async () => (await dbSessionDetailsByName(device2.page, sessionName))?.drills[0] ?? '', { timeout: 30000 })
+        .toBe('Imported Freestyle')
+      const received = await dbSessionDetailsByName(device2.page, sessionName)
+      expect(received).not.toBeNull()
+      expect(received?.drills).toEqual(['Imported Freestyle'])
+    } finally {
+      await device1.context.close()
+      await device2.context.close()
+    }
   })
 })
