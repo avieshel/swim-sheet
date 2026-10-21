@@ -271,7 +271,7 @@ export const SessionsList: React.FC = () => {
               title="Import session"
               className="h-11 w-11 inline-flex items-center justify-center rounded-xl border border-outline text-on-surface hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              <Icon name="file_upload" />
+              <Icon name="file_download" />
             </button>
             <Link
               to="/sessions/catalog"
@@ -416,7 +416,7 @@ export const SessionsList: React.FC = () => {
                           title="Export session"
                           className="h-11 w-11 inline-flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         >
-                          <Icon name="file_download" />
+                          <Icon name="file_upload" />
                         </button>
                         <button
                           type="button"

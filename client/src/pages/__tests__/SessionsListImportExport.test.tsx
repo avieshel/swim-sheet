@@ -85,7 +85,7 @@ describe('SessionsList import and export actions', () => {
     renderSessionsList()
 
     const importButton = await screen.findByRole('button', { name: 'Import session' })
-    expect(importButton.textContent).toContain('file_upload')
+    expect(importButton.textContent).toContain('file_download')
     await user.click(importButton)
 
     expect(screen.getByRole('dialog', { name: 'Import session' })).toBeTruthy()
@@ -95,7 +95,7 @@ describe('SessionsList import and export actions', () => {
     renderSessionsList()
 
     const exportButton = await screen.findByRole('button', { name: 'Export Sample Session' })
-    expect(exportButton.textContent).toContain('file_download')
+    expect(exportButton.textContent).toContain('file_upload')
   })
 
   it('exports from a session card without navigating into it', async () => {

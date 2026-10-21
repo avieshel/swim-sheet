@@ -20,7 +20,7 @@
 - Name collisions compare trimmed, case-insensitive names. Import never overwrites; a collision offers a distinct `<name> (imported)` name, with a numbered suffix if needed, or cancel.
 - Suggested copy names must stay within the configured name length; truncate only the base portion needed to fit the suffix. The final import name is revalidated.
 - Imported drills stay embedded in the session. Do not call `addDrill()` or write/merge `libraryDrills` during import.
-- Session management uses a toolbar import icon (`file_upload`) and a per-session export icon (`file_download`). Icon-only controls have visible focus rings, at least 44×44px targets, and descriptive accessible labels/tooltips.
+- Session management uses a toolbar import icon (`file_download`) and a per-session export icon (`file_upload`). Icon-only controls have visible focus rings, at least 44×44px targets, and descriptive accessible labels/tooltips.
 - File import/export works signed out and offline. A signed-in import is owned by the recipient and follows normal sync; it must not access the sender's account.
 - Pages/components cannot import `db/` directly. DAO owns Dexie transaction mechanics; name policy remains in the service-supplied guard. Tunable limits are not inlined at use sites. Do not add dependencies or weaken project hard gates.
 - Share-link publishing/table, admin copy RPC, live collaboration, and result sharing are out of scope for this plan.
@@ -209,7 +209,7 @@ Expected: FAIL because the modal and SessionsList actions are not implemented.
 
 - [x] **Step 7: Implement modal and SessionsList controls**
 
-Use `SessionModalShell`, labeled file input accepting `.swimsheet`/JSON, a stable preview/error layout, inline recoverable errors, disabled/loading feedback during reads/import, and 44px minimum actions with visible focus rings. Keep file selection/download in UI helpers and all session reads/writes behind the API. Add a `file_upload` Icon button in the session toolbar and a `file_download` Icon button on each card; both require descriptive `aria-label` and `title`. Stop propagation so export does not open the card. On success, call `onImported(sessionId)`, show the completion state, and use `onViewSession(sessionId)` only when the user activates View session.
+Use `SessionModalShell`, labeled file input accepting `.swimsheet`/JSON, a stable preview/error layout, inline recoverable errors, disabled/loading feedback during reads/import, and 44px minimum actions with visible focus rings. Keep file selection/download in UI helpers and all session reads/writes behind the API. Add a `file_download` Icon button in the session toolbar and a `file_upload` Icon button on each card; both require descriptive `aria-label` and `title`. Stop propagation so export does not open the card. On success, call `onImported(sessionId)`, show the completion state, and use `onViewSession(sessionId)` only when the user activates View session.
 
 - [x] **Step 8: Run UI tests and verify they pass**
 
