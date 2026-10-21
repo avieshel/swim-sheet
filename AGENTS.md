@@ -22,6 +22,7 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Session domain model — plan, decomposition, what the agent cannot set | `docs/context/Session-Model-Context.md` |
 | AI session harness (shared contract, agent/harness split, evals) | `shared/sessionDraft/`, `supabase/functions/ai-session-harness/`, `supabase/evals/` |
 | Template creation + promote-to-live flow (Initiative 1) | `docs/context/Session-Creation-To-Live-Context.md` |
+| Session package import/export and share-link design | `docs/context/Import-Export-Context.md`, `docs/context/Session-Sharing-Design.md` |
 | Past sessions table + swimmer-filtered history (Initiative 2) | `docs/context/Past-Sessions-Data-Context.md` |
 | Implementation plan for both initiatives (sequenced tasks) | `docs/context/Session-Initiatives-PLAN.md` |
 

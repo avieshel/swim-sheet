@@ -243,6 +243,8 @@ Individual swimmer profile.
 Template manager — grid of saved session templates.
 
 - The "Session Templates" area is a named section with consistent primary/secondary actions and responsive template cards. **New Template** still creates the same empty session shell inline; **Create with AI** still routes to `/sessions/ai`.
+- The toolbar has an accessible `file_upload` icon button to import a `.swimsheet` file. Each template card has a `file_download` icon button to export that session; both controls have descriptive accessible labels, visible focus states, and 44px touch targets.
+- Import opens a named modal with file selection, package validation, a preview (name, drill count, total distance, optional creator label), explicit copy-name handling, and a View session success action. Import creates only a new private session and embedded drills; it does not update the drill bank or import runs/results.
 - Template cards: name, drill count, total distance, focus label
 - Card chip `AI draft` when `session.aiDraftStatus === 'unreviewed'` (local-only marker; not synced)
 - Click to navigate to editor (`/sessions/:id`)
