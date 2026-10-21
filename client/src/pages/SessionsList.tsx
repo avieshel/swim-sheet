@@ -12,8 +12,11 @@ import { useActiveRun } from '../hooks/useActiveRun'
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
+import { SessionPackageImportModal } from '../components/SessionPackageImportModal'
 import { Events, analytics } from '../services/analyticsEvents'
 import type { Stroke } from '../types/swimming'
+import { exportSessionPackage } from '../api/sessionPackages'
+import { downloadSessionPackageFile } from '../utils/sessionPackageFile'
 
 interface SessionWithTotals extends Session {
   drillCount: number
@@ -30,7 +33,9 @@ export const SessionsList: React.FC = () => {
   const [recentRuns, setRecentRuns] = useState<RunSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewForm, setShowNewForm] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const [formName, setFormName] = useState('')
+  const [exportError, setExportError] = useState<string | null>(null)
   const [templateSearch, setTemplateSearch] = useState('')
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [recentSearch, setRecentSearch] = useState('')
@@ -107,6 +112,16 @@ export const SessionsList: React.FC = () => {
     setShowNewForm(false)
     setFormName('')
     loadAll()
+  }
+
+  const handleExport = async (id: string, name: string) => {
+    setExportError(null)
+    try {
+      const sessionPackage = await exportSessionPackage(id)
+      downloadSessionPackageFile(sessionPackage, name)
+    } catch {
+      setExportError('Could not export the session. Review the template and try again.')
+    }
   }
 
   const performDelete = async (id: string, name: string) => {
@@ -249,6 +264,15 @@ export const SessionsList: React.FC = () => {
             <p className="font-body-md text-body-md text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowImportModal(true)}
+              aria-label="Import session"
+              title="Import session"
+              className="h-11 w-11 inline-flex items-center justify-center rounded-xl border border-outline text-on-surface hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <Icon name="file_upload" />
+            </button>
             <Link
               to="/sessions/catalog"
               className="h-11 inline-flex items-center gap-2 px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-all no-underline"
@@ -272,6 +296,11 @@ export const SessionsList: React.FC = () => {
             </Link>
           </div>
         </div>
+        {exportError && (
+          <p role="alert" className="mb-4 rounded-lg bg-error-container/40 p-3 text-label-sm text-error">
+            {exportError}
+          </p>
+        )}
 
         {showNewForm && (
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 mb-6 border border-outline-variant shadow-sm">
@@ -379,13 +408,25 @@ export const SessionsList: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                        aria-label={`Delete ${s.name}`}
-                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <Icon name="delete" />
-                      </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); void handleExport(s.id, s.name) }}
+                          aria-label={`Export ${s.name}`}
+                          title="Export session"
+                          className="h-11 w-11 inline-flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <Icon name="file_download" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
+                          aria-label={`Delete ${s.name}`}
+                          className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <Icon name="delete" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
                       <span className="flex items-center gap-1">
@@ -539,6 +580,13 @@ export const SessionsList: React.FC = () => {
         onConfirm={confirmDeleteRun}
         onCancel={() => setRunDeleteTarget(null)}
       />
+      {showImportModal && (
+        <SessionPackageImportModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => { void loadAll() }}
+          onViewSession={(sessionId) => navigate(`/sessions/${sessionId}`)}
+        />
+      )}
     </div>
   )
 }
