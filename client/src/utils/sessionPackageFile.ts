@@ -35,6 +35,9 @@ export function downloadSessionPackageFile(
   sessionName: string,
 ): void {
   const blob = new Blob([JSON.stringify(sessionPackage, null, 2)], { type: 'application/json' })
+  if (blob.size > defaultSessionPackageConfig.limits.maxFileBytes) {
+    throw new Error('The exported session exceeds the session package size limit.')
+  }
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url

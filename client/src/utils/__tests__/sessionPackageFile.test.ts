@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defaultSessionPackageConfig } from '../../../../shared/sessionPackage/config'
 import type { SessionPackageV1 } from '../../../../shared/sessionPackage/types'
 import {
@@ -14,6 +14,8 @@ const packageData: SessionPackageV1 = {
   session: { name: 'Main Set', notes: '' },
   drills: [],
 }
+
+afterEach(() => vi.restoreAllMocks())
 
 describe('session package file helpers', () => {
   it('rejects oversize files before reading text', async () => {
@@ -38,6 +40,21 @@ describe('session package file helpers', () => {
     const file = new File(['{bad json'], 'session.swimsheet')
 
     await expect(readSessionPackageFile(file)).rejects.toThrow(/valid json/i)
+  })
+
+  it('rejects oversized exports before creating a download URL', () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:session-package')
+    const oversizedPackage: SessionPackageV1 = {
+      ...packageData,
+      session: {
+        ...packageData.session,
+        notes: 'n'.repeat(defaultSessionPackageConfig.limits.maxFileBytes),
+      },
+    }
+
+    expect(() => downloadSessionPackageFile(oversizedPackage, 'Large Set')).toThrow(/size limit/i)
+    expect(createObjectURL).not.toHaveBeenCalled()
+    createObjectURL.mockRestore()
   })
 
   it('downloads a JSON file with the swimsheet extension', () => {

@@ -152,6 +152,20 @@ describe('session package service export', () => {
 
     await expect(exportSessionPackage('source-session')).rejects.toThrow()
   })
+
+  it('derives missing drill summary fields from the authored items', async () => {
+    await db.sessions.add(session())
+    const createdFromEditor = {
+      ...drill(),
+      stroke: undefined,
+      distance: undefined,
+    } as unknown as Drill
+    await db.drills.add(createdFromEditor)
+
+    const result = await exportSessionPackage('source-session')
+
+    expect(result.drills[0]).toMatchObject({ stroke: 'butterfly', distance: 100 })
+  })
 })
 
 describe('session package service inspection', () => {

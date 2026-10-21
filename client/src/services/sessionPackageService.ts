@@ -6,6 +6,7 @@ import {
 } from '../db/dao'
 import type { Drill, SafeDrill, SafeSession } from '../db/schema'
 import { defaultSessionPackageConfig } from '../../../shared/sessionPackage/config'
+import { getDrillTotalDistance } from '../utils/drillHelpers'
 import type {
   SessionPackageDrillV1,
   SessionPackageItemV1,
@@ -48,10 +49,12 @@ function mapItem(item: Drill['items'][number]): SessionPackageItemV1 {
 }
 
 function mapDrill(drill: Drill): SessionPackageDrillV1 {
+  const stroke = drill.stroke || drill.items[0]?.stroke
+  if (!stroke) throw new Error(`Drill "${drill.name}" has no stroke to export`)
   return {
     name: drill.name,
-    stroke: drill.stroke,
-    distance: drill.distance,
+    stroke,
+    distance: drill.distance ?? getDrillTotalDistance(drill),
     order: drill.order,
     items: drill.items.map(mapItem),
     repeatCount: drill.repeatCount,
