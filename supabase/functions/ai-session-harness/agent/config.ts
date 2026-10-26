@@ -43,3 +43,17 @@ export function getProviderTimeoutMs(): number {
 export function getProviderMaxAttempts(): number {
   return positiveIntFromEnv('PROVIDER_MAX_ATTEMPTS', PROVIDER_MAX_ATTEMPTS)
 }
+
+function booleanFromEnv(key: string): boolean {
+  const raw = Deno.env.get(key) ?? ''
+  return raw === '1' || raw.toLowerCase() === 'true' || raw.toLowerCase() === 'yes'
+}
+
+// Opt-in structured outputs: send `response_format: json_schema` (enforcing the
+// shared contract at decode time) plus the routing hint that the request must
+// reach an endpoint supporting it. Providers without structured-output support
+// treat json_schema as a hint or 400 — so this stays off by default and is
+// enabled per deployment.
+export function getProviderStructuredOutputs(): boolean {
+  return booleanFromEnv('PROVIDER_STRUCTURED_OUTPUTS')
+}

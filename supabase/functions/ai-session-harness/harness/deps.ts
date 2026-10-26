@@ -113,6 +113,7 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
           rawContent: meta.rawContent,
           providerStatus: meta.providerStatus,
           finishReason: meta.finishReason,
+          model: meta.model,
           error: null,
         }
       } catch (err) {
@@ -122,6 +123,7 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
             rawContent: meta.rawContent,
             providerStatus: err.status,
             finishReason: meta.finishReason,
+            model: err.model,
             error: { kind: err.kind, message: err.message, retryAfterSeconds: err.retryAfterSeconds },
           }
         }
@@ -130,6 +132,7 @@ export function createDeps(env: EnvGet = (key) => Deno.env.get(key)): HandlerDep
           rawContent: meta.rawContent,
           providerStatus: meta.providerStatus,
           finishReason: meta.finishReason,
+          model: meta.model,
           error: { kind: 'network', message: err instanceof Error ? err.message : 'network error' },
         }
       }

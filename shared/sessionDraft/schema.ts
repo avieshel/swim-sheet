@@ -18,6 +18,38 @@
 import type { SessionDraftConfig } from './config.ts'
 import type { EquipmentId, SessionDraftContext } from './types.ts'
 
+// The full response envelope the agent asks the model for: `plan` is capped at
+// the contract's plan-line limit, and `draft` is the shared draft schema. Sent
+// as `response_format: json_schema` so structured-output-capable endpoints
+// constrain-decode into the exact contract shape. Not strict mode — `draft` and
+// `message` are conditionally required by `outcome`, which strict mode cannot
+// express, so the shared valves remain the validator's job.
+export function buildResponseSchema(
+  config: SessionDraftConfig,
+  context: SessionDraftContext,
+): JsonSchema {
+  return {
+    type: 'object',
+    description: 'The agent response envelope.',
+    required: ['outcome'],
+    additionalProperties: false,
+    properties: {
+      outcome: { type: 'string', enum: ['draft', 'not_actionable'] },
+      plan: {
+        type: 'array',
+        description: 'One short line per drill, in order. Omit when outcome is not_actionable.',
+        maxItems: config.limits.maxPlanEntries,
+        items: { type: 'string', maxLength: config.limits.maxPlanLineLength },
+      },
+      message: {
+        type: 'string',
+        description: 'Set only when outcome is not_actionable.',
+      },
+      draft: buildDraftJsonSchema(config, context),
+    },
+  }
+}
+
 export interface JsonSchema {
   type?: string
   description?: string

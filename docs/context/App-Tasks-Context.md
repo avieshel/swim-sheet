@@ -29,9 +29,26 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ---
 
-## Known Issues
+## A-056: AI harness resilience — structured outputs opt-in, plan-line truncation, model attribution 🚧
 
-- **Tombstone retention purge is written but parked in `migrations_archive/`.**
+**Source**: 2026-10-26 incident — one user's session generation failed 11 of 15 provider attempts across two generation episodes (03:47–03:49 and 03:57–04:02 UTC). Diagnosis from `ai_private.ai_analytics_trace`: 4× `"stream produced no content"` (a reasoning model bled its tokens into the content channel until nothing usable remained), 2× provider timeout (deployed `PROVIDER_TIMEOUT_MS=120000` masked it), 2× Nvidia 502s, 1× `finish_reason=length` (reasoning tokens consumed the 4096 `max_tokens`), 3× validator `"draft.plan entry exceeds 100 characters"`. Hebrew input ruled out — English prompts failed identically.
+
+**Decision**: stay on a **single LLM provider/model** (`PROVIDER_MODEL`) for now. Model failover (a `PROVIDER_MODELS` chain) was drafted and deliberately removed — retry/re-prompt behavior stays as-is, and switching models later means changing one secret.
+
+**Fix (branch `ai-harness-provider-resilience`, draft PR)**:
+- **Structured outputs opt-in** — `PROVIDER_STRUCTURED_OUTPUTS=1` sends `response_format: json_schema` (generated from the shared contract by `shared/sessionDraft/schema.ts:buildResponseSchema`) plus OpenRouter's `provider: { require_parameters: true }` routing hint. Off by default: endpoints without support treat `json_schema` as a hint or 400.
+- **Plan-line cap** — new `maxPlanLineLength` limit in `shared/sessionDraft/config.ts` (replaces the accidental reuse of `maxNameLength`); `coercePlan` truncates overlong display-only plan lines before validation on the agent side (`agent/output.ts`), while shape/empty/entry-count checks stay hard failures. The client re-validates through its own binding of the same shared validator.
+- **Model attribution** — `ProviderMeta.model` and `ProviderError.model` thread through `onMeta` into every trace row, so `ai_private.ai_analytics_trace.model` reflects the model that actually answered.
+- **Streaming diagnosability** — a 200 stream with no content deltas now fails as a `shape` error carrying the raw SSE body (was a silent NULL `raw_content`), and an internal stream timeout surfaces as `timeout` (was misread as a parse failure).
+
+**Also**: `ss_inspector` (the read-only DB-inspect role) was granted `USAGE` + `SELECT` on the `ai_private` schema on 2026-10-26, verified via `utils/db_inspect.sh --env production`.
+
+**Recommendation carried for later**: when the model becomes a decision point again, prefer a non-reasoning model (e.g. `openai/gpt-4.1-mini`) — a reasoning model's token bleed caused 8 of the 15 failed attempts and consumed the token budget entirely in one.
+
+**Status**: Draft PR open for review; not yet deployed (secret `PROVIDER_STRUCTURED_OUTPUTS` remains unset until the daybed endpoint supports json_schema).
+
+---
+ **Tombstone retention purge is written but parked in `migrations_archive/`.**
   `supabase/migrations_archive/20261011000000_purge_expired_tombstones.sql` is
   complete and was verified against local Postgres on 2026-10-11 (applies
   idempotently, registers one `pg_cron` job, and a four-scenario test confirmed

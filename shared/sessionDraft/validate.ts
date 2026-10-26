@@ -234,11 +234,24 @@ function validatePlan(config: SessionDraftConfig, value: unknown): ValidationOut
     if (typeof entry !== 'string' || entry.trim().length === 0) {
       return fail('invalid_shape', 'draft.plan entries must be non-empty strings')
     }
-    if (entry.length > config.limits.maxNameLength) {
-      return fail('limit_exceeded', `draft.plan entry exceeds ${config.limits.maxNameLength} characters`)
+    if (entry.length > config.limits.maxPlanLineLength) {
+      return fail('limit_exceeded', `draft.plan entry exceeds ${config.limits.maxPlanLineLength} characters`)
     }
   }
   return { ok: true, value: value as string[] }
+}
+
+// Agent-side leniency for the plan's display-only lines: overlong entries are
+// truncated to the cap instead of costing the whole provider attempt. Shape
+// problems (non-strings, empty entries, too many entries) are deliberately not
+// coerced — those stay hard validation failures.
+export function coercePlan(config: SessionDraftConfig, value: unknown): unknown {
+  if (!Array.isArray(value)) return value
+  return value.map((entry) =>
+    typeof entry === 'string' && entry.length > config.limits.maxPlanLineLength
+      ? entry.slice(0, config.limits.maxPlanLineLength)
+      : entry,
+  )
 }
 
 export function validateHarnessResult(
