@@ -5,11 +5,61 @@ export function getDrillTotalDistance(d: { items?: { distance: number; repeatCou
   return d.items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * (d.repeatCount || 1)
 }
 
+interface DrillLikeItem {
+  distance?: number
+  stroke?: string
+  repeatCount?: number
+  interval?: string
+  intensity?: string
+  equipment?: string[]
+}
+
+interface DrillLike {
+  name?: string
+  distance?: number
+  stroke?: string
+  repeatCount?: number
+  items?: DrillLikeItem[]
+}
+
+// One-line summary in the shared drill-list visual language (DrillsSection):
+// a single step reads as meters + stroke, multiple steps as a rounds × steps
+// shape over the drill's total distance.
+export function drillSubtitle(d: DrillLike): string {
+  const items = d.items ?? []
+  if (items.length <= 1) {
+    const item = items[0]
+    const reps = (item?.repeatCount ?? 1) * (d.repeatCount ?? 1)
+    const dist = item?.distance ?? d.distance ?? 0
+    const stroke = item?.stroke ?? d.stroke ?? ''
+    const meterText = reps > 1 ? `${reps}×${dist}m` : `${dist}m`
+    return `${meterText} ${stroke}`.trim()
+  }
+  return `${(d.items ?? []).reduce((sum, item) => sum + ((item.distance ?? 0) * (item.repeatCount ?? 1)), 0) * (d.repeatCount ?? 1)}m · ${d.repeatCount ?? 1} rounds × ${items.length} steps`
+}
+
+export function drillStepLines(d: DrillLike): Array<{ label: string; text: string; interval?: string; intensity?: string }> {
+  return (d.items ?? []).map((item, idx) => ({
+    label: String(idx + 1),
+    text: `${item.repeatCount ?? 1}×${item.distance ?? 0}m ${item.stroke ?? ''}`.trim(),
+    interval: item.interval,
+    intensity: item.intensity,
+  }))
+}
+
+export function drillEquipment(d: DrillLike): string[] {
+  const seen = new Set<string>()
+  for (const item of d.items ?? []) {
+    for (const id of item.equipment ?? []) seen.add(id)
+  }
+  return Array.from(seen)
+}
+
+
 export interface EmptyDrillForm {
   name: string
   items: { id: string; distance: number; stroke: Stroke; repeatCount: number }[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: 'technique' | 'fitness' | 'none'
   labels: string[]
   description: string
@@ -20,7 +70,6 @@ export function emptyDrillForm(): EmptyDrillForm {
     name: '',
     items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
     repeatCount: 1,
-    timingMode: 'individual',
     focus: 'none',
     labels: [],
     description: '',

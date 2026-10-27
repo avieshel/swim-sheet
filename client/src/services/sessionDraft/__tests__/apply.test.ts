@@ -49,7 +49,6 @@ describe('mapDraftToSessionAndDrills', () => {
 
   it('supplies neutral app defaults', () => {
     const { drills, session } = mapDraftToSessionAndDrills(draft, false)
-    expect(drills[0].timingMode).toBe('individual')
     expect(drills[0].focus).toBe('none')
     expect(drills[0].labels).toEqual([])
     expect(drills[0].description).toBe('')

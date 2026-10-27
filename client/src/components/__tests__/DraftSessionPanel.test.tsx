@@ -64,23 +64,36 @@ function valueOf(label: string): string {
   return (screen.getByLabelText(label) as HTMLInputElement).value
 }
 
+async function openEditor(user: userEvent.User, drillName: string) {
+  await user.click(screen.getByRole('button', { name: `Edit drill: ${drillName}` }))
+}
+
 describe('DraftSessionPanel', () => {
-  it('exposes the proposal inside a named editor section', () => {
+  it('exposes the proposal list and the session name', () => {
     renderPanel()
-    expect(screen.getByRole('region', { name: 'Proposed session' })).toBeTruthy()
+    expect(screen.getByText('Proposed session')).toBeTruthy()
+    expect(valueOf('Session name')).toBe('Aerobic 2000')
   })
 
-  it('shows the session name and a total that spans every drill', () => {
+  it('shows a one-line subtitle per drill and a total that spans every drill', () => {
     renderPanel(
       fixture({
         drills: [
           { name: 'Main set', repeatCount: 2, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 10 }] },
-          { name: 'Cool down', repeatCount: 1, items: [{ distance: 50, stroke: 'freestyle', repeatCount: 4 }] },
+          {
+            name: 'IM set',
+            repeatCount: 1,
+            items: [
+              { distance: 100, stroke: 'butterfly', repeatCount: 4 },
+              { distance: 100, stroke: 'backstroke', repeatCount: 4 },
+            ],
+          },
         ],
       }),
     )
-    expect(valueOf('Session name')).toBe('Aerobic 2000')
-    expect(screen.getByText('2200m')).toBeTruthy()
+    expect(screen.getByText('2800m')).toBeTruthy()
+    expect(screen.getByText('20×100m freestyle')).toBeTruthy()
+    expect(screen.getByText('800m · 1 rounds × 2 steps')).toBeTruthy()
   })
 
   it('renames the session', async () => {
@@ -91,9 +104,10 @@ describe('DraftSessionPanel', () => {
     expect(valueOf('Session name')).toBe('Threshold 3000')
   })
 
-  it('edits the reps on a step', async () => {
+  it('edits the reps on a step from the drill editor', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.clear(screen.getByLabelText('Reps for Main set'))
     await user.type(screen.getByLabelText('Reps for Main set'), '12')
     expect(valueOf('Reps for Main set')).toBe('12')
@@ -102,6 +116,7 @@ describe('DraftSessionPanel', () => {
   it('edits the distance on a step', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.clear(screen.getByLabelText('Distance for Main set'))
     await user.type(screen.getByLabelText('Distance for Main set'), '75')
     expect(valueOf('Distance for Main set')).toBe('75')
@@ -110,6 +125,7 @@ describe('DraftSessionPanel', () => {
   it('edits the interval on a step', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.clear(screen.getByLabelText('Interval for Main set'))
     await user.type(screen.getByLabelText('Interval for Main set'), '2:00')
     expect(valueOf('Interval for Main set')).toBe('2:00')
@@ -118,6 +134,7 @@ describe('DraftSessionPanel', () => {
   it('changes the stroke on a step', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByRole('button', { name: /^Freestyle/ }))
     await user.click(screen.getByRole('button', { name: 'Butterfly' }))
     expect(screen.getByRole('button', { name: /^Butterfly/ })).toBeTruthy()
@@ -126,6 +143,7 @@ describe('DraftSessionPanel', () => {
   it('changes the intensity on a step', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByRole('button', { name: /^v2/ }))
     await user.click(screen.getByRole('button', { name: 'v4' }))
     expect(screen.getByRole('button', { name: /^v4/ })).toBeTruthy()
@@ -134,13 +152,16 @@ describe('DraftSessionPanel', () => {
   it('clears the intensity when the dash option is chosen', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByRole('button', { name: /^v2/ }))
     await user.click(screen.getByRole('button', { name: '--' }))
     expect(screen.getByRole('button', { name: /^--/ })).toBeTruthy()
   })
 
-  it('marks equipment that is on as pressed', () => {
+  it('marks equipment that is on as pressed', async () => {
+    const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     expect(screen.getByTitle('Fins').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByTitle('Paddles').getAttribute('aria-pressed')).toBe('false')
   })
@@ -148,6 +169,7 @@ describe('DraftSessionPanel', () => {
   it('turns equipment off when an active one is clicked', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByTitle('Fins'))
     expect(screen.getByTitle('Fins').getAttribute('aria-pressed')).toBe('false')
   })
@@ -155,6 +177,7 @@ describe('DraftSessionPanel', () => {
   it('turns equipment on when an inactive one is clicked', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByTitle('Paddles'))
     expect(screen.getByTitle('Paddles').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByTitle('Fins').getAttribute('aria-pressed')).toBe('true')
@@ -163,25 +186,33 @@ describe('DraftSessionPanel', () => {
   it('increments and decrements the set repeats', async () => {
     const user = userEvent.setup()
     renderPanel()
-    expect(screen.getByText('2x')).toBeTruthy()
+    expect(screen.getByText('2 × Main set')).toBeTruthy()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByRole('button', { name: 'Increase set repeats for Main set' }))
-    expect(screen.getByText('3x')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.getByText('3 × Main set')).toBeTruthy()
+    await openEditor(user, 'Main set')
     await user.click(screen.getByRole('button', { name: 'Decrease set repeats for Main set' }))
     await user.click(screen.getByRole('button', { name: 'Decrease set repeats for Main set' }))
-    expect(screen.getByText('1x')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.getByText('Main set')).toBeTruthy()
   })
 
   it('renames a drill', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     await user.clear(screen.getByLabelText('Drill name 1'))
     await user.type(screen.getByLabelText('Drill name 1'), 'Build set')
-    expect(valueOf('Drill name 1')).toBe('Build set')
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.getByText('2 × Build set')).toBeTruthy()
   })
 
   it('adds a step to a drill', async () => {
     const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
+    expect(screen.getByText('Edit drill 1')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Add step to Main set' }))
     const reps = screen.getAllByLabelText('Reps for Main set') as HTMLInputElement[]
     expect(reps).toHaveLength(2)
@@ -205,57 +236,61 @@ describe('DraftSessionPanel', () => {
         ],
       }),
     )
+    await openEditor(user, 'Main set')
     await user.click(screen.getByRole('button', { name: 'Remove step 2 from Main set' }))
     expect(screen.queryByRole('button', { name: 'Remove step 2 from Main set' })).toBeNull()
     expect(screen.getAllByLabelText('Distance for Main set')[0].value).toBe('100')
   })
 
-  it('cannot remove the only step in a drill', () => {
+  it('cannot remove the only step in a drill', async () => {
+    const user = userEvent.setup()
     renderPanel()
+    await openEditor(user, 'Main set')
     expect(screen.getByRole('button', { name: 'Remove step 1 from Main set' })).toHaveProperty('disabled', true)
   })
 
-  it('adds a drill', async () => {
+  it('adds a drill and opens an empty editor for it', async () => {
     const user = userEvent.setup()
     renderPanel()
     await user.click(screen.getByRole('button', { name: 'Add drill' }))
-    expect(screen.getAllByLabelText(/^Drill name/)).toHaveLength(2)
+    expect(screen.getByText('2 drills · 2100m')).toBeTruthy()
+    await openEditor(user, 'New drill')
     expect(valueOf('Drill name 2')).toBe('New drill')
   })
 
   it('removes a drill when more than one exists', async () => {
     const user = userEvent.setup()
     renderPanel(twoDrills)
-    await user.click(screen.getByRole('button', { name: 'Remove drill 2' }))
-    expect(screen.queryByLabelText('Drill name 2')).toBeNull()
-    expect(valueOf('Drill name 1')).toBe('Warmup')
+    await user.click(screen.getByRole('button', { name: 'Remove drill: Warmup' }))
+    expect(screen.queryByRole('button', { name: 'Remove drill: Warmup' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Remove drill: Main set' })).toBeTruthy()
   })
 
   it('cannot remove the only drill', () => {
     renderPanel()
-    expect(screen.getByRole('button', { name: 'Remove drill 1' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: /Remove drill/ })).toHaveProperty('disabled', true)
   })
 
   it('moves a drill up', async () => {
     const user = userEvent.setup()
     renderPanel(twoDrills)
-    await user.click(screen.getByRole('button', { name: 'Move drill 2 up' }))
-    expect(valueOf('Drill name 1')).toBe('Main set')
-    expect(valueOf('Drill name 2')).toBe('Warmup')
+    await user.click(screen.getByRole('button', { name: 'Move Main set up' }))
+    expect(screen.getByRole('button', { name: 'Move Main set up' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Move Warmup down' })).toHaveProperty('disabled', true)
   })
 
   it('moves a drill down', async () => {
     const user = userEvent.setup()
     renderPanel(twoDrills)
-    await user.click(screen.getByRole('button', { name: 'Move drill 1 down' }))
-    expect(valueOf('Drill name 1')).toBe('Main set')
-    expect(valueOf('Drill name 2')).toBe('Warmup')
+    await user.click(screen.getByRole('button', { name: 'Move Warmup down' }))
+    expect(screen.getByRole('button', { name: 'Move Warmup down' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Move Main set up' })).toHaveProperty('disabled', true)
   })
 
   it('cannot move the first drill up or the last drill down', () => {
     renderPanel(twoDrills)
-    expect(screen.getByRole('button', { name: 'Move drill 1 up' })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: 'Move drill 2 down' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Move Warmup up' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Move Main set down' })).toHaveProperty('disabled', true)
   })
 
   it('disables save and explains why when the draft is not valid', () => {
@@ -281,9 +316,8 @@ describe('DraftSessionPanel', () => {
   })
 
   it('calls onSave', async () => {
-    const user = userEvent.setup()
     const props = renderPanel()
-    await user.click(screen.getByRole('button', { name: /Save session/ }))
+    await userEvent.setup().click(screen.getByRole('button', { name: /Save session/ }))
     expect(props.onSave).toHaveBeenCalledOnce()
   })
 

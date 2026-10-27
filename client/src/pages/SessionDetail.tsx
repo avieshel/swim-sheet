@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { EquipmentIcons, type EquipmentType } from '../components/EquipmentIcons'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
-import { SessionEditorSection } from '../components/session/SessionEditorSection'
+import { DrillsList, type DrillsListRow } from '../components/session/DrillsList'
 import { SessionMetadataModal } from '../components/session/SessionMetadataModal'
 import { Icon } from '../components/Icon'
 import { getSession, updateSession, deleteSession } from '../api/sessions'
 import { keepSessionDraft } from '../api/sessionDraft'
-import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteDrill, updateLibraryDrill, deleteLibraryDrill, getSessionDrills } from '../api/drills'
+import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteDrill, getSessionDrills } from '../api/drills'
 import type { Session } from '../api/sessions'
-import type { Drill, LibraryDrill, SafeLibraryDrill, SafeDrill } from '../api/drills'
+import type { Drill, LibraryDrill, SafeDrill } from '../api/drills'
 import { strokeColors } from '../constants/drill'
-import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
+import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, emptyDrillForm, drillSubtitle, drillStepLines, drillEquipment, type SimilarDrill } from '../utils/drillHelpers'
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
 import { Events, analytics } from '../services/analyticsEvents'
@@ -27,19 +26,15 @@ export const SessionDetail: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [editingMeta, setEditingMeta] = useState(false)
 
-  // Drill bank
+  // The library stays loaded here only as a similarity mirror for the editor's
+  // duplicate warning; its own UI lives on the /drills page.
   const [libraryDrills, setLibraryDrills] = useState<LibraryDrill[]>([])
-  const [showDrillBank, setShowDrillBank] = useState(false)
-  const [libraryFilter, setLibraryFilter] = useState('')
-  const [activeTagFilters, setActiveTagFilters] = useState<string[]>([])
-  const [activeFocusFilter, setActiveFocusFilter] = useState<'all' | 'technique' | 'fitness'>('all')
 
   // Inline drill editing
   // (Removed legacy inline editing states)
 
   // Rich Drill Editor
   const [showRichEditor, setShowRichEditor] = useState(false)
-  const [editingLibraryId, setEditingLibraryId] = useState<string | null>(null)
   const [richDrill, setRichDrill] = useState<Partial<Drill>>(emptyDrillForm())
 
   const [similarWarning, setSimilarWarning] = useState<{ similars: SimilarDrill[]; data: DrillFormData; proceedSave: () => void } | null>(null)
@@ -132,42 +127,13 @@ export const SessionDetail: React.FC = () => {
     navigate('/live')
   }
 
-  const openRichEditor = (drill?: Drill | LibraryDrill, isLibrary = false) => {
+  const openRichEditor = (drill?: Drill) => {
     if (drill) {
       setRichDrill({ ...drill })
-      setEditingLibraryId(isLibrary ? drill.id : null)
     } else {
       setRichDrill(emptyDrillForm())
-      setEditingLibraryId(null)
     }
     setShowRichEditor(true)
-  }
-
-  const handleAddFromLibrary = async (libDrill: LibraryDrill) => {
-    if (!id) return
-    const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
-    await createDrill({
-      sessionId: id,
-      name: libDrill.name,
-      stroke: libDrill.stroke,
-      distance: libDrill.distance,
-      order: nextOrder,
-      items: libDrill.items || [
-        {
-          id: crypto.randomUUID(),
-          distance: libDrill.distance || 0,
-          stroke: libDrill.stroke || 'freestyle',
-          repeatCount: 1,
-        },
-      ],
-      repeatCount: libDrill.repeatCount || 1,
-      timingMode: libDrill.timingMode || 'individual',
-      focus: libDrill.focus || 'none',
-      labels: libDrill.labels || [],
-      description: libDrill.description || '',
-    })
-    analytics.track(Events.DrillAddedToSession('session_detail', libDrill.stroke, libDrill.distance))
-    loadData()
   }
 
   const handleDeleteDrill = (drillId: string) => {
@@ -180,21 +146,6 @@ export const SessionDetail: React.FC = () => {
         await deleteDrill(drillId)
         analytics.track(Events.DrillDeleted('session'))
         loadData()
-        setConfirmState(prev => ({ ...prev, open: false }))
-      }
-    })
-  }
-
-  const handleDeleteLibraryDrill = (drill: LibraryDrill) => {
-    setConfirmState({
-      open: true,
-      title: 'Delete Bank Drill',
-      message: `Are you sure you want to permanently remove "${drill.name}" from the drill library?`,
-      confirmLabel: 'Delete',
-      onConfirm: async () => {
-        await deleteLibraryDrill(drill.id)
-        analytics.track(Events.DrillDeleted('library'))
-        loadLibrary()
         setConfirmState(prev => ({ ...prev, open: false }))
       }
     })
@@ -222,26 +173,6 @@ export const SessionDetail: React.FC = () => {
 
   // Focus area detection
   const focusAreas = detectFocus(drills)
-
-  const allLibraryTags = Array.from(new Set(libraryDrills.flatMap(d => d.labels || []))).sort()
-
-  const filteredLibrary = libraryDrills.filter(d => {
-    const matchesSearch = d.name.toLowerCase().includes(libraryFilter.toLowerCase()) ||
-      (d.description || '').toLowerCase().includes(libraryFilter.toLowerCase())
-    
-    const matchesFocus = activeFocusFilter === 'all' || d.focus === activeFocusFilter
-    
-    const matchesTags = activeTagFilters.length === 0 || 
-      activeTagFilters.every(tag => (d.labels || []).includes(tag))
-
-    return matchesSearch && matchesFocus && matchesTags
-  })
-
-  const toggleTagFilter = (tag: string) => {
-    setActiveTagFilters(prev => 
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    )
-  }
 
   if (loading) return (
     <div className="animate-pulse">
@@ -294,27 +225,6 @@ export const SessionDetail: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
-        <div className="hidden lg:block">
-          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant min-h-[40vh] md:min-h-[60vh]">
-            <div className="flex items-center justify-between mb-4">
-              <div className="h-6 w-20 bg-surface-variant rounded" />
-              <div className="h-4 w-20 bg-surface-variant rounded" />
-            </div>
-            <div className="h-10 bg-surface-container-low rounded-t-lg mb-4" />
-            <div className="h-8 bg-surface-container-low rounded-lg mb-4" />
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-surface-container-low rounded-xl p-3 mb-2 border border-outline-variant/30">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-1">
-                    <div className="h-4 w-28 bg-surface-variant rounded" />
-                    <div className="h-3 w-20 bg-surface-variant rounded" />
-                  </div>
-                  <div className="h-6 w-6 bg-surface-variant rounded" />
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
@@ -467,19 +377,12 @@ export const SessionDetail: React.FC = () => {
 
       {/* Drill Editor Modal */}
       <DrillEditorModal
-        key={showRichEditor ? editingLibraryId ?? richDrill.id ?? 'new' : 'closed'}
+        key={showRichEditor ? richDrill.id ?? 'new' : 'closed'}
         open={showRichEditor}
-        title={editingLibraryId ? 'Edit Bank Drill' : richDrill.id ? 'Edit Drill' : 'New Drill'}
+        title={richDrill.id ? 'Edit Drill' : 'New Drill'}
         initialData={showRichEditor ? richDrill as DrillFormData : undefined}
         onSave={async (data) => {
           const save = async () => {
-            if (editingLibraryId) {
-              await updateLibraryDrill(editingLibraryId, data as unknown as Partial<SafeLibraryDrill>)
-              analytics.track(Events.DrillUpdated('library'))
-              setShowRichEditor(false)
-              loadLibrary()
-              return
-            }
             if (!id || !data.name?.trim()) return
             const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
             const drillData = { ...data, sessionId: id, order: data.id ? (richDrill.order ?? nextOrder) : nextOrder }
@@ -492,15 +395,13 @@ export const SessionDetail: React.FC = () => {
             }
             setShowRichEditor(false)
             loadData()
-            loadLibrary()
           }
-          const excludeId = data.id ?? editingLibraryId ?? undefined
-          const mirrorName = data.id && !editingLibraryId ? richDrill.name : undefined
+          const excludeId = data.id ?? undefined
           const similars = findSimilarDrills(
             { name: data.name, stroke: data.stroke, distance: data.distance, focus: data.focus, labels: data.labels },
             [
               ...drills.filter(d => d.id !== excludeId),
-              ...libraryDrills.filter(d => d.id !== excludeId && d.name !== mirrorName),
+              ...libraryDrills.filter(d => d.id !== excludeId),
             ].map(d => ({ id: d.id, name: d.name, stroke: d.stroke, distance: d.distance, focus: d.focus, labels: d.labels }))
           )
           if (similars.length > 0) {
@@ -509,22 +410,16 @@ export const SessionDetail: React.FC = () => {
             await save()
           }
         }}
-        onDelete={showRichEditor && (richDrill.id || editingLibraryId) ? (() => {
+        onDelete={showRichEditor && richDrill.id ? (() => {
           setConfirmState({
             open: true,
-            title: `Delete ${editingLibraryId ? 'Bank' : 'Session'} Drill`,
-            message: `Are you sure you want to permanently delete this ${editingLibraryId ? 'bank' : 'session'} drill?`,
+            title: 'Delete Session Drill',
+            message: 'Are you sure you want to permanently delete this drill?',
             onConfirm: async () => {
-              if (editingLibraryId) {
-                await deleteLibraryDrill(editingLibraryId)
-                analytics.track(Events.DrillDeleted('library'))
-              } else {
-                await deleteDrill(richDrill.id!)
-                analytics.track(Events.DrillDeleted('session'))
-              }
+              await deleteDrill(richDrill.id!)
+              analytics.track(Events.DrillDeleted('session'))
               setShowRichEditor(false)
               loadData()
-              loadLibrary()
               setConfirmState(prev => ({ ...prev, open: false }))
             }
           })
@@ -554,276 +449,44 @@ export const SessionDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Main content: Drills + Drills panel (responsive two-column) */}
-      <div className="r-grid" style={{ '--grid-min': 'min(100%, 400px)' } as React.CSSProperties}>
-        {/* Drill List */}
-        <SessionEditorSection
-          title="Drills"
-          className="min-h-[40vh] md:min-h-[60vh] p-4 md:p-6"
-          actions={
-            <>
-              <button
-                onClick={() => setShowDrillBank(!showDrillBank)}
-                aria-label="Toggle drill bank"
-                aria-expanded={showDrillBank}
-                className="h-10 md:h-12 px-3 md:px-4 bg-surface-container-high text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container-highest active:scale-95 transition-all cursor-pointer"
-              >
-                <Icon name="library_books" size="lg" />
-                <span className="hidden sm:inline">Drills</span>
-              </button>
-              <button
-                onClick={(event) => {
-                  event.currentTarget.focus()
-                  openRichEditor()
-                }}
-                aria-label="Add Drill"
-                className="h-10 md:h-12 px-3 md:px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
-              >
-                <Icon name="add" size="lg" />
-                <span className="hidden sm:inline">Add Drill</span>
-              </button>
-            </>
-          }
-        >
-
-          {drills.length === 0 ? (
-            <p className="font-body-md text-body-md text-on-surface-variant py-8 text-center">No drills yet. Use the <strong>Drills</strong> panel or add a custom drill.</p>
-          ) : (
-            <div className="space-y-2">
-              {drills.map((d, i) => (
-                <div key={d.id} className="flex items-center justify-between p-3 md:p-4 bg-surface-container-low/70 hover:bg-surface-container-low rounded-xl border border-outline-variant/30 gap-3 transition-colors">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="flex flex-col gap-0.5 shrink-0">
-                      <button
-                        onClick={() => moveDrill(d, -1)}
-                        disabled={i === 0}
-                        aria-label={`Move ${d.name} up`}
-                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <Icon name="keyboard_arrow_up" />
-                      </button>
-                      <button
-                        onClick={() => moveDrill(d, 1)}
-                        disabled={i === drills.length - 1}
-                        aria-label={`Move ${d.name} down`}
-                        className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <Icon name="keyboard_arrow_down" />
-                      </button>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                          <span className="font-bold text-on-surface truncate">{d.name}</span>
-                          <span className="text-label-sm bg-primary text-on-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(d)}m</span>
-                          {d.repeatCount > 1 && <span className="text-label-sm bg-primary-container text-on-primary-container px-1.5 py-0.5 rounded font-bold">{d.repeatCount}x</span>}
-                        </div>
-                        {d.description && (
-                          <p className="text-label-sm text-on-surface-variant mt-1 line-clamp-1 italic">{d.description}</p>
-                        )}
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-
-                        {d.items && d.items.length > 0 ? (
-                          d.items.map((item, idx) => (
-                            <span key={item.id} className="text-label-sm text-on-surface-variant flex items-center gap-1">
-                              {idx > 0 && <span className="text-outline-variant mr-1">•</span>}
-                              <span className="font-bold text-primary">{item.repeatCount}x{item.distance}m</span>
-                              <span className="capitalize">{item.stroke}</span>
-                              {item.intensity && <span className="text-secondary font-bold">{item.intensity}</span>}
-                              {item.interval && <span className="text-primary font-bold">@ {item.interval}</span>}
-                               {item.equipment && item.equipment.length > 0 && (
-                                 <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary/10">
-                                   {item.equipment.map(e => (
-                                     <div key={e} className="flex items-center gap-0.5">
-                                       <EquipmentIcons type={e as EquipmentType} className="w-3 h-3 text-secondary" />
-                                       <span className="text-caption-caps font-bold text-secondary uppercase leading-none">{e}</span>
-                                     </div>
-                                   ))}
-                                 </span>
-                               )}
-                            </span>
-                          ))
-                        ) : (
-                          <>
-                            <span className={`${strokeColors[d.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>
-                              {d.stroke}
-                            </span>
-                            <span className="text-label-sm text-on-surface-variant">{d.distance}m</span>
-                          </>
-                        )}
-                      </div>
-                      {(d.focus !== 'none' || (d.labels && d.labels.length > 0)) && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {d.focus !== 'none' && <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{d.focus}</span>}
-                          {d.labels?.map(l => (
-                            <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded uppercase">{l}</span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={(event) => {
-                        event.currentTarget.focus()
-                        openRichEditor(d)
-                      }}
-                      aria-label="Edit drill"
-                      className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <Icon name="edit" color="primary" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDrill(d.id)}
-                      aria-label="Remove drill"
-                      className="h-11 w-11 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                    >
-                      <Icon name="delete" color="error" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </SessionEditorSection>
-
-        {/* Drills Panel — hidden on mobile unless toggled, always visible on wider screens */}
-        <div className={`${showDrillBank ? 'block' : 'hidden lg:block'}`}>
-          <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 border border-outline-variant lg:sticky lg:top-28 min-h-[40vh] md:min-h-[60vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-headline-md text-on-surface m-0 flex items-center gap-2">
-                <Icon name="library_books" color="primary" />
-                Drills
-              </h3>
-              <button
-                onClick={() => navigate('/drills')}
-                className="text-xs text-primary font-bold hover:underline cursor-pointer bg-transparent border-none"
-              >
-                Manage Drills
-              </button>
-            </div>
-            
-            <div className="space-y-4 mb-4">
-              {/* Search */}
-              <div className="relative">
-                <Icon name="search" size="lg" color="on-surface-variant" className="absolute left-2 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={libraryFilter}
-                  onChange={e => setLibraryFilter(e.target.value)}
-                  placeholder="Search drills..."
-                  className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 pl-9 pr-2 py-2 font-body-md outline-none rounded-t-lg shadow-sm"
-                />
-              </div>
-
-              {/* Focus Filters */}
-              <div className="flex bg-surface-container-low p-1 rounded-lg">
-                {(['all', 'technique', 'fitness'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setActiveFocusFilter(f)}
-                    className={`flex-1 h-9 md:h-10 text-label-sm font-bold rounded-md transition-all cursor-pointer capitalize ${activeFocusFilter === f ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tag Filters */}
-              {allLibraryTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-surface-container-low/50 rounded-lg">
-                  {allLibraryTags.map(tag => {
-                    const active = activeTagFilters.includes(tag)
-                    return (
-                      <button
-                        key={tag}
-                        onClick={() => toggleTagFilter(tag)}
-                        className={`h-7 px-2 rounded-full text-caption-caps font-bold uppercase tracking-wider transition-all cursor-pointer border ${active ? 'bg-primary text-on-primary border-primary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30'}`}
-                      >
-                        {tag}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-              {filteredLibrary.length === 0 ? (
-                <div className="text-center py-10">
-                  <Icon name="search_off" size="3xl" color="on-surface-variant" className="mb-2" />
-                  <p className="text-label-sm text-on-surface-variant">No drills match your filters.</p>
-                  {(libraryFilter || activeFocusFilter !== 'all' || activeTagFilters.length > 0) && (
-                    <button 
-                      onClick={() => { setLibraryFilter(''); setActiveFocusFilter('all'); setActiveTagFilters([]) }}
-                      className="mt-2 text-xs text-primary font-bold hover:underline bg-transparent border-none cursor-pointer"
-                    >
-                      Clear all filters
-                    </button>
-                  )}
-                </div>
-              ) : filteredLibrary.map(libDrill => (
-                <div
-                  key={libDrill.id}
-                  className="bg-surface-container-low rounded-xl border border-outline-variant/30 hover:border-primary/40 transition-all group overflow-hidden"
-                >
-                  <div className="p-3">
-                    <div className="flex items-start justify-between mb-1.5">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <h4 className="font-bold text-sm text-on-surface truncate m-0">{libDrill.name}</h4>
-                          <span className="text-caption-caps bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase">{getDrillTotalDistance(libDrill)}m</span>
-                        </div>
-                        {libDrill.description && (
-                          <p className="text-label-sm text-on-surface-variant italic line-clamp-2 leading-relaxed mb-2">{libDrill.description}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button
-                          onClick={() => handleAddFromLibrary(libDrill)}
-                          aria-label="Add to session"
-                          className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                        >
-                          <Icon name="add_circle" color="primary" />
-                        </button>
-                        <button
-                          onClick={(event) => {
-                            event.currentTarget.focus()
-                            openRichEditor(libDrill, true)
-                          }}
-                          aria-label="Edit bank drill"
-                          className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                        >
-                          <Icon name="edit" color="on-surface-variant" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLibraryDrill(libDrill)}
-                          aria-label="Delete bank drill"
-                          className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
-                        >
-                          <Icon name="delete" color="error" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 items-center">
-                      {libDrill.focus && libDrill.focus !== 'none' && (
-                        <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-1.5 py-0.5 rounded uppercase">{libDrill.focus}</span>
-                      )}
-                      {(libDrill.labels || []).map(l => (
-                        <span key={l} className="text-caption-caps bg-surface-container-highest text-on-surface-variant px-1.5 py-0.5 rounded uppercase">{l}</span>
-                      ))}
-                      {!libDrill.items?.length && (
-                        <span className={`${strokeColors[libDrill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-caption-caps font-bold px-1.5 py-0.5 rounded uppercase`}>{libDrill.stroke}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="text-label-sm text-on-surface-variant mt-3 text-center">{libraryDrills.length} drills in bank</p>
-          </div>
-        </div>
-      </div>
+      {/* Drills list — shared presentation with the live overview */}
+      <DrillsList
+        title="Drills"
+        className="mt-6"
+        rows={drills.map((d, i): DrillsListRow => ({
+          id: d.id,
+          name: d.name,
+          repeatCount: d.repeatCount || 1,
+          distance: getDrillTotalDistance(d),
+          subtitle: drillSubtitle(d),
+          description: d.description,
+          badges: [
+            ...(d.focus !== 'none' ? [d.focus.toUpperCase()] : []),
+            ...(d.labels || []),
+          ],
+          equipment: drillEquipment(d) as DrillsListRow['equipment'],
+          steps: drillStepLines(d),
+          onEdit: () => openRichEditor(d),
+          onDelete: () => handleDeleteDrill(d.id),
+          onMove: (direction) => { void moveDrill(d, direction) },
+          canMoveUp: i !== 0,
+          canMoveDown: i !== drills.length - 1,
+        }))}
+        actions={
+          <button
+            onClick={(event) => {
+              event.currentTarget.focus()
+              openRichEditor()
+            }}
+            aria-label="Add Drill"
+            className="h-10 md:h-12 px-3 md:px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+          >
+            <Icon name="add" size="lg" />
+            <span className="hidden sm:inline">Add Drill</span>
+          </button>
+        }
+        emptyMessage={<p className="font-body-md text-body-md text-on-surface-variant">No drills yet. Add your first drill from the editor.</p>}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

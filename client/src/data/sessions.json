@@ -17,7 +17,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "none",
         "labels": [
           "warmup"
@@ -40,7 +39,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "continuous",
         "focus": "technique",
         "labels": [
           "warmup",
@@ -64,7 +62,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "technique",
         "labels": [
           "warmup",
@@ -85,7 +82,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "technique",
         "labels": [
           "warmup",
@@ -107,7 +103,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "continuous",
         "focus": "technique",
         "labels": [
           "warmup",
@@ -128,7 +123,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "fitness",
         "labels": [
           "main-set",
@@ -153,7 +147,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "fitness",
         "labels": [
           "main-set",
@@ -178,7 +171,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "fitness",
         "labels": [
           "main-set",
@@ -202,7 +194,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "fitness",
         "labels": [
           "main-set",
@@ -226,7 +217,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "fitness",
         "labels": [
           "main-set",
@@ -248,7 +238,6 @@
           }
         ],
         "repeatCount": 1,
-        "timingMode": "individual",
         "focus": "none",
         "labels": [
           "cooldown"

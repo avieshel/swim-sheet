@@ -92,7 +92,6 @@ export const DrillBank: React.FC = () => {
       order: nextOrder,
       items: detailDrill.items || [],
       repeatCount: detailDrill.repeatCount || 1,
-      timingMode: detailDrill.timingMode || 'individual',
       focus: detailDrill.focus || 'none',
       labels: detailDrill.labels || [],
       description: detailDrill.description || '',

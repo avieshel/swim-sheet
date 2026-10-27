@@ -20,7 +20,6 @@ const makeDrill = (over: Partial<Drill> = {}): Drill => ({
   order: 0,
   items: [item({})],
   repeatCount: 1,
-  timingMode: 'individual',
   focus: 'none',
   labels: [],
   description: '',
@@ -123,7 +122,6 @@ describe('buildSessionSnapshot', () => {
       stroke: 'butterfly',
       distance: 100,
       repeatCount: 4,
-      timingMode: 'continuous',
       focus: 'fitness',
       labels: ['race'],
       description: 'desc',
@@ -144,7 +142,6 @@ describe('buildSessionSnapshot', () => {
     expect(sd.stroke).toBe('butterfly')
     expect(sd.items).toEqual(drill.items)
     expect(sd.repeatCount).toBe(4)
-    expect(sd.timingMode).toBe('continuous')
     expect(sd.focus).toBe('fitness')
     expect(sd.labels).toEqual(['race'])
     expect(sd.description).toBe('desc')

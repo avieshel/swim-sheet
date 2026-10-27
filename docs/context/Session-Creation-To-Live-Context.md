@@ -30,7 +30,7 @@ Initiative 2 (`service/runHistoryService.ts`).
 | Area | Current reality | Where |
 |------|-----------------|-------|
 | Template creation | Bare inline form: **name + pool length only** (no drills, no guidance). Coach must create a shell, then go into the editor. | `SessionsList.tsx:176-215` (`showNewForm` block) |
-| Drill assembly | Done entirely in `SessionDetail` — up/down arrows, drill bank sidebar, `DrillEditorModal`. | `SessionDetail.tsx:484-730` |
+| Drill assembly | Done entirely in `SessionDetail` — up/down arrows on the `DrillsList` rows, `DrillEditorModal` for full editing (the drill-bank sidebar was removed; the library lives on `/drills`). | `SessionDetail.tsx`, `components/session/DrillsList.tsx` |
 | **Promote to live** | **Does not exist anywhere in the UI.** `createRunFromTemplate` is dead to the UI — it is only called by `createQuickStartRun`. Docs claim a "Run" action on template cards, but no such button/code exists. | `api/runs.ts:58`, `services/runService.ts:126-201,203-243` |
 | Run hand-off | `LiveDeck` shows the **Live picker** (never auto-starts): a pinned quick-time card plus template sessions ranked by usage. Selecting a template starts a planned run via `createRunFromTemplate`. | `LiveDeck.tsx` |
 | Active-run init | The planned-run init path already rebuilds groups from `RunSwimmer` links — so handed-off planned runs render correctly today, with one caveat (no drill pre-selected). | `LiveDeck.tsx:1146-1172` |

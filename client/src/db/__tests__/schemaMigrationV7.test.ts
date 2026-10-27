@@ -29,7 +29,7 @@ describe('v7 -> v8 upgrade with existing data', () => {
     await legacy.table('drills').add({
       id: 'd1', sessionId: 's1', name: 'Pull', stroke: 'freestyle', distance: 100,
       order: 0, items: [{ id: 'i1', distance: 100, stroke: 'freestyle', repeatCount: 1 }],
-      repeatCount: 1, timingMode: 'individual', focus: 'none', labels: [], description: '',
+      repeatCount: 1, focus: 'none', labels: [], description: '',
       createdAt: 't0', updatedAt: 't0',
     })
     await legacy.table('sessionRuns').add({

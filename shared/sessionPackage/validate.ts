@@ -204,7 +204,7 @@ function validateDrill(
   }
   const repeatCount = validateRepeatCount(value.repeatCount, config, `${path}.repeatCount`)
   if (!repeatCount.ok) return repeatCount
-  if (!isTimingMode(value.timingMode, config)) return fail('invalid_shape', `${path}.timingMode is unsupported`)
+  if (value.timingMode !== undefined && !isTimingMode(value.timingMode, config)) return fail('invalid_shape', `${path}.timingMode is unsupported`)
   if (!isFocus(value.focus, config)) return fail('invalid_shape', `${path}.focus is unsupported`)
   const description = boundedString(value.description, config.limits.maxDescriptionLength, `${path}.description`, true)
   if (!description.ok) return description

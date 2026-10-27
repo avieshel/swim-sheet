@@ -167,8 +167,7 @@ describe('toCloudRow', () => {
       op: 'upsert',
       payload: {
         id: 'd1', sessionId: 's1', name: 'D', stroke: 'freestyle', distance: 50,
-        order: 0, items: [{ distance: 25, stroke: 'freestyle' }], repeatCount: 1,
-        timingMode: 'individual', focus: 'technique', labels: [], description: '',
+        order: 0, items: [{ distance: 25, stroke: 'freestyle' }], repeatCount: 1, focus: 'technique', labels: [], description: '',
       },
       rev: null,
     }
@@ -338,7 +337,7 @@ describe('completed history mapping', () => {
       op: 'upsert',
       payload: {
         id: 'drill-1', sessionId: 'session-1', libraryDrillId: 'lib-1', name: 'Pull', stroke: 'freestyle',
-        distance: 100, order: 0, items: [], repeatCount: 1, timingMode: 'individual', focus: 'none',
+        distance: 100, order: 0, items: [], repeatCount: 1, focus: 'none',
         labels: [], description: '', createdAt: 'created', updatedAt: 'updated',
       },
       rev: null,

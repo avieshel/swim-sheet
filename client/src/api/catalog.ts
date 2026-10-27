@@ -34,7 +34,6 @@ interface CatalogSessionDrill {
   distance: number
   items: CatalogDrillItem[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: CatalogFocus
   labels: string[]
   description: string
@@ -76,7 +75,6 @@ export async function importSession(session: CatalogSessionData): Promise<string
       distance: d.distance,
       items: d.items.map(item => ({ id: crypto.randomUUID(), ...item })),
       repeatCount: d.repeatCount,
-      timingMode: d.timingMode,
       focus: d.focus,
       labels: d.labels,
       description: d.description,

@@ -25,7 +25,7 @@ export interface SessionPackageDrillV1 {
   order: number
   items: SessionPackageItemV1[]
   repeatCount: number
-  timingMode: SessionPackageTimingMode
+  timingMode?: SessionPackageTimingMode
   focus: SessionPackageFocus
   labels: string[]
   description: string
