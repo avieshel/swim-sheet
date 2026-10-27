@@ -1,66 +1,68 @@
-# Import/Export Context
+# Session Package Import/Export Design
 
-## Overview
+## Status and scope
 
-File-based session template sharing for cross-coach distribution. Not for same-coach multi-device (that's what the server sync engine is for). Used for:
+This is the detailed design and implementation contract for **Step 1:
+portable session-template files**. The file-based import/export foundation is
+implemented; server-backed share links remain a later phase described in
+[`Session-Sharing-Design.md`](./Session-Sharing-Design.md).
 
-1. **Onboarding** — a coach trying the app receives a session file from the app creator, imports it, and immediately has a real session to run
-2. **Peer sharing** — coaches exchange sessions with each other via email/AirDrop/messaging
-3. **Curated defaults** — the app creator maintains a collection of seed session files for different workout types
+A coach exports one session template to a JSON `.swimsheet` file and sends it
+through email, WhatsApp, AirDrop, or another channel. The recipient imports it
+as a new session in their own PWA. The same versioned package is the payload for
+the later server-backed share-link flow described in
+[`Session-Sharing-Design.md`](./Session-Sharing-Design.md).
 
-## Design Principle
+In scope:
+- One session template and its ordered drills, including rich drill items.
+- Importing into a signed-out/local PWA or a signed-in PWA.
+- Explicit name-conflict handling, validation, and atomic creation.
+- A portable package contract that can also be stored by a later share-link
+  service.
 
-Imported content is **namespaced** — it lives in its own section of the drill bank, tagged with the creator's identity. It never merges with the coach's "native" drill library unless the coach explicitly promotes individual drills via "Make Native."
+Out of scope:
+- Whole-database backup/restore (already separate in Settings).
+- Swimmers, active/completed runs, lap/timing results, or organization membership.
+- Drill-bank import, global drill deduplication, or “Make Native”. Session drills
+  remain embedded in the imported session; importing must not change the
+  recipient's drill bank.
+- Live collaboration, updates flowing back to the author, or result sharing.
 
-This avoids the dedup problem: two coaches call the same drill different things, so name-based dedup is unreliable. Namespacing keeps each coach's native library pristine.
+## Product model
 
-## Data Model
+Import/export is a **copy** operation, not shared access to the author's record.
+The export is a self-contained snapshot. Import creates a new session and new
+local IDs; editing or deleting either copy has no effect on the other.
 
-### LibraryDrill additions
+The same behavior serves these cases:
 
-```ts
-interface LibraryDrill {
-  // ... existing fields
-  source: 'builtin' | 'personal' | 'customized' | 'imported'
-  creatorFingerprint?: string   // stable UUID of the exporting coach
-  creatorLabel?: string         // human-readable label ("Sarah's Swim Club")
-  importBatchId?: string        // groups drills from the same import file
-}
-```
+| Case | Flow | Result |
+|---|---|---|
+| Two signed-out PWAs | Send `.swimsheet` file manually | Recipient gets a local copy; no backend required. |
+| Two logged-in users with separate accounts | Send/import the same file | Recipient gets a copy in their account; normal sync sends it to their other devices. The accounts remain isolated. |
+| One user deliberately shares a copy | Same package, with a share-link delivery flow later | Recipient explicitly imports a new copy. This is a UX/delivery distinction, not a different session data model. |
 
-### Session additions
+The file path must continue to work offline and without authentication. A
+logged-in recipient's import follows existing sync behavior; a file import does
+not itself grant access to the sharer's cloud data.
 
-```ts
-interface Session {
-  // ... existing fields
-  source?: 'native' | 'imported'
-  creatorFingerprint?: string
-  importBatchId?: string
-}
-```
+## Portable package format
 
-### Creator Fingerprint
+### Envelope
 
-- Generated on first export — a stable UUID persisted in `localStorage` (via `DbMeta` table key `creatorFingerprint`)
-- Coach can optionally set a human-readable label ("Sarah's Swim Club") that appears in the import UI
-- The fingerprint is the identity anchor for re-import updates; the label is just display
-- Written into every exported file so imports are traceable to the source
-
-## Export Format
-
-### File format version: `swimsheet-session-v1`
+The v1 file is UTF-8 JSON with extension `.swimsheet` and MIME type
+`application/json`:
 
 ```json
 {
-  "format": "swimsheet-session-v1",
-  "exportedAt": "2026-07-30T12:00:00.000Z",
+  "format": "swimsheet-session",
+  "version": 1,
+  "exportedAt": "2026-10-21T12:00:00.000Z",
   "creator": {
-    "fingerprint": "a1b2c3d4-e5f6-...",
-    "label": "Sarah's Swim Club"
+    "label": "Optional coach or club label"
   },
   "session": {
     "name": "200m IM Day",
-    "poolLength": 25,
     "notes": "Focus on transitions and underwaters"
   },
   "drills": [
@@ -68,219 +70,190 @@ interface Session {
       "name": "IM Order Practice",
       "stroke": "im",
       "distance": 200,
-      "order": 1,
+      "order": 0,
       "items": [
-        {
-          "id": "item-uuid-1",
-          "distance": 50,
-          "stroke": "butterfly",
-          "repeatCount": 1
-        },
-        {
-          "id": "item-uuid-2",
-          "distance": 50,
-          "stroke": "backstroke",
-          "repeatCount": 1
-        },
-        {
-          "id": "item-uuid-3",
-          "distance": 50,
-          "stroke": "breaststroke",
-          "repeatCount": 1
-        },
-        {
-          "id": "item-uuid-4",
-          "distance": 50,
-          "stroke": "freestyle",
-          "repeatCount": 1
-        }
+        { "distance": 50, "stroke": "butterfly", "repeatCount": 1 },
+        { "distance": 50, "stroke": "backstroke", "repeatCount": 1 },
+        { "distance": 50, "stroke": "breaststroke", "repeatCount": 1 },
+        { "distance": 50, "stroke": "freestyle", "repeatCount": 1 }
       ],
       "repeatCount": 1,
       "timingMode": "individual",
       "focus": "fitness",
-      "labels": ["anaerobic", "aerobic", "rhythm"],
-      "description": "50m of each stroke in IM order (Fly, Back, Breast, Free). Focus on stroke transitions."
+      "labels": ["aerobic"],
+      "description": "Swim 50m of each stroke in IM order."
     }
   ]
 }
 ```
 
-No `id` fields for entities — they are regenerated on import. The `session.name` and drill `name` values are the identity anchors for re-import matching.
+`drills` may be empty: the app allows empty template shells and export/import
+must preserve them. A drill's `items` may also be empty if the source record is
+empty; the package is a transport format, not a repair operation.
 
-### File extension and MIME type
-- Extension: `.swimsheet`
-- MIME type: `application/json` (served with `Content-Disposition: attachment; filename="..."`)
+`creator.label` is optional, display-only metadata supplied by the exporter. It
+is untrusted input and must never be used for authorization. Do not export an
+auth user ID, email address, organization ID, or raw database ownership fields.
+The package has no stable publisher fingerprint in v1; imported files are not
+silently treated as updates from a known author.
 
-## Import Flow
+### Included content
 
-### Phase 1: Basic import (no de duplication)
+- Session: `name`, `notes`.
+- Drill: `name`, `stroke`, `distance`, `order`, `items`, `repeatCount`,
+  `timingMode`, `focus`, `labels`, `description`.
+- Drill item: `distance`, `stroke`, `repeatCount`, and supported optional fields
+  such as `intensity`, `interval`, `equipment`, and `segments`.
 
-```
-User taps "Import Session" → file picker → selects .swimsheet file
-  ↓
-Parse + validate format === 'swimsheet-session-v1'
-  ↓
-Check: session name already exists in db.sessions?
-  │
-  ├─ No → create session, add drills
-  │
-  └─ Yes → show conflict dialog:
-           [Create as Copy] → append " (imported YYYY-MM-DD)" to name
-           [Skip]            → abort import
-  ↓
-For each drill in file:
-  Call addLibraryDrill({
-    ...drill,
-    source: 'imported',
-    creatorFingerprint: file.creator.fingerprint,
-    creatorLabel: file.creator.label,
-    importBatchId: batchId,
-  })
-  → addLibraryDrill upserts by (name + creatorFingerprint)
-    → If same name from same creator exists → updates existing import record
-    → If same name from different creator → creates separate import record
-    → This prevents duplicates within the same import source
-  ↓
-Call addDrill({ ...drill, session_id: newSessionId })
-  → addDrill internally calls addLibraryDrill (upserts again — idempotent)
-  ↓
-Show import summary:
-  "Imported '200m IM Day' — 6 drills (2 already in your library from Sarah's Swim Club)"
-```
+The package requires top-level drill `stroke` and `distance`. Some manually
+authored local drills may have those summary fields absent while their items
+contain the authored structure. Export preserves a present summary value; when
+it is absent, it derives stroke from the first item and distance with the
+existing `getDrillTotalDistance` rule. If no stroke can be derived, export
+fails with a recoverable error instead of inventing one.
 
-### Import result dialog
+The package deliberately omits all database IDs, `sessionId`, `libraryDrillId`,
+`assignedTo`, `visibility`, `catalogKey`, AI draft state, timestamps used for
+local persistence, and all run/history data. IDs inside `DrillItem` are also
+omitted and regenerated on import. Unknown future authored fields require an
+explicit package-contract update; the importer must not silently discard them.
 
-```
-┌──────────────────────────────────┐
-│ Import Complete                   │
-│                                   │
-│ Session: 200m IM Day             │
-│ Drills imported: 6               │
-│ Already in library: 2            │
-│ (from Sarah's Swim Club)         │
-│                                   │
-│ [View in Sessions] [View Imports] │
-└──────────────────────────────────┘
-```
+`poolLength` is not included in v1: the client `Session` model does not currently
+carry it, even though a cloud column exists. The package must not invent a value
+from a device-wide setting. If pool length becomes an authored session field,
+add it deliberately to the package contract and import/export tests.
 
-### Key dedup rules (within import namespace)
+### Contract ownership and validation
 
-| Scenario | Behavior |
-|---|---|
-| Same drill name, same creator, same batch | `addLibraryDrill` upserts — no duplicate |
-| Same drill name, same creator, different batch | `addLibraryDrill` upserts by (name + creator) — updates existing, no duplicate |
-| Same drill name, different creator | Creates separate entry with different `creatorFingerprint` — allowed |
-| Same session name, any creator | Conflict dialog — user chooses Create as Copy or Skip |
-| Re-import same file twice | All drills match by (name + creator), session skipped on second import |
+The portable DTO, version-specific validator, and tunable size/count limits
+belong in a runtime-agnostic `shared/sessionPackage/` module, following the
+existing shared-contract pattern. Both the PWA and future share endpoint use the
+same validator/config; there must not be separate client and server copies of
+the package rules.
 
-## Export Flow
+Validation is strict and allowlist-based:
+- Check format and supported version before mapping to app types.
+- Validate every string, enum, number, nested item, segment, and array shape.
+- Reject unknown fields for v1 rather than silently losing authored content.
+- Enforce maximum file size and collection/string bounds from a dedicated config
+  module, not inline numeric limits.
+- Treat creator text, filenames, and every imported value as untrusted.
 
-### From SessionsList
+The v1 default limits are: file 1 MiB; session/drill/segment/creator name 100
+characters; session notes 4,000 characters; drill description 400 characters;
+interval/intensity 40 characters; labels 20 per drill and 64 characters each;
+drills 100 per session; items 100 per drill; equipment 16 values per item and
+64 characters each; segments 100 per item; distance 10,000m; repeat count 100.
+Distances may be zero; repeat counts must be positive integers; drill order must
+be a nonnegative safe integer. Equipment remains a bounded string rather than
+an enum so user-configured equipment survives transfer. Intensity and interval
+are bounded strings as in the current authoring model; interval syntax is not
+reinterpreted by the importer. These defaults live only in the shared package
+config and can be deliberately changed there.
 
-```
-User taps export icon on session card
-  ↓
-Read session + drills from Dexie
-  ↓
-Get creator fingerprint from localStorage (generate if missing)
-  ↓
-Construct JSON payload (format: swimsheet-session-v1)
-  ↓
-Download as {session-name-slugified}.swimsheet
-```
+Malformed, unsupported, or oversized files fail before writing anything and
+show a recoverable message. Do not partially import a session.
 
-### Creator fingerprint management
+## Export flow
 
-- Stored in the `_meta` table (accessed as `db._meta`) under key `creatorFingerprint`
-- Generated via `crypto.randomUUID()` on first export
-- Coach can see/change their creator label in Settings
-- Fingerprint never changes once generated (stable identity anchor)
+1. From a session card or editor, choose **Export session**.
+2. Read the session and its ordered drills through the API/service layers.
+3. Map only the package allowlist; omit database/ownership fields and all run
+   data; validate the package before serialization.
+4. Serialize as UTF-8 JSON and enforce the configured 1 MiB file-size cap on the
+   generated bytes. If the export exceeds it, do not start a download; show a
+   recoverable message.
+5. Download `<session-name-slug>.swimsheet` using the browser's file-download
+   mechanism. The app does not require an account or a network connection.
+6. The coach shares the file through their preferred channel.
 
-## Drill Bank UI
+If a session cannot be read or fails package validation, do not produce a
+partial or misleading file; show an error and leave the source unchanged.
 
-```
-┌─────────────────────────────────┐
-│ Drill Bank                   [+]│
-├─────────────────────────────────┤
-│ [My Drills] [Imports ▼]         │ ← tab selector
-├─────────────────────────────────┤
-│ Imported from:                   │
-│ Sarah's Swim Club                │ ← grouped by creatorLabel
-│ ── Sprint Set              [×]  │
-│ ── Descending Set          [×]  │
-│ ── 200 IM                  [×]  │
-│                                 │
-│ Imported from:                   │
-│ Coach Mike                       │
-│ ── Distance Day            [×]  │
-├─────────────────────────────────┤
-│ [+ Import Session]              │
-└─────────────────────────────────┘
-```
+## Import flow
 
-- Tap `[×]` removes the drill from the import batch (soft-delete: flags as `source: 'archived'`)
-- Import batches are collapsed by default
-- Expanding a batch shows the individual drills
-- Imported drills are not editable inline (read-only copy of the source)
-- "Make Native" button per drill opens a matching UI against the native library
+1. Choose **Import session**, then select a `.swimsheet` file. The parser should
+   accept valid JSON content regardless of the extension, but the picker should
+   guide users toward `.swimsheet` files.
+2. Enforce the configured byte limit before parsing. Parse JSON and run the
+   shared versioned validator.
+3. Show a preview with session name, drill count, total distance when derivable,
+   and optional creator label. Do not persist before confirmation.
+4. Check for a session-name collision using trimmed, case-insensitive names. If
+   one exists, offer **Import as a copy**
+   (with a suggested distinct name: `<name> (imported)`, adding a numbered
+   suffix if needed) or **Cancel**. Never overwrite or merge an existing
+   session. V1 does not promise re-import-as-update; repeated imports go through
+   the same conflict choice.
+5. On confirmation, create a new session and all drills in one Dexie transaction.
+   Generate fresh IDs and timestamps for the session, drills, and nested drill
+   items; assign new `sessionId` values and preserve drill order and authored
+   fields.
+6. Show success and a **View session** action.
 
-## "Make Native" Flow (Phase 2)
+Use the DAO's conditional session-and-drills writer: it evaluates the service's
+name-conflict predicate and inserts the session plus drills inside the same
+Dexie read-write transaction. This prevents concurrent imports from both
+passing a stale preflight check. Do **not** route imported drills through `addDrill`:
+that method also writes to the drill bank, where current name-based upsert can
+collide with a recipient's native/builtin entry. Import creates only the session
+and its embedded drills. A later promotion-to-library feature is separate.
 
-When a coach finds an imported drill they want in their permanent library:
+The receiving session is an ordinary editable template. The importer does not
+create `SessionRun`, `RunDrill`, swimmers, laps, or timing data.
 
-1. Tap "Make Native" on an imported drill
-2. App runs `findSimilarDrills()` against the native library
-3. High match found (≥0.5) → "This looks like your '200 IM'. Replace with native version?"
-   - [Use Native] — links session to native drill, hides import drill
-   - [Keep Both] — copies import drill as `source: 'personal'`
-   - [Cancel]
-4. No match found → "Add 'Sprint Set' to your library?" → creates copy as `source: 'personal'`
+## Sync and ownership behavior
 
-## What This Doesn't Solve (Deliberately)
+- Signed-out import writes only to the local Dexie database and works offline.
+- Signed-in import creates recipient-owned local rows. Existing sync pushes the
+  session before its drills into the recipient's own organization; the sharer's
+  organization and rows are never read by the recipient's sync process.
+- Provenance shown from `creator.label` may be retained as import metadata only
+  if it is intentionally modeled and synced. It is not required for v1 copy
+  semantics and must not be claimed to sync until cloud columns and
+  `SupabaseSyncTransport` mappings support it.
+- Do not use Settings' whole-database JSON backup as a session-sharing file.
+  Backup/restore is a different format and can replace local data, while a
+  `.swimsheet` import is a validated additive copy of one template.
 
-| Problem | Solution | Status |
-|---|---|---|
-| Same coach, phone ↔ tablet sync | Server sync engine (fix A-008, A-009) | Future work |
-| Global drill dedup across all coaches | Not possible without AI — namespacing avoids the need | Out of scope |
-| Central session marketplace / library | File-based sharing only — no server-side community | Out of scope |
-| Imported drill editing (mid-session) | Coach edits the native version, not the import | By design |
+## Service boundaries
 
-## Implementation Notes
+- `shared/sessionPackage/`: package types, version config, limits, pure validator
+  and mapping helpers shared with the future backend endpoint.
+- Client UI: file picker/download, preview, duplicate-name choice, and messages.
+- Client API/service: export a validated package; validate and import a package.
+- DAO: pure reads plus atomic session-and-drills creation. The service supplies
+  the name-conflict predicate; the DAO owns only the Dexie transaction. No
+  library side effects.
+- Future share delivery: retrieves the same package format and calls the same
+  import service as file import.
 
-### `addLibraryDrill` must be updated
+Pages and components must not import `db/` directly.
 
-Current `addLibraryDrill` upserts by name alone. For imported drills, the upsert key must be `(name + creatorFingerprint)`:
+## Acceptance criteria
 
-```ts
-// Updated upsert logic
-if (data.source === 'imported' && data.creatorFingerprint) {
-  existing = await db.libraryDrills
-    .where({ name: data.name, creatorFingerprint: data.creatorFingerprint })
-    .first()
-} else {
-  existing = await db.libraryDrills.where('name').equals(data.name).first()
-}
-```
+- A signed-out PWA can export a session and import the file in another signed-out
+  PWA without a server request.
+- A logged-in recipient can import a file into their own account; after sync,
+  the session and its drills appear on their other device, not in the sender's
+  account.
+- Rich drill items, order, optional fields, and segments round-trip without loss.
+- Imported session/drill/item IDs are fresh; no run, swimmer, or result data is
+  copied; the drill bank is unchanged.
+- Invalid, unsupported, unknown-field, and over-limit files produce no partial
+  writes.
+- Name conflicts never overwrite existing content and are resolved explicitly.
+- Export/import does not require auth and does not depend on server availability.
 
-### `addDrill` auto-save to library
+## Test design
 
-The existing `addDrill` → `addLibraryDrill` chain (dao.ts:103-116) works fine for imported sessions — `addLibraryDrill` will upsert the imported drill (by name + creator), which is the correct behavior.
-
-### Import does not create Run records
-
-Imports only create `Session` + `Drill` records. The coach runs them as usual through `runService.createFromTemplate`. Imports are templates, not historical data.
-
-### File structure
-
-```
-client/src/
-├── api/
-│   └── importExport.ts    # exportSession(), importSession(), generateCreatorFingerprint()
-├── db/
-│   └── schema.ts          # source, creatorFingerprint, importBatchId on LibraryDrill/Session
-├── pages/
-│   ├── SessionsList.tsx   # Export button, Import button, conflict dialog
-│   └── DrillBank.tsx      # "My Drills" / "Imports" tab
-└── utils/
-    └── importHelpers.ts   # format validation, session name conflict handling
-```
+- Shared contract unit tests for valid v1 packages, each invalid field/enum,
+  unknown keys, malformed nested structures, and configured bounds.
+- Service/DAO tests for round-trip mapping, fresh IDs, drill order and rich item
+  preservation, atomic rollback, no library writes, and collision behavior.
+- UI tests for file selection/download, preview, conflict choice, cancel, errors,
+  and success navigation.
+- E2E: export in one browser context, transfer the file to another PWA context,
+  import, edit/run the copy, and verify the original remains unchanged. Add a
+  signed-in sync E2E for recipient-account propagation when the auth test setup
+  is available.

@@ -74,13 +74,39 @@ export async function deleteSession(id: string): Promise<void> {
 // Atomic session + drills insert for AI drafts. It writes directly to the drills
 // table and must NOT call addDrill(), which also writes to libraryDrills. A
 // failure at any point rolls the whole transaction back — no partial session.
-export async function addSessionWithDrills(
+export function addSessionWithDrills(
   session: SafeSession,
   drills: Array<Omit<SafeDrill, 'sessionId'>>,
 ): Promise<string> {
+  return writeSessionWithDrills(session, drills)
+}
+
+export async function addSessionWithDrillsIf(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  return writeSessionWithDrills(session, drills, canCreate)
+}
+
+function writeSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+): Promise<string>
+function writeSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null>
+async function writeSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate?: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
   const now = new Date().toISOString()
   const sessionId = crypto.randomUUID()
-  await db.transaction('rw', [db.sessions, db.drills], async () => {
+  return db.transaction('rw', [db.sessions, db.drills], async () => {
+    if (canCreate && !canCreate(await db.sessions.toArray())) return null
     await db.sessions.add({ ...session, id: sessionId, createdAt: now, updatedAt: now })
     for (const drill of drills) {
       await db.drills.add({
@@ -91,8 +117,8 @@ export async function addSessionWithDrills(
         updatedAt: now,
       })
     }
+    return sessionId
   })
-  return sessionId
 }
 
 // ── Template Drills ────────────────────────────────────────

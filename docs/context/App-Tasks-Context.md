@@ -870,27 +870,36 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Problem**: No way to share session templates between coaches. Current alternatives (iPhone notes, verbal instruction) are fragile. The app needs a way for existing coaches to share sessions with new coaches (onboarding vector) and for coaches to trade sessions with peers.
 
-**Solution**: File-based export/import with import namespacing.
+**Solution**: One versioned, validated `.swimsheet` JSON package for a session template and its drills. Export/import creates independent copies and works without sign-in or network access. Imported drills remain embedded in the session; import must not write to or deduplicate against the recipient's drill bank.
 
-**Export**: A session template + its drills serialized to a JSON file. Downloaded via browser.
+**Phase 1 — file foundation**:
+- Export one session template to a `.swimsheet` file for email, WhatsApp, AirDrop, etc.
+- Import a file into a signed-out/local PWA or a signed-in PWA; signed-in imports enter that user's normal account sync.
+- Validate before writing, preview, handle name conflicts without overwrite, generate fresh IDs, and create the session + drills atomically.
+- The package excludes swimmers, runs, and timing/results data.
 
-**Import**: Parse JSON, create session + drills through existing DAO methods. Drills are tagged `source: 'imported'` with a `creatorFingerprint` (stable UUID of the exporting coach). Imports are displayed separately in the drill bank under an "Imports" tab.
+**Later phase — server-backed share link (design only)**:
+- A signed-in sharer publishes a synced session snapshot to a private share table.
+- A high-entropy bearer link serves the same package as file export; anyone with the link may preview/download/import without signing in.
+- Expiry and revocation stop future retrieval only; they cannot recall an already imported copy.
+- This is copy distribution, not live collaboration or result sharing. Organization collaboration requires a separate org-aware sync/access epic.
 
-**Design doc**: `docs/context/Import-Export-Context.md`
+**Design docs**: `docs/context/Import-Export-Context.md` (detailed package/import/export design), `docs/context/Session-Sharing-Design.md` (high-level link design).
 
-**Implementation stages**:
-1. Phase 1 (onboarding): Export/download from SessionsList, import/file-pick into SessionsList. Imports tagged as `source: 'imported'`.
-2. Phase 2 (peer sharing): Import namespace grouping, re-import updates from same creator, "Make Native" drill-by-drill matching UI.
-3. Phase 3 (curated defaults): Maintain a collection of seed session JSON files. New coaches receive these on sign-up interest (email/AirDrop).
-
-**Files**:
-- New: `client/src/api/importExport.ts` — `exportSession()`, `importSession()` functions
-- `client/src/pages/SessionsList.tsx` — Export button per card, Import button in header
-- `client/src/db/schema.ts` — optional `creatorFingerprint`, `importBatchId`, `source: 'imported'` on LibraryDrill/Session
-- `client/src/pages/DrillBank.tsx` — "My Drills" / "Imports" tab
+**Implementation boundaries**:
+- Shared package DTO, validator, versioning, and limits belong in `shared/sessionPackage/` for reuse by PWA and future backend endpoint.
+- Client package service/API handles mapping; DAO performs atomic session-and-drills CRUD only.
+- No drill-bank Imports tab, creator-fingerprint identity scheme, re-import-as-update, or “Make Native” in v1.
 
 **Priority**: High
-**Status**: In Progress — Export/download from SessionsList and import/file-pick UI not yet implemented
+**Status**: Phase 1 complete — file-based import/export implemented. Server-backed share-link publishing remains a separate future phase.
+
+**Implemented**:
+- `shared/sessionPackage/` — versioned v1 package types, config, and strict validator.
+- `client/src/services/sessionPackageService.ts` + `client/src/api/sessionPackages.ts` — package mapping, collision handling, and atomic session/drill import.
+- `client/src/utils/sessionPackageFile.ts` — bounded JSON file read and `.swimsheet` download.
+- `client/src/components/SessionPackageImportModal.tsx` + `SessionsList.tsx` — accessible import preview and per-template export controls.
+- `tests/session-import-export.spec.ts` — signed-out PWA-to-PWA file transfer; `tests/sync-cross-device.spec.ts` — authenticated recipient import propagation.
 
 ---
 
