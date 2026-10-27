@@ -22,24 +22,28 @@ export const INTENSITY_LABELS: Readonly<Record<IntensityV1, string>> = {
 
 export interface SessionDraftLimits {
   schemaVersion: number
-  maxNameLength: number
-  maxDescriptionLength: number
+  // Session-domain caps.
+  maxSessionNameLength: number
+  // Drill-domain caps.
+  maxDrillNameLength: number
+  maxDrillDescriptionLength: number
+  maxStepsPerDrill: number
+  maxRepeatCount: number
   maxIntervalLength: number
   maxPromptLength: number
   maxDrills: number
-  maxItemsPerDrill: number
-  // Cap on the agent's own plan lines. A plan that long has stopped being a
-  // plan, and would bloat every response.
-  maxPlanEntries: number
+  // The agent's own plan: one line per drill. A plan that long has stopped
+  // being a plan, and would bloat every response.
+  maxSessionPlanLines: number
   // Cap on a single plan line's characters. The prompt states it and the
   // validator enforces it; agents that ignore it have their plan lines
   // truncated (never the draft lost) before validation.
-  maxPlanLineLength: number
+  maxSessionPlanLineLength: number
   maxRecentSessions: number
   maxDistance: number
-  maxRepeatCount: number
   // Bounds for the inbound request context (defense at the trust boundary).
   maxGroupNames: number
+  maxGroupNameLength: number
   maxDistanceUnitsLength: number
   // Retry window to tell the client to wait when the harness returns 429 without
   // a Retry-After value. Matches the per-user rate-limit window.
@@ -61,18 +65,20 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
   intensityLabels: INTENSITY_LABELS,
   limits: {
     schemaVersion: 1,
-    maxNameLength: 100,
-    maxDescriptionLength: 400,
+    maxSessionNameLength: 100,
+    maxDrillNameLength: 100,
+    maxDrillDescriptionLength: 400,
     maxIntervalLength: 40,
     maxPromptLength: 4000,
     maxDrills: 30,
-    maxItemsPerDrill: 10,
-    maxPlanEntries: 12,
-    maxPlanLineLength: 100,
+    maxStepsPerDrill: 10,
+    maxSessionPlanLines: 12,
+    maxSessionPlanLineLength: 100,
     maxRecentSessions: 2,
     maxDistance: 10_000,
     maxRepeatCount: 100,
     maxGroupNames: 100,
+    maxGroupNameLength: 100,
     maxDistanceUnitsLength: 16,
     rateLimitFallbackSeconds: 3600,
   },

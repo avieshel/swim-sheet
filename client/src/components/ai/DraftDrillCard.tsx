@@ -14,7 +14,7 @@ interface DraftDrillCardProps {
 }
 
 export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove }: DraftDrillCardProps) {
-  const { maxItemsPerDrill, maxRepeatCount } = defaultSessionDraftConfig.limits
+  const { maxStepsPerDrill, maxRepeatCount } = defaultSessionDraftConfig.limits
 
   const replaceItem = (itemIndex: number, item: SessionDraftItemV1) => {
     const items = [...drill.items]
@@ -129,7 +129,7 @@ export function DraftDrillCard({ drill, index, count, onChange, onRemove, onMove
         type="button"
         aria-label={`Add step to ${drill.name}`}
         onClick={addItem}
-        disabled={drill.items.length >= maxItemsPerDrill}
+        disabled={drill.items.length >= maxStepsPerDrill}
           className="mt-3 h-11 min-w-[44px] text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <Icon name="add_circle" size="sm" />

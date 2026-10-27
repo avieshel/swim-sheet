@@ -38,8 +38,8 @@ export function buildResponseSchema(
       plan: {
         type: 'array',
         description: 'One short line per drill, in order. Omit when outcome is not_actionable.',
-        maxItems: config.limits.maxPlanEntries,
-        items: { type: 'string', maxLength: config.limits.maxPlanLineLength },
+        maxItems: config.limits.maxSessionPlanLines,
+        items: { type: 'string', maxLength: config.limits.maxSessionPlanLineLength },
       },
       message: {
         type: 'string',
@@ -145,14 +145,14 @@ export function buildDraftJsonSchema(
           '100m freestyle — the name is what makes them different drills. Prefer a name ' +
           'from the library catalogue when one fits; otherwise coin a descriptive one. ' +
           'Never call it "Set 1" or repeat the session name.',
-        maxLength: limits.maxNameLength,
+        maxLength: limits.maxDrillNameLength,
       },
       description: {
         type: 'string',
         description:
           'Optional. What the technique actually is, when the name alone does not tell ' +
           'a coach what to do. Omit it when the name is self-explanatory.',
-        maxLength: limits.maxDescriptionLength,
+        maxLength: limits.maxDrillDescriptionLength,
       },
       repeatCount: {
         type: 'integer',
@@ -166,7 +166,7 @@ export function buildDraftJsonSchema(
         type: 'array',
         description: 'The steps making up this block, in the order they are swum.',
         minItems: 1,
-        maxItems: limits.maxItemsPerDrill,
+        maxItems: limits.maxStepsPerDrill,
         items: item,
       },
     },
@@ -192,7 +192,7 @@ export function buildDraftJsonSchema(
           name: {
             type: 'string',
             description: 'Short title for the whole session. An object with this one key, never a bare string.',
-            maxLength: limits.maxNameLength,
+            maxLength: limits.maxSessionNameLength,
           },
         },
       },

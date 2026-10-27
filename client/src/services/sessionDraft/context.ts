@@ -10,7 +10,7 @@ import { sanitizePrompt } from '../../../../shared/sessionDraft/sanitize'
 export function buildSessionDraftContext(input: ContextInput): SessionDraftContext {
   const groupNames = input.groupNames
     .map((group) => sanitizePrompt(group, input.knownSwimmerNames).text)
-    .filter((group) => group.trim().length > 0 && group.length <= defaultSessionDraftConfig.limits.maxNameLength)
+    .filter((group) => group.trim().length > 0 && group.length <= defaultSessionDraftConfig.limits.maxGroupNameLength)
     .slice(0, defaultSessionDraftConfig.limits.maxGroupNames)
 
   const recentSessions = input.recentSessions.slice(0, defaultSessionDraftConfig.limits.maxRecentSessions)
