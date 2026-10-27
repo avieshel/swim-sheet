@@ -114,9 +114,11 @@ describe('AiSessionDraft', () => {
     const user = userEvent.setup()
     renderPage()
     await generateDraft()
+    await user.click(await screen.findByRole('button', { name: 'Edit drill: Main set' }))
     const reps = await screen.findByLabelText('Reps for Main set')
     await user.clear(reps)
     await user.type(reps, '8')
+    await user.click(await screen.findByRole('button', { name: 'Close' }))
     await user.click(screen.getByRole('button', { name: /Save session/ }))
     await waitFor(() => {
       const [saved] = applySessionDraft.mock.calls[0]
