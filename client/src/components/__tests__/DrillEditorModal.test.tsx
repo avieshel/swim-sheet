@@ -53,7 +53,7 @@ describe('DrillEditorModal', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('pre-fills fields in edit mode', () => {
+  it('pre-fills fields in edit mode', async () => {
     render(
       <DrillEditorModal
         open={true}
@@ -68,6 +68,8 @@ describe('DrillEditorModal', () => {
     )
     const nameInput = screen.getByPlaceholderText(/e\.g\. Pyramid Set/) as HTMLInputElement
     expect(nameInput.value).toBe('Pre-existing Drill')
+    const detailsToggle = screen.getByRole('button', { name: /Description & Tags/ })
+    await userEvent.setup().click(detailsToggle)
     const descInput = screen.getByPlaceholderText(/6-1-6 breathing/) as HTMLTextAreaElement
     expect(descInput.value).toBe('Some description')
   })

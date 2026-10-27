@@ -68,7 +68,15 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
+  const [detailsExpanded, setDetailsExpanded] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  const detailsSummary = (form.description || '')
+    .trim()
+    .slice(0, 40) || [
+      ...(form.labels || []),
+      ...(form.focus && form.focus !== 'none' ? [form.focus] : []),
+    ].join(' · ')
 
   const hasStrokeChanged = (): boolean => {
     if (!initialData?.stroke) return false
@@ -123,80 +131,6 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                 placeholder="e.g. Pyramid Set or 8x100m Progression"
                 className="w-full min-h-12 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
-            </div>
-
-            <div>
-              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Description / Instructions</label>
-              <textarea
-                id="drill-description"
-                value={form.description || ''}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-                placeholder="e.g. 6-1-6 breathing: 6 kicks on side, 1 stroke, 6 kicks on other side..."
-                rows={2}
-                className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
-              />
-              <div className="mt-3">
-                <span className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Tags</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {PHASE_LABELS.map(label => {
-                    const active = form.labels?.includes(label)
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => {
-                          const labels = form.labels || []
-                          setForm({
-                            ...form,
-                            labels: active ? labels.filter(l => l !== label) : [...labels, label]
-                          })
-                        }}
-                        className={`min-h-9 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="flex gap-2 mt-2">
-                  {['none', 'technique', 'fitness'].map(f => (
-                    <button
-                      key={f}
-                      type="button"
-                      aria-pressed={form.focus === f}
-                      onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
-                      className={`flex-1 min-h-9 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-                {form.focus !== 'none' && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {(form.focus === 'technique' ? TECHNIQUE_LABELS : FITNESS_LABELS).map(label => {
-                      const active = form.labels?.includes(label)
-                      return (
-                        <button
-                          key={label}
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => {
-                            const labels = form.labels || []
-                            setForm({
-                              ...form,
-                              labels: active ? labels.filter(l => l !== label) : [...labels, label]
-                            })
-                          }}
-                          className={`min-h-9 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
-                        >
-                          {label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -354,27 +288,119 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               </div>
             </div>
 
+            <div className="border border-outline-variant rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setDetailsExpanded(v => !v)}
+                aria-expanded={detailsExpanded}
+                className="w-full flex items-center justify-between gap-3 p-3 md:p-4 cursor-pointer hover:bg-surface-container-low/50 transition-colors bg-surface-container-lowest"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="font-headline-sm text-on-surface">Description &amp; Tags</span>
+                  {!detailsExpanded && detailsSummary && (
+                    <span className="text-label-sm text-on-surface-variant truncate">{detailsSummary}</span>
+                  )}
+                </span>
+                <Icon name={detailsExpanded ? 'expand_less' : 'expand_more'} size="sm" className="text-on-surface-variant shrink-0" />
+              </button>
+              {detailsExpanded && (
+                <div className="p-3 md:p-4 border-t border-outline-variant/20 space-y-3">
+              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Description / Instructions</label>
+              <textarea
+                id="drill-description"
+                value={form.description || ''}
+                onChange={e => setForm({ ...form, description: e.target.value })}
+                placeholder="e.g. 6-1-6 breathing: 6 kicks on side, 1 stroke, 6 kicks on other side..."
+                rows={2}
+                className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
+              />
+              <div>
+                <span className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Tags</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {PHASE_LABELS.map(label => {
+                    const active = form.labels?.includes(label)
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          const labels = form.labels || []
+                          setForm({
+                            ...form,
+                            labels: active ? labels.filter(l => l !== label) : [...labels, label]
+                          })
+                        }}
+                        className={`min-h-9 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {['none', 'technique', 'fitness'].map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      aria-pressed={form.focus === f}
+                      onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
+                      className={`flex-1 min-h-9 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                {form.focus !== 'none' && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(form.focus === 'technique' ? TECHNIQUE_LABELS : FITNESS_LABELS).map(label => {
+                      const active = form.labels?.includes(label)
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            const labels = form.labels || []
+                            setForm({
+                              ...form,
+                              labels: active ? labels.filter(l => l !== label) : [...labels, label]
+                            })
+                          }}
+                          className={`min-h-9 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+              </div>
+              )}
+            </div>
+
             <div className="sticky bottom-0 -mx-4 sm:-mx-5 md:-mx-6 mt-5 px-4 sm:px-5 md:px-6 pt-4 pb-4 -mb-4 sm:-mb-5 md:-mb-6 bg-surface-container-lowest border-t border-outline-variant">
-              {onDelete && (
-                <div className="flex justify-center mb-3">
+              <div className="flex items-center gap-3">
+                {onDelete ? (
                   <button
                     onClick={onDelete}
-                    className="text-xs text-error font-bold hover:underline cursor-pointer bg-transparent border-none"
+                    className="flex-1 h-12 min-w-[44px] rounded-xl font-label-sm bg-error text-on-error hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                   >
-                    Delete Drill
+                    Delete
                   </button>
-                </div>
-              )}
-              <div className="flex gap-3">
+                ) : (
+                  <span className="w-0" />
+                )}
                 <button
                   onClick={handleSave}
-                  className="flex-1 min-h-12 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none"
+                  className="flex-1 h-12 min-w-[44px] rounded-xl font-label-sm bg-primary text-on-primary hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                 >
                   {form.id ? 'Save Changes' : 'Create Drill'}
                 </button>
                 <button
                   onClick={onClose}
-                  className="h-12 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors cursor-pointer bg-transparent"
+                  className="flex-1 h-12 min-w-[44px] border-2 border-outline text-on-surface rounded-xl font-label-sm hover:bg-surface-container transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
