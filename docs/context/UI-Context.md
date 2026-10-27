@@ -493,13 +493,13 @@ Styled select dropdown used in drill editor and session setup.
 Add/edit swimmer form with name, group, notes, status fields. Used by SwimmersList, SwimmerDetail, and the Live view. The `name` field has an autocomplete dropdown (`rosterSwimmers` prop) that opens showing the **entire roster** when the modal opens (so the coach can see existing swimmers and avoid duplicates); as they type it filters to matches. Selecting a roster swimmer sets `selectedDbId` and the form acts as an edit/update of that existing record. **Duplicate prevention**: on submit, if the typed name (case-insensitive) matches an existing roster swimmer (other than the one being edited) and no roster swimmer was explicitly selected, the save is blocked. The error is shown in a dedicated, always-rendered error label (reserved height, so the modal size never changes) that sits above the autocomplete dropdown (higher z-index + solid background) so it is never shadowed by the open dropdown. The coach must either pick the existing swimmer from the dropdown or use a different name. This guarantees no two roster swimmers share a name. In the Live view the modal is rendered both per active swimmer card (via `ActiveSwimmerRow`) and per completed/saved swimmer card (via `SavedSwimmerRow`) — clicking any swimmer's name opens it pre-filled, so the coach can always reach add/edit from the live screen. Saving either updates an existing roster swimmer, promotes a quick swimmer into a real roster entry, or re-links it to an existing roster swimmer selected from the autocomplete. For a saved (completed-drill) card, edits also update the saved snapshot (`handleEditSavedSwimmer`) and `promoteAndLinkSwimmer` rewrites the snapshot `dbId`, so the coach can build their swimmer base as they progress rather than pre-loading everyone.
 
 ### DrillEditorModal (shared)
-Rich drill editor with support for:
-- Name, description, stroke, total distance
-- Set components (items with reps, distance, stroke, intensity, interval, equipment)
-- Drill segments (for broken sets, IM, pyramids)
-- Focus labels, technique/fitness/phase classification
+Rich drill editor with a concise, mobile-first vertical layout:
+- **Title** — drill name
+- **Description / Instructions** — textarea, with the phase/focus **tags inline below it** (no separate section): phase pills, a focus segmented control, and focus sub-labels when a focus is chosen. The tags are surfaced here because the AI sets them during draft generation.
+- **Total Set Repeats** — stepper paired with a live Set Distance readout
+- **Steps** — each step is one compact row (`reps × distance / stroke / intensity / interval / equipment toggles / remove`), wrapping gracefully on narrow phones but a single line on wider screens. The equipment toggles are small icon buttons; the distance/stroke/intensity are compact selects.
 
-The phase/focus classification lives in a **collapsed "Tags & classification"** section (chevron header showing the current selection as a summary) — collapsed by default since the AI sets these during draft generation; expanding reveals the same phase pills, focus segmented control, and focus sub-labels. The editor is compact (no `lg` padding inflation) with a sticky Save/Cancel footer so the primary action stays reachable on phones.
+The editor is compact (no `lg` padding inflation) with a sticky Save/Cancel footer so the primary action stays reachable on phones.
 
 ---
 

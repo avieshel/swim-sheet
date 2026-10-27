@@ -68,12 +68,6 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
-  const [tagsExpanded, setTagsExpanded] = useState(false)
-
-  const tagSummary = [
-    ...(form.labels || []),
-    ...(form.focus && form.focus !== 'none' ? [form.focus] : []),
-  ].join(' · ')
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   const hasStrokeChanged = (): boolean => {
@@ -141,9 +135,71 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                 rows={2}
                 className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
               />
+              <div className="mt-3">
+                <span className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Tags</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {PHASE_LABELS.map(label => {
+                    const active = form.labels?.includes(label)
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => {
+                          const labels = form.labels || []
+                          setForm({
+                            ...form,
+                            labels: active ? labels.filter(l => l !== label) : [...labels, label]
+                          })
+                        }}
+                        className={`min-h-9 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {['none', 'technique', 'fitness'].map(f => (
+                    <button
+                      key={f}
+                      type="button"
+                      aria-pressed={form.focus === f}
+                      onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
+                      className={`flex-1 min-h-9 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                {form.focus !== 'none' && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(form.focus === 'technique' ? TECHNIQUE_LABELS : FITNESS_LABELS).map(label => {
+                      const active = form.labels?.includes(label)
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => {
+                            const labels = form.labels || []
+                            setForm({
+                              ...form,
+                              labels: active ? labels.filter(l => l !== label) : [...labels, label]
+                            })
+                          }}
+                          className={`min-h-9 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Total Set Repeats</label>
                 <div className="flex items-center gap-3">
@@ -158,235 +214,141 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               </div>
             </div>
 
-            {/* Tags & classification — collapsed by default since the AI sets these */}
-            <div className="border border-outline-variant rounded-2xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setTagsExpanded(v => !v)}
-                aria-expanded={tagsExpanded}
-                className="w-full flex items-center justify-between gap-3 p-3 md:p-4 cursor-pointer hover:bg-surface-container-low/50 transition-colors bg-surface-container-lowest"
-              >
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="font-headline-sm text-on-surface">Tags &amp; classification</span>
-                  {!tagsExpanded && tagSummary && (
-                    <span className="text-label-sm text-on-surface-variant truncate">{tagSummary}</span>
-                  )}
-                </span>
-                <Icon name={tagsExpanded ? 'expand_less' : 'expand_more'} size="sm" className="text-on-surface-variant shrink-0" />
-              </button>
-              {tagsExpanded && (
-                <div className="p-3 md:p-4 border-t border-outline-variant/20 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Session Phase</label>
-                    <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-                      {PHASE_LABELS.map(label => {
-                        const active = form.labels?.includes(label)
-                        return (
-                          <button
-                            key={label}
-                            type="button"
-                            aria-pressed={active}
-                            onClick={() => {
-                              const labels = form.labels || []
-                              setForm({
-                                ...form,
-                                labels: active ? labels.filter(l => l !== label) : [...labels, label]
-                              })
-                            }}
-                            className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
-                          >
-                            {label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Primary Focus</label>
-                    <div className="flex gap-2 mb-3">
-                      {['none', 'technique', 'fitness'].map(f => (
-                        <button
-                          key={f}
-                          type="button"
-                          aria-pressed={form.focus === f}
-                          onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
-                          className={`flex-1 min-h-11 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
-                        >
-                          {f}
-                        </button>
-                      ))}
-                    </div>
-                    {form.focus !== 'none' && (
-                      <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-                        {(form.focus === 'technique' ? TECHNIQUE_LABELS : FITNESS_LABELS).map(label => {
-                          const active = form.labels?.includes(label)
-                          return (
-                            <button
-                              key={label}
-                              type="button"
-                              aria-pressed={active}
-                              onClick={() => {
-                                const labels = form.labels || []
-                                setForm({
-                                  ...form,
-                                  labels: active ? labels.filter(l => l !== label) : [...labels, label]
-                                })
-                              }}
-                              className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
-                            >
-                              {label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Items List */}
+            {/* Steps — each step is one compact row */}
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block font-label-caps text-label-caps text-on-surface-variant">Set Components</label>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block font-label-caps text-label-caps text-on-surface-variant">Steps</label>
                 <button
                   type="button"
                   onClick={() => setForm({
                     ...form,
                     items: [...(form.items || []), { id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }]
                   })}
-                  className="h-11 min-w-[44px] text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="h-9 text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon name="add_circle" size="sm" />
                   Add Step
                 </button>
               </div>
-              <div className="space-y-3">
+              <div className="divide-y divide-outline-variant/15">
                 {(form.items || []).map((item, idx) => (
-                  <div key={item.id} className="p-3 md:p-4 bg-surface-container-low/70 rounded-2xl border border-outline-variant/40 relative group">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 items-end gap-3">
-                      <div className="min-w-0">
-                        <label htmlFor={`drill-step-reps-${idx}`} className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Reps</label>
-                        <input
-                          id={`drill-step-reps-${idx}`}
-                          type="number"
-                          min="1"
-                          value={item.repeatCount}
-                          onChange={e => {
-                            const newItems = [...(form.items || [])]
-                            newItems[idx] = { ...item, repeatCount: parseInt(e.target.value) || 1 }
-                            setForm({ ...form, items: newItems })
-                          }}
-                          className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <CustomSelect
-                          label="Dist (m)"
-                          value={item.distance > 600 ? 'custom' : item.distance}
-                          options={[
-                            ...[25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 550, 600].map(v => ({ value: v, label: `${v}m` })),
-                            { value: 'custom', label: item.distance > 600 ? `${item.distance}m` : 'Custom...' }
-                          ]}
-                          onChange={(val) => {
-                            const newItems = [...(form.items || [])]
-                            if (val === 'custom') {
-                              const custom = prompt('Enter custom distance (m):', String(item.distance))
-                              newItems[idx] = { ...item, distance: parseInt(custom || '0') || 0 }
-                            } else {
-                              newItems[idx] = { ...item, distance: val as number }
-                            }
-                            setForm({ ...form, items: newItems })
-                          }}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <CustomSelect
-                          label="Stroke"
-                          value={item.stroke}
-                          options={strokeOptions}
-                          onChange={(val) => {
-                            const newItems = [...(form.items || [])]
-                            newItems[idx] = { ...item, stroke: val as Stroke }
-                            setForm({ ...form, items: newItems })
-                          }}
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <CustomSelect
-                          label="Int"
-                          value={item.intensity || ''}
-                          options={[
-                            { value: '', label: '--' },
-                            { value: 'v1', label: 'v1' },
-                            { value: 'v2', label: 'v2' },
-                            { value: 'v3', label: 'v3' },
-                            { value: 'v4', label: 'v4' },
-                          ]}
-                          onChange={(val) => {
-                            const newItems = [...(form.items || [])]
-                            newItems[idx] = { ...item, intensity: val as string }
-                            setForm({ ...form, items: newItems })
-                          }}
-                        />
-                      </div>
-                      <div className="col-span-2 sm:col-span-1 min-w-0">
-                        <label htmlFor={`drill-step-interval-${idx}`} className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Interval</label>
-                        <input
-                          id={`drill-step-interval-${idx}`}
-                          type="text"
-                          value={item.interval || ''}
-                          onChange={e => {
-                            const newItems = [...(form.items || [])]
-                            newItems[idx] = { ...item, interval: e.target.value }
-                            setForm({ ...form, items: newItems })
-                          }}
-                          placeholder="2:00"
-                          className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
-                        />
-                      </div>
-
-                      <div className="col-span-2 sm:col-span-3 grid grid-cols-4 gap-1 pb-1">
-                        {EQUIPMENT_OPTIONS.map(opt => {
-                          const active = item.equipment?.includes(opt.id)
-                          return (
-                            <button
-                              key={opt.id}
-                              type="button"
-                              title={opt.label}
-                              aria-pressed={Boolean(active)}
-                              onClick={() => {
-                                const newItems = [...(form.items || [])]
-                                const equipment = item.equipment || []
-                                newItems[idx] = {
-                                  ...item,
-                                  equipment: active ? equipment.filter(e => e !== opt.id) : [...equipment, opt.id]
-                                }
-                                setForm({ ...form, items: newItems })
-                              }}
-                              className={`min-h-11 min-w-[44px] rounded-xl flex flex-col items-center justify-center transition-all border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary border-secondary shadow-sm' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'}`}
-                            >
-                              <EquipmentIcons type={opt.id as EquipmentType} className="w-4 h-4 mb-0.5" />
-                              <span className="text-caption font-bold uppercase tracking-tighter leading-none">{opt.label}</span>
-                            </button>
-                          )
-                        })}
-                      </div>
-
-                      <div className="col-span-2 sm:col-span-3 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newItems = (form.items || []).filter((_, i) => i !== idx)
-                            setForm({ ...form, items: newItems })
-                          }}
-                          disabled={(form.items || []).length === 1}
-                          className="h-11 w-11 flex items-center justify-center rounded-xl text-outline hover:text-error hover:bg-error-container/20 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
-                        >
-                          <Icon name="delete" size="lg" />
-                        </button>
-                      </div>
+                  <div key={item.id} className="flex items-center gap-2 flex-wrap py-2">
+                    <span className="text-label-sm tabular-nums text-on-surface-variant w-4 shrink-0 text-center">{idx + 1}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="number"
+                        min="1"
+                        aria-label="Reps"
+                        value={item.repeatCount}
+                        onChange={e => {
+                          const newItems = [...(form.items || [])]
+                          newItems[idx] = { ...item, repeatCount: parseInt(e.target.value) || 1 }
+                          setForm({ ...form, items: newItems })
+                        }}
+                        className="w-12 min-h-9 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 text-center"
+                      />
+                      <span className="text-on-surface-variant">×</span>
                     </div>
+                    <div className="w-24 shrink-0" title="Distance">
+                      <CustomSelect
+                        label=""
+                        value={item.distance > 600 ? 'custom' : item.distance}
+                        options={[
+                          ...[25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 550, 600].map(v => ({ value: v, label: `${v}m` })),
+                          { value: 'custom', label: item.distance > 600 ? `${item.distance}m` : 'Custom…' }
+                        ]}
+                        onChange={(val) => {
+                          const newItems = [...(form.items || [])]
+                          if (val === 'custom') {
+                            const custom = prompt('Enter custom distance (m):', String(item.distance))
+                            newItems[idx] = { ...item, distance: parseInt(custom || '0') || 0 }
+                          } else {
+                            newItems[idx] = { ...item, distance: val as number }
+                          }
+                          setForm({ ...form, items: newItems })
+                        }}
+                      />
+                    </div>
+                    <div className="w-28 shrink-0" title="Stroke">
+                      <CustomSelect
+                        label=""
+                        value={item.stroke}
+                        options={strokeOptions}
+                        onChange={(val) => {
+                          const newItems = [...(form.items || [])]
+                          newItems[idx] = { ...item, stroke: val as Stroke }
+                          setForm({ ...form, items: newItems })
+                        }}
+                      />
+                    </div>
+                    <div className="w-16 shrink-0" title="Intensity">
+                      <CustomSelect
+                        label=""
+                        value={item.intensity || ''}
+                        options={[
+                          { value: '', label: '--' },
+                          { value: 'v1', label: 'v1' },
+                          { value: 'v2', label: 'v2' },
+                          { value: 'v3', label: 'v3' },
+                          { value: 'v4', label: 'v4' },
+                        ]}
+                        onChange={(val) => {
+                          const newItems = [...(form.items || [])]
+                          newItems[idx] = { ...item, intensity: val as string }
+                          setForm({ ...form, items: newItems })
+                        }}
+                      />
+                    </div>
+                    <input
+                      type="text"
+                      aria-label="Interval"
+                      value={item.interval || ''}
+                      onChange={e => {
+                        const newItems = [...(form.items || [])]
+                        newItems[idx] = { ...item, interval: e.target.value }
+                        setForm({ ...form, items: newItems })
+                      }}
+                      placeholder="int"
+                      className="w-16 min-h-9 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 text-center"
+                    />
+                    <div className="flex gap-0.5 shrink-0">
+                      {EQUIPMENT_OPTIONS.map(opt => {
+                        const active = item.equipment?.includes(opt.id)
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            title={opt.label}
+                            aria-pressed={Boolean(active)}
+                            aria-label={opt.label}
+                            onClick={() => {
+                              const newItems = [...(form.items || [])]
+                              const equipment = item.equipment || []
+                              newItems[idx] = {
+                                ...item,
+                                equipment: active ? equipment.filter(e => e !== opt.id) : [...equipment, opt.id]
+                              }
+                              setForm({ ...form, items: newItems })
+                            }}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary border-secondary' : 'bg-surface-container-highest text-on-surface-variant border-outline-variant/30 hover:bg-outline-variant'}`}
+                          >
+                            <EquipmentIcons type={opt.id as EquipmentType} className="w-4 h-4" />
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newItems = (form.items || []).filter((_, i) => i !== idx)
+                        setForm({ ...form, items: newItems })
+                      }}
+                      disabled={(form.items || []).length === 1}
+                      aria-label="Remove step"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-outline hover:text-error hover:bg-error-container/20 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error shrink-0"
+                    >
+                      <Icon name="delete" size="sm" />
+                    </button>
                   </div>
                 ))}
               </div>
