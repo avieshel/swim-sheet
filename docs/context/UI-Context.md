@@ -497,7 +497,9 @@ Rich drill editor with support for:
 - Name, description, stroke, total distance
 - Set components (items with reps, distance, stroke, intensity, interval, equipment)
 - Drill segments (for broken sets, IM, pyramids)
-- Timing mode, focus labels, technique/fitness/phase classification
+- Focus labels, technique/fitness/phase classification
+
+The phase/focus classification lives in a **collapsed "Tags & classification"** section (chevron header showing the current selection as a summary) — collapsed by default since the AI sets these during draft generation; expanding reveals the same phase pills, focus segmented control, and focus sub-labels. The editor is compact (no `lg` padding inflation) with a sticky Save/Cancel footer so the primary action stays reachable on phones.
 
 ---
 

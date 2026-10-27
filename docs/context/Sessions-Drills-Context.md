@@ -345,15 +345,18 @@ Coach reality: **warm-ups are not timed, cool-downs are not timed, and the main 
 *might* be timed — and even then, maybe not for every rep and not for every swimmer.**
 Timing is decided at the wall, per drill, per lane, per swimmer.
 
-Current model conflates three different questions into one saved binary field
-(`timingMode: 'individual' | 'continuous'`, `client/src/db/schema.ts:46`):
+Current model conflates three different questions into one saved binary field — this was
+`timingMode: 'individual' | 'continuous'` on `Drill`/`LibraryDrill` (`client/src/db/schema.ts`),
+now **removed** (Oct 2026). Drills always unroll to one `RunDrill` per rep/item in
+`runService.createFromTemplate`, so the "continuous" collapse no longer exists.
 
 1. **Is this drill timed at all?** — No such concept. Every drill in the live deck shows
    Start/Lap/Finish controls (`SwimmerRows.tsx`), warm-up included. There is no "untimed"
    drill, so the coach either times warm-ups (noise) or ignores the controls.
-2. **How is it timed?** — `timingMode` answers this (individual reps vs continuous set),
-   but it's saved on the template and only changes run-snapshot flattening
-   (`runService.ts:150-197`) — it's about structure, not about whether timing happens.
+2. **How is it timed?** — Historically `timingMode` answered this (individual reps vs
+   continuous set), but it only changed run-snapshot flattening (`runService.ts`) — it was
+   about structure, not about whether timing happens. That distinction is gone; runs always
+   flatten per rep.
 3. **Who is timed?** — No per-swimmer timing opt-in. Timing is all-or-nothing per lane
    via group Start/Finish.
 

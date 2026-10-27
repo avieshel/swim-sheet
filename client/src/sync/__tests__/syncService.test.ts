@@ -374,7 +374,7 @@ describe('syncService', () => {
     async function seedSeededOnly(): Promise<void> {
       await db.libraryDrills.add({
         id: 'builtin-1', name: 'Catch Up', stroke: 'freestyle', distance: 100, items: [],
-        repeatCount: 1, timingMode: 'individual', focus: 'technique', labels: [], description: 'd',
+        repeatCount: 1, focus: 'technique', labels: [], description: 'd',
         source: 'builtin', catalogKey: 'Catch Up', popularity: 0, createdAt: 't', updatedAt: 't',
       })
       await db.sessions.add({
@@ -386,7 +386,7 @@ describe('syncService', () => {
       for (const [index, name] of ['Easy Free', 'Kickboard'].entries()) {
         await db.drills.add({
           id: `seeded-drill-${index}`, sessionId: 'seeded-session', name, stroke: 'freestyle',
-          distance: 100, order: index, items: [], repeatCount: 1, timingMode: 'individual',
+          distance: 100, order: index, items: [], repeatCount: 1,
           focus: 'technique', labels: [], description: '', createdAt: 't', updatedAt: 't',
         })
       }
@@ -431,12 +431,12 @@ describe('syncService', () => {
       await seedSeededOnly()
       await db.drills.add({
         id: 'my-drill', sessionId: 'seeded-session', name: 'Race Pace 200', stroke: 'freestyle',
-        distance: 200, order: 99, items: [], repeatCount: 1, timingMode: 'individual',
+        distance: 200, order: 99, items: [], repeatCount: 1,
         focus: 'fitness', labels: [], description: '', createdAt: 't', updatedAt: 't',
       })
       await db.libraryDrills.add({
         id: 'my-library-drill', name: 'Race Pace 200', stroke: 'freestyle', distance: 200, items: [],
-        repeatCount: 1, timingMode: 'individual', focus: 'fitness', labels: [], description: '',
+        repeatCount: 1, focus: 'fitness', labels: [], description: '',
         source: 'personal', createdAt: 't', updatedAt: 't',
       })
       const transport = fakeTransport({ cloudChanges: [remoteSession('cloud-session')] })

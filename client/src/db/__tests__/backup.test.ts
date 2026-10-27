@@ -225,8 +225,7 @@ describe('granular data resets', () => {
   it('deleteAllSessions clears templates and their drills, but keeps completed runs', async () => {
     await db.sessions.add({ id: 'sess-1', name: 'Distance Progression', notes: '', createdAt: now(), updatedAt: now() })
     await db.drills.add({
-      id: 'drill-1', sessionId: 'sess-1', name: '4x25 sprint', order: 1, items: [], repeatCount: 1,
-      timingMode: 'individual', focus: 'none', labels: [], description: '', stroke: 'freestyle', distance: 100,
+      id: 'drill-1', sessionId: 'sess-1', name: '4x25 sprint', order: 1, items: [], repeatCount: 1, focus: 'none', labels: [], description: '', stroke: 'freestyle', distance: 100,
       createdAt: now(), updatedAt: now(),
     })
     await db.sessionRuns.add({

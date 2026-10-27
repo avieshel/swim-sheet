@@ -60,7 +60,6 @@ export interface EmptyDrillForm {
   name: string
   items: { id: string; distance: number; stroke: Stroke; repeatCount: number }[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: 'technique' | 'fitness' | 'none'
   labels: string[]
   description: string
@@ -71,7 +70,6 @@ export function emptyDrillForm(): EmptyDrillForm {
     name: '',
     items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
     repeatCount: 1,
-    timingMode: 'individual',
     focus: 'none',
     labels: [],
     description: '',

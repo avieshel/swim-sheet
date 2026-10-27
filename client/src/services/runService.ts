@@ -14,7 +14,7 @@ import {
 import { db } from '../db/schema'
 import type { SafeSessionRun, SafeRunDrill, SafeLaneDrillResult, SafeLap, SavedDrillData } from '../db/schema'
 import { settingsService } from './settingsService'
-import { buildSessionSnapshot, computeDrillMetrics } from '../utils/sessionSnapshot'
+import { buildSessionSnapshot } from '../utils/sessionSnapshot'
 
 function buildMarkerData(startedAt?: number, poolLength = 25): string | null {
   return startedAt != null
@@ -257,51 +257,24 @@ export const runService = {
       const drill = drills[drillIndex]
       const items = drill.items || []
       if (items.length === 0) continue
-      const metrics = computeDrillMetrics(drill)
 
-      if (drill.timingMode === 'continuous') {
-        const totalDistance = items.reduce((sum, item) => sum + (item.distance * item.repeatCount), 0) * drill.repeatCount
-
-        const instructionLines: string[] = []
-        const equipmentSet = new Set<string>()
-
-        if (drill.repeatCount > 1) instructionLines.push(`${drill.repeatCount}x:`)
+      for (let r = 0; r < drill.repeatCount; r++) {
         for (const item of items) {
-          const intervalText = item.interval ? ` @ ${item.interval}` : ''
-          const equipText = item.equipment?.length ? ` [${item.equipment.join(', ')}]` : ''
-          instructionLines.push(`${item.repeatCount}x ${item.distance}m ${item.stroke} ${item.intensity || ''}${intervalText}${equipText}`)
-          item.equipment?.forEach(e => equipmentSet.add(e))
-        }
+          for (let ir = 0; ir < item.repeatCount; ir++) {
+            const setLabel = drill.repeatCount > 1 ? `(${r + 1}/${drill.repeatCount}) ` : ''
+            const repLabel = item.repeatCount > 1 ? `[${ir + 1}/${item.repeatCount}]` : ''
 
-        await addRunDrill({
-          runId,
-          name: drill.name,
-          stroke: metrics.dominantStroke,
-          distance: totalDistance,
-          order: runDrillOrder++,
-          instructions: instructionLines.join('\n'),
-          equipment: Array.from(equipmentSet),
-          notes: drill.description || '',
-        }, drillIndex)
-      } else {
-        for (let r = 0; r < drill.repeatCount; r++) {
-          for (const item of items) {
-            for (let ir = 0; ir < item.repeatCount; ir++) {
-              const setLabel = drill.repeatCount > 1 ? `(${r + 1}/${drill.repeatCount}) ` : ''
-              const repLabel = item.repeatCount > 1 ? `[${ir + 1}/${item.repeatCount}]` : ''
-
-              await addRunDrill({
-                runId,
-                name: `${setLabel}${drill.name}`,
-                stroke: item.stroke,
-                distance: item.distance,
-                order: runDrillOrder++,
-                instructions: repLabel || item.intensity || '',
-                interval: item.interval,
-                equipment: item.equipment,
-                notes: drill.description || '',
-              }, drillIndex)
-            }
+            await addRunDrill({
+              runId,
+              name: `${setLabel}${drill.name}`,
+              stroke: item.stroke,
+              distance: item.distance,
+              order: runDrillOrder++,
+              instructions: repLabel || item.intensity || '',
+              interval: item.interval,
+              equipment: item.equipment,
+              notes: drill.description || '',
+            }, drillIndex)
           }
         }
       }
@@ -329,7 +302,6 @@ export const runService = {
         order: 0,
         items: [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
         repeatCount: 1,
-        timingMode: 'individual',
         focus: 'none',
         labels: [],
         description: '',

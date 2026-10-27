@@ -82,7 +82,6 @@ describe('syncStore', () => {
       order: 0,
       items: [],
       repeatCount: 1,
-      timingMode: 'individual',
       focus: 'technique',
       labels: [],
       description: '',

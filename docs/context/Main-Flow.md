@@ -214,7 +214,7 @@ if the template is the active run's session the button reads **View Live**.
 2. Name, description, stroke, total distance
 3. Set components: items with reps, distance, stroke, intensity, interval, equipment
 4. Drill segments for broken sets, IM, pyramids
-5. Timing mode, focus labels, technique/fitness/phase classification
+5. Focus labels, technique/fitness/phase classification
 6. On save: similarity detection checks existing drills → warning if match found
 7. "Create Anyway" / "Cancel"
 

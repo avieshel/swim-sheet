@@ -23,7 +23,6 @@ export interface DrillFormData {
   name: string
   items: DrillItem[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: string
   labels: string[]
   description: string
@@ -50,7 +49,6 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
       name: initialData.name || '',
       items: (initialData.items && initialData.items.length > 0) ? initialData.items : [{ id: crypto.randomUUID(), distance: 100, stroke: 'freestyle', repeatCount: 1 }],
       repeatCount: initialData.repeatCount ?? 1,
-      timingMode: initialData.timingMode || 'individual',
       focus: initialData.focus || 'none',
       labels: initialData.labels || [],
       description: initialData.description || '',
@@ -70,6 +68,12 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
+  const [tagsExpanded, setTagsExpanded] = useState(false)
+
+  const tagSummary = [
+    ...(form.labels || []),
+    ...(form.focus && form.focus !== 'none' ? [form.focus] : []),
+  ].join(' · ')
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   const hasStrokeChanged = (): boolean => {
@@ -111,11 +115,11 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
 
   return (
     <SessionModalShell title={title} onClose={onClose} initialFocusRef={nameInputRef} restoreFocusRef={restoreFocusRef} size="wide">
-        <div className="p-4 md:p-6 lg:p-8" onKeyDown={handleContentKeyDown}>
-          <div className="space-y-6">
+        <div className="p-4 sm:p-5 md:p-6" onKeyDown={handleContentKeyDown}>
+          <div className="space-y-5">
             {/* Basic Info */}
             <div>
-              <label htmlFor="drill-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Drill Name</label>
+              <label htmlFor="drill-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Drill Name</label>
               <input
                 ref={nameInputRef}
                 id="drill-name"
@@ -128,7 +132,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             </div>
 
             <div>
-              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Description / Instructions</label>
+              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Description / Instructions</label>
               <textarea
                 id="drill-description"
                 value={form.description || ''}
@@ -139,34 +143,13 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Total Set Repeats</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Total Set Repeats</label>
                 <div className="flex items-center gap-3">
                   <button type="button" aria-label="Decrease total set repeats" onClick={() => setForm({ ...form, repeatCount: Math.max(1, (form.repeatCount || 1) - 1) })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">-</button>
                   <span className="font-bold text-lg w-8 text-center">{form.repeatCount}x</span>
                   <button type="button" aria-label="Increase total set repeats" onClick={() => setForm({ ...form, repeatCount: (form.repeatCount || 1) + 1 })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">+</button>
-                </div>
-              </div>
-              <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Timing Mode</label>
-                <div className="flex bg-surface-container-low p-1 rounded-lg">
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, timingMode: 'individual' })}
-                    aria-pressed={form.timingMode === 'individual'}
-                    className={`flex-1 min-h-11 text-label-sm font-bold rounded-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.timingMode === 'individual' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-                  >
-                    Individual
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setForm({ ...form, timingMode: 'continuous' })}
-                    aria-pressed={form.timingMode === 'continuous'}
-                    className={`flex-1 min-h-11 text-label-sm font-bold rounded-lg transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.timingMode === 'continuous' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
-                  >
-                    Continuous
-                  </button>
                 </div>
               </div>
               <div className="flex flex-col justify-center items-center sm:items-end">
@@ -175,73 +158,91 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               </div>
             </div>
 
-            {/* Phase & Focus */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Session Phase</label>
-                <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-                  {PHASE_LABELS.map(label => {
-                    const active = form.labels?.includes(label)
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => {
-                          const labels = form.labels || []
-                          setForm({
-                            ...form,
-                            labels: active ? labels.filter(l => l !== label) : [...labels, label]
-                          })
-                        }}
-                        className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Primary Focus</label>
-                <div className="flex gap-2 mb-3">
-                  {['none', 'technique', 'fitness'].map(f => (
-                    <button
-                      key={f}
-                      type="button"
-                      aria-pressed={form.focus === f}
-                      onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
-                      className={`flex-1 min-h-11 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-                {form.focus !== 'none' && (
-                  <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
-                    {(form.focus === 'technique' ? TECHNIQUE_LABELS : FITNESS_LABELS).map(label => {
-                      const active = form.labels?.includes(label)
-                      return (
-                        <button
-                          key={label}
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => {
-                            const labels = form.labels || []
-                            setForm({
-                              ...form,
-                              labels: active ? labels.filter(l => l !== label) : [...labels, label]
-                            })
-                          }}
-                          className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
-                        >
-                          {label}
-                        </button>
-                      )
-                    })}
+            {/* Tags & classification — collapsed by default since the AI sets these */}
+            <div className="border border-outline-variant rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTagsExpanded(v => !v)}
+                aria-expanded={tagsExpanded}
+                className="w-full flex items-center justify-between gap-3 p-3 md:p-4 cursor-pointer hover:bg-surface-container-low/50 transition-colors bg-surface-container-lowest"
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="font-headline-sm text-on-surface">Tags &amp; classification</span>
+                  {!tagsExpanded && tagSummary && (
+                    <span className="text-label-sm text-on-surface-variant truncate">{tagSummary}</span>
+                  )}
+                </span>
+                <Icon name={tagsExpanded ? 'expand_less' : 'expand_more'} size="sm" className="text-on-surface-variant shrink-0" />
+              </button>
+              {tagsExpanded && (
+                <div className="p-3 md:p-4 border-t border-outline-variant/20 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Session Phase</label>
+                    <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
+                      {PHASE_LABELS.map(label => {
+                        const active = form.labels?.includes(label)
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => {
+                              const labels = form.labels || []
+                              setForm({
+                                ...form,
+                                labels: active ? labels.filter(l => l !== label) : [...labels, label]
+                              })
+                            }}
+                            className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                          >
+                            {label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div>
+                    <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Primary Focus</label>
+                    <div className="flex gap-2 mb-3">
+                      {['none', 'technique', 'fitness'].map(f => (
+                        <button
+                          key={f}
+                          type="button"
+                          aria-pressed={form.focus === f}
+                          onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
+                          className={`flex-1 min-h-11 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
+                        >
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                    {form.focus !== 'none' && (
+                      <div className="flex flex-wrap gap-1.5 p-3 bg-surface-container-low rounded-xl border border-outline-variant/30">
+                        {(form.focus === 'technique' ? TECHNIQUE_LABELS : FITNESS_LABELS).map(label => {
+                          const active = form.labels?.includes(label)
+                          return (
+                            <button
+                              key={label}
+                              type="button"
+                              aria-pressed={active}
+                              onClick={() => {
+                                const labels = form.labels || []
+                                setForm({
+                                  ...form,
+                                  labels: active ? labels.filter(l => l !== label) : [...labels, label]
+                                })
+                              }}
+                              className={`min-h-11 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${active ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant hover:bg-outline-variant'}`}
+                            >
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Items List */}
@@ -263,7 +264,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               <div className="space-y-3">
                 {(form.items || []).map((item, idx) => (
                   <div key={item.id} className="p-3 md:p-4 bg-surface-container-low/70 rounded-2xl border border-outline-variant/40 relative group">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-8 items-end gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 items-end gap-3">
                       <div className="min-w-0">
                         <label htmlFor={`drill-step-reps-${idx}`} className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Reps</label>
                         <input
@@ -345,7 +346,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         />
                       </div>
 
-                      <div className="col-span-2 sm:col-span-3 xl:col-span-2 grid grid-cols-4 gap-1 pb-1">
+                      <div className="col-span-2 sm:col-span-3 grid grid-cols-4 gap-1 pb-1">
                         {EQUIPMENT_OPTIONS.map(opt => {
                           const active = item.equipment?.includes(opt.id)
                           return (
@@ -372,7 +373,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         })}
                       </div>
 
-                      <div className="col-span-2 sm:col-span-3 xl:col-span-1 flex justify-end">
+                      <div className="col-span-2 sm:col-span-3 flex justify-end">
                         <button
                           type="button"
                           onClick={() => {
@@ -391,22 +392,34 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-outline-variant">
-               <button
-                 onClick={handleSave}
-                className="flex-1 min-h-12 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none"
-               >
-                 {form.id ? 'Save Changes' : 'Create Drill'}
-               </button>
-               <button
-                 onClick={onClose}
+            <div className="sticky bottom-0 -mx-4 sm:-mx-5 md:-mx-6 mt-5 px-4 sm:px-5 md:px-6 pt-4 pb-4 -mb-4 sm:-mb-5 md:-mb-6 bg-surface-container-lowest border-t border-outline-variant">
+              {onDelete && (
+                <div className="flex justify-center mb-3">
+                  <button
+                    onClick={onDelete}
+                    className="text-xs text-error font-bold hover:underline cursor-pointer bg-transparent border-none"
+                  >
+                    Delete Drill
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSave}
+                  className="flex-1 min-h-12 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none"
+                >
+                  {form.id ? 'Save Changes' : 'Create Drill'}
+                </button>
+                <button
+                  onClick={onClose}
                   className="h-12 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors cursor-pointer bg-transparent"
-               >
-                 Cancel
-               </button>
-             </div>
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
 
-             {/* Stroke-Change Confirmation */}
+            {/* Stroke-Change Confirmation */}
 <ConfirmDialog
                  open={showStrokeConfirm}
                  title="Stroke Changed"
@@ -417,17 +430,6 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                  cancelLabel="Discard"
                  destructive={false}
                />
-
-            {onDelete && (
-              <div className="pt-2 flex justify-center">
-                <button
-                  onClick={onDelete}
-                  className="text-xs text-error font-bold hover:underline cursor-pointer bg-transparent border-none"
-                >
-                  Delete Drill
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </SessionModalShell>

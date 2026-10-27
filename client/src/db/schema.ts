@@ -56,7 +56,6 @@ export interface Drill {
   order: number
   items: DrillItem[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: 'technique' | 'fitness' | 'none'
   labels: string[]
   description: string
@@ -175,7 +174,6 @@ export interface LibraryDrill {
   distance: number
   items?: DrillItem[]
   repeatCount?: number
-  timingMode?: 'individual' | 'continuous'
   focus?: 'technique' | 'fitness' | 'none'
   labels?: string[]
   description?: string

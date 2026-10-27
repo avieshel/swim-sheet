@@ -29,7 +29,6 @@ interface CatalogSessionDrill {
   distance: number
   items: CatalogDrillItem[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: CatalogFocus
   labels: string[]
   description: string

@@ -14,7 +14,6 @@ interface SnapshotDrill {
   stroke: Stroke
   items: DrillItem[]
   repeatCount: number
-  timingMode: 'individual' | 'continuous'
   focus: 'technique' | 'fitness' | 'none'
   labels: string[]
   description: string
@@ -76,7 +75,6 @@ export function buildSessionSnapshot(session: Session, drills: Drill[]): Session
       stroke: drill.stroke,
       items: drill.items ?? [],
       repeatCount: drill.repeatCount ?? 1,
-      timingMode: drill.timingMode ?? 'individual',
       focus: drill.focus ?? 'none',
       labels: drill.labels ?? [],
       description: drill.description ?? '',
