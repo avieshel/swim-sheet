@@ -160,8 +160,8 @@ export function validateSessionDraft(
   if (typeof session.name !== 'string' || session.name.trim().length === 0) {
     return fail('invalid_shape', 'draft.session.name must be a non-empty string')
   }
-  if (session.name.length > config.limits.maxNameLength) {
-    return fail('limit_exceeded', `draft.session.name exceeds ${config.limits.maxNameLength} characters`)
+  if (session.name.length > config.limits.maxSessionNameLength) {
+    return fail('limit_exceeded', `draft.session.name exceeds ${config.limits.maxSessionNameLength} characters`)
   }
 
   const drills = input.drills
@@ -183,16 +183,16 @@ export function validateSessionDraft(
     if (typeof drill.name !== 'string' || drill.name.trim().length === 0) {
       return fail('invalid_shape', `${drillPath}.name must be a non-empty string`)
     }
-    if (drill.name.length > config.limits.maxNameLength) {
-      return fail('limit_exceeded', `${drillPath}.name exceeds ${config.limits.maxNameLength} characters`)
+    if (drill.name.length > config.limits.maxDrillNameLength) {
+      return fail('limit_exceeded', `${drillPath}.name exceeds ${config.limits.maxDrillNameLength} characters`)
     }
     // Optional, so `null` means omitted here for the same reason as on an item.
     if (!isAbsent(drill.description)) {
       if (typeof drill.description !== 'string') {
         return fail('invalid_shape', `${drillPath}.description must be a string`)
       }
-      if (drill.description.length > config.limits.maxDescriptionLength) {
-        return fail('limit_exceeded', `${drillPath}.description exceeds ${config.limits.maxDescriptionLength} characters`)
+      if (drill.description.length > config.limits.maxDrillDescriptionLength) {
+        return fail('limit_exceeded', `${drillPath}.description exceeds ${config.limits.maxDrillDescriptionLength} characters`)
       }
     }
     if (!isPositiveInteger(drill.repeatCount)) {
@@ -202,8 +202,8 @@ export function validateSessionDraft(
     if (!Array.isArray(items) || items.length < 1) {
       return fail('invalid_shape', `${drillPath}.items must contain at least one item`)
     }
-    if (items.length > config.limits.maxItemsPerDrill) {
-      return fail('limit_exceeded', `${drillPath}.items exceeds ${config.limits.maxItemsPerDrill} items`)
+    if (items.length > config.limits.maxStepsPerDrill) {
+      return fail('limit_exceeded', `${drillPath}.items exceeds ${config.limits.maxStepsPerDrill} steps`)
     }
     const validatedItems: SessionDraftItemV1[] = []
     for (let i = 0; i < items.length; i++) {
@@ -227,18 +227,31 @@ export function validateSessionDraft(
 
 function validatePlan(config: SessionDraftConfig, value: unknown): ValidationOutcome<string[]> {
   if (!Array.isArray(value)) return fail('invalid_shape', 'draft.plan must be an array of strings')
-  if (value.length > config.limits.maxPlanEntries) {
-    return fail('limit_exceeded', `draft.plan exceeds ${config.limits.maxPlanEntries} entries`)
+  if (value.length > config.limits.maxSessionPlanLines) {
+    return fail('limit_exceeded', `draft.plan exceeds ${config.limits.maxSessionPlanLines} lines`)
   }
   for (const entry of value) {
     if (typeof entry !== 'string' || entry.trim().length === 0) {
       return fail('invalid_shape', 'draft.plan entries must be non-empty strings')
     }
-    if (entry.length > config.limits.maxNameLength) {
-      return fail('limit_exceeded', `draft.plan entry exceeds ${config.limits.maxNameLength} characters`)
+    if (entry.length > config.limits.maxSessionPlanLineLength) {
+      return fail('limit_exceeded', `draft.plan entry exceeds ${config.limits.maxSessionPlanLineLength} characters`)
     }
   }
   return { ok: true, value: value as string[] }
+}
+
+// Agent-side leniency for the plan's display-only lines: overlong entries are
+// truncated to the cap instead of costing the whole provider attempt. Shape
+// problems (non-strings, empty entries, too many lines) are deliberately not
+// coerced — those stay hard validation failures.
+export function coercePlan(config: SessionDraftConfig, value: unknown): unknown {
+  if (!Array.isArray(value)) return value
+  return value.map((entry) =>
+    typeof entry === 'string' && entry.length > config.limits.maxSessionPlanLineLength
+      ? entry.slice(0, config.limits.maxSessionPlanLineLength)
+      : entry,
+  )
 }
 
 export function validateHarnessResult(
@@ -368,7 +381,7 @@ function validateRequestContext(config: SessionDraftConfig, value: unknown): Val
   }
   if (
     !groupNames.every(
-      (name) => typeof name === 'string' && name.trim().length > 0 && name.length <= config.limits.maxNameLength,
+      (name) => typeof name === 'string' && name.trim().length > 0 && name.length <= config.limits.maxGroupNameLength,
     )
   ) {
     return fail('invalid_shape', 'request.context.groupNames must be non-empty strings within the name limit')

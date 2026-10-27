@@ -151,10 +151,10 @@ describe('buildDraftJsonSchema', () => {
     const drill = schema.properties?.drills
     expect(drill?.maxItems).toBe(config.limits.maxDrills)
     expect(drill?.minItems).toBe(1)
-    expect(drill?.items?.properties?.items?.maxItems).toBe(config.limits.maxItemsPerDrill)
+    expect(drill?.items?.properties?.items?.maxItems).toBe(config.limits.maxStepsPerDrill)
     expect(drill?.items?.properties?.repeatCount?.maximum).toBe(config.limits.maxRepeatCount)
     expect(drill?.items?.properties?.items?.items?.properties?.distance?.maximum).toBe(config.limits.maxDistance)
-    expect(schema.properties?.session?.properties?.name?.maxLength).toBe(config.limits.maxNameLength)
+    expect(schema.properties?.session?.properties?.name?.maxLength).toBe(config.limits.maxSessionNameLength)
   })
 
   it('requires exactly the fields the validator requires', () => {

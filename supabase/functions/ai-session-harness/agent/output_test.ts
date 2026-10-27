@@ -2,6 +2,7 @@
 
 import { assert, assertEquals } from 'jsr:@std/assert@1'
 import { validateHarnessResult, validateSessionDraft } from './output.ts'
+import { defaultSessionDraftConfig } from '../shared/sessionDraft/config.ts'
 
 const validDraft = {
   schemaVersion: 1,
@@ -38,6 +39,19 @@ Deno.test('validateHarnessResult accepts not_actionable', () => {
   if (result.ok && result.value.outcome === 'not_actionable') {
     assertEquals(result.value.message, 'Not a session.')
   }
+})
+
+Deno.test('validateHarnessResult truncates overlong plan lines instead of failing the draft', () => {
+  const result = validateHarnessResult({ outcome: 'draft', plan: ['x'.repeat(140)], draft: validDraft })
+  assert(result.ok)
+  if (result.ok && result.value.outcome === 'draft') {
+    assertEquals(result.value.plan?.[0]?.length, defaultSessionDraftConfig.limits.maxSessionPlanLineLength)
+  }
+})
+
+Deno.test('validateHarnessResult still rejects too many plan lines', () => {
+  const many = Array.from({ length: 40 }, (_, i) => `drill ${i}`)
+  assert(!validateHarnessResult({ outcome: 'draft', plan: many, draft: validDraft }).ok)
 })
 
 Deno.test('validateHarnessResult rejects unknown outcome', () => {

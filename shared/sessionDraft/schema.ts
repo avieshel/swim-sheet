@@ -18,6 +18,38 @@
 import type { SessionDraftConfig } from './config.ts'
 import type { EquipmentId, SessionDraftContext } from './types.ts'
 
+// The full response envelope the agent asks the model for: `plan` is capped at
+// the contract's plan-line limit, and `draft` is the shared draft schema. Sent
+// as `response_format: json_schema` so structured-output-capable endpoints
+// constrain-decode into the exact contract shape. Not strict mode — `draft` and
+// `message` are conditionally required by `outcome`, which strict mode cannot
+// express, so the shared valves remain the validator's job.
+export function buildResponseSchema(
+  config: SessionDraftConfig,
+  context: SessionDraftContext,
+): JsonSchema {
+  return {
+    type: 'object',
+    description: 'The agent response envelope.',
+    required: ['outcome'],
+    additionalProperties: false,
+    properties: {
+      outcome: { type: 'string', enum: ['draft', 'not_actionable'] },
+      plan: {
+        type: 'array',
+        description: 'One short line per drill, in order. Omit when outcome is not_actionable.',
+        maxItems: config.limits.maxSessionPlanLines,
+        items: { type: 'string', maxLength: config.limits.maxSessionPlanLineLength },
+      },
+      message: {
+        type: 'string',
+        description: 'Set only when outcome is not_actionable.',
+      },
+      draft: buildDraftJsonSchema(config, context),
+    },
+  }
+}
+
 export interface JsonSchema {
   type?: string
   description?: string
@@ -113,14 +145,14 @@ export function buildDraftJsonSchema(
           '100m freestyle — the name is what makes them different drills. Prefer a name ' +
           'from the library catalogue when one fits; otherwise coin a descriptive one. ' +
           'Never call it "Set 1" or repeat the session name.',
-        maxLength: limits.maxNameLength,
+        maxLength: limits.maxDrillNameLength,
       },
       description: {
         type: 'string',
         description:
           'Optional. What the technique actually is, when the name alone does not tell ' +
           'a coach what to do. Omit it when the name is self-explanatory.',
-        maxLength: limits.maxDescriptionLength,
+        maxLength: limits.maxDrillDescriptionLength,
       },
       repeatCount: {
         type: 'integer',
@@ -134,7 +166,7 @@ export function buildDraftJsonSchema(
         type: 'array',
         description: 'The steps making up this block, in the order they are swum.',
         minItems: 1,
-        maxItems: limits.maxItemsPerDrill,
+        maxItems: limits.maxStepsPerDrill,
         items: item,
       },
     },
@@ -160,7 +192,7 @@ export function buildDraftJsonSchema(
           name: {
             type: 'string',
             description: 'Short title for the whole session. An object with this one key, never a bare string.',
-            maxLength: limits.maxNameLength,
+            maxLength: limits.maxSessionNameLength,
           },
         },
       },

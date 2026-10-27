@@ -18,7 +18,7 @@ const request: SessionDraftRequest = {
   },
 }
 
-const config: ProviderConfig = { baseUrl: 'https://example.test/v1', apiKey: 'k', model: 'm', maxTokens: PROVIDER_MAX_TOKENS, maxAttempts: PROVIDER_MAX_ATTEMPTS }
+const config: ProviderConfig = { baseUrl: 'https://example.test/v1', apiKey: 'k', model: 'm', structuredOutputs: false, maxTokens: PROVIDER_MAX_TOKENS, maxAttempts: PROVIDER_MAX_ATTEMPTS }
 
 function stubFetch(impl: typeof fetch): () => void {
   const original = globalThis.fetch

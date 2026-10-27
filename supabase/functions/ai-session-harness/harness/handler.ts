@@ -31,6 +31,9 @@ export interface RunAgentResult {
   rawContent: string | null
   providerStatus?: number
   finishReason?: string
+  // The configured model that produced the content (or last attempted on
+  // failure). Attribution for the trace row only.
+  model?: string
   error: RunAgentError | null
 }
 
@@ -116,12 +119,13 @@ function streamResponse(
       let attempt = 0
       let priorAttempt: PriorAttempt | undefined = undefined
       let providerCalledAt = new Date().toISOString()
-      let lastFull = ''
       let lastErr: ProviderError | null = null
       let lastKind = 'invalid'
       let lastMessage: string | null = null
       let providerStatus: number | null = null
       let finishReason: string | null = null
+      let providerModel: string | undefined = undefined
+      const withModel = (model?: string) => (model ? { model } : {})
       while (attempt < deps.maxAttempts) {
         attempt++
         providerCalledAt = new Date().toISOString()
@@ -132,6 +136,7 @@ function streamResponse(
             .runAgentStream(request, signal, priorAttempt, (m) => {
               providerStatus = m.providerStatus ?? null
               finishReason = m.finishReason ?? null
+              if (m.model) providerModel = m.model
             })
             .getReader()
           for (;;) {
@@ -152,7 +157,6 @@ function streamResponse(
           lastErr = err instanceof ProviderError ? err : null
           lastKind = err instanceof ProviderError ? err.kind : 'network'
           lastMessage = err instanceof Error ? err.message : null
-          lastFull = full
           providerStatus = lastErr?.status ?? providerStatus
           // A JSON-parse failure from the stream is retryable; everything else
           // (timeout/network/status/rate-limit/unavailable) is not.
@@ -167,6 +171,7 @@ function streamResponse(
               provider_status: providerStatus,
               finish_reason: finishReason,
               attempt_count: attempt,
+              ...withModel(lastErr?.model ?? providerModel),
             })
             priorAttempt = { error: lastMessage ?? 'provider response was not valid JSON', response: full }
             continue
@@ -182,6 +187,7 @@ function streamResponse(
             provider_status: providerStatus,
             finish_reason: finishReason,
             attempt_count: attempt,
+            ...withModel(lastErr?.model ?? providerModel),
           })
           break
         }
@@ -195,7 +201,6 @@ function streamResponse(
         }
         const parsed = parseProviderJson(full)
         if (parsed === undefined) {
-          lastFull = full
           lastErr = null
           lastKind = 'shape'
           // Include the offending text so the trace shows what the model
@@ -211,13 +216,13 @@ function streamResponse(
             provider_status: providerStatus,
             finish_reason: finishReason,
             attempt_count: attempt,
+            ...withModel(providerModel),
           })
           priorAttempt = { error: lastMessage, response: full }
           continue
         }
         const validation = validateHarnessResult(parsed)
         if (!validation.ok) {
-          lastFull = full
           lastErr = null
           lastKind = 'invalid'
           lastMessage = validation.error.message
@@ -231,6 +236,7 @@ function streamResponse(
             provider_status: providerStatus,
             finish_reason: finishReason,
             attempt_count: attempt,
+            ...withModel(providerModel),
           })
           priorAttempt = { error: validation.error.message, response: full }
           continue
@@ -247,6 +253,7 @@ function streamResponse(
           provider_status: providerStatus,
           finish_reason: finishReason,
           attempt_count: attempt,
+          ...withModel(providerModel),
         })
         send({ type: 'done', result: validation.value })
         controller.close()
@@ -374,6 +381,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
       providerCalledAt = new Date().toISOString()
       const agent = await deps.runAgent(validated, priorAttempt)
       lastAgent = agent
+      const withModel = (model?: string) => (model ? { model } : {})
       if (agent.error) {
         // A provider-level error. Record this attempt as its own trace row, then
         // either re-prompt on invalid JSON (`shape`) or stop on a hard failure.
@@ -386,6 +394,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
           error_message: agent.error.message,
           provider_called_at: providerCalledAt,
           attempt_count: attempt,
+          ...withModel(agent.model),
         })
         if (agent.error.kind === 'shape') {
           priorAttempt = { error: agent.error.message, response: agent.rawContent ?? '' }
@@ -404,6 +413,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
           error_message: null,
           provider_called_at: providerCalledAt,
           attempt_count: attempt,
+          ...withModel(agent.model),
         })
         return json(validation.value, 200)
       }
@@ -421,6 +431,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
         error_message: validation.error.message,
         provider_called_at: providerCalledAt,
         attempt_count: attempt,
+        ...withModel(agent.model),
       })
     }
     // Every attempt above already landed its own trace row (one per LLM call),
