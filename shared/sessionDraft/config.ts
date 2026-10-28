@@ -35,10 +35,16 @@ export interface SessionDraftLimits {
   // The agent's own plan: one line per drill. A plan that long has stopped
   // being a plan, and would bloat every response.
   maxSessionPlanLines: number
-  // Cap on a single plan line's characters. The prompt states it and the
-  // validator enforces it; agents that ignore it have their plan lines
-  // truncated (never the draft lost) before validation.
+  // Cap on a single plan line's characters. Agents that ignore it have their
+  // plan lines truncated (never the draft lost) before validation.
   maxSessionPlanLineLength: number
+  // Word budget for a plan line. The prompt states the limit in words, which
+  // models follow far better than character counts, and the example's plan
+  // lines are held to it.
+  maxSessionPlanLineWords: number
+  // Plan lines above this word count are not rejected: they are read by the
+  // model as a signal that a "drill" is really two drills and should be split.
+  maxSessionPlanLineSplitWords: number
   maxRecentSessions: number
   maxDistance: number
   // Bounds for the inbound request context (defense at the trust boundary).
@@ -74,6 +80,8 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
     maxStepsPerDrill: 10,
     maxSessionPlanLines: 12,
     maxSessionPlanLineLength: 100,
+    maxSessionPlanLineWords: 15,
+    maxSessionPlanLineSplitWords: 20,
     maxRecentSessions: 2,
     maxDistance: 10_000,
     maxRepeatCount: 100,

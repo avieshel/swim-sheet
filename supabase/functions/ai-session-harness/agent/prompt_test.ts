@@ -210,3 +210,64 @@ Deno.test('the schema in the prompt documents every drill field', () => {
   assert(prompt.includes('Never nest one drill inside another'))
   assert(prompt.includes('independent of the drill'))
 })
+
+// Production traces (2026-10-26/27) show otherwise-valid drafts rejected because
+// a plan line exceeded 100 characters: the prompt asked for sentence-shaped plan
+// lines but never showed one, and character counts are not countable by models.
+// The example must carry real plan lines, and the rule must be a word budget.
+
+Deno.test('the example carries plan lines that meet the plan limits', () => {
+  const example = buildExampleResult(context)
+  assert(example.plan !== undefined, 'the example must show plan lines')
+  for (const line of example.plan) {
+    assert(
+      line.length <= defaultSessionDraftConfig.limits.maxSessionPlanLineLength,
+      `plan line too long: ${line}`,
+    )
+    assert(
+      line.split(/\s+/).length <= defaultSessionDraftConfig.limits.maxSessionPlanLineWords,
+      `plan line too wordy: ${line}`,
+    )
+  }
+})
+
+Deno.test('the example plan has one line per drill', () => {
+  const example = buildExampleResult(context)
+  assertEquals(example.plan?.length, example.draft.drills.length)
+})
+
+Deno.test('the prompt gives a soft word budget for plan lines with a split flag', () => {
+  const prompt = buildSystemPrompt(context)
+  const limits = defaultSessionDraftConfig.limits
+  assert(
+    prompt.includes(`at most ${limits.maxSessionPlanLineWords} words`),
+    'the comfortable budget must be countable',
+  )
+  assert(
+    prompt.includes(`more than ${limits.maxSessionPlanLineSplitWords} words`),
+    'a line past the split threshold must be read as complexity, not failure',
+  )
+  assert(prompt.includes('split'), 'the response to the flag is to split the drill')
+})
+
+Deno.test('the prompt drops the character budget for plan lines', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(
+    !prompt.includes(`at most ${defaultSessionDraftConfig.limits.maxSessionPlanLineLength} characters`),
+    'character counts are not countable by the model',
+  )
+})
+
+Deno.test('the plan word budget sits at the plan definition, before the schema', () => {
+  const prompt = buildSystemPrompt(context)
+  const planIntro = prompt.indexOf('The plan is a display-only caption')
+  const budget = prompt.indexOf('words')
+  const schema = prompt.indexOf('The draft must match')
+  assert(planIntro !== -1 && budget !== -1 && schema !== -1)
+  assert(planIntro < budget && budget < schema)
+})
+
+Deno.test('the prompt calls the plan display-only', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('display-only'))
+})

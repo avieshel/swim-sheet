@@ -22,6 +22,10 @@ import { buildDraftJsonSchema } from '../shared/sessionDraft/schema.ts'
 // than one item. A single drill holding a single item is ambiguous: a model can
 // read `items` as "the things in this drill" and then nest whole drills inside
 // it, which arrives at the validator as unsupported fields on an item.
+//
+// The example also carries the plan, one line per drill, held to the shared
+// word budget: a model that never sees a plan line writes sentence-length ones,
+// which the instruction cannot fix because models cannot count characters.
 export type DraftHarnessResult = Extract<HarnessResult, { outcome: 'draft' }>
 
 export function buildExampleResult(context: SessionDraftContext): DraftHarnessResult {
@@ -49,7 +53,11 @@ export function buildExampleResult(context: SessionDraftContext): DraftHarnessRe
       },
     ],
   }
-  return { outcome: 'draft', draft }
+  const plan = [
+    'Warmup: one 200m step, easy',
+    'Main set: 10 x 100m, then 4 x 50m',
+  ]
+  return { outcome: 'draft', plan, draft }
 }
 
 export function buildSystemPrompt(context: SessionDraftContext): string {
@@ -66,12 +74,12 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
     'or missing any workout detail), instead:',
     '{ "outcome": "not_actionable", "message": "..." }',
     '',
-    'The plan is how you read the request before building anything: one short line',
-    'per drill you decided on, in order, saying what each one is and why the repeat',
-    `count sits where you put it. Keep it under a dozen lines, and keep every line`,
-    `at most ${defaultSessionDraftConfig.limits.maxSessionPlanLineLength} characters — abbreviate. Say what you decided,`,
-    'not what you are about to do — "Warmup: one 400m step at easy", not "I will add',
-    'a warmup".',
+    'The plan is a display-only caption of what you decided, one short line per',
+    'drill, in order. Methods and reasons go there — but it is worth little next to',
+    `the draft, so keep each line to at most ${defaultSessionDraftConfig.limits.maxSessionPlanLineWords} words, telegraphic,`,
+    `never a full sentence. If a line needs more than ${defaultSessionDraftConfig.limits.maxSessionPlanLineSplitWords} words, that line is`,
+    'probably describing two drills — split it. Say what you decided, not what you',
+    'are about to do — "Warmup: one 400m step at easy", not "I will add a warmup".',
     '',
     'The draft must match this JSON Schema exactly. Every field carries a comment',
     'explaining what it means — read them, they are the specification:',

@@ -44,6 +44,8 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 **Also**: `ss_inspector` (the read-only DB-inspect role) was granted `USAGE` + `SELECT` on the `ai_private` schema on 2026-10-26, verified via `utils/db_inspect.sh --env production`.
 
+**Prompt hardening (2026-10-28)** — the two 2026-10-26/27 `gpt-4.1-mini` traces each lost a first, otherwise-valid attempt to `draft.plan entry exceeds 100 characters`. The prompt invited sentence-length plan lines ("say what each one is and why the repeat count sits where you put it") while a character cap — which models cannot count — guarded them, and the worked example omitted `plan` entirely. Now (`agent/prompt.ts`, `shared/sessionDraft/config.ts`): the example carries the plan, one per drill, inside a countable word budget: `maxSessionPlanLineWords` (15) is the comfortable soft budget and `maxSessionPlanLineSplitWords` (20) reads as a signal that a "drill" is really two drills to split, never a hard failure. The 100-character cap stays as the validator's backstop backed by `coercePlan` truncation.
+
 **Recommendation carried for later**: when the model becomes a decision point again, prefer a non-reasoning model (e.g. `openai/gpt-4.1-mini`) — a reasoning model's token bleed caused 8 of the 15 failed attempts and consumed the token budget entirely in one.
 
 **Status**: Draft PR open for review; not yet deployed (secret `PROVIDER_STRUCTURED_OUTPUTS` remains unset until the daybed endpoint supports json_schema).
