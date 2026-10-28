@@ -34,8 +34,4 @@ skills-lock.json
 # and nothing in it is a project guarantee (CI does not read it, reviewers do
 # not read it). Deliberate, reviewable tooling belongs in the repo instead —
 # see supabase/tests/ for committed verification scripts.
-#
-# The contents are ignored but the README is tracked, so the convention stays
-# discoverable to teammates and agents.
-.local-utils/*
-!.local-utils/README.md
+.local-utils/
