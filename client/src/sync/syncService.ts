@@ -570,7 +570,7 @@ class SyncService {
       await this.claimUnclaimed(homeOrg)
       await this.backfillCompletedHistory(orgId)
       await this.enqueueCompletedRunChildren(orgId)
-      const pending = await getPendingChanges(orgId)
+      const pending = await getPendingChanges(orgId, homeOrg)
       const res = await this.transport.push(pending, orgId)
       conflicts = res.conflicts
       pushed = pending.length - conflicts.length

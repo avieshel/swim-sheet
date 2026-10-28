@@ -74,7 +74,6 @@ function deferCapture(fn: () => Promise<void>): void {
     void fn().catch(() => {})
   }, 0)
 }
-
 export function attachSyncHooks(): void {
   for (const table of SYNC_TABLES) {
     const t = db[table]
@@ -94,39 +93,54 @@ export function attachSyncHooks(): void {
   }
 }
 
+// A capture marks a row dirty without rewriting fields it does not own: the
+// write is a subset update, and the full-row put is only for first creation.
+// A full-row put built from a stale read races with claimUnclaimed and can
+// revert a row's org claim to ''.
 export async function markDirty(table: SyncTable, id: string, catalogKey?: string): Promise<void> {
   const key = metaKey(table, id)
-  const existing = await db._sync_meta.get(key)
-  const row: SyncMetaRow = {
-    key,
-    orgId: existing?.orgId ?? '',
-    table,
-    rowId: id,
-    catalogKey: catalogKey ?? existing?.catalogKey,
-    rev: existing?.rev ?? null,
+  const updated = await db._sync_meta.update(key, {
     status: 'pending',
     deleted: 0,
-  }
-  await db._sync_meta.put(row)
+    ...(catalogKey !== undefined ? { catalogKey } : {}),
+  })
+  if (updated > 0) return
+  await db._sync_meta.put({
+    key,
+    orgId: '',
+    table,
+    rowId: id,
+    catalogKey,
+    rev: null,
+    status: 'pending',
+    deleted: 0,
+  })
 }
 
 async function markDirtyDelete(table: SyncTable, id: string): Promise<void> {
   const key = metaKey(table, id)
-  const existing = await db._sync_meta.get(key)
-  const row: SyncMetaRow = {
-    key,
-    orgId: existing?.orgId ?? '',
-    table,
-    rowId: id,
-    catalogKey: existing?.catalogKey,
-    rev: existing?.rev ?? null,
+  const updated = await db._sync_meta.update(key, {
     status: 'pending_delete',
     deleted: 1,
-  }
-  await db._sync_meta.put(row)
+  })
+  if (updated > 0) return
+  await db._sync_meta.put({
+    key,
+    orgId: '',
+    table,
+    rowId: id,
+    catalogKey: undefined,
+    rev: null,
+    status: 'pending_delete',
+    deleted: 1,
+  })
 }
 
-export async function getPendingChanges(orgId: string): Promise<LocalChange[]> {
+// Unclaimed rows (orgId === '') are claimable only by the canonical home org.
+// They stay pending for the active org only while it is the home org, so a row
+// whose pending meta materializes mid-sync (deferred captures do exactly that)
+// waits for a home-org sync instead of leaking to a foreign account.
+export async function getPendingChanges(orgId: string, homeOrg: string = orgId): Promise<LocalChange[]> {
   const metas = await db._sync_meta
     .where('status')
     .anyOf('pending', 'pending_delete')
@@ -136,6 +150,7 @@ export async function getPendingChanges(orgId: string): Promise<LocalChange[]> {
     // Org-scoped: a row belongs to an org once claimed, but rows captured
     // before sign-in (orgId === '') are claimable by the active org.
     if (m.orgId !== '' && m.orgId !== orgId) continue
+    if (m.orgId === '' && orgId !== homeOrg) continue
     if (m.status === 'pending_delete') {
       if (HISTORY_TABLES.includes(m.table) && m.rev === null) continue
       changes.push({

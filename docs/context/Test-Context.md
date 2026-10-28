@@ -110,6 +110,14 @@ E2E tests that seed Dexie via `page.evaluate` may fail if Dexie hasn't finished 
 - Always use `waitForFunction(() => (window as any).db?.isOpen?.())` before evaluate
 - Retry logic within evaluate as fallback
 
+`accountIsolation.test.ts` intermittently failed in CI (2026-10-28) — not a flake but a real
+race: deferred capture captures (`deferCapture` in `syncStore.ts`) can materialize an
+unclaimed `orgId: ''` meta row mid-sync, after `claimUnclaimed`; `getPendingChanges` then
+treated it as claimable by the active (foreign) org, pushing local data cross-account, and
+a stale-read full-row put could revert a claim to `''`. Fixed in 2026-10-28: `getPendingChanges(orgId, homeOrg)` only pushes unclaimed rows to the home org, and
+`markDirty`/`markDirtyDelete` update a subset of fields first (full-row put only on first
+creation) so a late capture can never rewrite a claim. Stress-run 15× clean.
+
 ## Playwright API Gotchas
 
 The cross-device sync spec was written against a different test runner and had

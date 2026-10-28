@@ -63,6 +63,34 @@ describe('syncStore', () => {
     expect(pending[0]).toMatchObject({ table: 'swimmers', id: 's1', op: 'upsert' })
   })
 
+  // Deferred captures can materialize a row's pending meta mid-sync, after the
+  // claim pass has run and read the (then empty) unclaimed list. An unclaimed
+  // row may therefore only be pushed to its canonical home org — pushing it to
+  // the merely active org leaks local data across accounts.
+  test('unclaimed rows are pending for their home org, never a foreign active org', async () => {
+    await db.swimmers.add({ id: 's1', name: 'A', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't' })
+    await markDirty('swimmers', 's1')
+    expect(await getPendingChanges('org-Z', 'org-A')).toHaveLength(0)
+    expect(await getPendingChanges('org-A', 'org-A')).toMatchObject([
+      { table: 'swimmers', id: 's1' },
+    ])
+  })
+
+  test('a late capture does not revert an existing claim', async () => {
+    await db.swimmers.add({ id: 's1', name: 'A', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't' })
+    await markDirty('swimmers', 's1')
+    const existing = await db._sync_meta.get('swimmers:s1')
+    await db._sync_meta.put({ ...existing!, orgId: 'org-A' })
+    await markDirty('swimmers', 's1')
+    expect((await db._sync_meta.get('swimmers:s1'))?.orgId).toBe('org-A')
+  })
+
+  test('unclaimed rows stay claimable by the active org when no home org differs', async () => {
+    await db.swimmers.add({ id: 's1', name: 'A', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: 't' })
+    await markDirty('swimmers', 's1')
+    expect((await getPendingChanges('org-A'))[0]).toMatchObject({ id: 's1' })
+  })
+
   test('returns parent sessions before dependent drills', async () => {
     await db.sessions.add({
       id: 'session-1',
