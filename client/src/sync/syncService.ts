@@ -28,6 +28,7 @@ import type {
   SyncResult,
   FirstMergeSummary,
   CloudChange,
+  LocalChange,
 } from './types'
 
 const CORE_SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDrills']
@@ -42,6 +43,20 @@ function errorMessage(e: unknown): string {
   if (!cause?.message || message.includes(cause.message)) return message
   const code = cause.code ? `${cause.code}: ` : ''
   return `${message} (${code}${cause.message})`
+}
+
+// The server enforces a partial unique index on (organization_id, catalog_key)
+// for sessions and library_drills. When a local catalogKey'd row is pushed under
+// a fresh id that collides with the cloud's canonical row, Postgres rejects the
+// insert with SQLSTATE 23505. The transport surfaces this as a `failed to push
+// <table>` error whose cause message names the offending index.
+function isCatalogKeyViolation(e: unknown): boolean {
+  const message = errorMessage(e)
+  return (
+    message.includes('sessions_org_catalog_key_uniq') ||
+    message.includes('library_drills_org_catalog_key_uniq') ||
+    message.includes('23505')
+  )
 }
 
 function classifyError(e: unknown): SyncError {
@@ -164,6 +179,8 @@ class SyncService {
     const hasLocal = await this.hasLocalRows()
     this.needsFirstMergeConfirmation = firstSync && hasLocal
     if (this.needsFirstMergeConfirmation) {
+      // performFirstMerge reconciles catalogKey'd rows by catalog key itself, so
+      // no separate pass is needed here.
       try {
         this.firstMergeSummary = await this.previewFirstMerge(this.transport, this.currentOrgId)
         this.state = { ...this.state, firstMergeSummary: this.firstMergeSummary, phase: 'needs_first_merge' }
@@ -173,6 +190,17 @@ class SyncService {
         this.recordError(e)
       }
       return
+    }
+    // Not going through first-merge (e.g. a pure-starter device whose only local
+    // rows are catalogKey'd). Adopt the cloud's canonical rows for those entries
+    // before the first push, otherwise they would be inserted as brand-new rows
+    // and collide with the existing cloud catalog row (23505 on the partial
+    // unique index). Best-effort: a failed reconcile must not block sign-in;
+    // syncNow's push path self-heals any residual collision as a safety net.
+    try {
+      await this.reconcileCatalogRows(this.currentOrgId)
+    } catch {
+      // fall through to the normal sync flow; the push path recovers below
     }
     await this.syncNow()
   }
@@ -307,6 +335,67 @@ class SyncService {
       await db._sync_meta.delete(`${table}:${fromId}`)
       await setMetaSynced(table, toId, orgId, rev, false)
     })
+  }
+
+  // Adopt the cloud's canonical row for any local session/libraryDrill that carries
+  // a catalogKey already present in the cloud under a DIFFERENT id. This is the
+  // silent counterpart to performFirstMerge's catalog match: it must run whenever
+  // we are about to touch the cloud, not only behind the first-merge dialog.
+  //
+  // Without it, a fresh device that only holds seeded starters (which are
+  // catalogKey'd) skips the first-merge gate in start() and pushes them as brand
+  // new inserts. The partial unique index on (organization_id, catalog_key) then
+  // rejects the second insert with 23505 (sessions_org_catalog_key_uniq).
+  private async reconcileCatalogRows(orgId: string): Promise<void> {
+    const cloud = await this.transport.pull(orgId, emptyCursors(), ['sessions', 'libraryDrills'])
+    const cloudByCatalog = new Map<string, CloudChange>()
+    for (const c of cloud.changes) {
+      if (c.catalogKey) cloudByCatalog.set(c.catalogKey, c)
+    }
+    if (cloudByCatalog.size === 0) return
+
+    for (const table of ['sessions', 'libraryDrills'] as SyncTable[]) {
+      const t = localTable(table)
+      const rows = await t.toArray()
+      for (const row of rows) {
+        const id = String(row.id)
+        const record = row as Record<string, unknown>
+        const catalogKey = record.catalogKey as string | undefined
+        if (!catalogKey) continue
+        const cloudRow = cloudByCatalog.get(catalogKey)
+        if (!cloudRow || cloudRow.id === id) continue
+        if (await t.get(cloudRow.id)) {
+          // A previous local row for this catalogKey already adopted the cloud
+          // id; fold this duplicate into it rather than creating a second local
+          // row (which would collide on the local primary key).
+          await db.transaction(
+            'rw',
+            [t as unknown as Table, db._sync_meta, ...(table === 'sessions' ? [db.drills] : [])],
+            async () => {
+              if (table === 'sessions') {
+                await db.drills.where('sessionId').equals(id).modify({ sessionId: cloudRow.id })
+              }
+              await t.delete(id)
+              await db._sync_meta.delete(`${table}:${id}`)
+            },
+          )
+          continue
+        }
+        const pushed = await this.transport.push(
+          [{
+            table,
+            id: cloudRow.id,
+            op: 'upsert',
+            payload: { ...record, id: cloudRow.id },
+            catalogKey,
+            rev: (record.updatedAt as string) ?? '',
+          }],
+          orgId,
+        )
+        const rev = pushed.applied[0]?.updatedAt ?? cloudRow.updatedAt
+        await this.remapLocalRow(table, id, cloudRow.id, orgId, rev)
+      }
+    }
   }
 
   // The app seeds builtin drills and the default session template before sign-in
@@ -536,6 +625,22 @@ class SyncService {
     void this.refresh()
   }
 
+  // Push the pending batch, recovering from a catalog-key unique violation
+  // instead of surfacing it as a hard failure. When the server rejects a
+  // session/libraryDrill insert because its catalogKey already exists under a
+  // different cloud id, we adopt that cloud id for the colliding local rows and
+  // retry — turning a corrupting 23505 into a silent reconcile.
+  private async pushChanges(pending: LocalChange[], orgId: string) {
+    try {
+      return await this.transport.push(pending, orgId)
+    } catch (e) {
+      if (!isCatalogKeyViolation(e)) throw e
+      await this.reconcileCatalogRows(orgId)
+      const retry = await getPendingChanges(orgId, this.homeOrgId ?? orgId)
+      return this.transport.push(retry, orgId)
+    }
+  }
+
   async syncNow(): Promise<SyncResult> {
     if (!this.currentOrgId) {
       if (getCurrentUserId()) {
@@ -571,7 +676,7 @@ class SyncService {
       await this.backfillCompletedHistory(orgId)
       await this.enqueueCompletedRunChildren(orgId)
       const pending = await getPendingChanges(orgId, homeOrg)
-      const res = await this.transport.push(pending, orgId)
+      const res = await this.pushChanges(pending, orgId)
       conflicts = res.conflicts
       pushed = pending.length - conflicts.length
       for (const c of conflicts) await setMetaConflict(c)

@@ -349,6 +349,52 @@ describe('syncService', () => {
     expect(syncService.getState().phase).toBe('error')
   })
 
+  test('a pure-starter device adopts the cloud catalog row instead of inserting a duplicate', async () => {
+    // A fresh device whose only local rows are catalogKey'd seeded starters must
+    // adopt the cloud's canonical row on first sync. Pushing them as brand-new
+    // inserts would collide with the unique (organization_id, catalog_key) index
+    // and surface as 23505 (sessions_org_catalog_key_uniq).
+    await db.sessions.add({
+      id: 'local-starter', name: 'Distance Progression', catalogKey: 'Distance Progression',
+      notes: '', createdAt: 't', updatedAt: 't',
+    })
+    await db.drills.add({
+      id: 'drill-1', sessionId: 'local-starter', name: 'Easy Free', order: 0, stroke: 'freestyle',
+      distance: 50, items: [], repeatCount: 1, focus: 'none', labels: [], description: '',
+      createdAt: 't', updatedAt: 't',
+    })
+    const cloudSession: CloudChange = {
+      table: 'sessions', id: 'cloud-starter', op: 'upsert',
+      payload: { id: 'cloud-starter', name: 'Distance Progression', notes: '', visibility: 'private', catalogKey: 'Distance Progression', createdAt: 't', updatedAt: '2026-01-01T00:00:00.000Z' },
+      catalogKey: 'Distance Progression', updatedAt: '2026-01-01T00:00:00.000Z', deletedAt: null,
+    }
+    const transport = fakeTransport({ cloudChanges: [cloudSession] })
+    syncService.init(transport, { autoSync: false })
+    syncService.setActiveOrg('org-A')
+
+    await syncService.start()
+
+    expect(syncService.getState().phase).toBe('ready')
+    expect(await db.sessions.get('local-starter')).toBeUndefined()
+    const adopted = await db.sessions.get('cloud-starter')
+    expect(adopted).toBeDefined()
+    expect(adopted?.catalogKey).toBe('Distance Progression')
+    // The invariant that the unique index enforces: no session carrying this
+    // catalog key is ever inserted under a second id (which is what trips 23505).
+    // Reconcile + syncNow may re-push the canonical row (idempotent upsert) and
+    // push a delete for the merged-away local id, but every catalog-keyed session
+    // push must target the single canonical cloud id.
+    const catalogPushes = transport.upserted.filter(
+      (c) => c.table === 'sessions' && (c.payload as { catalogKey?: string })?.catalogKey === 'Distance Progression',
+    )
+    expect(catalogPushes.length).toBeGreaterThan(0)
+    expect(new Set(catalogPushes.map((c) => c.id))).toEqual(new Set(['cloud-starter']))
+    expect(await db.sessions.get('local-starter')).toBeUndefined()
+    // The starter's drill was reparented to the adopted cloud id.
+    const drill = await db.drills.get('drill-1')
+    expect(drill?.sessionId).toBe('cloud-starter')
+  })
+
   // The first-sync gate asks "does this device hold data worth protecting?".
   // Catalog-seeded rows (builtin drills, the default session template) are
   // written by the app before sign-in, so counting them as local data blocks

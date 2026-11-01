@@ -1161,3 +1161,19 @@ Added `Events.AppSettings(action, extra)` factory to `client/src/services/analyt
 **Verification**: local Ollama run (`gemma4`) of `supabase/evals/run.ts` now produces the described steps correctly; `deno task test` (harness + evals) green, `npm run check` (client lint + tsc + knip + 865 vitest) green.
 
 **Note**: production still needs the Edge Function redeployed for the new prompt/schema/contract to take effect; the retry-loop detail-loss was a server-deploy artifact, not client code.
+
+---
+
+## A-058: Sync push fails with 23505 `sessions_org_catalog_key_uniq` ✅
+
+**Source**: 2026-11-01 user report — every sync surfaced `failed to push sessions (23505: duplicate key value violates unique constraint "sessions_org_catalog_key_uniq")`. Production `sessions` holds exactly one catalog-keyed row (`Distance Progression`, id `64e9a5ab-…`) in the user's org; the partial unique index `sessions_org_catalog_key_uniq` (on `(organization_id, catalog_key) where catalog_key is not null`, migration `20261007000000_sync_foundation.sql`) guarantees no cloud duplicate, so the violation is a *fresh insert* carrying a `catalog_key` that already exists under a different id.
+
+**Root cause**: a local session can carry a `catalogKey` (seeded starters in `seedDefaultSessions` set `catalogKey: catalog.name`) while its `id` does **not** match the cloud's row for that key. The catalog-key reconciliation that resolves this lives only inside `performFirstMerge`, which is gated behind `needsFirstMergeConfirmation` (`start()` sets it when `firstSync && hasLocalRows()`). `hasLocalRows()` deliberately **excludes** catalogKey'd rows (so a pure-starter second device is not nagged with a merge dialog). So a device whose only local data is seeded starters skips first-merge entirely, pushes the starter raw as a new insert, and collides with the existing cloud catalog row.
+
+**Fix** (`client/src/sync/syncService.ts`):
+- Added `reconcileCatalogRows(orgId)` — a silent counterpart to the first-merge catalog match. It pulls the org's `sessions`/`libraryDrills` catalog keys, and for any local row whose `catalogKey` already exists in the cloud under a different id, pushes its content into the cloud row and adopts that id locally (`remapLocalRow`, which also reparents the session's drills). Runs in `start()` on the **non-first-merge** path (where the bug lives); if a catalogKey is already adopted locally, the extra local copy is folded in instead of creating a second local row.
+- Added `pushChanges()` wrapping `transport.push` in `syncNow` as a safety net: if the server still rejects a push with the catalog-key unique violation (detected via `isCatalogKeyViolation`, keyed on the `sessions_org_catalog_key_uniq` / `library_drills_org_catalog_key_uniq` / `23505` text), it reconciles and retries once — so an already-running client self-heals on its next sync without manual data loss.
+
+**Verification**: new regression test `syncService.test.ts` "a pure-starter device adopts the cloud catalog row instead of inserting a duplicate" (seeds a starter with `catalogKey: 'Distance Progression'`, a cloud row under a different id; asserts the local row adopts the cloud id, the drill is reparented, and no catalog-keyed session push uses a second id). Full client gate green: `npm run check` (lint + tsc + knip + 866 vitest).
+
+**Note**: the server unique index is correct and must stay; the client must never push a catalog-keyed insert under a new id. The fix is client-side only.
