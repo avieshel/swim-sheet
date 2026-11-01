@@ -3,7 +3,9 @@ import {
   formatDrillLine,
   formatDraft,
   describeDraftProblem,
+  describeHarnessResultProblem,
 } from '../../../../../shared/sessionDraft/format'
+import { defaultSessionDraftConfig } from '../../../../../shared/sessionDraft/config'
 import type { SessionDraftDrillV1, SessionDraftV1 } from '../../../../../shared/sessionDraft/types'
 
 const drill = (overrides: Partial<SessionDraftDrillV1> = {}): SessionDraftDrillV1 => ({
@@ -103,6 +105,16 @@ describe('describeDraftProblem', () => {
     expect(problem).toContain('breaststroke')
   })
 
+  it('advises on any draft field that exceeds its character limit', () => {
+    const bad = {
+      schemaVersion: 1,
+      session: { name: 'x'.repeat(250) },
+      drills: [{ name: 'Set', repeatCount: 1, items: [] }],
+    }
+    const problem = describeDraftProblem(bad)
+    expect(problem).toContain('100')
+  })
+
   it('reports an empty drill list plainly', () => {
     const problem = describeDraftProblem({ schemaVersion: 1, session: { name: 'A' }, drills: [] })
     expect(problem).toBeTruthy()
@@ -112,5 +124,59 @@ describe('describeDraftProblem', () => {
     const problem = describeDraftProblem({ schemaVersion: 1, session: 'A', drills: [] }) ?? ''
     expect(problem).toContain('not a bare string')
     expect(problem).not.toBe('draft.session must be an object with only name')
+  })
+
+  it('names the offending field on a step that carries a rogue one', () => {
+    const bad = {
+      schemaVersion: 1,
+      session: { name: 'A' },
+      drills: [{ name: 'Set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1, description: 'rogue' }] }],
+    }
+    const problem = describeDraftProblem(bad) ?? ''
+    expect(problem).toContain(': description)')
+    expect(problem).toContain("drill's description")
+  })
+
+  it('falls back to a plain message when the path cannot be walked', () => {
+    const problem = describeDraftProblem({ schemaVersion: 1, session: { name: 'A' }, drills: [] }) ?? ''
+    expect(problem).toBeTruthy()
+  })
+})
+
+describe('describeHarnessResultProblem', () => {
+  const validDraft: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'A' },
+    drills: [
+      { name: 'Warmup', repeatCount: 1, items: [{ distance: 50, stroke: 'freestyle', repeatCount: 2 }] },
+    ],
+  }
+
+  it('returns null for a valid result', () => {
+    expect(describeHarnessResultProblem({ outcome: 'draft', draft: validDraft })).toBeNull()
+  })
+
+  it('delegates to the draft advice for a shape failure', () => {
+    const bad = {
+      schemaVersion: 1,
+      session: { name: 'A' },
+      drills: [{ name: 'Set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1, description: 'rogue' }] }],
+    }
+    const problem = describeHarnessResultProblem({ outcome: 'draft', draft: bad }) ?? ''
+    expect(problem).toContain('items[0]')
+    expect(problem).toContain('equipment')
+    expect(problem).toContain('make it a drill')
+  })
+
+  it('advises with the numeric budget on an overlong plan line', () => {
+    const problem =
+      describeHarnessResultProblem({ outcome: 'draft', plan: ['x'.repeat(150)], draft: validDraft }) ?? ''
+    expect(problem).toContain(String(defaultSessionDraftConfig.limits.maxSessionPlanLineLength))
+    expect(problem).toContain('word')
+  })
+
+  it('falls back to the raw message for failures with no pattern', () => {
+    const problem = describeHarnessResultProblem({ outcome: 'nonsense' }) ?? ''
+    expect(problem).toContain('unknown outcome')
   })
 })

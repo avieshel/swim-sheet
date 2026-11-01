@@ -9,7 +9,7 @@
 import { sanitizePrompt } from '../../shared/sessionDraft/sanitize.ts'
 import { createSessionDraftSeed } from '../../shared/sessionDraft/seed.ts'
 import { draftTotalDistance } from '../../shared/sessionDraft/distance.ts'
-import { formatDraft, describeDraftProblem } from '../../shared/sessionDraft/format.ts'
+import { formatDraft, describeHarnessResultProblem } from '../../shared/sessionDraft/format.ts'
 import { EQUIPMENT_IDS } from '../../shared/sessionDraft/config.ts'
 import type { EquipmentId, SessionDraftContext, SessionDraftV1 } from '../../shared/sessionDraft/types.ts'
 import { buildSystemPrompt, buildUserContent } from '../functions/ai-session-harness/agent/prompt.ts'
@@ -125,7 +125,7 @@ export async function runDraft(request: DraftRunRequest): Promise<DraftRunResult
       ok: false,
       code: validation.error.code,
       message: validation.error.message,
-      advice: describeDraftProblem(result.raw) ?? undefined,
+      advice: describeHarnessResultProblem(result.raw) ?? undefined,
     }
     return result
   }

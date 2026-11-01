@@ -359,6 +359,59 @@ Deno.test('gives up after maxAttempts validation failures', async () => {
   assertEquals(last.raw_content, 'bad-5')
 })
 
+const itemWithRogueField = {
+  schemaVersion: 1,
+  session: { name: 'Tuesday' },
+  drills: [
+    {
+      name: 'Technique Warmup',
+      repeatCount: 1,
+      items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1, description: 'rogue field' }],
+    },
+  ],
+}
+
+Deno.test('feeds actionable advice from a contract failure into the retry', async () => {
+  const priorErrors: string[] = []
+  let calls = 0
+  const deps = makeDeps({
+    runAgent: (_request, priorAttempt) => {
+      if (priorAttempt) priorErrors.push(priorAttempt.error)
+      calls++
+      if (calls === 1) {
+        return Promise.resolve({ result: { outcome: 'draft', draft: itemWithRogueField }, rawContent: 'bad', providerStatus: 200, finishReason: 'stop', error: null })
+      }
+      return Promise.resolve({ result: { outcome: 'draft', draft: validDraft }, rawContent: 'good', providerStatus: 200, finishReason: 'stop', error: null })
+    },
+  })
+  const res = await call(deps, makeRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  assertEquals(priorErrors.length, 1)
+  // The retry sees the field-level advice, not just the terse validator string.
+  assertEquals(priorErrors[0].includes('may carry only'), true)
+  assertEquals(priorErrors[0].includes('description'), true)
+})
+
+Deno.test('streams the retry with actionable advice after a failed draft', async () => {
+  const priorErrors: Array<string | undefined> = []
+  let calls = 0
+  const deps = makeDeps({
+    runAgentStream: (_request, _signal, priorAttempt) => {
+      priorErrors.push(priorAttempt?.error)
+      calls++
+      if (calls === 1) return deltaStream([JSON.stringify({ outcome: 'draft', draft: itemWithRogueField })])
+      return deltaStream([JSON.stringify({ outcome: 'draft', draft: validDraft })])
+    },
+  })
+  const res = await createHandler(deps)(streamRequest(OK_BODY))
+  assertEquals(res.status, 200)
+  const frames = await readFrames(res)
+  assertEquals(frames[frames.length - 1].type, 'done')
+  assertEquals(priorErrors.length, 2)
+  assertEquals(priorErrors[0], undefined)
+  assertEquals(priorErrors[1]?.includes('may carry only'), true)
+})
+
 Deno.test('records the raw provider response on a contract validation failure', async () => {
   const traces: Array<Record<string, unknown>> = []
   const deps = makeDeps({

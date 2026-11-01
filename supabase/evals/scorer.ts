@@ -20,6 +20,10 @@ export type Requirement =
   | { kind: 'itemDistance'; distance: number }
   | { kind: 'repeatCountForDistance'; distance: number; repeatCount: number }
   | { kind: 'hasEquipment'; id: EquipmentId }
+  | { kind: 'distinctDrillNames'; min: number }
+  | { kind: 'descriptionMentions'; any: string[] }
+  | { kind: 'distinctIntensities'; min: number }
+  | { kind: 'anyOf'; requirements: Requirement[] }
 
 export interface EvalExpectation {
   outcome: 'draft' | 'not_actionable'
@@ -99,6 +103,40 @@ export function scoreDraft(draft: SessionDraftV1, requirements: Requirement[]): 
           failures.push(`expected equipment ${req.id}`)
         }
         break
+      case 'distinctDrillNames': {
+        const distinct = new Set(draft.drills.map((d) => d.name.trim().toLowerCase())).size
+        if (distinct < req.min) {
+          failures.push(`expected at least ${req.min} distinct drill names, got ${distinct}`)
+        }
+        break
+      }
+      case 'descriptionMentions': {
+        // The nuances the schema cannot field (progression, technique focus,
+        // breathing patterns) belong in the drill name or description — the
+        // scorer checks the coach's intent landed in one of them.
+        const matched = draft.drills.some((d) => {
+          const text = `${d.name} ${d.description ?? ''}`.toLowerCase()
+          return req.any.some((term) => text.includes(term.toLowerCase()))
+        })
+        if (!matched) {
+          failures.push(`expected a drill whose name/description mentions ${req.any.join(' or ')}`)
+        }
+        break
+      }
+      case 'distinctIntensities': {
+        const distinct = new Set(items.map((i) => i.intensity).filter((v) => v !== undefined)).size
+        if (distinct < req.min) {
+          failures.push(`expected at least ${req.min} distinct intensities across steps, got ${distinct}`)
+        }
+        break
+      }
+      case 'anyOf': {
+        const alt = scoreDraft(draft, req.requirements)
+        if (!alt.passed) {
+          failures.push(`expected one of: (${req.requirements.length} alternatives) — ${alt.failures.join('; ')}`)
+        }
+        break
+      }
     }
   }
 

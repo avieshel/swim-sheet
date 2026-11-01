@@ -9,6 +9,7 @@ import { PROVIDER_RATE_LIMIT_FALLBACK_RETRY_SECONDS } from '../agent/config.ts'
 import { PriorAttempt, ProviderError, ProviderErrorKind, ProviderMeta, parseProviderJson } from '../agent/provider.ts'
 import { buildSystemPrompt, buildUserContent } from '../agent/prompt.ts'
 import { validateHarnessResult } from '../agent/output.ts'
+import { describeHarnessResultProblem } from '../shared/sessionDraft/format.ts'
 import { debugLog } from '../agent/debug.ts'
 import type { SessionDraftRequest } from '../agent/contract.ts'
 import type { AiTraceRecord } from '../analytics/types.ts'
@@ -238,7 +239,7 @@ function streamResponse(
             attempt_count: attempt,
             ...withModel(providerModel),
           })
-          priorAttempt = { error: validation.error.message, response: full }
+          priorAttempt = { error: describeHarnessResultProblem(parsed) ?? validation.error.message, response: full }
           continue
         }
         // Success: flush the buffered deltas, then the validated result.
@@ -418,7 +419,7 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
         return json(validation.value, 200)
       }
       lastContractError = validation.error.message
-      priorAttempt = { error: validation.error.message, response: agent.rawContent ?? '' }
+      priorAttempt = { error: describeHarnessResultProblem(agent.result) ?? validation.error.message, response: agent.rawContent ?? '' }
       // The model answered but the contract rejected it. Record this attempt as
       // its own trace row so a retry chain shows one row per call (sharing the
       // request's trace_id), then re-prompt with the failure context.

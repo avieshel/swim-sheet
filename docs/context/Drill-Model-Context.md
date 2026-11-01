@@ -183,8 +183,18 @@ Two jobs:
 1. **Matching vocabulary.** The library renders in this notation so a coach's phrasing can
    be compared against a concrete line rather than prose.
 2. **Validation feedback.** `describeDraftProblem` turns a validator failure into a
-   sentence an agent can act on — naming the offending step and the fields it may carry,
-   rather than "has an unsupported field".
+   sentence an agent can act on — naming the offending step and the fields it may carry
+   (and naming the offending field itself, so the model can relocate e.g. a technique
+   `description` to the drill instead of deleting it), rather than "has an unsupported
+   field". The harness-level sibling `describeHarnessResultProblem` covers plan-line
+   failures and is what the live retry loop and the eval pipeline feed back.
+
+The schema has faithful fields for distance, intensity, interval, and equipment — and
+those are the axis it covers. Everything the coach says that those fields cannot hold
+(technique focus, progression/gradation, breathing patterns, push-off instructions) is
+the **extra room**: it belongs in the drill's name or description, never in dropped
+words. Fields may graduate out of the extra room into the data model later, when
+enough usage data says which ones are worth a column; until then resist adding them.
 
 Format tests pin the exact output so the notation cannot drift.
 

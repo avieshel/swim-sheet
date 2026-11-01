@@ -87,4 +87,68 @@ export const cases: EvalCase[] = [
     prompt: 'Tell me a swimming joke.',
     expectation: { outcome: 'not_actionable' },
   },
+  {
+    // The production failure that shipped a generic 'Technique Warmup' of six
+    // identical 50m steps: the model lumped separately named techniques into
+    // one block instead of one drill per technique (name = identity).
+    id: 'technique-warmup-named-drills',
+    prompt: 'Warmup: 50 kick, 50 fists, 50 sculling, 50 single arm, 50 dog paddle.',
+    expectation: {
+      outcome: 'draft',
+      requirements: [
+        { kind: 'distinctDrillNames', min: 4 },
+        { kind: 'itemDistance', distance: 50 },
+      ],
+    },
+  },
+  {
+    // Production dropped 'כפות' (paddles) from 'fins and paddles', keeping only
+    // the first equipment term. Both must survive.
+    id: 'equipment-conjoined-fins-and-paddles',
+    prompt: '4 x 100m freestyle with fins and paddles on 2:00.',
+    expectation: {
+      outcome: 'draft',
+      requirements: [
+        { kind: 'hasEquipment', id: 'fins' },
+        { kind: 'hasEquipment', id: 'paddles' },
+        { kind: 'repeatCountForDistance', distance: 100, repeatCount: 4 },
+      ],
+    },
+  },
+  {
+    // Progression has no schema field; the coach's gradation must survive in
+    // one of the two supported encodings: extra-room text on the drill, or
+    // stepped intensities across its items.
+    id: 'progression-held-in-extra-room',
+    prompt: '3 x 100m freestyle descending 1 to 3 on 2:00, then 200 easy.',
+    expectation: {
+      outcome: 'draft',
+      requirements: [
+        {
+          kind: 'anyOf',
+          requirements: [
+            { kind: 'descriptionMentions', any: ['descend', 'progress'] },
+            { kind: 'distinctIntensities', min: 3 },
+          ],
+        },
+        { kind: 'itemWithIntensity', intensity: 'v1' },
+      ],
+    },
+  },
+  {
+    // Coaches paste prompts in their own language (production input was
+    // Hebrew). The draft must still come out structurally correct — the model
+    // should not lose the plan or flip to not_actionable because the text is
+    // not English.
+    id: 'hebrew-input',
+    prompt: 'חימום: 200 חתירה, אחר כך 4x50 רגליים עם סנפירים',
+    expectation: {
+      outcome: 'draft',
+      requirements: [
+        { kind: 'hasStroke', stroke: 'freestyle' },
+        { kind: 'itemDistance', distance: 50 },
+        { kind: 'hasEquipment', id: 'fins' },
+      ],
+    },
+  },
 ]

@@ -140,4 +140,37 @@ describe('AiSessionDraft', () => {
     await screen.findByLabelText('Session description')
     expect(screen.queryByText('Proposed session')).toBeNull()
   })
+
+  it('asks before a regeneration that would replace the proposal', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await generateDraft()
+    expect(await screen.findByText('Proposed session')).toBeTruthy()
+    expect(requestSessionDraftStream).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: /Generate draft/ }))
+
+    // Nothing is regenerated while the coach decides.
+    expect(await screen.findByText('Regenerate draft?')).toBeTruthy()
+    expect(screen.getByText('Proposed session')).toBeTruthy()
+    expect(requestSessionDraftStream).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('button', { name: 'Regenerate' }))
+    await waitFor(() => expect(requestSessionDraftStream).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('Proposed session')).toBeTruthy()
+  })
+
+  it('keeps the proposal when the regeneration is cancelled', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await generateDraft()
+    expect(await screen.findByText('Proposed session')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /Generate draft/ }))
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByText('Regenerate draft?')).toBeNull()
+    expect(screen.getByText('Proposed session')).toBeTruthy()
+    expect(requestSessionDraftStream).toHaveBeenCalledTimes(1)
+  })
 })

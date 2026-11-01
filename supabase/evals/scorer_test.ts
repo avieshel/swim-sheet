@@ -105,3 +105,116 @@ Deno.test('totalDistance multiplies both levels', () => {
   assert(res.passed)
   assertEquals(res.failures, [])
 })
+
+// A list of distinct technique drills ("50 kick, 50 scull, 50 fists") is the
+// failure that produced a generic "Technique Warmup" of six identical steps in
+// production: structurally legal, semantically wrong. The technique identity
+// lives on the drill name, so distinctness across drills is what to assert.
+
+const wristTap: SessionDraftV1 = {
+  schemaVersion: 1,
+  session: { name: 'Clinic' },
+  drills: [
+    { name: 'Fingertip Drag', repeatCount: 1, items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1 }] },
+    { name: 'Scull', repeatCount: 1, items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1 }] },
+    { name: 'Fist Drill', repeatCount: 1, items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1 }] },
+    { name: 'Kick', repeatCount: 1, items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1 }] },
+  ],
+}
+
+Deno.test('distinctDrillNames counts unique names across drills', () => {
+  const res = scoreDraft(wristTap, [{ kind: 'distinctDrillNames', min: 4 }])
+  assert(res.passed)
+})
+
+Deno.test('distinctDrillNames fails a single lumped drill', () => {
+  const lumped: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'Session' },
+    drills: [
+      {
+        name: 'Technique Warmup',
+        repeatCount: 1,
+        items: [{ distance: 50, stroke: 'freestyle', repeatCount: 4 }],
+      },
+    ],
+  }
+  const res = scoreDraft(lumped, [{ kind: 'distinctDrillNames', min: 4 }])
+  assert(!res.passed)
+  assertEquals(res.failures.length, 1)
+})
+
+Deno.test('descriptionMentions matches any given term case-insensitively', () => {
+  const described: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'Sample' },
+    drills: [
+      {
+        name: 'Descending 100s',
+        description: 'Each 100 is faster: descend 1 to 3.',
+        repeatCount: 1,
+        items: [{ distance: 100, stroke: 'freestyle', repeatCount: 3 }],
+      },
+    ],
+  }
+  const res = scoreDraft(described, [{ kind: 'descriptionMentions', any: ['descend', 'progress'] }])
+  assert(res.passed)
+  const undescribed: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'Sample' },
+    drills: [
+      { name: 'Main set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 3 }] },
+    ],
+  }
+  const miss = scoreDraft(undescribed, [{ kind: 'descriptionMentions', any: ['descend', 'progress'] }])
+  assert(!miss.passed)
+})
+
+// Progression is valid in two encodings — extra-room text on the drill, or
+// stepped intensities across its items — so the requirement is an anyOf.
+
+const stepped: SessionDraftV1 = {
+  schemaVersion: 1,
+  session: { name: 'Sample' },
+  drills: [
+    {
+      name: 'Descend',
+      repeatCount: 1,
+      items: [
+        { distance: 100, stroke: 'freestyle', repeatCount: 1, intensity: 'v2' },
+        { distance: 100, stroke: 'freestyle', repeatCount: 1, intensity: 'v3' },
+        { distance: 100, stroke: 'freestyle', repeatCount: 1, intensity: 'v4' },
+      ],
+    },
+  ],
+}
+
+Deno.test('distinctIntensities counts the effort range a draft covers', () => {
+  const res = scoreDraft(stepped, [{ kind: 'distinctIntensities', min: 3 }])
+  assert(res.passed)
+  const flat = scoreDraft(sampleDraft, [{ kind: 'distinctIntensities', min: 5 }])
+  assert(!flat.passed)
+})
+
+Deno.test('anyOf passes when one branch is met', () => {
+  const res = scoreDraft(stepped, [
+    {
+      kind: 'anyOf',
+      requirements: [
+        { kind: 'descriptionMentions', any: ['descend'] },
+        { kind: 'distinctIntensities', min: 3 },
+      ],
+    },
+  ])
+  assert(res.passed)
+  const none = scoreDraft(sampleDraft, [
+    {
+      kind: 'anyOf',
+      requirements: [
+        { kind: 'descriptionMentions', any: ['descend'] },
+        { kind: 'hasStroke', stroke: 'butterfly' },
+      ],
+    },
+  ])
+  assert(!none.passed)
+})

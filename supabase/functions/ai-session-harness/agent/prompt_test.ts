@@ -271,3 +271,37 @@ Deno.test('the prompt calls the plan display-only', () => {
   const prompt = buildSystemPrompt(context)
   assert(prompt.includes('display-only'))
 })
+
+// Production (2026-11-01): a Hebrew warmup listing distinct techniques ("kick,
+// fists, scull, one arm, dog paddle") came back as one block of six identical
+// unnamed steps. Steps cannot carry names, so techniques must sit on drills.
+
+Deno.test('the prompt shows a technique list as one drill per technique', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('one drill per technique'))
+  assert(prompt.includes('Scull'))
+})
+
+// Production (2026-11-01): "descending" was flattened to one flat intensity,
+// losing the gradation the coach asked for. The gradation belongs in the
+// description (extra room), with one representative intensity per step.
+
+Deno.test('the prompt routes gradation to the description and mid-range intensities', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('descending 1 to 3'))
+  assert(prompt.includes('v2'))
+})
+
+// Production (2026-11-01): the session name announced "4000" while the drills
+// summed to 2600m. A number the coach did not write must not appear.
+
+Deno.test('the prompt forbids inventing numbers in the session name', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('did not state'))
+})
+
+Deno.test('the prompt keeps names in English but plan lines and descriptions in the coach language', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('canonical English'))
+  assert(prompt.includes('language the coach wrote in'))
+})

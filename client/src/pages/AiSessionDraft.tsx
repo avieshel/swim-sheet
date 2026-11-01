@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icon'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SessionEditorSection } from '../components/session/SessionEditorSection'
 import { DraftSessionPanel } from '../components/ai/DraftSessionPanel'
 import {
@@ -62,6 +63,9 @@ export const AiSessionDraft: React.FC = () => {
   // Live preview of the streamed model text, shown before the structured draft
   // is finalized. Cleared on each new generation.
   const [streamingText, setStreamingText] = useState('')
+  // Regenerating is destructive: it replaces the on-screen proposal with a new
+  // one, so it asks first instead of discarding silently.
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   // The proposal is staged here, not in the database: the coach fine-tunes it
   // beside the prompt and nothing is persisted until they confirm.
@@ -165,6 +169,15 @@ export const AiSessionDraft: React.FC = () => {
   }
 
   async function handleGenerate() {
+    if (!prepared || !editedPrompt.trim()) return
+    if (draft) {
+      setConfirmRegenerate(true)
+      return
+    }
+    await generate()
+  }
+
+  async function generate() {
     if (!prepared || !editedPrompt.trim()) return
     setLoading(true)
     setError(null)
@@ -409,6 +422,19 @@ export const AiSessionDraft: React.FC = () => {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmRegenerate}
+        title="Regenerate draft?"
+        message="Generating again replaces the proposal currently on screen with a fresh one."
+        confirmLabel="Regenerate"
+        destructive={false}
+        onConfirm={() => {
+          setConfirmRegenerate(false)
+          void generate()
+        }}
+        onCancel={() => setConfirmRegenerate(false)}
+        onBackdropDismiss={() => setConfirmRegenerate(false)}
+      />
     </section>
   )
 }

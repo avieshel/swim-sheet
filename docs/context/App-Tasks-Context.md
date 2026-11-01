@@ -42,7 +42,7 @@ Remaining application-level work items. These should be converted to GitHub issu
 - **Model attribution** — `ProviderMeta.model` and `ProviderError.model` thread through `onMeta` into every trace row, so `ai_private.ai_analytics_trace.model` reflects the model that actually answered.
 - **Streaming diagnosability** — a 200 stream with no content deltas now fails as a `shape` error carrying the raw SSE body (was a silent NULL `raw_content`), and an internal stream timeout surfaces as `timeout` (was misread as a parse failure).
 
-**Also**: `ss_inspector` (the read-only DB-inspect role) was granted `USAGE` + `SELECT` on the `ai_private` schema on 2026-10-26, verified via `utils/db_inspect.sh --env production`.
+**Also**: `ss_inspector` (the read-only DB-inspect role) was granted `USAGE` + `SELECT` on the `ai_private` schema on 2026-10-26, verified by running read-only queries against production through that role.
 
 **Prompt hardening (2026-10-28)** — the two 2026-10-26/27 `gpt-4.1-mini` traces each lost a first, otherwise-valid attempt to `draft.plan entry exceeds 100 characters`. The prompt invited sentence-length plan lines ("say what each one is and why the repeat count sits where you put it") while a character cap — which models cannot count — guarded them, and the worked example omitted `plan` entirely. Now (`agent/prompt.ts`, `shared/sessionDraft/config.ts`): the example carries the plan, one per drill, inside a countable word budget: `maxSessionPlanLineWords` (15) is the comfortable soft budget and `maxSessionPlanLineSplitWords` (20) reads as a signal that a "drill" is really two drills to split, never a hard failure. The 100-character cap stays as the validator's backstop backed by `coercePlan` truncation.
 
@@ -125,6 +125,54 @@ Remaining application-level work items. These should be converted to GitHub issu
   change the E2E configuration as part of the completed-history sync work.
 
 ---
+
+## A-057: AI-draft quality — actionable retries, eval corpus, language handling ✅
+
+**Source**: 2026-11-01 inspection of `ai_private.ai_analytics_trace` — a Hebrew session
+request generated twice on the same draft slot. Both attempts crawled through the same
+fail→correct cycles (overlong plan lines, then `description` placed on an item and
+rejected), and the surviving draft flattened a six-technique warm-up into one block of
+six identical unnamed steps ("Technique Warmup"), dropped the paddles from
+"fins **and** paddles", and named the session "…4000" while the drills summed to 2600 m.
+
+**Fixes**:
+- **The live retry loop now feeds back actionable advice** — `describeHarnessResultProblem`
+  (`shared/sessionDraft/format.ts`, harness-level sibling of `describeDraftProblem`) is
+  wired into both the streaming and non-streaming validation-failure sites in
+  `harness/handler.ts`; the analytics trace still records the raw validator string. The
+  advice names the offending *field* (e.g. `items[0]: description`) and names the
+  correct home (`the drill's description`), so the model relocates instead of deleting.
+  The eval pipeline's `advice` uses the same function.
+- **Regenerating asks first** — `AiSessionDraft` routes a second Generate through a
+  `ConfirmDialog` because the proposal lives in component state and was silently
+  discarded (no session was ever saved from the coach's first generation).
+- **System prompt additions**, pinned by `prompt_test.ts`: a technique list is one drill
+  per technique (steps cannot carry names); gradation ("descending", "progressive") goes
+  to the drill description with one representative v2–v4 intensity per step — never
+  flattened to v1; plan lines and descriptions mirror the coach's language while drill
+  names stay canonical English (library matching); the session name may only quote
+  numbers the coach stated.
+- **Eval corpus extended** (`supabase/evals/cases.ts`): `technique-warmup-named-drills`,
+  `equipment-conjoined-fins-and-paddles`, `progression-held-in-extra-room` (an `anyOf` of
+  extra-room mention **or** ≥3 distinct intensities), `hebrew-input`. New scorer kinds:
+  `distinctDrillNames`, `descriptionMentions`, `distinctIntensities`, `anyOf`.
+
+**Known not fixed** (deliberate):
+- Per-step breathing patterns ("breathe every 7") have no schema field and no eval — the
+  extra room is the only home today. Candidate for a future field once data supports it.
+- A stray leading "Prompt: 400" line in the coach's input was silently ignored; surfacing
+  "what I read / what I dropped" is a UX idea, not built.
+- **Production `ai-session-harness` may be running a stale build** — CI only deploys the
+  PWA (Cloudflare Pages); Edge Functions deploy manually, and the 2026-10-27 plan-line-cap
+  fix (`supabase/functions/ai-session-harness/agent/output.ts` `coercePlan`) demonstrably
+  was not active: today's traces still failed on plan length, which current code truncates.
+  Redeploy the function before judging these improvements on production traces.
+
+**Priority**: High
+**Status**: Done. `npm run check` green (client 865 tests); `deno task test`/`deno task check`
+green (harness 111 tests); evals 24 scorer tests green; live evals 10/10 runs observed
+(with sequence of 9/10 → verify below) on the Ollama proxy model; production validation
+pending the Edge Function redeploy.
 
 ## A-044: Extract builtin drill/session data into external JSON catalog ✅
 
