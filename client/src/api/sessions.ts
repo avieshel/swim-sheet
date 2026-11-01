@@ -43,10 +43,9 @@ export function listCompletedRuns(): Promise<SessionRun[]> {
 export type { Session, SessionRun } from '../db/schema'
 
 // Direct draft creation bypasses the AI harness entirely. It shares the same
-// validator and writer as the harness path but does not mark the session as an
-// unreviewed draft.
+// validator and writer as the harness path and saves straight to the template list.
 export function createSessionFromDraft(input: unknown): Promise<ApplyDraftResult> {
-  return applySessionDraft(input, { markUnreviewed: false })
+  return applySessionDraft(input)
 }
 
 export type { ApplyDraftResult } from '../services/sessionDraft/apply'

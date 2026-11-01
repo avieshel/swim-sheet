@@ -4,7 +4,7 @@ import { createSessionDraftSeed } from '../../../shared/sessionDraft/seed'
 import { sanitizePrompt } from '../../../shared/sessionDraft/sanitize'
 import { buildSessionDraftContext } from '../services/sessionDraft/context'
 import { validateHarnessResult, validateSessionDraftRequest } from '../services/sessionDraft/validate'
-import { applySessionDraft as applyDraftService, keepSessionDraft as keepDraftService, getUnreviewedSessionDraft as getUnreviewedDraftService } from '../services/sessionDraft/apply'
+import { applySessionDraft as applyDraftService } from '../services/sessionDraft/apply'
 import type {
   ApplyDraftResult,
 } from '../services/sessionDraft/apply'
@@ -358,17 +358,9 @@ export async function requestSessionDraftStream(
   }
 }
 
-// Persist an actionable draft as a local, unreviewed session.
+// Persist an actionable draft as a normal session template. The AI step is just a
+// faster way to populate the drills, so the saved session is immediately a kept
+// template — no separate review gate, identical to a manually built session.
 export async function applySessionDraft(draft: SessionDraftV1): Promise<ApplyDraftResult> {
-  return applyDraftService(draft, { markUnreviewed: true })
-}
-
-// Mark an unreviewed draft as a normal, kept session (clears the local marker).
-export async function keepSessionDraft(id: string): Promise<void> {
-  return keepDraftService(id)
-}
-
-// The single local unreviewed draft, if one exists.
-export async function getUnreviewedSessionDraft() {
-  return getUnreviewedDraftService()
+  return applyDraftService(draft)
 }

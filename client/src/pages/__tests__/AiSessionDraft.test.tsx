@@ -9,8 +9,6 @@ const navigate = vi.fn()
 const prepareSessionDraft = vi.fn()
 const requestSessionDraftStream = vi.fn()
 const applySessionDraft = vi.fn()
-const getUnreviewedSessionDraft = vi.fn()
-const keepSessionDraft = vi.fn()
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -25,8 +23,6 @@ vi.mock('../../api/sessionDraft', () => ({
   prepareSessionDraft: (...args: unknown[]) => prepareSessionDraft(...args),
   requestSessionDraftStream: (...args: unknown[]) => requestSessionDraftStream(...args),
   applySessionDraft: (...args: unknown[]) => applySessionDraft(...args),
-  getUnreviewedSessionDraft: (...args: unknown[]) => getUnreviewedSessionDraft(...args),
-  keepSessionDraft: (...args: unknown[]) => keepSessionDraft(...args),
 }))
 
 const { AiSessionDraft } = await import('../AiSessionDraft')
@@ -80,7 +76,6 @@ beforeEach(() => {
     handlers.onDone({ outcome: 'draft', draft: sampleDraft })
   })
   applySessionDraft.mockReset().mockResolvedValue({ outcome: 'created', sessionId: 'session-1' })
-  getUnreviewedSessionDraft.mockReset().mockResolvedValue(null)
 })
 
 afterEach(cleanup)
@@ -101,13 +96,13 @@ describe('AiSessionDraft', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  it('saves and opens the session when the coach confirms', async () => {
+  it('saves and returns to the sessions list when the coach confirms', async () => {
     const user = userEvent.setup()
     renderPage()
     await generateDraft()
     await user.click(await screen.findByRole('button', { name: /Save session/ }))
     await waitFor(() => expect(applySessionDraft).toHaveBeenCalledWith(sampleDraft))
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/sessions/session-1'))
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/sessions'))
   })
 
   it('saves the edited proposal rather than the generated one', async () => {

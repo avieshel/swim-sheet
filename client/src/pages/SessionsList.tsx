@@ -401,12 +401,6 @@ export const SessionsList: React.FC = () => {
                             Live
                           </span>
                         )}
-                        {s.aiDraftStatus === 'unreviewed' && (
-                          <span className="shrink-0 flex items-center gap-1 text-label-caps text-tertiary bg-tertiary-container px-2 py-0.5 rounded-full">
-                            <Icon name="auto_awesome" size="sm" />
-                            AI draft
-                          </span>
-                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <button

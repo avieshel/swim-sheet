@@ -17,8 +17,7 @@ const mockApply = vi.hoisted(() => ({
 }))
 
 vi.mock('../../services/sessionDraft/apply', () => ({
-  applySessionDraft: (input: unknown, options: { markUnreviewed: boolean }) =>
-    mockApply.applySessionDraft(input, options),
+  applySessionDraft: (input: unknown) => mockApply.applySessionDraft(input),
 }))
 
 import { listSessions, getSession, createSession, updateSession, deleteSession, listCompletedRuns, createSessionFromDraft } from '../sessions'
@@ -81,7 +80,7 @@ describe('createSessionFromDraft (direct, no harness)', () => {
     const draft = { schemaVersion: 1, session: { name: 'X' }, drills: [] }
     mockApply.applySessionDraft.mockResolvedValue({ outcome: 'created', sessionId: 's9' })
     const result = await createSessionFromDraft(draft)
-    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(draft, { markUnreviewed: false })
+    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(draft)
     expect(result).toEqual({ outcome: 'created', sessionId: 's9' })
   })
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Icon } from '../components/Icon'
@@ -9,13 +9,10 @@ import {
   prepareSessionDraft,
   requestSessionDraftStream,
   applySessionDraft,
-  getUnreviewedSessionDraft,
-  keepSessionDraft,
   type PreparedSessionDraft,
   type SessionDraftResult,
 } from '../api/sessionDraft'
 import type { SessionDraftV1 } from '../../../shared/sessionDraft/types'
-import type { Session } from '../api/sessions'
 
 type Phase = 'compose' | 'review'
 
@@ -71,28 +68,9 @@ export const AiSessionDraft: React.FC = () => {
   // beside the prompt and nothing is persisted until they confirm.
   const [draft, setDraft] = useState<SessionDraftV1 | null>(null)
 
-  const [existingDraft, setExistingDraft] = useState<Session | null | undefined>(undefined)
-
   const isAnonymous = !user || user.is_anonymous
 
-  const applyExistingDraft = (draft: Session | null) => setExistingDraft(draft)
-
-  useEffect(() => {
-    if (status !== 'signed_in' || isAnonymous) return
-    let cancelled = false
-    getUnreviewedSessionDraft()
-      .then((draft) => {
-        if (!cancelled) applyExistingDraft(draft ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) applyExistingDraft(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [status, isAnonymous])
-
-  if (status === 'loading' || (existingDraft === undefined && !isAnonymous)) {
+  if (status === 'loading') {
     return (
       <div className="flex items-center justify-center py-24 text-on-surface-variant">
         <Icon name="hourglass_empty" size="xl" />
@@ -116,37 +94,6 @@ export const AiSessionDraft: React.FC = () => {
             <Icon name="settings" />
             Go to Settings
           </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (existingDraft) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant">
-          <h2 className="font-headline-md text-on-surface mb-2">You have an unreviewed AI draft</h2>
-          <p className="text-on-surface-variant mb-6">
-            Open the existing draft to keep editing it, or discard it and start a new one.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate(`/sessions/${existingDraft.id}`)}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold"
-            >
-              <Icon name="description" />
-              Open draft
-            </button>
-            <button
-              onClick={async () => {
-                await keepSessionDraft(existingDraft.id)
-                setExistingDraft(null)
-              }}
-              className="px-6 py-3 border-2 border-outline text-on-surface rounded-xl font-bold"
-            >
-              Discard and start over
-            </button>
-          </div>
         </div>
       </div>
     )
@@ -216,9 +163,11 @@ export const AiSessionDraft: React.FC = () => {
     setLoading(true)
     setError(null)
     try {
+      // The AI step just populates the drills; saving creates a normal template
+      // and returns to the sessions list, exactly like a manually built session.
       const applied = await applySessionDraft(draft)
-      if (applied.outcome === 'created' || applied.outcome === 'existing_draft') {
-        navigate(`/sessions/${applied.sessionId}`)
+      if (applied.outcome === 'created') {
+        navigate('/sessions')
         return
       }
       setError('That draft could not be saved. Please try again.')

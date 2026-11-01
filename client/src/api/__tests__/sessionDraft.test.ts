@@ -31,8 +31,7 @@ vi.mock('../drills', () => ({
 const mockApply = vi.hoisted(() => ({ applySessionDraft: vi.fn() }))
 
 vi.mock('../../services/sessionDraft/apply', () => ({
-  applySessionDraft: (draft: unknown, options: { markUnreviewed: boolean }) =>
-    mockApply.applySessionDraft(draft, options),
+  applySessionDraft: (draft: unknown) => mockApply.applySessionDraft(draft),
 }))
 
 import { supabase } from '../supabase'
@@ -241,10 +240,10 @@ describe('requestSessionDraft', () => {
 })
 
 describe('applySessionDraft (api wrapper)', () => {
-  it('delegates to the service with markUnreviewed true', async () => {
+  it('delegates to the service with the draft', async () => {
     mockApply.applySessionDraft.mockResolvedValue({ outcome: 'created', sessionId: 's1' })
     const result = await applySessionDraft(validDraft())
-    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(validDraft(), { markUnreviewed: true })
+    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(validDraft())
     expect(result).toEqual({ outcome: 'created', sessionId: 's1' })
   })
 })
