@@ -1,4 +1,4 @@
-import { getAllSessions, getSession, addSession, updateSession, deleteSession, getDrillsForSession, getCompletedRuns, getActiveRun, getSessionRunUsage, getActiveRunsForSession, getCompletedRunCountForSession, seedDefaultSessions } from '../db/dao'
+import { getAllSessions, getSession, addSession, updateSession, deleteSession, deleteSessionRunCascade, markSeedSessionDismissed, getDrillsForSession, getCompletedRuns, getActiveRun, getSessionRunUsage, getActiveRunsForSession, getCompletedRunCountForSession, seedDefaultSessions } from '../db/dao'
 import type { SafeSession, SessionRun } from '../db/schema'
 
 export type DeleteSessionResult =
@@ -38,12 +38,28 @@ export const sessionService = {
   // There is deliberately no force/override parameter. The check runs here on
   // every call rather than trusting the caller, because a run may have been
   // started on another device that has not synced back yet.
-  delete: async (id: string): Promise<DeleteSessionResult> => {
+  // A session with an active run blocks a plain delete — the coach should not
+  // remove a template out from under a session being delivered by accident. That
+  // is a UX guard, not a data-safety one: the run's snapshot is self-contained,
+  // so discarding the live run and the template together loses nothing recorded.
+  // When the caller passes force (only ever after an explicit confirmation that
+  // names the live session), we end and cascade-delete the active run first, then
+  // the template. The check still runs on every call rather than trusting the
+  // caller, because a run may have started on another device that has not synced
+  // back yet.
+  delete: async (id: string, opts?: { force?: boolean }): Promise<DeleteSessionResult> => {
     const activeRuns = await getActiveRunsForSession(id)
-    if (activeRuns.length > 0) {
+    if (activeRuns.length > 0 && !opts?.force) {
       return { ok: false, reason: 'active_run', run: activeRuns[0] }
     }
+    for (const run of activeRuns) {
+      if (run.id) await deleteSessionRunCascade(run.id)
+    }
+    const session = await getSession(id)
     await deleteSession(id)
+    // A deleted starter template (catalogKey set) must not be re-seeded on the
+    // next list load — record the dismissal so seeding skips it.
+    if (session?.catalogKey) await markSeedSessionDismissed(session.catalogKey)
     return { ok: true }
   },
   // For the confirm dialog: how many recorded runs a delete will leave intact.

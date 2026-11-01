@@ -13,6 +13,8 @@ const mockDao = vi.hoisted(() => ({
   getCompletedRunCountForSession: vi.fn(),
   getSessionRunUsage: vi.fn(),
   seedDefaultSessions: vi.fn(),
+  deleteSessionRunCascade: vi.fn(),
+  markSeedSessionDismissed: vi.fn(),
 }))
 
 vi.mock('../../db/dao', () => mockDao)
@@ -128,6 +130,51 @@ describe('sessionService', () => {
       expect(mockDao.getActiveRunsForSession).toHaveBeenCalledExactlyOnceWith('1')
       expect(result).toEqual({ ok: false, reason: 'active_run', run: expect.objectContaining({ id: 'r2' }) })
       expect(mockDao.deleteSession).not.toHaveBeenCalled()
+    })
+
+    it('force-deletes the active run (cascade) then the template when forced', async () => {
+      mockDao.getActiveRunsForSession.mockResolvedValue([run({ id: 'r2' })])
+      mockDao.deleteSessionRunCascade.mockResolvedValue(undefined)
+      mockDao.deleteSession.mockResolvedValue(undefined)
+
+      const result = await sessionService.delete('1', { force: true })
+
+      expect(result).toEqual({ ok: true })
+      expect(mockDao.deleteSessionRunCascade).toHaveBeenCalledExactlyOnceWith('r2')
+      expect(mockDao.deleteSession).toHaveBeenCalledExactlyOnceWith('1')
+    })
+
+    it('force option is ignored when there is no active run', async () => {
+      mockDao.getActiveRunsForSession.mockResolvedValue([])
+      mockDao.deleteSession.mockResolvedValue(undefined)
+
+      const result = await sessionService.delete('1', { force: true })
+
+      expect(result).toEqual({ ok: true })
+      expect(mockDao.deleteSessionRunCascade).not.toHaveBeenCalled()
+      expect(mockDao.deleteSession).toHaveBeenCalledExactlyOnceWith('1')
+    })
+
+    it('marks a deleted starter (catalog) session as dismissed so it is not re-seeded', async () => {
+      mockDao.getActiveRunsForSession.mockResolvedValue([])
+      mockDao.getSession.mockResolvedValue({ id: '1', catalogKey: 'Distance Progression' } as never)
+      mockDao.deleteSession.mockResolvedValue(undefined)
+
+      const result = await sessionService.delete('1')
+
+      expect(result).toEqual({ ok: true })
+      expect(mockDao.markSeedSessionDismissed).toHaveBeenCalledExactlyOnceWith('Distance Progression')
+    })
+
+    it('does not mark a user-created session as dismissed', async () => {
+      mockDao.getActiveRunsForSession.mockResolvedValue([])
+      mockDao.getSession.mockResolvedValue({ id: '1', catalogKey: undefined } as never)
+      mockDao.deleteSession.mockResolvedValue(undefined)
+
+      const result = await sessionService.delete('1')
+
+      expect(result).toEqual({ ok: true })
+      expect(mockDao.markSeedSessionDismissed).not.toHaveBeenCalled()
     })
   })
 

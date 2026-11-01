@@ -24,8 +24,8 @@ export function updateSession(id: string, data: Partial<SafeSession>): Promise<v
   return sessionService.update(id, data)
 }
 
-export function deleteSession(id: string): Promise<DeleteSessionResult> {
-  return sessionService.delete(id)
+export function deleteSession(id: string, opts?: { force?: boolean }): Promise<DeleteSessionResult> {
+  return opts ? sessionService.delete(id, opts) : sessionService.delete(id)
 }
 
 export function countCompletedRunsForSession(id: string): Promise<number> {

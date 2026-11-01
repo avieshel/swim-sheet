@@ -588,8 +588,13 @@ export async function seedDefaultSessions(): Promise<void> {
 
 async function seedDefaultSessionsOnce(): Promise<void> {
   const existingNames = new Set((await getAllSessions()).map(s => s.name))
+  const dismissed = await getDismissedSeedSessions()
   for (const catalog of sessionsCatalog) {
     if (existingNames.has(catalog.name)) continue
+    // A starter template the coach explicitly deleted must stay deleted. Without
+    // this, the delete removes the row and the next list load re-seeds it,
+    // making default sessions impossible to remove.
+    if (dismissed.has(catalog.name)) continue
 
     const sessionId = await addSession({
       name: catalog.name,
@@ -611,6 +616,27 @@ async function seedDefaultSessionsOnce(): Promise<void> {
         description: d.description,
       })
     }
+  }
+}
+
+const DISMISSED_SEED_SESSIONS_KEY = 'dismissedSeedSessions'
+
+// Record that the coach removed a starter template so seeding never brings it
+// back. Keyed by catalog name (the catalogKey used at seed time).
+export async function markSeedSessionDismissed(catalogKey: string): Promise<void> {
+  const dismissed = await getDismissedSeedSessions()
+  if (dismissed.has(catalogKey)) return
+  dismissed.add(catalogKey)
+  await db._meta.put({ key: DISMISSED_SEED_SESSIONS_KEY, value: JSON.stringify([...dismissed]) })
+}
+
+export async function getDismissedSeedSessions(): Promise<Set<string>> {
+  const meta = await db._meta.get(DISMISSED_SEED_SESSIONS_KEY)
+  if (!meta) return new Set()
+  try {
+    return new Set(JSON.parse(meta.value) as string[])
+  } catch {
+    return new Set()
   }
 }
 

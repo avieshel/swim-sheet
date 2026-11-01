@@ -268,7 +268,7 @@ export const SessionDetail: React.FC = () => {
             <button
               onClick={async () => {
                 if (!id) return
-                await deleteSession(id)
+                await deleteSession(id, { force: true })
                 navigate('/sessions')
               }}
               className="px-5 py-2.5 border-2 border-outline text-on-surface rounded-xl font-bold"

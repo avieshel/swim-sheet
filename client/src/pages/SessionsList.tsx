@@ -124,15 +124,15 @@ export const SessionsList: React.FC = () => {
     }
   }
 
-  const performDelete = async (id: string, name: string) => {
-    const result = await deleteSession(id)
+  const performDelete = async (id: string, name: string, force?: boolean) => {
+    const result = await deleteSession(id, force ? { force: true } : undefined)
     if (!result.ok) {
       setConfirmState({
         open: true,
-        title: 'Cannot Delete Template',
-        message: `"${name}" is being delivered right now. Finish or cancel the active session before deleting it.`,
-        confirmLabel: 'Got it',
-        onConfirm: () => setConfirmState(prev => ({ ...prev, open: false })),
+        title: 'Delete live session and template?',
+        message: `"${name}" is being delivered right now. Deleting it will end the live session (its recorded results are kept as history) and remove the template. This cannot be undone.`,
+        confirmLabel: 'Delete both',
+        onConfirm: () => { void performDelete(id, name, true) },
       })
       return
     }
