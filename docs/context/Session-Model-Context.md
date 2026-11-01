@@ -98,6 +98,12 @@ draft contract has no equivalent for:
 | `focus` | hardcoded `'none'` |
 | `labels` | hardcoded `[]` |
 
+Each `DrillItem` also carries an optional `description` (the step's technique, e.g.
+"Fist (אגרופים)" / "Scull"), mapped straight from `draft.drills[].items[].description`. A
+related block of named technique steps ("50 kick, 50 fist, 50 scull") is one drill whose
+items each carry that description; a standalone technique ("4x50 Fingertip Drag") is still its
+own named drill.
+
 So an AI-drafted session arrives with **no labels, no focus and no timing mode**, whatever
 the coach would have chosen. The coach fixes these afterwards in `DrillEditorModal`.
 

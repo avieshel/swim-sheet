@@ -115,7 +115,7 @@ Deno.test('the system prompt embeds the example verbatim', () => {
 // validator rejects as unsupported fields on an item. The example therefore
 // has to demonstrate the real two-level shape.
 
-const ITEM_FIELDS = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment']
+const ITEM_FIELDS = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment', 'description']
 
 Deno.test('the example shows more than one drill', () => {
   assert(buildExampleResult(context).draft.drills.length >= 2)
@@ -138,6 +138,18 @@ Deno.test('no example item carries drill-shaped fields', () => {
 Deno.test('the system prompt forbids nesting drills inside items', () => {
   const prompt = buildSystemPrompt(context)
   assert(prompt.includes('An item is never a drill'))
+})
+
+Deno.test('the system prompt keeps a block of technique steps as one described drill', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('A block of related technique steps is ONE drill'))
+  assert(prompt.includes('description naming the step'))
+})
+
+Deno.test('the system prompt mirrors coach language into step descriptions', () => {
+  const prompt = buildSystemPrompt(context)
+  assert(prompt.includes('Step descriptions follow the same rule'))
+  assert(prompt.includes('אגרופים'))
 })
 
 // The prompt used to describe the draft's fields in prose, which models elided
@@ -274,11 +286,13 @@ Deno.test('the prompt calls the plan display-only', () => {
 
 // Production (2026-11-01): a Hebrew warmup listing distinct techniques ("kick,
 // fists, scull, one arm, dog paddle") came back as one block of six identical
-// unnamed steps. Steps cannot carry names, so techniques must sit on drills.
+// unnamed steps. Each step now carries a description naming its technique, so a
+// related block of techniques is one drill with described steps.
 
-Deno.test('the prompt shows a technique list as one drill per technique', () => {
+Deno.test('the prompt keeps a technique list as one drill with described steps', () => {
   const prompt = buildSystemPrompt(context)
-  assert(prompt.includes('one drill per technique'))
+  assert(prompt.includes('A block of related technique steps is ONE drill'))
+  assert(prompt.includes('each described'))
   assert(prompt.includes('Scull'))
 })
 

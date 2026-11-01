@@ -128,6 +128,16 @@ export function buildDraftJsonSchema(
             : 'No equipment is enabled for this session. Always omit this field.',
         items: { type: 'string', enum: equipment as EquipmentId[] },
       },
+      description: {
+        type: 'string',
+        description:
+          'Optional. What this step\'s technique is, when the distance and stroke alone do ' +
+          'not say. A related block of named technique steps ("warmup: 50 kick, 50 fist, 50 ' +
+          'scull") is one drill whose items each carry a description; a standalone technique ' +
+          '("4x50 Fingertip Drag") stays its own named drill. Omit when the step is ' +
+          'unremarkable.',
+        maxLength: limits.maxStepDescriptionLength,
+      },
     },
   }
 

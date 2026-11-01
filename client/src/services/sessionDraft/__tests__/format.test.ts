@@ -130,11 +130,12 @@ describe('describeDraftProblem', () => {
     const bad = {
       schemaVersion: 1,
       session: { name: 'A' },
-      drills: [{ name: 'Set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1, description: 'rogue' }] }],
+      drills: [{ name: 'Set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1, note: 'rogue' }] }],
     }
     const problem = describeDraftProblem(bad) ?? ''
-    expect(problem).toContain(': description)')
-    expect(problem).toContain("drill's description")
+    expect(problem).toContain('items[0]')
+    expect(problem).toContain('note')
+    expect(problem).toContain('description')
   })
 
   it('falls back to a plain message when the path cannot be walked', () => {
@@ -160,12 +161,12 @@ describe('describeHarnessResultProblem', () => {
     const bad = {
       schemaVersion: 1,
       session: { name: 'A' },
-      drills: [{ name: 'Set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1, description: 'rogue' }] }],
+      drills: [{ name: 'Set', repeatCount: 1, items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1, note: 'rogue' }] }],
     }
     const problem = describeHarnessResultProblem({ outcome: 'draft', draft: bad }) ?? ''
     expect(problem).toContain('items[0]')
-    expect(problem).toContain('equipment')
-    expect(problem).toContain('make it a drill')
+    expect(problem).toContain('note')
+    expect(problem).toContain('description')
   })
 
   it('advises with the numeric budget on an overlong plan line', () => {

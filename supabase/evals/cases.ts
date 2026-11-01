@@ -90,14 +90,49 @@ export const cases: EvalCase[] = [
   {
     // The production failure that shipped a generic 'Technique Warmup' of six
     // identical 50m steps: the model lumped separately named techniques into
-    // one block instead of one drill per technique (name = identity).
+    // one block. Each technique now survives as its own step description inside
+    // one "Warmup" drill, so we assert distinct step descriptions, not distinct
+    // drill names.
     id: 'technique-warmup-named-drills',
     prompt: 'Warmup: 50 kick, 50 fists, 50 sculling, 50 single arm, 50 dog paddle.',
     expectation: {
       outcome: 'draft',
       requirements: [
-        { kind: 'distinctDrillNames', min: 4 },
+        { kind: 'distinctItemDescriptions', min: 4 },
         { kind: 'itemDistance', distance: 50 },
+      ],
+    },
+  },
+  {
+    // Production (2026-11-01): a Hebrew warmup listing distinct technique 50s
+    // came back as one block of six anonymous 50m steps — every technique
+    // ('fists', 'scull', 'hand-to-hand', 'dog paddle') was lost. The techniques
+    // must survive as step descriptions in the coach's language.
+    id: 'hebrew-technique-warmup',
+    prompt: 'חימום: 50 רגליים, 50 אגרופים, 50 שריטת מים, 50 יד יד, 50 כלב, 50 רגליים',
+    expectation: {
+      outcome: 'draft',
+      requirements: [
+        { kind: 'hasStroke', stroke: 'freestyle' },
+        { kind: 'itemDistance', distance: 50 },
+        { kind: 'distinctItemDescriptions', min: 4 },
+        { kind: 'descriptionMentions', any: ['אגרופים', 'fist'] },
+      ],
+    },
+  },
+  {
+    // Production (2026-11-01): a full Hebrew session whose technique detail was
+    // dropped entirely after the validation retry loop. The named technique 50s
+    // must survive as step descriptions through to the accepted draft.
+    id: 'hebrew-full-session-technique-detail',
+    prompt:
+      'אימון יום ב 2/11/26\n400 חתירה\n50 רגליים\n50 אגרופים\n50 שריטת מים\n50 יד יד\n50 כלב\n50 רגליים\n2*100 חתירה יציאה 2:00\n2*100 מעורב יציאה 2:10\n100 קל\n2*200 נשימות 3:40\n3*200 מהיר 3:30\n200 קל\n4*100 סנפירים וכפות תת מימי',
+    expectation: {
+      outcome: 'draft',
+      requirements: [
+        { kind: 'hasStroke', stroke: 'freestyle' },
+        { kind: 'distinctItemDescriptions', min: 4 },
+        { kind: 'descriptionMentions', any: ['אגרופים', 'fist', 'שריטת מים', 'scull'] },
       ],
     },
   },

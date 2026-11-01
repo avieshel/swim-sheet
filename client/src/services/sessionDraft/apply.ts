@@ -80,6 +80,7 @@ export function mapDraftToSessionAndDrills(
       intensity: item.intensity,
       interval: item.interval,
       equipment: item.equipment,
+      description: item.description,
     })),
     repeatCount: drill.repeatCount,
     focus: 'none',

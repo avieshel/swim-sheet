@@ -35,6 +35,9 @@ export interface DrillItem {
   intensity?: string
   interval?: string
   equipment?: string[]
+  // What this step's technique is, when the distance/stroke alone do not say —
+  // mirrors the AI session-draft item field. Optional; absent for plain steps.
+  description?: string
   segments?: DrillSegment[]
 }
 

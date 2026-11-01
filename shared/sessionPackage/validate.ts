@@ -139,7 +139,7 @@ function validateItem(
   config: SessionPackageConfig,
   path: string,
 ): Outcome<SessionPackageItemV1> {
-  const allowed = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment', 'segments']
+  const allowed = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment', 'description', 'segments']
   if (!isRecord(value) || !hasOnlyKeys(value, allowed)) {
     return fail('invalid_shape', `${path} must contain only supported item fields`)
   }
@@ -175,6 +175,11 @@ function validateItem(
     const segments = validateSegments(value.segments, config, `${path}.segments`)
     if (!segments.ok) return segments
     item.segments = segments.value
+  }
+  if (value.description !== undefined) {
+    const description = boundedString(value.description, config.limits.maxDescriptionLength, `${path}.description`, true)
+    if (!description.ok) return description
+    item.description = description.value
   }
   return { ok: true, value: item }
 }

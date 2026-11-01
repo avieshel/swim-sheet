@@ -366,7 +366,7 @@ const itemWithRogueField = {
     {
       name: 'Technique Warmup',
       repeatCount: 1,
-      items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1, description: 'rogue field' }],
+      items: [{ distance: 50, stroke: 'freestyle', repeatCount: 1, note: 'rogue field' }],
     },
   ],
 }
@@ -389,7 +389,7 @@ Deno.test('feeds actionable advice from a contract failure into the retry', asyn
   assertEquals(priorErrors.length, 1)
   // The retry sees the field-level advice, not just the terse validator string.
   assertEquals(priorErrors[0].includes('may carry only'), true)
-  assertEquals(priorErrors[0].includes('description'), true)
+  assertEquals(priorErrors[0].includes('note'), true)
 })
 
 Deno.test('streams the retry with actionable advice after a failed draft', async () => {

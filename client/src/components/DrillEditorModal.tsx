@@ -17,6 +17,7 @@ interface DrillItem {
   intensity?: string
   interval?: string
   equipment?: string[]
+  description?: string
 }
 
 export interface DrillFormData {
@@ -244,6 +245,18 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                       }}
                       placeholder="int"
                       className="w-16 min-h-9 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 text-center"
+                    />
+                    <input
+                      type="text"
+                      aria-label="Technique"
+                      value={item.description || ''}
+                      onChange={e => {
+                        const newItems = [...(form.items || [])]
+                        newItems[idx] = { ...item, description: e.target.value === '' ? undefined : e.target.value }
+                        setForm({ ...form, items: newItems })
+                      }}
+                      placeholder="technique"
+                      className="w-28 min-h-9 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 text-center"
                     />
                     <div className="flex gap-0.5 shrink-0">
                       {EQUIPMENT_OPTIONS.map(opt => {

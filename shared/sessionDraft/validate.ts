@@ -83,7 +83,7 @@ function validateItem(
   path: string,
 ): ValidationOutcome<SessionDraftItemV1> {
   if (!isPlainObject(value)) return fail('invalid_shape', `${path} must be an object`)
-  if (!hasOnlyKeys(value, ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment'])) {
+  if (!hasOnlyKeys(value, ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment', 'description'])) {
     return fail('invalid_shape', `${path} has an unsupported field`)
   }
   if (!isPositiveInteger(value.distance)) {
@@ -121,6 +121,14 @@ function validateItem(
       return fail('invalid_shape', `${path}.equipment must be an array of supported equipment ids`)
     }
   }
+  if (!isAbsent(value.description)) {
+    if (typeof value.description !== 'string') {
+      return fail('invalid_shape', `${path}.description must be a string`)
+    }
+    if (value.description.length > config.limits.maxStepDescriptionLength) {
+      return fail('limit_exceeded', `${path}.description exceeds ${config.limits.maxStepDescriptionLength} characters`)
+    }
+  }
   return {
     ok: true,
     value: {
@@ -130,6 +138,7 @@ function validateItem(
       intensity: isAbsent(value.intensity) ? undefined : (value.intensity as IntensityV1),
       interval: isAbsent(value.interval) ? undefined : (value.interval as string),
       equipment: isAbsent(value.equipment) ? undefined : (value.equipment as EquipmentId[]),
+      description: isAbsent(value.description) ? undefined : (value.description as string),
     },
   }
 }

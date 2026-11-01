@@ -27,6 +27,7 @@ export interface SessionDraftLimits {
   // Drill-domain caps.
   maxDrillNameLength: number
   maxDrillDescriptionLength: number
+  maxStepDescriptionLength: number
   maxStepsPerDrill: number
   maxRepeatCount: number
   maxIntervalLength: number
@@ -74,6 +75,7 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
     maxSessionNameLength: 100,
     maxDrillNameLength: 100,
     maxDrillDescriptionLength: 400,
+    maxStepDescriptionLength: 200,
     maxIntervalLength: 40,
     maxPromptLength: 4000,
     maxDrills: 30,

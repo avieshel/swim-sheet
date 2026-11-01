@@ -38,6 +38,7 @@ function mapItem(item: Drill['items'][number]): SessionPackageItemV1 {
   if (item.intensity !== undefined) mapped.intensity = item.intensity
   if (item.interval !== undefined) mapped.interval = item.interval
   if (item.equipment !== undefined) mapped.equipment = [...item.equipment]
+  if (item.description !== undefined) mapped.description = item.description
   if (item.segments !== undefined) {
     mapped.segments = item.segments.map((segment) => ({
       name: segment.name,
@@ -105,6 +106,7 @@ function mapImportedDrill(drill: SessionPackageDrillV1): Omit<SafeDrill, 'sessio
       intensity: item.intensity,
       interval: item.interval,
       equipment: item.equipment ? [...item.equipment] : undefined,
+      description: item.description,
       segments: item.segments?.map((segment) => ({ ...segment })),
     })),
     repeatCount: drill.repeatCount,

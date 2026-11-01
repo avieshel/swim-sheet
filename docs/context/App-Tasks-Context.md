@@ -1143,3 +1143,21 @@ Added `Events.AppSettings(action, extra)` factory to `client/src/services/analyt
 **Files modified**: `client/src/services/analyticsEvents.ts`, `client/src/pages/Settings.tsx`, `client/src/components/AccountSection.tsx`, `client/src/components/__tests__/AccountSection.test.tsx` (4 new cases), `client/src/pages/__tests__/Settings.test.tsx` (new — 6 cases), `docs/context/UI-Context.md`.
 
 **Status**: Done — `npm run check` green (lint + tsc + knip + 430 vitest).
+
+---
+
+## A-057: AI draft dropped technique detail (fingertip-drag / kick / fist / scull) on generation ✅
+
+**Source**: 2026-11-01 incident (db trace `ai_private.ai_analytics_trace`, ids 64–73, `openai/gpt-4.1-mini`). Coach pasted a Hebrew warm-up listing six named technique 50s (רגליים, אגרופים, שריטת מים, יד יד, כלב). Generation 1 burned all 5 validation retries on `draft.drills[].items[].has an unsupported field` (the model put the technique in an item-level `description`); generation 2 stripped every technique and accepted an anonymous block of identical 50m. Structure survived, detail did not.
+
+**Root cause**: the shared contract (`shared/sessionDraft`) deliberately forbade `description` on an item — "name is identity" meant each technique had to become its own named drill. The retry advice ("put it on the drill's description") was unactionable for a *block* of distinct techniques (one drill can hold only one drill-level `description`), so the weak model deleted the detail rather than relocate it.
+
+**Fix**:
+- `SessionDraftItemV1` gains an optional `description` (`shared/sessionDraft/types.ts`); new `maxStepDescriptionLength` limit in `config.ts`; validated and passed through in `validate.ts`; added to the JSON schema, `format.ts` notation (`50m freestyle [Fist]`), and the actionable-retry advice.
+- Prompt rewritten: a block of related technique steps is **one drill whose items each carry a `description`** naming the technique; a standalone technique stays its own named drill. Step descriptions mirror the coach's language, preferring the canonical catalogue name with the coach's wording alongside (e.g. `Fist (אגרופים)`).
+- Client pipes it through: `DrillItem.description` (`db/schema.ts`), `apply.ts` mapping, package import/export (`shared/sessionPackage` + `sessionPackageService.ts` for round-trip fidelity), `drillStepLines` renders it, and the AI-draft row (`DraftItemRow`) and `DrillEditorModal` expose it.
+- Evals: added `distinctItemDescriptions` scorer requirement; added Hebrew cases `hebrew-technique-warmup` and `hebrew-full-session-technique-detail`; `descriptionMentions` now scans item descriptions too.
+
+**Verification**: local Ollama run (`gemma4`) of `supabase/evals/run.ts` now produces the described steps correctly; `deno task test` (harness + evals) green, `npm run check` (client lint + tsc + knip + 865 vitest) green.
+
+**Note**: production still needs the Edge Function redeployed for the new prompt/schema/contract to take effect; the retry-loop detail-loss was a server-deploy artifact, not client code.

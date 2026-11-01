@@ -21,6 +21,7 @@ export type Requirement =
   | { kind: 'repeatCountForDistance'; distance: number; repeatCount: number }
   | { kind: 'hasEquipment'; id: EquipmentId }
   | { kind: 'distinctDrillNames'; min: number }
+  | { kind: 'distinctItemDescriptions'; min: number }
   | { kind: 'descriptionMentions'; any: string[] }
   | { kind: 'distinctIntensities'; min: number }
   | { kind: 'anyOf'; requirements: Requirement[] }
@@ -110,16 +111,34 @@ export function scoreDraft(draft: SessionDraftV1, requirements: Requirement[]): 
         }
         break
       }
+      case 'distinctItemDescriptions': {
+        // A related block of named techniques (e.g. "50 kick, 50 fists, 50 scull")
+        // is one drill whose items each carry their technique in `description`.
+        // This checks those techniques survived as distinct step descriptions
+        // rather than collapsing into one anonymous block.
+        const distinct = new Set(
+          items
+            .map((i) => (i.description ?? '').trim().toLowerCase())
+            .filter((v) => v.length > 0),
+        ).size
+        if (distinct < req.min) {
+          failures.push(`expected at least ${req.min} distinct step descriptions, got ${distinct}`)
+        }
+        break
+      }
       case 'descriptionMentions': {
         // The nuances the schema cannot field (progression, technique focus,
-        // breathing patterns) belong in the drill name or description — the
-        // scorer checks the coach's intent landed in one of them.
+        // breathing patterns) belong in the drill name/description, and since a
+        // block of related technique steps became described items, also in item
+        // descriptions. The scorer checks the coach's intent landed somewhere.
         const matched = draft.drills.some((d) => {
-          const text = `${d.name} ${d.description ?? ''}`.toLowerCase()
+          const drillText = `${d.name} ${d.description ?? ''}`.toLowerCase()
+          const itemText = d.items.map((i) => i.description ?? '').join(' ').toLowerCase()
+          const text = `${drillText} ${itemText}`
           return req.any.some((term) => text.includes(term.toLowerCase()))
         })
         if (!matched) {
-          failures.push(`expected a drill whose name/description mentions ${req.any.join(' or ')}`)
+          failures.push(`expected a drill or step whose name/description mentions ${req.any.join(' or ')}`)
         }
         break
       }

@@ -17,6 +17,11 @@ export interface SessionDraftItemV1 {
   intensity?: IntensityV1
   interval?: string
   equipment?: EquipmentId[]
+  // What this step's technique actually is, when the distance/stroke alone do
+  // not say. A related block of named technique steps ("warmup: 50 kick, 50
+  // fist, 50 scull") is one drill whose items each carry a description; a
+  // standalone technique ("4x50 Fingertip Drag") stays its own named drill.
+  description?: string
 }
 
 export interface SessionDraftDrillV1 {

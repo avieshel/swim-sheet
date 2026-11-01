@@ -130,6 +130,18 @@ export function DraftItemRow({ item, drillName, stepNumber, stepCount, onChange,
             <Icon name="delete" size="lg" />
           </button>
         </div>
+
+        <div className="col-span-2 sm:col-span-3 min-w-0">
+          <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Technique</label>
+          <input
+            type="text"
+            aria-label={`Technique for step ${stepNumber} of ${drillName}`}
+            placeholder="e.g. Fist drill, Scull, Kick"
+            value={item.description ?? ''}
+            onChange={(e) => onChange({ ...item, description: e.target.value === '' ? undefined : e.target.value })}
+            className="w-full min-h-11 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
       </div>
     </div>
   )

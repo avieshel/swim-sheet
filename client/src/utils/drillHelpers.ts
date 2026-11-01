@@ -12,6 +12,7 @@ interface DrillLikeItem {
   interval?: string
   intensity?: string
   equipment?: string[]
+  description?: string
 }
 
 interface DrillLike {
@@ -39,12 +40,16 @@ export function drillSubtitle(d: DrillLike): string {
 }
 
 export function drillStepLines(d: DrillLike): Array<{ label: string; text: string; interval?: string; intensity?: string }> {
-  return (d.items ?? []).map((item, idx) => ({
-    label: String(idx + 1),
-    text: `${item.repeatCount ?? 1}×${item.distance ?? 0}m ${item.stroke ?? ''}`.trim(),
-    interval: item.interval,
-    intensity: item.intensity,
-  }))
+  return (d.items ?? []).map((item, idx) => {
+    const base = `${item.repeatCount ?? 1}×${item.distance ?? 0}m ${item.stroke ?? ''}`.trim()
+    const text = item.description ? `${base} · ${item.description}` : base
+    return {
+      label: String(idx + 1),
+      text,
+      interval: item.interval,
+      intensity: item.intensity,
+    }
+  })
 }
 
 export function drillEquipment(d: DrillLike): string[] {

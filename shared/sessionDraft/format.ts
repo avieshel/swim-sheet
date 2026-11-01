@@ -19,7 +19,7 @@ import type { SessionDraftConfig } from './config.ts'
 import { defaultSessionDraftConfig } from './config.ts'
 import type { SessionDraftDrillV1, SessionDraftItemV1, SessionDraftV1 } from './types.ts'
 
-const ITEM_FIELDS = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment']
+const ITEM_FIELDS = ['distance', 'stroke', 'repeatCount', 'intensity', 'interval', 'equipment', 'description']
 
 // Locates the object a validator path points at (paths look like
 // "draft.drills[0].items[1]"), with the draft itself as the root. Returns
@@ -47,6 +47,7 @@ function formatItem(item: SessionDraftItemV1): string {
   if (item.intensity !== undefined) out += ` ${item.intensity}`
   if (item.interval !== undefined) out += ` @${item.interval}`
   if (item.equipment !== undefined && item.equipment.length > 0) out += ` +${item.equipment.join('+')}`
+  if (item.description !== undefined) out += ` [${item.description}]`
   return out
 }
 
@@ -96,9 +97,10 @@ export function describeDraftProblem(
       const named = unexpected.length > 0 ? `: ${unexpected.join(', ')}` : ''
       return (
         `A step carries a field it may not have (${path}${named}). A step is a single swim ` +
-        `repeated, and may carry only: ${ITEM_FIELDS.join(', ')}. It never has a name ` +
-        `and never has its own items — put what the technique is on the drill's description ` +
-        `instead. If it should be a named block, make it a drill.`
+        `repeated, and may carry only: ${ITEM_FIELDS.join(', ')}. It never has a name and ` +
+        `never has its own items. What the technique is goes in the step's own ` +
+        `\`description\` field (a short text, not a name) — that is exactly what it is for. ` +
+        `If the step needs a name of its own, make it a drill instead.`
       )
     }
     return (

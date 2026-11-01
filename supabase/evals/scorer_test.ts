@@ -196,6 +196,43 @@ Deno.test('distinctIntensities counts the effort range a draft covers', () => {
   assert(!flat.passed)
 })
 
+Deno.test('distinctItemDescriptions counts technique detail that survives on steps', () => {
+  const described: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'Warmup' },
+    drills: [
+      {
+        name: 'Warmup',
+        repeatCount: 1,
+        items: [
+          { distance: 50, stroke: 'freestyle', repeatCount: 1, description: 'Kick' },
+          { distance: 50, stroke: 'freestyle', repeatCount: 1, description: 'Fist drill' },
+          { distance: 50, stroke: 'freestyle', repeatCount: 1, description: 'Scull' },
+          { distance: 50, stroke: 'freestyle', repeatCount: 1, description: 'Dog paddle' },
+        ],
+      },
+    ],
+  }
+  assert(scoreDraft(described, [{ kind: 'distinctItemDescriptions', min: 4 }]).passed)
+  // Repeated descriptions count once; an anon block yields zero.
+  const collapsed: SessionDraftV1 = {
+    schemaVersion: 1,
+    session: { name: 'Warmup' },
+    drills: [
+      {
+        name: 'Warmup',
+        repeatCount: 1,
+        items: [
+          { distance: 50, stroke: 'freestyle', repeatCount: 1 },
+          { distance: 50, stroke: 'freestyle', repeatCount: 1 },
+          { distance: 50, stroke: 'freestyle', repeatCount: 1 },
+        ],
+      },
+    ],
+  }
+  assert(!scoreDraft(collapsed, [{ kind: 'distinctItemDescriptions', min: 4 }]).passed)
+})
+
 Deno.test('anyOf passes when one branch is met', () => {
   const res = scoreDraft(stepped, [
     {

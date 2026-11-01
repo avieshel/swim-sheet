@@ -15,6 +15,10 @@ export interface SessionPackageItemV1 {
   intensity?: string
   interval?: string
   equipment?: string[]
+  // What this step's technique is, when the distance/stroke alone do not say.
+  // Mirrors the AI session-draft item field so detail survives an export/import
+  // round-trip rather than being dropped.
+  description?: string
   segments?: SessionPackageSegmentV1[]
 }
 
