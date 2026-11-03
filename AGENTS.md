@@ -11,13 +11,19 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Need | Open |
 |------|------|
 | Architecture overview, tech stack, routes | `docs/context/App-Context.md` |
-| Data model, offline-first design, sync, schema | `docs/context/DB-Context.md` |
-| Design system, screen specs, component details | `docs/context/UI-Context.md` |
+| DB schema, entity tables, indexes, persistence/backup | `docs/context/DB-Schema-Context.md` |
+| DB sync, RLS, tenant/identity, migrations, frozen snapshot | `docs/context/DB-Sync-Context.md` |
+| Design system (tokens, colors, typography, icons, themes) | `docs/context/UI-Design-System-Context.md` |
+| Screen specs, layout, component details | `docs/context/UI-Context.md` |
+| Live deck UI (section layout, drill iteration grouping, timing breakout) | `docs/context/UI-Live-Deck-Context.md` |
+| Analytics events + delivery pipeline + payload policy | `docs/context/Analytics-Context.md` |
 | Testing stack, guidelines, known flaky tests | `docs/context/Test-Context.md` |
-| AI eval & ops: trace inspection, sync follow-ups, analytics policy | `docs/context/AI-Eval-And-Ops-Context.md` |
+| AI eval & ops: trace inspection, sync follow-ups | `docs/context/AI-Eval-And-Ops-Context.md` |
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
 | Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
+| Drill identity + bank taxonomy (named instruction, dimensions) | `docs/context/Drill-Identity-Context.md` |
+| Drill set grammar (progressions, pyramids, recovery, API) | `docs/context/Drill-Set-Grammar-Context.md` |
 | Drill domain model — schema, identity, repeat levels, notation | `docs/context/Drill-Model-Context.md` |
 | Session domain model — plan, decomposition, what the agent cannot set | `docs/context/Session-Model-Context.md` |
 | AI session harness (shared contract, agent/harness split, evals) | `shared/sessionDraft/`, `supabase/functions/ai-session-harness/`, `supabase/evals/` |
