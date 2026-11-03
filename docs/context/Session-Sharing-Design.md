@@ -99,6 +99,13 @@ current client sync resolves a personal organization and does not yet provide
 that collaboration flow. A future collaboration epic should keep the immutable
 share publication separate from grants to edit or access live shared content.
 
+**Note (2026-11)**: the initial schema (`supabase/migrations/20261005001000_initial_schema.sql`)
+already ships collaboration-shaped primitives — `sessions.visibility`
+(`'private' | 'organization'`) and `sessions.assigned_to`, with org RLS that lets members
+see organization-visible and assigned sessions, mirrored in `client/src/db/schema.ts`
+(`Session.visibility` / `assignedTo`) and the sync transport. Share-link and future
+collaboration work should reuse these columns rather than rebuild parallel ones.
+
 Sharing results is explicitly separate: the package and link contain no
 swimmers, `SessionRun`, timing, or results data.
 

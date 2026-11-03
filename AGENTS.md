@@ -11,13 +11,19 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Need | Open |
 |------|------|
 | Architecture overview, tech stack, routes | `docs/context/App-Context.md` |
-| Data model, offline-first design, sync, schema | `docs/context/DB-Context.md` |
-| Design system, screen specs, component details | `docs/context/UI-Context.md` |
+| DB schema, entity tables, indexes, persistence/backup | `docs/context/DB-Schema-Context.md` |
+| DB sync, RLS, tenant/identity, migrations, frozen snapshot | `docs/context/DB-Sync-Context.md` |
+| Design system (tokens, colors, typography, icons, themes) | `docs/context/UI-Design-System-Context.md` |
+| Screen specs, layout, component details | `docs/context/UI-Context.md` |
+| Live deck UI (section layout, drill iteration grouping, timing breakout) | `docs/context/UI-Live-Deck-Context.md` |
+| Analytics events + delivery pipeline + payload policy | `docs/context/Analytics-Context.md` |
 | Testing stack, guidelines, known flaky tests | `docs/context/Test-Context.md` |
-| Remaining app-level work | `docs/context/App-Tasks-Context.md` |
+| AI eval & ops: trace inspection, sync follow-ups | `docs/context/AI-Eval-And-Ops-Context.md` |
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
 | Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
+| Drill identity + bank taxonomy (named instruction, dimensions) | `docs/context/Drill-Identity-Context.md` |
+| Drill set grammar (progressions, pyramids, recovery, API) | `docs/context/Drill-Set-Grammar-Context.md` |
 | Drill domain model — schema, identity, repeat levels, notation | `docs/context/Drill-Model-Context.md` |
 | Session domain model — plan, decomposition, what the agent cannot set | `docs/context/Session-Model-Context.md` |
 | AI session harness (shared contract, agent/harness split, evals) | `shared/sessionDraft/`, `supabase/functions/ai-session-harness/`, `supabase/evals/` |
@@ -26,7 +32,7 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Past sessions table + swimmer-filtered history (Initiative 2) | `docs/context/Past-Sessions-Data-Context.md` |
 | Implementation plan for both initiatives (sequenced tasks) | `docs/context/Session-Initiatives-PLAN.md` |
 
-Archived plans and audits: `docs/archive/`
+Archived plans and audits: `docs/archive/` — **do not read unless explicitly instructed.** It contains stale, superseded docs that contradict the current code and will mislead you. The active context lives only in `docs/context/`.
 
 ---
 
@@ -112,7 +118,7 @@ Update the relevant context file to reflect the new reality:
 - **Changed the data model or schema?** → update `docs/context/DB-Context.md`
 - **Added/modified a page/component?** → update `docs/context/UI-Context.md`
 - **Changed architecture or added a dependency?** → update `docs/context/App-Context.md`
-- **Fixed a bug or completed a task?** → update `docs/context/App-Tasks-Context.md` (mark as done)
+- **Fixed a bug or completed a task?** → note it in the relevant context file; the historical task ledger is archived at `docs/archive/App-Tasks-Context.md`
 
 ---
 
@@ -127,7 +133,7 @@ Update the relevant context file to reflect the new reality:
 | Client API | Custom `api/` wrappers | Unified interface over Dexie + HTTP |
 | Client State | React Context | `LiveSessionContext` for live view |
 | Styling | Tailwind CSS | Material 3 design tokens in config |
-| Icons | Material Symbols Outlined | Use `<span class="material-symbols-outlined">icon_name</span>` |
+| Icons | Material Symbols Outlined | Use the `<Icon>` component (`client/src/components/Icon.tsx`), never a raw `<span class="material-symbols-outlined">` |
 | Server | Express + TypeScript | tsx watch for dev |
 | Server DB | better-sqlite3 | Single file, snake_case columns |
 | Unit Tests | Vitest | Co-located in `__tests__/` |
@@ -141,9 +147,7 @@ Update the relevant context file to reflect the new reality:
 ```
 client/src/
 ├── api/           # API layer (Dexie + HTTP wrappers)
-├── components/    # Shared UI components
-│   ├── forms/     # Form modals (SwimmerFormModal, DrillEditorModal)
-│   └── timing/    # Timing widgets (LapTimeline)
+├── components/    # Shared UI components (subgroups ai/, live/, session/; SwimmerFormModal, DrillEditorModal at root)
 ├── constants/     # Shared constants (drill options, stroke colors)
 ├── context/       # React context (LiveSessionContext)
 ├── db/            # Dexie schema + pure CRUD DAO

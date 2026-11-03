@@ -156,7 +156,8 @@ show a recoverable message. Do not partially import a session.
 
 ## Export flow
 
-1. From a session card or editor, choose **Export session**.
+1. From a session template card in the Sessions list (`SessionsList.tsx` — currently the
+   only export entry point), choose **Export session**.
 2. Read the session and its ordered drills through the API/service layers.
 3. Map only the package allowlist; omit database/ownership fields and all run
    data; validate the package before serialization.

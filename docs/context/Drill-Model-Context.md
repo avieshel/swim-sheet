@@ -6,7 +6,7 @@ The domain model for a **drill**: what it is, how its structure is expressed, an
 the part that is genuinely counter-intuitive — how a drill gets its identity.
 
 For the session that composes drills, see `Session-Model-Context.md`. For the screens,
-see `Drills-Screen-Context.md`.
+see `UI-Context.md` (DrillBank section).
 
 ---
 
@@ -86,25 +86,39 @@ SessionDraftDrillV1 {
   repeatCount: number      // repeats of the whole block
   items: SessionDraftItemV1[]
 }
+
+SessionDraftItemV1 {
+  distance: number
+  stroke: Stroke
+  repeatCount: number      // repeats of this one step
+  intensity?: IntensityV1
+  interval?: string
+  equipment?: EquipmentId[]
+  description?: string     // this step's technique, when the shapes alone don't say
+}
 ```
 
 ### 3. The persisted entity — `client/src/db/schema.ts`
 
-What is **stored** as a `Drill` row, via `mapDraftToSessionAndDrills`. It carries fields
-the draft contract has no equivalent for, all hardcoded by that mapping:
+What is **stored** as a `Drill` row, via `mapDraftToSessionAndDrills`. It carries fields the
+draft contract has no equivalent for, all set mechanically by that mapping (the authoritative
+"what the agent cannot set" table):
 
 | `Drill` field | Source |
 |---|---|
 | `stroke` | derived — the dominant stroke by distance × repeats |
 | `distance` | derived — `sum(item.distance × item.repeatCount) × repeatCount` |
 | `order` | array position |
-| `timingMode` | hardcoded `'individual'` |
 | `focus` | hardcoded `'none'` |
 | `labels` | hardcoded `[]` |
 | `description` | `draft.description ?? ''` |
 
-So labels, focus and timing mode **cannot currently be set by the agent**. That is a known
-gap, not an oversight in the mapping.
+Each persisted `DrillItem` also echoes the step's own
+`description?` (this step's technique), mapped straight from
+`draft.drills[].items[].description` (schema.ts `DrillItem.description`).
+
+So labels and focus cannot currently be set by the agent. That is a known gap, not an
+oversight in the mapping.
 
 ---
 
@@ -168,7 +182,7 @@ steps differ is exactly what the step level exists for.
 
 ```
 <name> | <n> sets | <step>; <step>
-<step> = <distance>m <stroke> x<reps> <intensity> @<interval> +<equipment>
+<step> = <distance>m <stroke> x<reps> <intensity> @<interval> +<equipment> [<description>]
 ```
 
 Real output:
@@ -176,7 +190,11 @@ Real output:
 ```
 Warmup | 400m freestyle v1
 Main set | 2 sets | 100m freestyle x3 v2 @1:30 +fins; 50m breaststroke x4
+Technique block | 50m freestyle v1 [kick]; 50m freestyle v1 [fists closed]; 50m freestyle v1 [scull]
 ```
+
+A step's technique description, when present, is always the trailing segment — `formatItem`
+appends it last, after interval and equipment.
 
 Two jobs:
 
@@ -184,17 +202,20 @@ Two jobs:
    be compared against a concrete line rather than prose.
 2. **Validation feedback.** `describeDraftProblem` turns a validator failure into a
    sentence an agent can act on — naming the offending step and the fields it may carry
-   (and naming the offending field itself, so the model can relocate e.g. a technique
-   `description` to the drill instead of deleting it), rather than "has an unsupported
-   field". The harness-level sibling `describeHarnessResultProblem` covers plan-line
-   failures and is what the live retry loop and the eval pipeline feed back.
+   (and naming the offending field itself). Since `description` became a first-class step
+   field, the message points technique detail at the step's own `description` field — "that
+   is exactly what it is for" — and only tells the model to make a step a *drill* when it
+   needs a name of its own, rather than sending the description anywhere else. The
+   harness-level sibling `describeHarnessResultProblem` covers plan-line failures and is
+   what the live retry loop and the eval pipeline feed back.
 
-The schema has faithful fields for distance, intensity, interval, and equipment — and
-those are the axis it covers. Everything the coach says that those fields cannot hold
-(technique focus, progression/gradation, breathing patterns, push-off instructions) is
-the **extra room**: it belongs in the drill's name or description, never in dropped
-words. Fields may graduate out of the extra room into the data model later, when
-enough usage data says which ones are worth a column; until then resist adding them.
+The schema has faithful fields for distance, intensity, interval, equipment, and a step
+`description` — and those are the axes it covers. Everything else the coach says that those
+fields cannot hold (progression/gradation, push-off instructions, coaching asides) is the
+**extra room**: it belongs in the step's `description`, or in the drill's name or
+description — never in dropped words. Fields may graduate out of the extra room into the
+data model later, when enough usage data says which ones are worth a column; until then
+resist adding them.
 
 Format tests pin the exact output so the notation cannot drift.
 
@@ -207,12 +228,22 @@ All from `shared/sessionDraft/config.ts`, never inlined at the point of use.
 | Limit | Value |
 |---|---|
 | `maxDrills` | 30 |
-| `maxItemsPerDrill` | 10 |
+| `maxStepsPerDrill` | 10 |
 | `maxDistance` | 10,000 |
 | `maxRepeatCount` | 100 |
-| `maxNameLength` | 100 |
-| `maxDescriptionLength` | 400 |
-| `maxPlanEntries` | 12 |
+| `maxDrillNameLength` | 100 |
+| `maxSessionNameLength` | 100 |
+| `maxDrillDescriptionLength` | 400 |
+| `maxSessionPlanLines` | 12 |
+
+The numeric values of what this table covered have not changed — only the
+key names (`maxItemsPerDrill` → `maxStepsPerDrill`, `maxNameLength` →
+`maxDrillNameLength`/`maxSessionNameLength`, `maxPlanEntries` →
+`maxSessionPlanLines`). The limits set has grown since: `maxStepDescriptionLength` (200)
+for the per-step technique text, plan-line bounds (`maxSessionPlanLineLength`,
+`maxSessionPlanLineWords`, plus a split-word allowance), `maxPromptLength` and
+`maxRecentSessions` — see `shared/sessionDraft/config.ts` for the full set; every bound
+is read from there, never inlined at the point of use.
 
 ---
 

@@ -6,7 +6,7 @@ The domain model for a **session**: how drills compose into a plan, what the age
 produces, and where the boundaries are today.
 
 For the drills it composes, see `Drill-Model-Context.md`. For the screens, see
-`Sessions-Screen-Context.md`.
+`UI-Context.md` (SessionsList / SessionDetail).
 
 ---
 
@@ -79,33 +79,28 @@ The plan is to add a structural representation for rest and intervals first, wit
 options, and only then let the agent use it. Until that exists, a rest stage will either
 be dropped or be absorbed into an adjacent step's interval, and neither is good.
 
-This is a known gap. It is listed again in `App-Tasks-Context.md`.
+This is a known gap (see the archived task ledger `docs/archive/App-Tasks-Context.md`).
 
 ---
 
 ## What the agent cannot set
 
 `mapDraftToSessionAndDrills` maps the draft onto stored rows and hardcodes anything the
-draft contract has no equivalent for:
+draft contract has no equivalent for. The authoritative field-by-field table is owned by
+[Drill-Model-Context.md](Drill-Model-Context.md) ("The three schemas"): `stroke` and
+`distance` are derived, and `focus` (`'none'`), `labels` (`[]`) and the drill-level
+`description` (`draft.description ?? ''`) are set mechanically — `timingMode` no longer
+exists on `Drill` at all.
 
-| `Drill` field | How it gets its value |
-|---|---|
-| `stroke` | derived — dominant stroke by distance × repeats |
-| `distance` | derived |
-| `order` | array position |
-| `description` | `draft.description ?? ''` |
-| `timingMode` | hardcoded `'individual'` |
-| `focus` | hardcoded `'none'` |
-| `labels` | hardcoded `[]` |
+Each persisted `DrillItem` also echoes the step's own optional `description` (the step's
+technique, e.g. "Fist (אגרופים)" / "Scull"), mapped straight from
+`draft.drills[].items[].description`. A related block of named technique steps ("50 kick,
+50 fist, 50 scull") is one drill whose items each carry that description; a standalone
+technique ("4x50 Fingertip Drag") is still its own named drill.
 
-Each `DrillItem` also carries an optional `description` (the step's technique, e.g.
-"Fist (אגרופים)" / "Scull"), mapped straight from `draft.drills[].items[].description`. A
-related block of named technique steps ("50 kick, 50 fist, 50 scull") is one drill whose
-items each carry that description; a standalone technique ("4x50 Fingertip Drag") is still its
-own named drill.
-
-So an AI-drafted session arrives with **no labels, no focus and no timing mode**, whatever
-the coach would have chosen. The coach fixes these afterwards in `DrillEditorModal`.
+So an AI-drafted session arrives with **no labels and no focus**, whatever the coach would
+have chosen. The coach fixes these afterwards in `DrillEditorModal`, which manages focus
+and labels only.
 
 ---
 
@@ -118,10 +113,10 @@ nothing behind. That keeps the single-unreviewed-draft-per-device guarantee inta
 makes the panel authoritative: what the coach sees is exactly what gets persisted.
 
 Controls cover the fields the draft contract carries — session name, drill name, set
-repeats, and per-step reps / distance / stroke / intensity / interval / equipment, with
-drills addable, removable and reorderable. They deliberately **exclude** `timingMode`,
-`focus` and `labels`, because the contract has no equivalent; those are reachable in
-`DrillEditorModal` after saving.
+repeats, and per-step reps / distance / stroke / intensity / interval / equipment (plus the
+step's technique `description`), with drills addable, removable and reorderable. They
+deliberately **exclude** `focus` and `labels`, because the contract has no equivalent;
+those are reachable in `DrillEditorModal` after saving.
 
 The staged draft is validated with the shared validator on every render, so an unparseable
 interval shows the validator's own message and disables Save rather than failing at save
