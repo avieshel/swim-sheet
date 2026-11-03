@@ -2,27 +2,39 @@
 
 ## Overview
 
-Offline-first PWA that lets swim coaches manage their data (swimmers, session templates and their drills) and track live sessions to record actual training data per swimmer. The server builds the React client and serves its static files, providing both the UI and the API.
+Offline-first PWA that lets swim coaches manage their data (swimmers, session templates and their drills) and track live sessions to record actual training data per swimmer. The client is a browser PWA: all coach data lives in IndexedDB (Dexie) on the device, and the client never calls the Express server's API. The Express server only serves the built PWA; cloud features (auth, sync, AI generation, analytics) go directly to Supabase.
 
-**Optional cloud features** — a coach can sign in with their Google account to sync data across devices and use AI session generation (Supabase Edge Function + `shared/sessionDraft/` contract). Collaboration between coaches is currently via manual session-template import/export (`.swimsheet` packages). Server-backed sharing with other coaches is planned but **not built** (design in `docs/context/Session-Sharing-Design.md`).
+**Optional cloud features** — a coach can sign in with their Google account for: (1) **auth** (Google OAuth via Supabase Auth), (2) **sync** of selected tables across devices (Supabase Postgres + RLS, driven by `syncService`/`SupabaseSyncTransport`), (3) **AI session generation** (Supabase Edge Function `ai-session-harness` + `shared/sessionDraft/` contract), and (4) **analytics** (anonymous device/context events written to `analytics_events`). Supabase holds no business logic — only storage, RLS, two sync RPCs (`ensure_personal_organization`, `sync_pulse`), updated-at triggers, and the AI Edge Function. Collaboration between coaches is currently via manual session-template import/export (`.swimsheet` packages). Server-backed sharing with other coaches is planned but **not built** (design in `docs/context/Session-Sharing-Design.md`).
 
 ## Architecture
 
+The app is a **client-side PWA**. All coach data lives in the browser's IndexedDB
+(Dexie) on the device; the client never calls the Express server's `/api/v1/*`
+routes. Supabase is the only remote dependency, and only for optional cloud
+features (auth, sync, AI generation, analytics). The Express server is a
+vestigial dev/static host: it serves the built PWA in production and exposes
+unused `/api/v1` CRUD routes against a throwaway SQLite file.
+
 ```
-┌─────────────────────────┐
-│       Server            │
-│  (Express + TS)         │
-│  ├─ API: /api/v1/*      │
-│  └─ Static: client build│
-└─────────────────────────┘
-        ▲
-        │ HTTPS/HTTP
-        │
-┌─────────────────────────┐
-│   Mobile/Tablet Browser │
-│   (SwimSheet PWA)       │
-│   └─ Dexie (IndexedDB)  │
-└─────────────────────────┘
+┌────────────────────────────────────────┐
+│           Device (browser/PWA)         │
+│  UI (pages) → api/ → services/ →       │
+│  dao (db/dao.ts) → Dexie (IndexedDB)   │
+└──────────────┬─────────────────────────┘
+               │ (optional, signed-in only)
+               ▼
+┌────────────────────────────────────────┐
+│           Supabase (cloud)             │
+│  Auth · Postgres sync (selected tables)│
+│  · analytics_events · ai-session-      │
+│    harness Edge Function               │
+└────────────────────────────────────────┘
+
+┌────────────────────────────────────────┐
+│  Express server (vestigial host)       │
+│  Serves the built PWA; /api/v1/* and   │
+│  its SQLite DB are not used by client.  │
+└────────────────────────────────────────┘
 ```
 
 ### Client
@@ -32,22 +44,21 @@ Offline-first PWA that lets swim coaches manage their data (swimmers, session te
 | UI | React 19 + TypeScript | SPA for mobile browser |
 | Build | Vite | Fast dev + PWA plugin |
 | Routing | react-router-dom v7 | Client-side routing |
-| Offline DB | Dexie.js 4 | IndexedDB wrapper — typed, queryable |
-| API | Custom `api/` wrappers | Consistent interface over Dexie + HTTP |
+| Offline DB | Dexie.js 4 | IndexedDB wrapper — typed, queryable (source of truth on device) |
+| API | Custom `api/` wrappers | Consistent interface over Dexie (no HTTP to Express) |
 | Services | Domain services | Business logic (runService, swimmerService, etc.) |
-| Sync | Custom Supabase sync engine | Bidirectional sync for selected tables; push local edits, pull remote changes, and surface conflicts |
+| Sync | Custom Supabase sync engine | Bidirectional sync for selected tables; push local edits, pull remote changes, and surface conflicts (signed-in only) |
 | Install | PWA manifest + SW | Add to home screen, full offline |
 | Tests | Vitest (unit), Playwright (e2e) | Testing stack |
 | Static analysis | ESLint + tsc + knip | Lint, typecheck, dead-code detection (`npm run check`) |
 
-### Server
+### Server (vestigial)
 
 | Layer | Tech | Purpose |
 |-------|------|---------|
-| API | Express + TypeScript | REST CRUD endpoints at `/api/v1/*` |
-| Static | Serves React build | Delivers the PWA to browsers |
-| DB | better-sqlite3 | Zero-config, single file at `/app/server/data/data.db` |
-| Schema | SQLite | Mirrors client Dexie schema with snake_case naming |
+| Static host | Express + TypeScript | Serves the built PWA in production; dev proxy target |
+| API (unused) | Express | REST CRUD at `/api/v1/*` — not called by the client at runtime |
+| DB (unused) | better-sqlite3 | Single file at `/app/server/data/data.db`, created empty on boot; client never reads it |
 
 ## Design Decisions
 
@@ -60,7 +71,7 @@ Offline-first PWA that lets swim coaches manage their data (swimmers, session te
 
 ### Offline-First PWA
 - The app works fully offline using IndexedDB (Dexie)
-- Supabase is optional — needed only for account-based cloud sync; core app data remains available offline
+- Supabase is optional — needed only for account-based cloud sync, AI session generation, and analytics; core app data remains available offline and never touches the Express server
 - PWA manifest enables "Add to Home Screen" on mobile
 - Service worker caches static assets only (never API responses)
 - **First run is always clean**: the client seeds only builtin templates (drill library, session catalog); it never contains or downloads previous/completed-session data. All coach session data is stored on the device.
@@ -73,7 +84,7 @@ UI (pages/) → API (api/) → Services (services/) → DAO (db/dao.ts) → Dexi
 ```
 
 - **UI**: Pages and components. Never imports `dao.ts` or Dexie directly.
-- **API**: Unified client that wraps both local Dexie operations and server HTTP calls. Pages call API functions.
+- **API**: Unified client over local Dexie operations. Pages call API functions. (The Express server's HTTP API is unused at runtime.)
 - **Services**: Business logic (session lifecycle, timing calculations, drill enrichment). Called by API layer.
 - **DAO**: Pure CRUD — no business logic. Only data access.
 - **DB**: Dexie schema + type definitions only.
@@ -157,7 +168,7 @@ Single Docker container (see `Dockerfile`):
 4. Copies client build into server's `public` folder
 5. Starts server on port 3001
 
-The server creates a fresh SQLite DB at runtime (`/app/data/data.db`) — it is empty on boot. The local dev DB under `server/data/` (which may contain previous session data) is excluded from the Docker build context via `.dockerignore`, so it can never be baked into a downloaded image. Client data is never bundled either; the only static data shipped is builtin drill/session catalog templates.
+The server creates a fresh SQLite DB at runtime (`/app/data/data.db`) — it is empty on boot and is **not read by the client** (it backs the vestigial `/api/v1/*` routes, which the client never calls). The local dev DB under `server/data/` (which may contain previous session data) is excluded from the Docker build context via `.dockerignore`, so it can never be baked into a downloaded image. Client data is never bundled either; the only static data shipped is builtin drill/session catalog templates.
 
 Development: run client (`npm run dev`) and server (`npm run dev`) separately. Client dev server proxies `/api` to server via Vite config.
 
