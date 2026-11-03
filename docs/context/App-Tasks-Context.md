@@ -29,7 +29,7 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 ---
 
-## A-056: AI harness resilience — structured outputs opt-in, plan-line truncation, model attribution 🚧
+## A-056: AI harness resilience — structured outputs opt-in, plan-line truncation, model attribution ✅
 
 **Source**: 2026-10-26 incident — one user's session generation failed 11 of 15 provider attempts across two generation episodes (03:47–03:49 and 03:57–04:02 UTC). Diagnosis from `ai_private.ai_analytics_trace`: 4× `"stream produced no content"` (a reasoning model bled its tokens into the content channel until nothing usable remained), 2× provider timeout (deployed `PROVIDER_TIMEOUT_MS=120000` masked it), 2× Nvidia 502s, 1× `finish_reason=length` (reasoning tokens consumed the 4096 `max_tokens`), 3× validator `"draft.plan entry exceeds 100 characters"`. Hebrew input ruled out — English prompts failed identically.
 
@@ -48,7 +48,12 @@ Remaining application-level work items. These should be converted to GitHub issu
 
 **Recommendation carried for later**: when the model becomes a decision point again, prefer a non-reasoning model (e.g. `openai/gpt-4.1-mini`) — a reasoning model's token bleed caused 8 of the 15 failed attempts and consumed the token budget entirely in one.
 
-**Status**: Draft PR open for review; not yet deployed (secret `PROVIDER_STRUCTURED_OUTPUTS` remains unset until the daybed endpoint supports json_schema).
+**Status**: Merged as commit 475a15c (PR #24); the code is live —
+`PROVIDER_STRUCTURED_OUTPUTS` (`agent/config.ts:58`), `maxSessionPlanLines`
+(`shared/sessionDraft/config.ts:83`), `coercePlan` (`agent/output.ts`). Only the standing
+caveat remains: the `ai-session-harness` Edge Function has not been redeployed (and the
+`PROVIDER_STRUCTURED_OUTPUTS` secret stays unset until the daybed endpoint supports
+json_schema) — see A-057's "Known not fixed" and its own deploy note.
 
 ---
  **Tombstone retention purge is written but parked in `migrations_archive/`.**
@@ -357,7 +362,7 @@ When two or more groups share the same physical lane number, visually cluster th
 - `setLaneDrillResult` upsert logic → `runService.ts`
 
 **Priority**: Medium
-**Status**: In Progress — `setLaneDrillResult` and `deleteSwimmerFromLaneDrillResult` moved to `runService.ts`. The dead DAO `createRunFromTemplate` was removed (the live implementation lives in `runService.ts`). Remaining items (seed data functions) deferred due to large hardcoded seed data (~400 lines).
+**Status**: In Progress — `setLaneDrillResult` and `deleteSwimmerFromLaneDrillResult` moved to `runService.ts`. The dead DAO `createRunFromTemplate` was removed (the live implementation lives in `runService.ts`). Remaining items (seed data functions) deferred due to large hardcoded seed data (~400 lines) — still in `dao.ts`: `patchLibraryDrills` (:504), `deduplicateLibraryDrills` (:524), `seedLibraryDrills` (:568), `seedDefaultSessions` (:579). Move-to-services remains open.
 
 ---
 
@@ -400,7 +405,12 @@ Server SQLite is missing:
 These need to be added for proper sync support.
 
 **Priority**: Low
-**Status**: Open
+**Status**: Obsolete — premise superseded. The client never calls the Express API ("the
+server" for sync): sync goes direct to Supabase via
+`client/src/sync/SupabaseSyncTransport.ts`, and the cloud already has both tables —
+`lane_drill_results` (`20261008000001_completed_history_sync.sql`) and `library_drills`
+(initial schema `20261005001000`). The Express server remains but is vestigial
+(`server/src/index.ts` mounts only `/api/v1/{swimmers,sessions,laps}`).
 
 ---
 
@@ -411,7 +421,10 @@ These need to be added for proper sync support.
 Sync engine pushes to `/api/swimmers`, `/api/sessions`, `/api/laps` but server expects `/api/v1/swimmers`, etc. Also, data format mismatches (client sends `run_drill_id`, server Laps route expects `session_id`).
 
 **Priority**: Low
-**Status**: Open
+**Status**: Obsolete — premise superseded. The sync engine never pushes to `/api/*`; it
+syncs direct to Supabase (`client/src/sync/SupabaseSyncTransport.ts`), and the client has
+no code fetching the Express API. The path/format mismatch premise no longer applies
+(the vestigial Express server remains at `/api/v1/{swimmers,sessions,laps}`).
 
 ---
 
@@ -460,7 +473,11 @@ Browse completed SessionRuns on a dedicated `/runs` page with full session manag
 > re-open-as-read-only deferred).
 
 **Priority**: Low
-**Status**: Open
+**Status**: Done — shipped under the shared read-model design above: `/runs` + `/runs/:id`
+routes (`client/src/App.tsx:56-57`), `RunsHistory.tsx` / `RunDetail.tsx` pages, the shared
+`RunHistoryTable` (`client/src/components/Table.tsx:281`) used by both RunsHistory and
+SwimmerDetail, and run deletion + JSON export in `client/src/api/runs.ts` (`deleteRun`,
+`exportRun`).
 
 ---
 
@@ -480,7 +497,9 @@ Browse completed SessionRuns on a dedicated `/runs` page with full session manag
 LibraryDrill is client-only. No server table or API routes exist. Needed for cross-device sync of custom drills.
 
 **Priority**: Low
-**Status**: Open
+**Status**: Obsolete — premise superseded by direct-to-Supabase sync: `library_drills` is
+a synced cloud table (initial schema `20261005001000`, mapped in
+`client/src/sync/SupabaseSyncTransport.ts`); no server API routes were ever needed.
 
 ---
 
@@ -531,7 +550,7 @@ Two changes:
 
 ---
 
-## A-016: Session template drill tags (warmup/main-set/cooldown) ✅
+## A-016: Session template drill tags (warmup/main-set/cooldown) — superseded, feature removed
 
 **Source**: User request
 
@@ -560,7 +579,12 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 - `client/src/context/__tests__/LiveSessionContext.test.ts` — 2 new tests
 
 **Priority**: Medium
-**Status**: Done
+**Status**: Superseded / removed — this shipped, then the feature was removed: no `tag`,
+`timingMode`, or `autoStart` remains in `client/src/db/schema.ts`, `runService.ts`, or
+`LiveSessionContext.tsx`; migration `20261027000000_drop_timing_mode.sql` dropped the
+related columns and commit fc92e7d removed the continuous timing mode. Phase-specific
+defaults were replaced by display-only `PHASE_LABELS` (`client/src/constants/drill.ts:29`)
+— no persisted tag and no auto-start behavior. See A-025/A-026 for the current design.
 
 ---
 
@@ -601,7 +625,7 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Source**: `docs/context/Sessions-Drills-Context.md`
 
-**Problem**: `EQUIPMENT_OPTIONS` (`client/src/constants/drill.ts:28`) omits `kickboard` even though `DEFAULT_EQUIPMENT` and seed data use it (`client/src/db/dao.ts:287,789,819`). Coaches can't select a kickboard in the modal.
+**Problem**: `EQUIPMENT_OPTIONS` (`client/src/constants/drill.ts:30`) omits `kickboard` even though `DEFAULT_EQUIPMENT` and seed data use it (`client/src/db/dao.ts:418`, `client/src/data/sessions.json:37,169`). Coaches can't select a kickboard in the modal.
 
 **Note**: This is *not* about the warm-up's "kick" segment — that is a kicking-focus freestyle with **no accessory** (expressed via segment name/note, see A-021). No "kick" stroke type should be added.
 
@@ -752,11 +776,11 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Source**: `docs/context/Sessions-Drills-Context.md` (Debate Outcome, P1 friction)
 
-**Problem**: Reset between reps is gated by a confirmation dialog every time (`LiveDeck.tsx:481-490`); for an 8×100 set that's 8 dialogs. Confirmation also blocks resetting a swimmer (`LiveDeck.tsx:457-479`).
+**Problem**: Reset between reps is gated by a confirmation dialog every time (reset confirms live in `client/src/pages/live/ActiveRunView.tsx`, not the old monolithic `LiveDeck.tsx` — see the `ConfirmDialog` block near its end); for an 8×100 set that's 8 dialogs. Confirmation also blocks resetting a swimmer's data.
 
 **Solution**: Tap-to-reset by default with a short hold-to-confirm affordance; remove the modal from the rep-to-rep loop. Same for clearing a swimmer's data.
 
-**Files**: `client/src/pages/LiveDeck.tsx`
+**Files**: `client/src/pages/live/ActiveRunView.tsx`, `client/src/components/live/*`
 
 **Priority**: Medium
 **Status**: Open
@@ -776,7 +800,11 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 **Files**: `client/src/context/LiveSessionContext.tsx`, `client/src/services/runService.ts`, `client/src/pages/LiveDeck.tsx`
 
 **Priority**: Medium
-**Status**: Open
+**Status**: Done — shipped: `BatchPromotionModal` (`client/src/components/BatchPromotionModal.tsx`)
+wired into the completion flow (`client/src/pages/live/ActiveRunView.tsx:612`),
+`promoteAndLinkSwimmer` / `discardTempSwimmer` (`client/src/services/runService.ts:325,390`),
+E2E `tests/live-swimmer-promotion.spec.ts`. Guest laps materialize only through the
+promotion/discard decision at completion, so no `quick-…` lap rows persist.
 
 ---
 
@@ -885,10 +913,11 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Solution (product-owner decision)**: Render `RunDrill.notes` (and rep `instructions`) as the instruction text on the deck drill card for **planned runs** — all rows (timed + untimed) share the same "instruction card" surface A-025/F-9 defines. **Quick-time rows stay label-only** — P1's deck never gains metadata clutter.
 
-**Files**: `client/src/pages/LiveDeck.tsx` (GroupCard — rendered in Timing Mode)
+**Files**: `client/src/components/live/DrillsSection.tsx` (deck drill cards)
 
 **Priority**: Medium
-**Status**: Open
+**Status**: Done — `DrillsSection.tsx` renders `row.notes` as the Description block and
+`row.instructions` on drill rows (`client/src/components/live/DrillsSection.tsx:109-110,198-204`).
 
 ---
 
@@ -1037,7 +1066,7 @@ When creating a session template, tag drills as 'warmup', 'main-set', or 'cooldo
 
 **Source**: User request — "create analytics events + payloads to analyze user interactions: overall usage (creating/editing drills & sessions, timing swimmers, creating swimmers), e.g. total swimmer count when viewing swimmers. Simple metrics for now; better windowed metrics in a future upgrade."
 
-Instrumented the existing `analytics.track` pipeline (`services/analyticsService.ts` → localStorage queue → Supabase `analytics_events`) with 25 events across all core flows. Payload policy follows Supabase-Tasks.md Task 4: **counts, enums, and action types only — no swimmer names, lap times, or free-text notes.**
+Instrumented the existing `analytics.track` pipeline (`services/analyticsService.ts` → localStorage queue → Supabase `analytics_events`) with 25 events across all core flows. Payload policy: **counts, enums, and action types only — no swimmer names, lap times, or free-text notes.**
 
 Event groups:
 - **Page views with counts**: `view_swimmers` (+`swimmer_count`), `view_sessions` (+`template_count`, `completed_run_count`), `view_drill_bank` (+`drill_count`), `view_session_template` (+`drill_count`, `total_distance`), `view_swimmer_profile`, `view_dashboard` (+4 counts), `view_runs_history` (+`run_count`, `swimmer_filter`)
@@ -1109,7 +1138,7 @@ Adopted from platform practices: single typed tracking plan (Segment/Amplitude s
 
 ---
 
-## A-053: Analytics device context — country, language, hardware, network
+## A-059: Analytics device context — country, language, hardware, network
 
 **Source**: User request — add device context to analytics events: country, browser language, OS, device type, screen size, connection type; country from Cloudflare (`/cdn-cgi/trace` or CF-IPCountry), no raw IP (PII decision).
 
@@ -1146,7 +1175,7 @@ Added `Events.AppSettings(action, extra)` factory to `client/src/services/analyt
 
 ---
 
-## A-057: AI draft dropped technique detail (fingertip-drag / kick / fist / scull) on generation ✅
+## A-060: AI draft dropped technique detail (fingertip-drag / kick / fist / scull) on generation ✅
 
 **Source**: 2026-11-01 incident (db trace `ai_private.ai_analytics_trace`, ids 64–73, `openai/gpt-4.1-mini`). Coach pasted a Hebrew warm-up listing six named technique 50s (רגליים, אגרופים, שריטת מים, יד יד, כלב). Generation 1 burned all 5 validation retries on `draft.drills[].items[].has an unsupported field` (the model put the technique in an item-level `description`); generation 2 stripped every technique and accepted an anonymous block of identical 50m. Structure survived, detail did not.
 

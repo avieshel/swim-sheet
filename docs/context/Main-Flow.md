@@ -20,7 +20,7 @@ All user journeys the application supports, organized by flow.
    - Lane 1: "Michael Phelps" + "Katie Ledecky" (2 temp swimmers — hints that a lane can hold more than one swimmer)
    - Lane 2: "Caeleb Dressel" (1 temp swimmer — hints that more than one lane exists)
    - On wide screens the two lanes sit side by side; on mobile they stack one under the other.
-3. 100m Freestyle drill pre-selected, session timer running
+3. 100m Freestyle drill pre-selected; the single-drill quick-start opens directly in the timing breakout (`ActiveRunView.tsx:300-307`). The session timer starts **paused** — the first Start/Lap action resumes it (`ensureSessionRunning`)
 4. Lane-level Start/Finish to control drill timing per lane
 5. Lane-level Lap/Reset to record splits or clear data
 6. Swimmer-level Start / Lap / Finish buttons for individual control
@@ -45,9 +45,9 @@ All user journeys the application supports, organized by flow.
 
 ### Flow: Page refresh recovery
 
-1. Active run restored from `SessionRun.notes` JSON via `INIT_FROM_RUN` (virtual swimmers grouped by lane)
-2. Real swimmers merged from RunSwimmer links
-3. Drill overrides restored from notes JSON
+1. Active run restored on mount (`LiveDeck.tsx`): groups rebuilt from persisted `RunSwimmer` links + `notes.virtualSwimmers` (quick-start temp swimmers), one `TimedGroup` per lane; in-memory timing state is rebuilt fresh — nothing auto-starts
+2. Real swimmers restored via `RunSwimmer` links; virtual swimmers via `notes.virtualSwimmers`
+3. No per-lane/per-drill override is restored — the model carries none (`TimedGroup = {id, lane, name, swimmers, currentRunDrillId}`)
 
 ### Flow: Post-hoc linking
 
@@ -104,10 +104,10 @@ chance to keep a guest's times before anything is thrown away.
 
 ## 2. Full Session Setup (Structured Path)
 
-**Entry**: Start a live session from **any** of three doors, all sharing the same
+**Entry**: Start a live session from any of these doors, all sharing the same
 flow (see A-049):
 - `/sessions` — **Start Live** on a template card (one tap; the card also has "Open Template")
-- `/dashboard` → SessionSetup (structured pick — template, lanes, swimmers)
+- `/sessions/:id` — **Start Live** in the SessionDetail header (reads **View Live** when that template already has the active run)
 - `/live` (`/` or `/live`) — the Live picker (quick time pinned first, then templates ranked by usage)
 
 Starting any session creates a `SessionRun` and lands on the live deck with **2 empty lanes**
@@ -116,14 +116,12 @@ if the template is the active run's session the button reads **View Live**.
 
 ### Flow: Create and run a session from template
 
-1. Navigate to `/dashboard`, `/sessions` (Start Live), or the Live picker
-2. Pick a session template from list
-3. Set date (default today), pool name, pool length
-4. Add swimmers from roster, assign to lanes
-5. "Start Session" / "Start Live" → creates `SessionRun`, snapshots drills into `RunDrills`
-6. Transitions to LiveDeck active run view
-7. Execute drills with lane/group timing
-8. "Complete Session" → saves all data, status = `completed`
+1. Navigate to `/sessions` (Start Live), `/sessions/:id`, or the Live picker
+2. Pick a session template → the run is created **immediately** via `createRunFromTemplate` (date = today, `poolName: 'Live'`, drills snapshot into `RunDrills`); there is no pre-start setup form on this path
+3. Lands on the live run view with **2 empty lanes** (`buildStartLanes`); the default quick template pre-fills temp swimmers while the roster is empty
+4. Assign swimmers on the deck via the lane editor
+5. Execute drills with lane/group timing
+6. "Complete Session" → saves all data, status = `completed`
 
 ---
 
@@ -158,10 +156,8 @@ if the template is the active run's session the button reads **View Live**.
 ### Flow: Drill navigation
 
 1. Coach scrolls freely through drills
-2. Drill selector per group card
-3. Drill tag-based auto-start behavior:
-   - warmup/cooldown → default paused (coach can override via Start)
-   - main-set → default timed
+2. Drill rows in the **Drills section** carry a timer chip — tap to enter the timing breakout on that drill (`DrillsSection.tsx` `onEnterTiming`); inside the breakout, `BreakoutHeader` steps one drill at a time (replaces the old dropdown picker)
+3. No tag/phase-based auto-start: navigating to a drill never starts timers. `PHASE_LABELS` (`constants/drill.ts:29`: warmup, pre-set, main set, cool down, taper) are display/grouping labels only — no persisted tag, no timing behavior
 
 ---
 
@@ -179,7 +175,7 @@ if the template is the active run's session the button reads **View Live**.
 ### Flow: Create template
 
 1. "New Template" button
-2. Set template name, default pool length
+2. Set template name (and notes)
 3. Add drills from drill library: name, stroke, distance
 4. Reorder drills via drag handle
 5. View real-time totals: total distance, stroke breakdown, drill count
@@ -189,7 +185,7 @@ if the template is the active run's session the button reads **View Live**.
 ### Flow: Edit template
 
 1. Click existing template → SessionDetail editor
-2. Edit name, pool length
+2. Edit name, notes
 3. Add/remove/reorder drills
 4. Inline drill editing: pencil → edit name/stroke/distance in-place
 5. Drill similarity detection: on save, warn if similar drill exists
@@ -272,17 +268,17 @@ if the template is the active run's session the button reads **View Live**.
 
 ## 7. Session History / Review
 
-**Entry**: Future `/history` route or filter on `/sessions`
+**Entry**: `/runs` (RunsHistory) and `/runs/:id` (RunDetail)
 
 ### Flow: Browse completed runs
 
-1. View list of completed SessionRuns by date
+1. View the completed-run table (search, swimmer filter via `?swimmer=` deep link, From/To date filter)
 2. Click run to see details:
-   - Template used (snapshot at run time)
+   - Template used (name/snapshot frozen at run time)
    - Swimmers and lane assignments
    - Drills performed
    - Lap times per swimmer per drill
-3. Data reads from LaneDrillResult blobs + Lap table
+3. Data reads run through `runHistoryService`: `LaneDrillResult` blobs first, `Lap` table fallback for blobless runs
 
 ---
 
@@ -293,7 +289,7 @@ if the template is the active run's session the button reads **View Live**.
 ### Flow: Configure app
 
 1. Team name, pool length, distance units (meters/yards)
-2. Theme: light / dark / auto
+2. Theme: Pool (Light) / Open Water (Dark) / Automatic
 3. Font size: small / medium / large
 4. Auto-save toggle
 5. Data management: export, import, reset
@@ -309,8 +305,7 @@ if the template is the active run's session the button reads **View Live**.
 1. Last-write-wins conflict resolution (by `updatedAt` timestamp)
 2. Manual sync trigger from Settings
 3. Sync indicator shows last sync time
-4. All tables sync: Swimmer, Session, SessionRun, RunDrill, RunSwimmer, Lap
-5. Client-only tables (LaneDrillResult, LibraryDrill) do not sync
+4. All tables sync — `SupabaseSyncTransport.ts` `SYNC_TABLES`: swimmers, sessions, drills, **libraryDrills** (cloud `library_drills`), sessionRuns, runDrills, runSwimmers, laps, **laneDrillResults** (cloud `lane_drill_results`)
 
 ---
 
@@ -321,7 +316,7 @@ if the template is the active run's session the button reads **View Live**.
 ### Flow: Central navigation hub
 
 1. Hero section: pool-gradient banner, today's workout focus
-2. "Quick Start Live" button → quick-time auto-start
+2. "Quick Time Lap" CTA → `/live` — opens the Live picker; nothing auto-starts (`CoachDashboard.tsx:72-78`)
 3. Hub tiles (3-column grid):
    - Team Management → swimmer count, link to `/swimmers`
    - Session Planner → template count, link to `/sessions`
@@ -346,41 +341,36 @@ if the template is the active run's session the button reads **View Live**.
 
 **Lanes**: A session can have **up to 8 lanes**, but new sessions start with **2 default lanes** — never 8. Lane cards render in a responsive grid: side by side when the screen is wide enough, stacked one under the other on mobile.
 
-The active run has two modes. **Overview** is the default — a session-level view with clear progress markers, per-lane swimmer counts, and the session structure. **Timing** is entered **per drill** (all lanes open the same drill in timing mode) for full per-swimmer timer detail. There is no global overview/timing toggle — timing is a drill-scoping action, so a coach can mark 5 drills "done" in the overview and then time only drill 6.
+The live run view is a single unified run list: a **Drills section** (drill rows with completion markers + per-drill timer chips) above a **Lane Swimmers section** (swimmer cards per lane). There is no separate overview/timing page mode — timing is entered as an **ephemeral timing breakout** (`timingBreakout` state in `ActiveRunView.tsx`, rendering `BreakoutHeader` + `GroupCard`/`SwimmerBreakoutCard` grids) and dismissed back to the run list.
 
-**Entry**: Active run view. It always opens in Overview. Timing is entered from either a drill row's **"Time"** button in the Session Structure table, or a lane card's **"Time This Drill"** button. Exiting uses the "Overview" back button in the timing banner.
+**Entry**: The run view. The breakout is entered from a drill row's timer chip in the Drills section (`onEnterTiming` — all lanes on that drill) or from a swimmer card's timer chip in the Lane Swimmers section (`onEnterTimingSwimmers` — singles out those swimmers on the current drill). Exiting uses the breakout header's back control. Quick-start runs with exactly one drill open directly in the breakout.
 
 **Personas**:
-- **High-level coach**: wants to track "where is each lane / how far through the session" without per-swimmer timing. Stays in Overview; only times a specific drill occasionally (e.g. one timed drill per session).
-- **Drill-focused coach**: enters Timing on the target drill and runs it with granular per-swimmer start/lap/finish, then returns to Overview.
+- **High-level coach**: wants to track "how far through the session we are" without per-swimmer timing. Uses the drill rows' completion checks and lane swimmer cards; only opens the breakout occasionally (e.g. one timed drill per session).
+- **Drill-focused coach**: opens the breakout on the target drill and runs it with granular per-swimmer start/lap/finish, then exits back to the run list.
 
-### Flow: Run a session in Overview
+### Flow: Run a session (run list)
 
 1. Coach starts a session from a template (or via quick-start)
 2. Swimmers are assigned to lanes
-3. Overview shows (rendered by `client/src/components/OverviewView.tsx`):
-   - **Session Header (session-level progress + lane summary)** — full-width **progress bar** with `done / total` and % (logical drills; repetition-groups count once), and a **lane-chip strip** (`L{n}` + swimmer count + edit icon) where each chip opens the **lane editor focused on that lane**; live/elapsed state
-   - **Session Structure table** — drills as rows, lanes as columns (header shows `L{n}` + swimmer count); each cell is a status marker (`✓` done / `▶` current with pulsing ring / `–` not started) + a legend; markers **toggle** (click to complete, click again to undo); each drill row has a **"Time"** button. Repeated drills (`repeatCount > 1`) collapse to a **single record** (`Nx <name>`, per-lane `done/total` progress) whose progress chip **completes/undoes the whole set in one click** and that **expands** (small `>` chevron) into each repetition with its own markers and Time button.
-   - **Per-lane current-drill card** (`client/src/components/LaneCard.tsx`) — big `L{n}` badge, lane name, **swimmer count made prominent**, current drill number/name/distance/stroke, Done/Current status
-4. Two primary actions per lane card:
-   - **Mark Done** — marker-only completion of the current drill (no timing), advances to next drill
-   - **Time This Drill** — enters Timing on that drill for all lanes
-5. Tapping a marker in the Session Structure completes (or, on a done marker, undoes) that (lane, drill); the repetition progress chip completes or undoes the whole set in one click; session-level controls unchanged: Play/Pause, Complete, Reset
+3. The run list shows (`client/src/components/live/DrillsSection.tsx` + `LaneSwimmersSection.tsx`):
+   - **LiveSessionHeader** — template name, progress (done/total distance), elapsed session timer, Play/Pause, lane editor, reset, complete
+   - **Drills section** — drill rows with distance/stroke/interval, a per-row **timer chip** (enters timing) and a **check toggle** (mark done / un-done, marker-only completion); repetitions render as sets — rounds show `Round n` with `done/running` counts, short groups start expanded and longer ones folded
+   - **Lane Swimmers section** — per-lane swimmer cards (per-swimmer Start/Lap/Finish controls), a timer chip per card, and lane management (opens the lane editor)
+4. Session-level controls live in the header: session timer, lane editor, Complete, Reset
 
-### Flow: Time a drill
+### Flow: Time a drill (timing breakout)
 
-1. Coach is in Overview; taps **"Time"** on a drill row or a lane card's **"Time This Drill"**
-2. `SET_ALL_DRILLS` sets every lane to that drill; `timingDrillId` opens the timing banner + the `GroupCard` grid for all lanes (per-swimmer Start/Lap/Finish, lap tables, stroke counts)
-3. Coach times individual swimmers on that drill
-4. Taps the **"Overview"** back button to return — swimmer data persists in `LaneDrillResult`
+1. Coach taps a drill row's timer chip (all lanes on that drill) or a swimmer card's timer chip (those swimmers on the current drill)
+2. `SET_ALL_DRILLS` sets every lane to that drill; `timingBreakout` opens the `BreakoutHeader` + `GroupCard` grid (per-swimmer Start/Lap/Finish, lap tables, stroke counts) — or `SwimmerBreakoutCard` grid in the swimmer-focused variant
+3. Coach times individual swimmers; the breakout header also supports switching drills, adding swimmers/temps, and "mark all done"
+4. Exiting the breakout returns to the run list — swimmer data persists in `LaneDrillResult`
 
 ### Design invariants
 
-- **No swimmerless lanes** — both modes require swimmers assigned to lanes. Overview just hides per-swimmer timing controls.
-- **Same data model** — both modes write to the same `LaneDrillResult` and `Lap` tables. Mode is purely a UI concern.
-- **Timing is drill-scoped, not a page mode** — `timingDrillId` is local ephemeral state in `ActiveRunView`; there is no persisted `viewMode` in `SessionRun.notes` anymore.
-- **Overview is deliberately minimal** — the focused (drill) coach gets full timers in Timing; the session coach sees markers and lanes in Overview.
-- **Swimmer counts are surfaced at session level** — per-lane counts in the session-header lane chips and the structure-table lane headers; tapping a lane chip opens the lane editor on that lane.
+- **No swimmerless lanes** — the breakout shows an "Add Swimmers" empty state when no lane has swimmers.
+- **Same data model** — the run list and the breakout write to the same `LaneDrillResult` and `Lap` tables. The breakout is purely a UI concern.
+- **Timing is drill-scoped, not a page mode** — `timingBreakout` is local ephemeral state in `ActiveRunView`; there is no persisted `viewMode` in `SessionRun.notes` anymore.
 
 ---
 
@@ -388,11 +378,11 @@ The active run has two modes. **Overview** is the default — a session-level vi
 
 | Scenario | Behavior |
 |----------|----------|
-| No active run + fresh app | Auto-starts quick-time session |
+| No active run + fresh app | Live picker shows: pinned "100m freestyle quick time" card + templates ranked by usage. Never auto-starts |
 | Active run on page load | Restores from notes JSON + RunSwimmer links |
 | Roster swimmer name duplicate | Blocked with inline error in SwimmerFormModal |
-| Delete template with completed runs | Template deleted, runs preserved (no effect) |
+| Delete template with active run | Plain delete is blocked with a confirm dialog; confirmed **force** delete ends the live run (cascade delete) and removes the template (`sessionService.delete(force)`) |
+| Delete starter/default template | Stays deleted — `catalogKey`-seeded sessions are marked dismissed (`markSeedSessionDismissed`) and are not re-seeded |
 | Complete session with virtual swimmers | If any guest (`quick-*`) recorded times, coach is prompted to **promote** (→ valid, kept via `promoteAndLinkSwimmer`) or **skip** (→ discarded via `discardTempSwimmer`). Only valid (promoted/roster) results persist. An all-guest/empty session shows a warning and is discarded (deleted) — no orphan guest data is saved. |
 | Browser offline | All CRUD works via Dexie; sync deferred |
 | Page refresh during active run | Recovery from `SessionRun.notes` JSON |
-| Page refresh in Overview Mode | View mode restored from `SessionRun.notes` JSON |

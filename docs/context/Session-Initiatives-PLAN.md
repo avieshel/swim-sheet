@@ -9,8 +9,9 @@ two-persona debate (P1 "Deck Timer" ↔ P2 "Set Architect"):
 - **Initiative 2** — **Past-sessions table** + swimmer-filtered history (`Past-Sessions-Data-Context.md`)
 
 Both conform to the **same data layer**: one additive read-model service +
-`RunHistoryTable` component serve every entry point; `startFromTemplate` produces the
-runs they read.
+`RunHistoryTable` (now in `components/Table.tsx:281`) serves the history surfaces;
+promoted runs are produced by the shared `useStartLiveSession` hook
+(`createRunFromTemplate` — the planned `startFromTemplate` was never built).
 
 ## The debate that shaped this plan
 
@@ -35,8 +36,9 @@ cross-examined each other. They settled a list. **This plan ratifies it:**
 6. **Virtual `quick-*` swimmers filter by NAME — best-effort, display-only.**
    Shows a "likely match" badge, **never writes a phantom `RunSwimmer` row**, never
    automerges on name collision. Promotion (A-030) stays the durable identity path.
-7. **Quick-time auto-start is preserved byte-for-byte.** After Complete, land on the
-   time readout (not the "Starting timer…" dead-end).
+7. ~~**Quick-time auto-start is preserved byte-for-byte.**~~ **Superseded:** auto-start was
+   removed entirely — the LiveDeck is picker-only and Complete returns to the picker
+   (fresh start, never auto-starts).
 8. **Mining ("save this section from a run")** is deferred and lives **only inside the
    run-detail expand** — never a history-table row action, never on the deck.
 9. **The set grammar / timing model is a SEPARATE track** (existing
@@ -62,16 +64,15 @@ is the "neither waits" settlement.
 
 Goal: one read model + one table component both initiatives render.
 
-> **Phase 0 status: DONE** — S-001..S-004 + S-010 (folded in for the knip gate) shipped.
+> **Phase 0 status: DONE** — S-001..S-004 + S-010 shipped.
 > `getLapsForRun` added to dao; `runHistoryService` read model (blob-first, lap fallback,
 > real+virtual merge, name-match flag, swimmer filter); `getRunHistory` api wrapper;
-> `RunHistoryTable` wired into SessionsList replacing the `CompletedRunsSection` stub.
-> Verified: `npm run check` green (23 files / 294 tests). Remaining Phase 1 work:
-> dedicated `/runs` page, SessionsList swimmer-selector, SwimmerDetail wiring.
-> Note: `S-010` (SessionsList wiring) is folded into Phase 0 — the knip gate treats an
-> unreferenced `RunHistoryTable` component as dead code, so it must have a live render
-> site in the same phase. `/runs`, the swimmer filter, and SwimmerDetail wiring remain
-> in Phase 1.
+> `RunHistoryTable` built (it lived briefly in SessionsList as the S-010 wiring, but has
+> since moved to `components/Table.tsx:281` and now serves `/runs` and `/swimmers/:id`).
+> The SessionsList past-sessions surface later diverged to a **"Recently Completed"
+> `SessionCard` grid** with per-card delete/export, driven by
+> `getRunHistory`/`deleteRun`/`countCompletedRunsForSession` (`SessionsList.tsx:497-576`).
+> Verified: `npm run check` green.
 
 ### Tasks
 
@@ -93,7 +94,7 @@ Mirror `getLapsForSwimmerInRun` (`dao.ts:268-273`): loads run's `RunDrill`s, the
 **S-003 — API: `getRunHistory`** — `client/src/api/runs.ts` ✅
 Thin delegating wrapper over the service (REST `GET /runs?filter=`).
 
-**S-004 — Component: `RunHistoryTable`** — `client/src/components/RunHistoryTable.tsx` (new)
+**S-004 — Component: `RunHistoryTable`** — as built: `client/src/components/Table.tsx:281`
 - Data-first columns: **recorded times** → attendees → date → template → pool → drills/
   distance. Responsive: stacked card list on mobile, sortable table on desktop.
 - Inline **row-expand** detail: per-drill, per-swimmer times + stroke counts via
@@ -142,8 +143,10 @@ data without any other feature present.
 > fetch (`computeSwimmerStats` in `SwimmersList.tsx`; matches by id with name fallback).
 
 **S-010 — SessionsList: replace `CompletedRunsSection`** — `client/src/pages/SessionsList.tsx`
-Swap the stub (`:319-357`) for `RunHistoryTable` (no filter) behind a "Past Sessions"
-header; "View all → /runs".
+As built: the stub was replaced by a **"Recently Completed" `SessionCard` grid** (search +
+"Show all" folding, per-card delete via `deleteRun` cascade and session-package export),
+driven by `getRunHistory()` — not by `RunHistoryTable`. The full table lives on `/runs`
+("View all" equivalent); `RunHistoryTable` renders there and on `/swimmers/:id`.
 
 **S-011 — `/runs` page + swimmer filter** — `client/src/pages/RunsHistory.tsx` (new)
 - `getRunHistory({ swimmerId })` driven; **swimmer filter dropdown** (roster; blank = all)
@@ -173,9 +176,10 @@ work; virtual match is badged, no data written; delete/export on detail; `npm ru
 ## Phase 2 — Promote-to-live (Initiative 1, production side)
 
 **S-020 — Promote service** — `client/src/services/runService.ts`, `api/runs.ts`
-`startFromTemplate(sessionId, input)` (D-4): `createFromTemplate` + `RunSwimmer` insert
-loop; guardrail: DAO auto-completes prior active run (`dao.ts:149-155`). API wrapper
-`startRunFromTemplate`.
+As built: no `startFromTemplate` — the shared **`useStartLiveSession`** hook
+(`client/src/hooks/useStartLiveSession.ts`) calls `createFromTemplate`
+(`runService.ts:226`) directly, stamps notes, and opens 2 default empty lanes via
+`buildStartLanes` (`api/runSetup.ts:59`). Swimmer lane assignment happens on the deck.
 
 **S-021 — `LiveSessionSetupModal`** — `client/src/components/forms/LiveSessionSetupModal.tsx`
 Date/pool/pool-length (pre-filled from template), swimmer→lane (pre-checked from **most
@@ -189,23 +193,25 @@ recent** `RunSwimmer` links per template). **Weak-path buttons:**
 (stopPropagation) + `SessionDetail` header button. Confirm → `startFromToLive` →
 `navigate('/live')`.
 
-> **Partial (A-049).** The "Start Live" primary action shipped on both `SessionsList`
+> **Partial (A-049) — as built.** The "Start Live" primary action shipped on both `SessionsList`
 > cards and the `SessionDetail` header via a shared `useStartLiveSession` hook (now used
 > by `LiveDeck` too), navigating to `/live`. Templates with no drills are disabled. The
 > `LiveSessionSetupModal` (S-021 — date/pool pre-fill, "Quick start"/"Configure"
-> expander, overwrite undo toast) remains unimplemented; starting simply uses
-> `createRunFromTemplate` defaults, and an existing active run is auto-completed by the DAO.
+> expander, overwrite undo toast) remains unimplemented; starting uses
+> `createRunFromTemplate` defaults (date = today, `poolName: 'Live'`, 2 empty lanes), and
+> a pre-existing **active run is deleted** by the single-active-run rule in
+> `runService.create` (`runService.ts:78-85`) — not auto-completed.
 
 **S-023 — LiveDeck hand-off + post-Complete landing** — `client/src/pages/LiveDeck.tsx`
-- Verify planned-run active-run init (`:1146-1172`) renders a promoted run unchanged;
-  if `Configure` set drill-1/notes, pass it through.
+- Verify planned-run active-run init renders a promoted run unchanged; if `Configure` set
+  drill-1/notes, pass it through.
 - **Fix Complete landing:** after `onComplete`, land on a "Session saved — view times"
-  readout (navigates to `/run/` detail) before the next auto-start;
-  keep `autoStartedRef` reset behaviour identical otherwise.
+  readout (navigates to run detail). As built: Complete returns to the Live picker
+  (no auto-start exists to preserve).
 
 **DoD:** one-tap Quick start from any template (incl. default) reaches `/live`; Configure
-extends without gating; undo toast for overwrites; post-Complete → readout; quick-time
-auto-start untouched.
+extends without gating; undo toast for overwrites; post-Complete → readout. ~~quick-time
+auto-start untouched~~ — superseded: auto-start removed (settled #7).
 
 ---
 
@@ -220,14 +226,18 @@ tagging + focus/labels (P2 controls; defaults safe per settled #3). One commit:
 **S-032 — Wire SessionsList** — replace `showNewForm` inline block
 (`SessionsList.tsx:36-215`) with the modal. Remove dead inline form.
 
-**S-033 — Default template polish**
-- Export shared `DEFAULT_QUICK_SESSION_NAME` constant; display-friendly label
-  ("Quick Time — 100m Freestyle") + pool icon chip.
-- Verify render in list with drill counts/totals; delete/rename → next quick-start
-  recreates (resilience retained `runService.ts:208-230`). Keep visible, never hidden.
+**S-033 — Default template polish** — as built
+- `DEFAULT_QUICK_SESSION_NAME` exported from `hooks/useStartLiveSession.ts:10` (note:
+  `runService.ts:287` still carries its own duplicate literal); the "display-friendly
+  label + pool icon chip" treatment is **not** verified in code — still open. ~~delete/rename → next quick-start
+  recreates~~ — **superseded (b71a3fe):** deleting a `catalogKey`-ed starter session marks
+  the seed dismissed (`sessionService.delete` → `markSeedSessionDismissed`,
+  `sessionService.ts:60-62`), so it stays deleted instead of being recreated.
+  Renaming decouples it from quick-start's canonical-name lookup as originally planned.
 
 **DoD:** "New Template" lands on a populated editor; the default session remains a normal
-editable visible template; `npm run check` + e2e for both paths.
+editable visible template; ~~and recreates on next quick-start if deleted~~ — deletion is
+now sticky by design.
 
 ---
 
@@ -235,6 +245,13 @@ editable visible template; `npm run check` + e2e for both paths.
 
 Referenced for forward-compat; owned by existing tasks `A-012`(superseded)/`A-020`/
 `A-021`/`A-024`/`A-025`/`A-035`.
+
+> **Prerequisite gone:** the phase referenced a persisted drill **tag/phase** mechanism
+> (A-016's warmup/cooldown/main-set tags) for defaults. That no longer exists — phases are
+> now the `PHASE_LABELS` constants (`constants/drill.ts:29`: warmup, pre-set, main set,
+> cool down, taper), used for display/grouping only, with no persisted tag and no
+> auto-start behavior. A-025's "phase-default timing model" would need a new persisted
+> mechanism first.
 - `RunDrill` additive `segmentLabel?`/`untimed?` carry-through in `createFromTemplate`
   (serializer-only; P1 accepted, P2 gated).
 - Per-drill/per-rep fidelity in the expand (send-off ladders, recovery tags).

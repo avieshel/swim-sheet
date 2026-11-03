@@ -2,7 +2,9 @@
 
 ## Overview
 
-Offline-first PWA for swim coaches to track lap times, stroke counts, and athlete progress. The server builds the React client and serves its static files, providing both the UI and the API.
+Offline-first PWA that lets swim coaches manage their data (swimmers, session templates and their drills) and track live sessions to record actual training data per swimmer. The server builds the React client and serves its static files, providing both the UI and the API.
+
+**Optional cloud features** — a coach can sign in with their Google account to sync data across devices and use AI session generation (Supabase Edge Function + `shared/sessionDraft/` contract). Collaboration between coaches is currently via manual session-template import/export (`.swimsheet` packages). Server-backed sharing with other coaches is planned but **not built** (design in `docs/context/Session-Sharing-Design.md`).
 
 ## Architecture
 
@@ -49,6 +51,13 @@ Offline-first PWA for swim coaches to track lap times, stroke counts, and athlet
 
 ## Design Decisions
 
+### Product Design Principles
+- **Consistent management pattern** across the three domains: List view (SwimmersList / SessionsList / DrillBank) → Create/Edit modal (SwimmerFormModal / SessionMetadataModal / DrillEditorModal) → Detail view (SwimmerDetail / SessionDetail). Drills are edited via a detail *modal*, not a detail page.
+- **Swimmer data is deliberately minimal**: `name, group, labels, notes, status` — no age, DOB, strokes, or equipment fields (privacy stance; see `docs/context/UI-Context.md`).
+- **Drills are copy-on-use**: starting a session copies library drills into the session/run. A `libraryDrillId` soft reference records provenance only — edits never propagate back to the library or forward to other sessions.
+- **Session swimmer lists are independent of the global roster**: temp (`quick-*`) swimmers exist inside a run and are promoted or discarded at completion; run history is frozen and unaffected by later swimmer or template changes.
+- **Deleting a session template has no effect on completed run history** (frozen snapshot).
+
 ### Offline-First PWA
 - The app works fully offline using IndexedDB (Dexie)
 - Supabase is optional — needed only for account-based cloud sync; core app data remains available offline
@@ -81,35 +90,34 @@ The live view uses Timed Groups instead of a single global timer. Each group has
 
 On DrillBank load, `deduplicateLibraryDrills()` runs as a one-time cleanup: it groups library drills by exact name, keeps the most complete entry (preferring built-in source), and deletes the rest.
 
-### Two-Agent Workflow
-- **Planner** (cloud model): Design, architecture decisions, task breakdown, code review
-- **Coder** (local model): File creation, implementation, testing
-- Planner creates PLAN.md with numbered tasks and shells out to Coder for each
-- Coder self-reviews its own implementation
-
 ## Project Structure
 
 ```
 SwimSheet/
 ├── client/
-│   ├── src/
-│   │   ├── api/            # API layer (unified Dexie + HTTP)
-│   │   ├── components/     # Shared UI components
-│   │   ├── constants/      # Shared constants (drill options, etc.)
-│   │   ├── context/        # React context (AuthContext, LiveSessionContext)
-│   │   ├── db/             # Dexie schema + DAO (pure CRUD)
-│   │   ├── pages/          # Route page components
-│   │   │   └── live/       # ActiveRunView (live session runner) — split from LiveDeck
-│   │   ├── services/       # Business logic services
-│   │   ├── sync/           # Sync engine
-│   │   ├── utils/          # Utility functions
-│   │   └── App.tsx         # Root with routes
-│   └── tests/              # E2E test directory
+│   └── src/
+│       ├── api/            # API layer (unified Dexie + HTTP)
+│       ├── components/     # Shared UI components (ai/, live/, session/ subgroups)
+│       ├── constants/      # Shared constants (drill options, etc.)
+│       ├── context/        # React context (AuthProvider, LiveSessionContext)
+│       ├── data/           # Builtin seed data (drills.json, session catalog)
+│       ├── db/             # Dexie schema + DAO (pure CRUD)
+│       ├── hooks/          # UI-adjacent logic (useActiveRun, useStartLiveSession)
+│       ├── i18n/           # Locale/format helpers
+│       ├── pages/          # Route page components
+│       │   └── live/       # ActiveRunView (live session runner) — split from LiveDeck
+│       ├── services/       # Business logic services (incl. sessionDraft/, sessionPackage/)
+│       ├── sync/           # Sync engine (Supabase transport)
+│       ├── timing/         # Client-side timing helpers
+│       ├── utils/          # Utility functions
+│       └── App.tsx         # Root with routes
 ├── server/
 │   └── src/
 │       ├── db/             # SQLite schema + DAO
-│       └── routes/         # Express route handlers
-├── tests/                  # Playwright e2e tests
+│       └── routes/         # Express route handlers (swimmers, sessions, laps)
+├── shared/                 # Runtime-agnostic contracts (sessionDraft/, sessionPackage/)
+├── supabase/               # Migrations + ai-session-harness Edge Function + evals
+├── tests/                  # Playwright e2e tests (root)
 ├── docs/context/           # Context files (this folder)
 ├── Dockerfile              # Single-container Docker build
 ├── README.md               # Project overview
@@ -130,7 +138,9 @@ SwimSheet/
 | `/swimmers/:id` | SwimmerDetail | Individual swimmer profile |
 | `/sessions` | SessionsList | Template list |
 | `/sessions/catalog` | CatalogScreen | Session template catalog |
+| `/sessions/ai` | AiSessionDraft | AI session generation (gated on sign-in; produces a session via the `shared/sessionDraft` contract) |
 | `/sessions/:id` | SessionDetail | Template editor with drills |
+| `/auth/callback` | AuthCallback | OAuth redirect handler for Google sign-in |
 | `/drills` | DrillBank | Global drill library |
 | `/settings` | Settings | App preferences |
 | `/runs` | RunsHistory | Completed run history |

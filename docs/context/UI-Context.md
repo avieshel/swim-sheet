@@ -16,16 +16,22 @@
 - Full Material 3 color token set defined in Tailwind config
 
 ### Typography
-| Token | Font | Size | Weight |
-|-------|------|------|--------|
-| display-timer | Montserrat | 64px | 700 |
-| headline-lg | Montserrat | 32px | 700 |
-| headline-lg-mobile | Montserrat | 24px | 700 |
-| headline-md | Montserrat | 20px | 600 |
-| body-lg | Inter | 18px | 500 |
-| body-md | Inter | 16px | 400 |
-| label-caps | Inter | 12px | 700 (0.05em letter-spacing, uppercase) |
-| label-sm | Inter | 12px | 500 |
+All size tokens are `clamp()` ranges defined in `client/src/index.css:63-95` (display/headline use Montserrat, body/label/caption use Inter), used via `font-*`/`text-*` class utilities.
+
+| Token | clamp() range | Weight | Notes |
+|-------|--------------|--------|-------|
+| display-timer | 36px → 64px | 700 | line-height 1.1, letter-spacing −0.02em |
+| headline-lg | 24px → 32px | 700 | line-height 1.2 |
+| headline-lg-mobile | 20px → 24px | 700 | line-height 1.3 |
+| headline-md | 18px → 20px | 600 | line-height 1.4 |
+| body-lg | 16px → 18px | 500 | line-height 1.5 |
+| body-md | 14px → 16px | 400 | line-height 1.5 |
+| label-caps | 10px → 12px | 700 | line-height 1.3, 0.05em tracking |
+| label-sm | 10px → 12px | 500 | line-height 1.3 |
+| caption | 8px → 10px | 500 | line-height 1.3 |
+| caption-caps | 8px → 10px | 700 | line-height 1.3, 0.05em tracking |
+
+The `html` root font-size is itself `clamp(14px, 1vw + 0.5rem, 18px)`, scaled down/up by `data-font-size="small|large"` (Settings → font size), so every token scales with the chosen base size.
 
 ### Spacing Tokens
 | Token | Value |
@@ -98,15 +104,15 @@ The desktop header shows a compact signed-in account indicator linking to Settin
   - `public/icons/icon-512.png` (512×512)
 - **Regeneration**: `node scripts/generate-icons.mjs` (uses sharp)
 
-### Dark Mode
-Supported via dark mode class (`dark:` prefix in Tailwind). Toggle via Settings.
+### Themes (no Tailwind `dark:` prefix)
+Named themes written to `document.documentElement.dataset.theme` (`pool` = light, `open-water` = dark), each a full CSS-variable override block in `client/src/index.css:181-266` (`[data-theme="pool"]` / `[data-theme="open-water"]`). Chosen in Settings → Theme: `Pool (Light)`, `Open Water (Dark)`, or `Automatic` (deletes the attribute and follows the system). Layout and Settings both re-apply the stored theme on load.
 
 ## Layout
 
 ### App Shell
-- **Sticky TopAppBar**: Pool icon + "Swim Sheet" title. Desktop nav links (Home, Swimmers, Sessions, Live). Team name chip.
-- **Bottom Nav (mobile)**: 4 tabs — Home, Swimmers, Sessions, Live. Active tab highlighted with `bg-secondary-container` / filled icon.
-- **Main content**: `max-w-7xl mx-auto` container with responsive padding.
+- **Sticky TopAppBar**: Pool icon + "Swim Sheet" title (links to `/`). Desktop nav: 5 links — Swimmers, Sessions, Drills, Live, Settings (active link tinted `bg-primary-container/10`, Live shows a pulsing green dot while a run is active). `AccountIndicator` at the right edge.
+- **Bottom Nav (mobile)**: the same 5 items; active tab highlighted with `bg-secondary-container` / filled icon.
+- **Main content**: `r-container` responsive container.
 - **Desktop**: TopAppBar nav replaces bottom nav.
 - **Full-height live shell.** When a run is active on `/` or `/live`, `Layout` switches the shell from `min-h-screen` to a fixed `h-[100dvh]` + `overflow-hidden`, and `<main>` becomes a `flex flex-col min-h-0` column with reduced bottom padding (`pb-20 md:pb-12`) so it clears the mobile bottom nav. This gives the live view a bounded box, so **the document, body, and `<main>` never scroll — inner elements scroll instead**. Every other route keeps normal page scrolling. Gated on `isLiveRoute && activeRun`, so the session picker (no active run) still scrolls normally.
 - **Scope**: `Layout` is a pathless layout route (renders `<Outlet />`) wrapping all app routes, including `/` (LiveDeck). The public landing page (`/about`) renders outside it with its own header/footer.
@@ -116,7 +122,7 @@ The Active Run View (`pages/live/ActiveRunView.tsx`) is a `flex-1 min-h-0 flex f
 
 | Section | Component | Default | Height behavior |
 |---------|-----------|---------|-----------------|
-| Session details | `live/LiveSessionHeader.tsx` | **collapsed** | `shrink-0`. Expanded panel is capped at `max-h-[45dvh] md:max-h-[60dvh]` with internal scroll so it can't squeeze the sections below. |
+| Session details | `live/LiveSessionHeader.tsx` | **collapsed** | `shrink-0`. Collapsed bar: template name + live/paused dot, a Play/Pause+ timer circle, elapsed (`font-display-timer`), and expand chevron. Expanded panel is capped at `max-h-[45dvh] md:max-h-[60dvh]` with internal scroll and shows status / start time (wall clock) / pool size (editable inline, 25m·50m presets) / total drills / **total distance** (`{completedDistance} / {totalDistance}m`, summed from drills whose lane results are `completed`), plus Start–Pause / Complete, Edit Session, and Reset actions. There is no session-wide drill-count percentage bar — per-row percentages are computed per drill group in `DrillsSection` from `computeDrillRowProgress`; logical-drill counting and repetition grouping come from `client/src/utils/sessionProgress.ts` (`groupDrillRows`, `stripRepPrefix`, `buildDrillGroup`, `firstIncompleteDrillRow`, `isDrillRowComplete`). |
 | Drills | `live/DrillsSection.tsx` | **expanded** | `flex-1 min-h-0`; the list is `flex-1 min-h-0 overflow-y-auto` (replaces the old `max-h-[32vh] md:max-h-[38vh]`). Takes all space down to the swimmers bar. |
 | Lane Swimmers | `live/LaneSwimmersSection.tsx` | **collapsed** | `shrink-0` (sits directly above the mobile bottom nav); `flex-1 min-h-0` with an internal `overflow-y-auto` body when expanded. |
 
@@ -212,32 +218,23 @@ The Active Run View (`pages/live/ActiveRunView.tsx`) is a `flex-1 min-h-0 flex f
 
 ---
 
-### CoachDashboard (`/`)
-Landing hub showing today's focus, quick stats, and navigation.
+### CoachDashboard (`/dashboard`)
+Navigation hub with live counts. Aggregates directly in the page — `listSessions`, `listSwimmers`, `getAllLaps` (+ `getRunDrill` per lap to sum distance), `listCompletedRuns` from the API facades. There is no `api/dashboard.ts` or dashboard service.
 
-- **Hero Section**: Pool-gradient banner (`#00677f → #00d1ff`) with today's workout focus and a single "Quick Time Lap" CTA to `/live` (the duplicate "Quick Start Live" outline button was removed — it was identical to the primary CTA and the Active Deck tile; both always navigate to the same LiveDeck).
-- **Hub Tiles** (3-column grid):
-  1. Team Management — swimmer count
-  2. Session Planner — template count
-  3. Active Deck — pulse animation, dark card
-- **Bento Stats Grid**: Total distance, template count, completed runs, next meet countdown.
+- **Hero**: pool-gradient banner (`#00677f → #00d1ff`) with the template/swimmer counts and a single "Quick Time Lap" CTA to `/live`.
+- **Hub tiles** (intrinsic `r-grid`): Team Management → `/swimmers`, Session Planner → `/sessions` (template count), Active Deck → `/live` (dark `bg-inverse-surface` card with pulsing timer icon).
+- **Stats bento**: Total Distance Recorded (real number; the bar chart is decorative), Team Status (registered swimmers), Completed Sessions (count + progress bar).
 
-### SwimmersList (`/swimmers`)
-Roster manager with CRUD.
+### SwimmersList (`/swimmers`) and SwimmerDetail (`/swimmers/:id`)
+Roster manager. The `Swimmer` record is `{id, name, group, labels?, notes, status: 'active' | 'inactive', createdAt, updatedAt}` — defined in `client/src/db/schema.ts` (no age-group / strokes / equipment fields anywhere in the UI).
 
-- Search bar with filter button
-- Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop
-- Swimmer cards: avatar (64px circle), name, group badge, notes, View Stats link, edit/delete buttons
-- "Add New Swimmer" dashed CTA card
-- FAB button (+ icon) for add
-- Quick Edit Modal: name, group, notes, status toggle (Active/Inactive); Save/Cancel
+**SwimmersList**: "Team Management" header with a live roster count; search by name or group (real-time filter); responsive card grid (1/2/3/4 cols). Cards: icon avatar, name, group + status badges, notes, plus **Last Session** (links to `/runs/:id`) and **Sessions · 30d** computed from `getRunHistory`; a primary Stats button and edit/delete icon buttons. "Add New Swimmer" dashed card doubles as the empty-state CTA. Add/edit goes through the shared `SwimmerFormModal`; delete is a `ConfirmDialog` ("Delete Swimmer") that warns it also removes the swimmer's session links and lap data.
 
-### SwimmerDetail (`/swimmers/:id`)
-Individual swimmer profile.
+**Deletion model** (`deleteSwimmer` in `client/src/db/dao.ts`): a surgical hard delete in one transaction — removes the swimmer's `runSwimmers` links and `laps`, but keeps runs and lane-result data blobs (they store name + times inline) so recorded history stays readable.
 
-- Profile header with inline editing of name and group, status badge
-- List of session runs the swimmer participated in (from RunSwimmer join)
-- General info section: goals, notes, primary events
+**API facade** (`client/src/api/swimmers.ts`): `listSwimmers`, `searchSwimmers`, `getSwimmer`, `createSwimmerIfNotExists`, `updateSwimmer`, `deleteSwimmer`, `deleteSwimmerWithData`, `exportSwimmerData`.
+
+**SwimmerDetail**: profile header (name, group + status badges, Edit + Delete), notes in a General Information section, and a Session History `RunHistoryTable` (from `components/Table.tsx`). Its delete dialog is a custom multi-action modal (the shared 2-button `ConfirmDialog` can't express it): **"Export data & delete"** (`deleteSwimmerWithData` downloads a JSON blob first; a failed export falls back to the plain delete), **"Delete all data permanently"**, Cancel, and a quiet **"Export data without deleting"** link (`exportSwimmerData`).
 
 ### SessionsList (`/sessions`)
 Template manager — grid of saved session templates.
@@ -247,9 +244,10 @@ Template manager — grid of saved session templates.
 - Import opens a named modal with file selection, package validation, a preview (name, drill count, total distance, optional creator label), explicit copy-name handling, and a View session success action. Import creates only a new private session and embedded drills; it does not update the drill bank or import runs/results.
 - Template cards: name, drill count, total distance, focus label
 - Click to navigate to editor (`/sessions/:id`)
-- Delete flows through a two-step confirmation:
-  1. **Active run → refused.** "Cannot Delete Template — `<name>` is being delivered right now. Finish or cancel the active session before deleting it." (`Got it` dismisses.) This is a UX rule, not a data-safety one: the run's snapshot renders without the template.
-  2. **Completed runs → informed, then allowed.** "`<name>` was used in N recorded sessions. Deleting it keeps that history — each run keeps its own snapshot of what was done." A template with no runs gets the single plain confirmation.
+- Delete flows through confirmations (`deleteSession(id, { force? })` in `client/src/api/sessions.ts:27`):
+  1. **Plain delete.** A template with no completed runs gets the single "Delete Template" confirmation.
+  2. **Completed runs → informed, then allowed.** "`<name>` was used in N recorded sessions. Deleting it keeps that history — each run keeps its own snapshot of what was done."
+  3. **Live run → delete-with-force.** If the template is being delivered right now the first delete attempt is refused (`performDelete`), and a follow-up dialog — "Delete live session and template?" — offers **Delete both**: ending the live run (its recorded results are kept as history) and removing the template (`force: true`, `SessionsList.tsx:127-139`).
 
 ### AiSessionDraft (`/sessions/ai`)
 The AI drafting entry point. The only sign-in-gated feature in the app.
@@ -280,23 +278,27 @@ Template editor. AI-generated sessions open here exactly like any manually creat
 - The session list, manual editor, AI draft editor, and focused modals use existing semantic color/typography tokens and responsive layouts. No session-authoring API, service, DAO, or schema changes are involved.
 
 ### DrillBank (`/drills`)
-Global drill library.
+Global drill library. `Drill` / `LibraryDrill` / `RunDrill` types live in `client/src/db/schema.ts` — see also DB-Context; not restated here.
 
-- Search with filter chips
-- Drill cards with stroke badge, distance, focus labels
-- Rich drill editor modal (sets, intervals, equipment) using the shared `SessionModalShell` presentation and keyboard/focus behavior.
-- Seed defaults and reset capability
+- Search plus label filter chips (each shows its drill count), and a **Popular** chip that re-sorts by `popularity` descending. Drill cards show the stroke/distance line, focus/label tags, and a `trending_up` badge with the raw count for `popularity > 0`.
+- **Popularity** is a plain counter bumped by `bumpDrillPopularity` (api/drills.ts) in two places: adding a bank drill into a session from the detail modal, and confirming the editor's stroke-change dialog with **Save as New Variant** (the dialog copy itself says the bump is the point). Plain edits (stroke unchanged) don't bump.
+- Each drill opens a **detail modal** (full info + Add to Session with a session picker). The dedicated `/drills/:id` `DrillDetail` page/route is commented out in `App.tsx` — detail is modal-only.
+- **Deletion is reference-aware**: `handleDelete` checks `sessionsUsingLibraryDrill` first; unused drills get the plain confirmation, drills in use get the "Still Used In Sessions" dialog and cascade through `deleteLibraryDrillInUse` (**Delete everywhere**) — see the Drill Bank test context below.
+- `deduplicateLibraryDrills()` runs on library load. `resetLibraryToDefaults` / `seedLibraryDrills` exist in `api/drills.ts` but are **not wired to any UI control**.
+- Rich drill editor modal (sets, intervals, equipment) using the shared `SessionModalShell` presentation and keyboard/focus behavior — see Key Components.
 
 ### LiveDeck (`/`)
 Real-time coaching view with Timed Groups. This is the root route — the app's default entry point.
 
-**Live Picker** (no active run): the app **never auto-starts** a session. The Live screen shows a picker with a pinned **"100m freestyle quick time"** card first, then session templates ranked by **usage** (most-used, then most-recently-used, then newest). Selecting quick time with an **empty roster (0 real swimmers)** starts with 2 lanes:
+**Live Picker** (no active run): the app **never auto-starts** a session. The Live screen shows a picker with a pinned **"100m freestyle quick time"** card first, then session templates ranked by **usage** — `listSessionsByUsage()` with the default quick session filtered out (`LiveDeck.tsx`). Selecting quick time with an **empty roster (0 real swimmers)** starts with 2 lanes:
 - Lane 1 ("Michael Phelps" + "Katie Ledecky" — 2 temp swimmers, hints at multi-swimmer capability), Lane 2 ("Caeleb Dressel" — 1 temp swimmer, hints more lanes exist)
 - Default drill: 100m Freestyle
 - A notice modal explains the temp swimmers were auto-added and can be removed now or swapped for real swimmers later
 - With any real swimmer on the roster, quick time (and every template) starts with **2 empty lanes** — temp hints are never pre-populated
 - Per-lane controls: "Add Swimmer" (saves a real roster swimmer) and "Temp Swimmer" (adds a random famous swimmer name)
 - After completing a session, the picker is shown again (fresh start; never auto-starts)
+
+**Run hydration (restore, not auto-start):** on mount `LiveDeck` fetches `getActiveRun()`; if one exists it becomes the active run and groups are rebuilt from the persisted `runSwimmers` links plus `notes.virtualSwimmers` (quick-start temp swimmers), one `TimedGroup` per lane — live in-memory timing state itself is rebuilt fresh. Starting the session clock only happens on explicit play (`START_SESSION_TIMER`).
 
 **Active Run View** (run in progress):
 - **Session header box**: session name, "Live" indicator with pulsing dot, wall-time start (e.g. "Started 14:30"), date/pool/drill count, Play/Pause toggle, Lane Editor (pencil icon), Reset, Complete buttons
@@ -324,60 +326,14 @@ Real-time coaching view with Timed Groups. This is the root route — the app's 
 - **Live view (`/`)** — limited controls: **Reset** (clears all timing data for the current run, returns groups to drill 1) and **Complete** (finalizes and persists the session). These are the only session-level actions available during a live session.
 - **Runs history screen** (future, `/runs`) — full session lifecycle management: browse completed sessions, view per-swimmer lap data, delete old runs, re-open a completed run for review. This is where the coach goes for post-session analysis and administration.
 
-**View Modes:**
-
-The LiveDeck supports two view modes to accommodate different coaching styles:
-
-- **Overview** (default): A session-level, high-level view rendered by `client/src/components/OverviewView.tsx`. It is deliberately minimal — no per-swimmer timers or lap tables. It is split into two panels (about 50/50 of the screen on tablet):
-  - **Drills panel (top, expandable)** — the **Session Structure table**: a drills × lanes grid with a column per lane (header shows `L{n}` + swimmer count) and a row per drill. Cells are **status markers**: `check` = done, `play_arrow` = current (pulsing ring), `–` = not started; a legend below the table explains each. **Markers are toggles** — a click marks a not-done (lane, drill) complete via `completeLaneResult` (no timing, no advance); clicking a done marker again **undos** it via `uncompleteLaneResult`. Every drill row also has a **"Time"** button that opens **Timing for all lanes on that specific drill**. A fullscreen toggle expands the drills panel to the whole view (hiding the lanes panel) for focused reading — about 5–6 drills fit on tablet.
-  - **Repeated drills collapse to a single record.** A template drill with `repeatCount > 1` (individual-mode) becomes several `RunDrill` rows sharing `parent_drill_id`; the structure table groups consecutive same-parent rows into one row (**`Nx <name>`**, total distance, per-lane progress `done/total`) instead of N rows. The per-lane progress chip **toggles the whole set in one click** (complete all reps when incomplete; undo all when fully complete). An **expand** toggle (small `>` chevron) reveals each repetition (stored name `(r/N)` + mark `done/current/todo` markers + per-rep **Time** button).
-  - **Lanes panel (bottom, collapsible)** — a **collapsible container** for lane cards. The collapsed header is a **summary strip** ("Lanes · N lanes · N swimmers" + chevron); expanding shows a **responsive grid** (`r-grid` with a 360px minimum) so two lanes sit **side by side on wide screens** and **stack one under the other on mobile**.
-  - **Lane cards are slim and assignment-focused** (`client/src/components/LaneCard.tsx`) — one per lane (**including empty lanes**): a big `L{n}` badge, lane name, **swimmer count** ("N swimmers assigned"), swimmer chips, a `casino` **quick-add temp swimmer** button, and a **Manage Swimmers** button (opens the lane editor scoped to that lane). Empty lanes show a dashed "Add Temp Swimmer" / "Manage Swimmers" card. **No note field, no in-card drill card, no Mark Done / Time buttons** — timing happens from drill-row "Time" buttons or the timing-mode `GroupCard`.
-  - **Lane layout** — sessions start with **2 default lanes** (the app supports **up to 8 lanes**, but new sessions never instantiate 8).
-  - Temp (hint) swimmers are pre-populated **only for the quick time session and only while the real roster is empty (0 swimmers)**: Lane 1 starts with 2 temp swimmers and Lane 2 with 1. Once the coach has any real swimmer, quick time and **every custom template session** start with lanes **empty** so the coach assigns their own swimmers. When temp swimmers are auto-added, a notice modal explains they can be removed or later swapped for real swimmers.
-  - No per-swimmer rows and no timers in the overview. The primary action is "Time" (per drill row) to enter timing for a drill.
-
-**Session-level progress and lane summary live in the session header** (owned by `ActiveRunView.tsx`, not OverviewView): session progress is a **distance readout** (`{completedDistance} / {totalDistance}m`, summed from the drills whose lane results are `completed`) plus **per-lane chips** (`L{n}` + swimmer count + edit icon) that each call `openLaneEditor(lane)` to open the lane editor focused on that lane. There is **no session-wide drill-count percentage bar** — the per-row percentage bars in the drills structure table are computed per drill group in `client/src/components/live/DrillsSection.tsx` from `computeDrillRowProgress`. Logical-drill counting (each repetition-group counts once per lane) and repetition grouping come from `client/src/utils/sessionProgress.ts` (`groupDrillRows`, `stripRepPrefix`, `buildDrillGroup`, `computeDrillRowProgress`, `firstIncompleteDrillRow`, `isDrillRowComplete`), which `DrillsSection.tsx` is the sole consumer of.
-
-**Overview is the everyday runner.** It can drive a whole practice using markers alone (`completeLaneResult` per lane writes `LaneDrillResult.completed` with `data: null`); timing is only pulled in via "Time" for the drills the coach wants lap/split detail. Progress is tracked per lane over the session flow and persists for the run.
-
-- **Timing breakout** (full detail, focusable): a single surface entered two ways, both rendering a top `BreakoutHeader` (`components/live/BreakoutHeader.tsx`) with an "Overview" exit. The **drill-name line is itself the drill navigator**: a vertical roller where each drill is a snap page and the centered drill is current. On mobile, flick up/down with a finger to "roll" through the session's drills; on desktop, use the **up/down chevrons** flanking it (styled like the swimmer-ordering arrows) to step one drill at a time. This replaces the old dropdown picker and the per-lane `< 1/16 >` stepper (`DrillNav` in `GroupCard`), which is **hidden inside the breakout**. The breakout is a **focus filter** over the same `LaneDrillResult` / `Lap` data — no data model bifurcation. Both views read the same `laneDrillResults` + `groups` (and the live `store`), so switching between them is seamless and real-time. Progression (`LaneDrillResult.completed`) is a **projection of the actual per-swimmer timed results**, not a separate flag that can drift: `completeDrill` sets it when the last swimmer finishes a drill, and `clearSwimmer` / `editSavedSwimmer` **recompute it** from the saved blob (`isLaneResultComplete`) so clearing or editing a swimmer's timing in the timing view instantly flips the overview's check. The manual "mark done" toggle in the overview stays an explicit coach override.
+**Timing breakout** (full detail, focusable): a single surface entered two ways, both rendering a top `BreakoutHeader` (`components/live/BreakoutHeader.tsx`) with an exit (small ✕ overlay on the `timer` icon) back to the sections. The **drill-name line is itself the drill navigator**: a vertical roller where each drill is a snap page and the centered drill is current. On mobile, flick up/down with a finger to "roll" through the session's drills; on desktop, use the **up/down chevrons** flanking it (styled like the swimmer-ordering arrows) to step one drill at a time. This replaces the old dropdown picker and the per-lane `< 1/16 >` stepper (`DrillNav` in `GroupCard`), which is **hidden inside the breakout**. The breakout is a **focus filter** over the same `LaneDrillResult` / `Lap` data — no data model bifurcation. Both views read the same `laneDrillResults` + `groups` (and the live `store`), so switching between them is seamless and real-time. Progression (`LaneDrillResult.completed`) is a **projection of the actual per-swimmer timed results**, not a separate flag that can drift: `completeDrill` sets it when the last swimmer finishes a drill, and `clearSwimmer` / `editSavedSwimmer` **recompute it** from the saved blob (`isLaneResultComplete`) so clearing or editing a swimmer's timing in the timing view instantly flips the drill row's check. The manual "mark done" toggle in the drills section stays an explicit coach override.
   - **From a drill row** ("Time" button, `DrillsSection`): `enterTiming(drillId)` calls `SET_ALL_DRILLS` and sets `timingBreakout = { drillId, swimmerIds: null }`, so **all lanes open the same drill**. Renders the complete `GroupCard` per lane (per-swimmer Start/Lap/Finish, stroke steppers, lap tables).
-  - **From a swimmer** (timer chip in the `LaneSwimmersSection` lane list): `enterTimingSwimmers([dbId])` sets the breakout drill to the **current drill** — the first drill after the last fully-completed one (`computeCurrentDrillId` in `ActiveRunView`) — and `timingBreakout = { drillId, swimmerIds: [dbId] }`. Renders a **flat grid of `SwimmerBreakoutCard`** (`components/SwimmerBreakoutCard.tsx`) — one card per focused swimmer (grouped by lane), each a focused timing card. Inside the breakout the coach **adds more swimmers** (a swimmer not yet focused becomes a focused card), **switches the shared drill** (moves the whole focused set via `SET_ALL_DRILLS` — the timing view is just a focused projection of session state onto one drill; it does not mutate swimmer data), and **marks all done**. Per-swimmer remove (×) **drops focus only** — the swimmer stays in their lane. This supports a 25-swimmer session where the coach times 4, then 6 others, then 1, while the rest are ticked done in the Overview.
+  - **From a swimmer** (timer chip in the `LaneSwimmersSection` lane list): `enterTimingSwimmers([dbId])` sets the breakout drill to the **current drill** — the first drill after the last fully-completed one (`computeCurrentDrillId` in `ActiveRunView`) — and `timingBreakout = { drillId, swimmerIds: [dbId] }`. Renders a **flat grid of `SwimmerBreakoutCard`** (`components/SwimmerBreakoutCard.tsx`) — one card per focused swimmer (grouped by lane), each a focused timing card. Inside the breakout the coach **adds more swimmers** (a swimmer not yet focused becomes a focused card), **switches the shared drill** (moves the whole focused set via `SET_ALL_DRILLS` — the timing view is just a focused projection of session state onto one drill; it does not mutate swimmer data), and **marks all done**. Per-swimmer remove (×) **drops focus only** — the swimmer stays in their lane. This supports a 25-swimmer session where the coach times 4, then 6 others, then 1, while the rest are ticked done in the drills section.
   - Data model: timing is already keyed by `(runId, groupId, drillId, swimmerId)`, so focusing swimmers across drills needs no schema change — only UI state (`timingBreakout` in `ActiveRunView`).
 
-The live session UI is split across a few files instead of one monolith: `pages/LiveDeck.tsx` (bootstrap — quick-start + template chooser + run hydration), `pages/live/ActiveRunView.tsx` (the active-session runner: header, `timingBreakout` focus state, overview/timing orchestration, lane editor, promotion), `components/live/DrillsSection.tsx` (drills × lanes structure + per-drill "Time"), `components/live/LaneSwimmersSection.tsx` (lane list + per-swimmer "Time" chips), `components/GroupCard.tsx` (the per-lane timing card), `components/live/BreakoutHeader.tsx` (shared drill switcher + focus controls), and `components/SwimmerBreakoutCard.tsx` (the per-swimmer focused timing card).
+The live session UI is split across a few files instead of one monolith: `pages/LiveDeck.tsx` (bootstrap — quick-start + template chooser + run hydration), `pages/live/ActiveRunView.tsx` (the active-session runner: header, `timingBreakout` focus state, sections/timing orchestration, lane editor, promotion), `components/live/LiveSessionHeader.tsx` (session details panel), `components/live/DrillsSection.tsx` (drills × lanes structure + per-drill timer), `components/live/LaneSwimmersSection.tsx` (lane list + per-swimmer "Time" chips), `components/GroupCard.tsx` (the per-lane timing card), `components/live/BreakoutHeader.tsx` (shared drill switcher + focus controls), and `components/SwimmerBreakoutCard.tsx` (the per-swimmer focused timing card).
 
-There is **no global overview/timing segmented control** — timing is entered per drill (all lanes) **or** per swimmer (focused set), matching the coach flow "mark 5 drills done in the overview, then time drill 6, or pull out 4 swimmers to time". The old `viewMode` persisted in `SessionRun.notes` JSON was removed in favor of the ephemeral `timingBreakout` state.
-
-**OverviewView layout (expandable Drills panel + collapsible Lanes panel) — progress bar & lane chips live in the session header:**
-```
-┌─────────────────────────────────────────────┐
-│ Session Header  (ActiveRunView)             │
-│  ▶ Live · 14:32        [⏱] [✔ Complete]    │
-│  ┌────┐ ┌────┐ ┌────┐                      │
-│  │L1 4 ││L2 3 ││L3 5 │  ← lane chips (open │
-│  └────┘ └────┘ └────┘     lane editor)     │
-│  [██████████░░░░░░░░░░┡]  2 / 8 · 25%      │  ← full-width progress bar
-├─────────────────────────────────────────────┤
-│ Drills                       [⛶ Expand]    │  ← fullscreen toggle (hides lanes)
-│ #  Drill       L1 (4)   L2 (3)   L3 (5)     │
-│ 1  100 Free    [✓]      [✓]      [✓]   [⏱] │  ← markers + Time
-│ 2  5x 50 Fly    2/4      1/4      0/4   [+] │  ← repeated drill (single record, 4 reps)
-│ 3  100 IM      [·]      [·]      [·]   [⏱] │     expand [-] → per-rep marker rows
-│  ✓ Done  ▶ In progress  · Not started      │
-├─────────────────────────────────────────────┤
-│ Lanes · 2 lanes · 3 swimmers         [∨]   │  ← collapsible summary strip
-│ ┌─────────────┐ ┌─────────────┐            │  ← slim lane cards (2-up wide)
-│ │⭕ L1 Lane 1                 │ ││ ⭕ L2 Lane 2  │            │
-│ │2 swimmers assigned         │ ││ 1 swimmer... │            │
-│ │[Phelps] [Ledecky] [🎲] [👥]│ ││ [Dressel] [🎲]│            │
-│ └─────────────┘ └─────────────┘            │
-└─────────────────────────────────────────────┘
-```
-*Lane markers: `✓` = drill done for that lane, `▶` = current drill (pulsing ring), `·` = not started; row **⏱ Time** opens Timing for all lanes on that drill. Lane cards are assignment-only (quick-add + Manage Swimmers); no note field, no drill info, no timing controls.*
-
-*Note: the diagram above shows three lanes for illustration; new sessions always start with 2.*
+There is **no global sections/timing segmented control** — timing is entered per drill (all lanes) **or** per swimmer (focused set), matching the coach flow "tick 5 drills done in the drills section, then time drill 6, or pull out 4 swimmers to time". The old `viewMode` persisted in `SessionRun.notes` JSON was removed in favor of the ephemeral `timingBreakout` state.
 
 **Swimmer-level buttons** (3 compact buttons: Start, Lap, Finish):
 - **Start** (emerald) — `store.markSwimmerStart(...)` if not already started; disabled after started.
@@ -525,7 +481,7 @@ Instrumentation is defined in one place: `client/src/services/analyticsEvents.ts
 
 Events queue in localStorage (`swimsheet_analytics_queue`, capped at 500 — oldest dropped) and flush in batches of 50 to Supabase `analytics_events`. Delivery is at-least-once: every event carries a client-generated `event_id` (uuidv7, unique index via migration `20261004000002`) so a retried batch that already landed fails with `23505` and is treated as delivered. Systemic failures keep the queue and retry with exponential backoff (5s → 5min); row-level failures (SQLSTATE class 22/23) recursively split the batch to isolate the poison event, which moves to a dead-letter list (last 20, `swimsheet_analytics_dead_letter`) instead of blocking the other 49. Flushes run on every `track`, on `online`, and on `pagehide`/`visibilitychange` via `fetch keepalive` so closing the tab doesn't lose the queue. `device_id` is a uuidv7 in `localStorage` under `swimsheet_device_id`; when `localStorage` throws (blocked storage, some private modes) it degrades to `sessionStorage` so the id survives a reload within the tab, and only then to a module-scoped uuid for the page's lifetime. There is deliberately **no shared fallback constant** — a global literal would silently merge unrelated users' events into one bucket in `analytics_events`. Note the id is a client-asserted grouping hint, not an identity: the anon insert policy is `with check (true)`, so `device_id` is fully attacker-controlled and must never gate access, quotas, or rate limits. Every event carries `session_id`, timestamps, timezone, and `app_version` (first 7 chars of the build's git commit, `dev` fallback), plus device context: `device_country` (2-letter code from the same-origin Cloudflare `/cdn-cgi/trace`, localStorage-cached for 7 days, `null` on non-Cloudflare hosts), `device_language` (navigator.language), `device_os`, `device_type` (`mobile`|`tablet`|`desktop`), `device_screen` (`WxH`), `device_connection` (Network Information `effectiveType`, `null` if unsupported). Context is resolved in `services/deviceContext.ts` — country awaited before the batch POST so no event ships without it unless the trace fetch fails. Sessions use a 30-min inactivity window: immutable `swimsheet_session_start` + sliding `swimsheet_session_last`; `isNewSession()` gates `app_opened` in `App.tsx`. `user_id` comes from `getCurrentUserId()` (`api/supabase.ts`), which falls back to a **synchronous** parse of the persisted Supabase session (`sb-swimsheet-auth-token`) when the in-memory `cachedUserId` is still unset. That fallback is what lets `app_opened` — tracked on mount, before Supabase's async `getSession()` resolves — carry a real `user_id` with no network call, no spinner, and no change to the offline-first flush behaviour. It reads through `createAuthStorage()` so the persist flag is respected and the inactive store is never read, returns `null` on missing/malformed data, and reads expired sessions too (auth-js `_isValidSession` only checks key presence, and a failed refresh leaves storage intact), so a long-offline device still resolves its user.
 
-**Payload policy (per Supabase-Tasks.md Task 4): counts, enums, and action types only — no swimmer names, lap times, or free-text notes.**
+**Payload policy: counts, enums, and action types only — no swimmer names, lap times, or free-text notes.**
 
 ### Event catalog
 

@@ -127,7 +127,7 @@ Update the relevant context file to reflect the new reality:
 | Client API | Custom `api/` wrappers | Unified interface over Dexie + HTTP |
 | Client State | React Context | `LiveSessionContext` for live view |
 | Styling | Tailwind CSS | Material 3 design tokens in config |
-| Icons | Material Symbols Outlined | Use `<span class="material-symbols-outlined">icon_name</span>` |
+| Icons | Material Symbols Outlined | Use the `<Icon>` component (`client/src/components/Icon.tsx`), never a raw `<span class="material-symbols-outlined">` |
 | Server | Express + TypeScript | tsx watch for dev |
 | Server DB | better-sqlite3 | Single file, snake_case columns |
 | Unit Tests | Vitest | Co-located in `__tests__/` |
@@ -141,9 +141,7 @@ Update the relevant context file to reflect the new reality:
 ```
 client/src/
 ├── api/           # API layer (Dexie + HTTP wrappers)
-├── components/    # Shared UI components
-│   ├── forms/     # Form modals (SwimmerFormModal, DrillEditorModal)
-│   └── timing/    # Timing widgets (LapTimeline)
+├── components/    # Shared UI components (subgroups ai/, live/, session/; SwimmerFormModal, DrillEditorModal at root)
 ├── constants/     # Shared constants (drill options, stroke colors)
 ├── context/       # React context (LiveSessionContext)
 ├── db/            # Dexie schema + pure CRUD DAO

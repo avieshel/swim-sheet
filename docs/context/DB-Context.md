@@ -94,9 +94,10 @@ legacy fallback.
 
 ### Rich Drills (DrillItem[])
 Drills have evolved beyond simple name/stroke/distance:
-- `items: DrillItem[]` — array of set components, each with distance, stroke, intensity, interval, equipment
+- `items: DrillItem[]` — array of set components, each with distance, stroke, intensity, interval, equipment, optional `description` (the step's technique)
 - `segments` (within DrillItem) — for broken sets like IM or pyramids
-- `repeatCount`, `timingMode`, `focus`, `labels` for drill classification
+- `repeatCount`, `focus`, `labels`, `description` for drill classification
+- `timingMode` was removed entirely (Oct 2026, migration `20261027000000_drop_timing_mode.sql`): the continuous timing mode is gone and runs always unroll one `RunDrill` row per rep (`runService.ts`). The field survives only as an optional legacy field in the `.swimsheet` package DTO (`shared/sessionPackage/types.ts`) so old import files with `"timingMode": "individual"` still parse.
 - `LibraryDrill` is the global drill bank (builtin + personal + customized)
 
 ### Frozen History Snapshot
@@ -117,7 +118,7 @@ A completed run is a **self-contained record**. At run start (`runService.create
 **Reference-counting asymmetry** (deliberate, not inconsistent):
 - Editing a session/drill: always safe, no warning.
 - Deleting a drill from a session: always safe.
-- Deleting a **session**: refused while any run from it is `status === 'active'` (UX rule, not data safety). Completed runs never block — they only drive a confirm stating the count and that history is preserved.
+- Deleting a **session**: refused while any run from it is `status === 'active'` (UX rule, not data safety). The API is `deleteSession(id, { force? })` — the refusal returns `{ ok: false, reason: 'active_run' }`; `SessionsList` then offers the confirm "Delete live session and template?" → **Delete both**, which ends and cascade-deletes the active run before removing the template. Completed runs never block — they only drive a confirm stating the count and that history is preserved. A deleted starter template (`catalogKey` set) is recorded via `markSeedSessionDismissed` so seeding does not re-create it.
 - Deleting a **library drill** in use: warns, names each referencing session and its drill count, then offers "Delete everywhere" or cancel.
 
 **Library provenance:** `Drill.libraryDrillId` records which `libraryDrills` entry a session drill was copied from. This is copy-on-use *with provenance* — a session still owns its own drill rows and edits never propagate. The cloud column is a **soft reference with no FK constraint**: a hard cascade would let one library deletion destroy drills inside sessions a coach still works from. A dangling reference is expected, not corruption — nothing resolves it on a read path, and repair (repoint/clear) is offered but never automatic.
@@ -128,7 +129,7 @@ Design: `docs/superpowers/specs/2026-10-11-frozen-history-snapshot-design.md`.
 - Domain CRUD persists on-device in **Dexie (IndexedDB)**; app settings live in **localStorage** (`swimsheet-settings`). Supabase is an optional cloud-sync target for configured, signed-in users; the app remains usable offline and does not rely on the legacy `/api` routes for domain data.
 - **Persistent storage**: `navigator.storage.persist()` is requested once at startup (best-effort) to opt the origin out of automatic eviction. Status is surfaced in Settings, where the grant state shows a green check mark and an info ("i") icon opens a modal explaining what storage protection means and how it interacts with the automatic backup.
 - **Automatic backup**: every mutation schedules a debounced (3s) write of the full DB snapshot to `localStorage` (`swimsheet_db_backup`), wired via Dexie table hooks (`creating`/`updating`/`deleting`) plus a startup save. Empty snapshots are never written (so a fresh install or a fully-wiped DB doesn't create a restorable empty backup).
-- **Backup format**: `{ formatVersion: 1, schemaVersion: 6, savedAt, tables }`. `restoreAllTables()` wipes + bulk-loads inside one transaction. Restore/import normalizes pre-v6 snake_case Dexie properties to camelCase; v6 exports are camelCase.
+- **Backup format**: `{ formatVersion: 1, schemaVersion, savedAt, tables }` — `schemaVersion` is stamped from `DB_SCHEMA_VERSION` (currently **8**) at write time. `restoreAllTables()` wipes + bulk-loads inside one transaction. Restore/import normalizes pre-v6 snake_case Dexie properties to camelCase; v6+ exports are camelCase.
 - **Restore policy**: `ensureDbOpen()` restores from the backup **only** when (a) the DB opens but is empty, or (b) opening fails. It never restores a backup that is empty, is from an unsupported format, or was written by a newer schema (version guard). The backup is cleared after a successful restore. The previous behavior — restoring whenever a backup existed, and `db.delete()` on any open failure — was replaced.
 - **Manual export/import**: Settings → "Back up to file" downloads the same snapshot JSON; "Restore from file" validates and restores it after a confirm dialog. This is the only copy that survives device change / clear-site-data.
 - **Intentional wipes clear the backup** (`clearBackup()` runs in `deleteAllSwimmers` / `deleteAllSessions`) so an explicit reset isn't undone by an auto-restore.
@@ -206,13 +207,13 @@ A single exercise within a Session template.
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
 | `sessionId` | `session_id` | string/TEXT | FK → Session |
+| `libraryDrillId` | `library_drill_id` | string/TEXT \| undefined | Optional soft reference → LibraryDrill (no FK, no cascade) |
 | `name` | `name` | string/TEXT | Required |
 | `stroke` | `stroke` | `Stroke`/TEXT | freestyle/backstroke/breaststroke/butterfly/im |
 | `distance` | `distance` | number/INTEGER | Total distance in meters |
 | `order` | `drill_order` | number/INTEGER | Position in drill list |
 | `items` | — | `DrillItem[]` | Client-only: rich set components |
 | `repeatCount` | — | number | Client-only: set repeats |
-| `timingMode` | — | 'individual' \| 'continuous' | Client-only |
 | `focus` | — | 'technique' \| 'fitness' \| 'none' | Client-only |
 | `labels` | — | string[] | Client-only |
 | `description` | — | string | Client-only |
@@ -227,6 +228,7 @@ A single execution of a Session template.
 | `id` | `id` | string/TEXT PK | UUID |
 | `sessionId` | `session_id` | string/TEXT | FK → Session |
 | `sessionName` | `session_name` | string/TEXT \| null | **Frozen** template name, written once at run start |
+| `sessionSnapshot` | `session_snapshot` | string/TEXT \| undefined | **Frozen** serialized `SessionSnapshot`; history renders from this alone (see Frozen History Snapshot) |
 | `date` | `date` | string/TEXT | Run date |
 | `poolName` | `pool_name` | string/TEXT | Pool name/location |
 | `poolLength` | `pool_length` | number/INTEGER | Overridable from template |
@@ -245,12 +247,16 @@ Snapshot of a Drill at the time a SessionRun starts.
 |--------|--------|------|-------|
 | `id` | `id` | string/TEXT PK | UUID |
 | `runId` | `run_id` | string/TEXT | FK → SessionRun |
-| `parentDrillId` | `parent_drill_id` | string/TEXT | Optional FK → source drill for repeated reps |
+| `drillIndex` | `drill_index` | number/INTEGER \| null | Position into `SessionSnapshot.drills`; replaced `parentDrillId`, null on pre-v8 rows |
+| `parentDrillId` | `parent_drill_id` | string/TEXT | Optional FK → source drill for repeated reps; legacy rows only |
 | `name` | `name` | string/TEXT | Snapshot of drill name |
-| `stroke` | `stroke` | `RunDrillStroke`/TEXT | Snapshot of drill stroke |
+| `stroke` | `stroke` | `RunDrillStroke`/TEXT | Snapshot of drill stroke (`metrics.dominantStroke`) |
 | `distance` | `distance` | number/INTEGER | Snapshot of drill distance |
 | `order` | `drill_order` | number/INTEGER | Position in run drill list |
 | `notes` | `notes` | string/TEXT | Optional |
+| `instructions` | `instructions` | string/TEXT \| undefined | Unrolled step text snapshot |
+| `interval` | `interval` | string/TEXT \| undefined | Step interval snapshot |
+| `equipment` | `equipment` | string[] \| undefined | Step equipment snapshot |
 | `createdAt` | `created_at` | string/TEXT | ISO 8601 |
 | `updatedAt` | `updated_at` | string/TEXT | ISO 8601 |
 
@@ -310,7 +316,7 @@ JSON blob storage for timed group timing data.
 | `data` | string \| null | Local JSON string; stored as JSONB in Supabase. `null` = completed via marker only, never timed |
 | `updatedAt` | string | ISO 8601; cloud insert timestamps are server-assigned |
 
-**Single-model rule (markers + optional timing):** `completed` is the always-present per-lane progress marker. Timing is an *optional* attachment to the same row: when a drill is timed, `data` carries the `SavedDrillData` blob (start/lap/finish + stroke counts); when a lane is just marked done in the overview, `data` stays `null`. The API surface is one set of lane-result endpoints — the difference is purely how much of the payload is filled. Progress bars/`OverviewView` read `completed`; timing views additionally read `data`.
+**Single-model rule (markers + optional timing):** `completed` is the always-present per-lane progress marker. Timing is an *optional* attachment to the same row: when a drill is timed, `data` carries the `SavedDrillData` blob (start/lap/finish + stroke counts); when a lane is just marked done in the overview, `data` stays `null`. The API surface is one set of lane-result endpoints — the difference is purely how much of the payload is filled. Progress markers in the live run list read `completed`; timing views additionally read `data`.
 
 **Per-(swimmer, drill) status (`SavedSwimmerData.status`):** each entry inside the `data` blob also carries an optional `status: 'done' | 'timed' | 'skipped' | 'notdone'`, recording the coach's explicit standing for that swimmer on that drill. It is a **client-side JSON field only — no Dexie column and no Supabase column**, since the blob is mirrored as opaque JSONB. `deriveSwimmerStatus` resolves priority: an explicit stored `status` wins; otherwise a recorded time stamp implies `'timed'`, a bare completion marker implies `'done'`, and anything with no signal defaults to `'done'` (the lazy-coach rule that keeps a saved session gap-free). The two explicit non-complete states are **preserved and never overwritten by that default**: `'skipped'` (the coach took this swimmer out of the drill) and `'notdone'` (the coach explicitly left this swimmer/drill incomplete, distinct from the implicit default).
 
@@ -389,7 +395,6 @@ Global drill library with builtin defaults and user customizations.
 | `distance` | number | Total distance |
 | `items` | DrillItem[] | Rich set components |
 | `repeatCount` | number | Set repeats |
-| `timingMode` | 'individual' \| 'continuous' | Timing approach |
 | `focus` | 'technique' \| 'fitness' \| 'none' | Training focus |
 | `labels` | string[] | Classification labels |
 | `description` | string | Optional description |
@@ -399,6 +404,8 @@ Global drill library with builtin defaults and user customizations.
 
 ### Settings
 App-wide configuration (both client and server).
+
+**Status note (Oct 2026):** the client-side Settings storage is Dexie + localStorage; the server-side Settings table, its DAO and the `settings` router still exist in `server/src/`, but the router is **not mounted** in `server/src/index.ts` (only swimmers/sessions/laps are) — the server settings API is unwired/vestigial.
 
 | Client | Server | Type | Notes |
 |--------|--------|------|-------|
