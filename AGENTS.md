@@ -14,7 +14,7 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Data model, offline-first design, sync, schema | `docs/context/DB-Context.md` |
 | Design system, screen specs, component details | `docs/context/UI-Context.md` |
 | Testing stack, guidelines, known flaky tests | `docs/context/Test-Context.md` |
-| Remaining app-level work | `docs/context/App-Tasks-Context.md` |
+| AI eval & ops: trace inspection, sync follow-ups, analytics policy | `docs/context/AI-Eval-And-Ops-Context.md` |
 | Quick Start / path-to-value for new users | `docs/context/Quick-Start-Context.md` |
 | User journeys (all flows) | `docs/context/Main-Flow.md` |
 | Session-building flow + sample session & friction points | `docs/context/Sessions-Drills-Context.md` |
@@ -112,7 +112,7 @@ Update the relevant context file to reflect the new reality:
 - **Changed the data model or schema?** → update `docs/context/DB-Context.md`
 - **Added/modified a page/component?** → update `docs/context/UI-Context.md`
 - **Changed architecture or added a dependency?** → update `docs/context/App-Context.md`
-- **Fixed a bug or completed a task?** → update `docs/context/App-Tasks-Context.md` (mark as done)
+- **Fixed a bug or completed a task?** → note it in the relevant context file; the historical task ledger is archived at `docs/archive/App-Tasks-Context.md`
 
 ---
 

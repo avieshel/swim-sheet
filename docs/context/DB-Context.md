@@ -2,13 +2,13 @@
 
 ## Overview
 
-The client uses **Dexie (IndexedDB)** as its primary offline-first store and optionally syncs selected tables with **Supabase Postgres**. The Express/**better-sqlite3** server remains for legacy API features; it is not the cloud-sync transport. The Supabase schema mirrors synced client data with naming-convention differences (camelCase client, snake_case cloud).
+The client uses **Dexie (IndexedDB)** as its primary offline-first store and optionally syncs selected tables with **Supabase Postgres**. The Express/**better-sqlite3** server is a vestigial host: it serves the built PWA and exposes unused `/api/v1/*` routes; the client never reads its SQLite DB and Supabase is the only cloud backend. The Supabase schema mirrors synced client data with naming-convention differences (camelCase client, snake_case cloud).
 
 ## Design Decisions
 
 ### Offline-First with Dexie
 - All CRUD operates against local IndexedDB via Dexie
-- The app works fully offline — the server is only needed for sync and first-time load
+- The app works fully offline — the Express server is not required at runtime (it only serves the built PWA); sync goes directly to Supabase
 - Dexie provides typed tables via `EntityTable<T, 'id'>`
 - Schema versioning: current version is **8**. v6 = camelCase field migration, v7 = additive, **v8 = frozen history snapshot** (`RunDrill.drillIndex`, `SessionRun.sessionSnapshot`, `Drill.libraryDrillId`). tenant/share fields may appear as optional data ahead of a future formal claim migration.
 - Tables are indexed for query performance: `id`, foreign keys, `updatedAt` for sync
@@ -50,7 +50,7 @@ The probe may only ever **skip** work, never decide it, because its failure mode
 - `20261008000001_completed_history_sync.sql` adds the RLS-protected `lane_drill_results` cloud table and is applied to **both** local and hosted (`npm run db:push` on 2026-10-08), so hosted now has 18 tables / 52 policies / 4 recorded migrations and all `verify-hosted.sh` checks pass. Deploying this client *before* that push failed every pull with `PGRST205: Could not find the table 'public.lane_drill_results'` — the migration-ordering rule below is why the schema has to land first. Hosted two-device verification remains outstanding.
 - `20261009000000_run_template_name_snapshot.sql` adds `session_runs.session_name` and backfills from surviving templates. Applied to **both** local (`db reset`) and hosted (`supabase db push --linked`) on 2026-10-09 — hosted is now at 5 recorded migrations, still 18 tables / 52 policies, and `verify-hosted.sh` passes.
 - `20261011000000_snapshot_columns.sql` adds the frozen-history columns: `session_runs.session_snapshot text`, `run_drills.drill_index integer`, `drills.library_drill_id uuid`, plus `idx_drills_library_drill_id`. Applied to **both** local (`psql`) and hosted (`npm run db:push`) on 2026-10-11 — hosted is now at **6 recorded migrations**, still 18 tables / 52 policies, and `verify-hosted.sh` passes all 7 checks. All three columns verified present on hosted and **nullable**, so the columns-first rollout is safe: the deployed client sends none of them and `fromCloudRow` reads named fields only, so it ignores them. `library_drill_id` is a **soft reference with no FK constraint and no `on delete cascade`** — a hard cascade would let one library-drill deletion silently destroy drills inside sessions a coach still works from. Design: `docs/superpowers/specs/2026-10-11-frozen-history-snapshot-design.md`.
-- `20261011000000_purge_expired_tombstones.sql` is **archived, not applied** — it shares its version prefix with the snapshot columns migration, and two files with one version make `db push` apply one and silently skip the other. It lives in `supabase/migrations_archive/`; see the Known Issues entry in `App-Tasks-Context.md` for pickup steps.
+- `20261011000000_purge_expired_tombstones.sql` is **archived, not applied** — it shares its version prefix with the snapshot columns migration, and two files with one version make `db push` apply one and silently skip the other. It lives in `supabase/migrations_archive/`; see `docs/context/AI-Eval-And-Ops-Context.md` for pickup steps.
  - `20261014000000_ai_session_harness_rate_limit.sql` adds the **private** operational store for AI harness rate limiting. It creates an `ai_private` schema (not `public`, so not exposed by PostgREST), an `ai_request_log` table, and a `public.ai_request_record(uuid)` SECURITY DEFINER RPC that atomically checks+increments a rolling 1-hour per-user limit (default 10). The RPC is `REVOKE`d from `public`/`anon`/`authenticated` and `GRANT`ed only to `service_role`, so only the Edge Function's service-role client can call it. This is the "no new public domain table or RLS policy" constraint for the AI feature. Local verification: `supabase/tests/ai_rate_limit_check.sql` (passes). Hosted check: `verify-hosted.sh` now asserts anon/authenticated cannot call it and the table is not exposed in `public`.
 - **Migration ordering rule:** apply schema *before* merging the code that needs it, because `main` merges trigger the Cloudflare Pages deploy. Nothing in CI runs migrations, so an unapplied migration is otherwise only discovered at runtime.
 - `20261014000001_sync_pulse.sql` adds the read-only `public.sync_pulse(organization, cursors)` RPC — a "which tables could have rows past my cursor?" probe, so a pull costs one request instead of one per sync table. `SECURITY DEFINER` with `set search_path = public`, gated on `is_organization_member`, and `REVOKE`d from `public`/`anon` like `ensure_personal_organization`, so `rls_hardening_check.sql` and `verify-hosted.sh` already cover it with no new assertions. **Not yet applied to hosted** — until it is, the RPC errors and the client falls back to the old full fan-out, so it is safe to deploy ahead of the migration.
@@ -443,7 +443,7 @@ App-wide configuration (both client and server).
 
 All tables also have their primary `id` key path; `_meta` uses `key` as its primary key.
 
-### Server/SQLite indexes (snake_case)
+### Server/SQLite indexes (snake_case, vestigial — the client never reads these tables)
 
 | Table | Index | Columns |
 |-------|-------|---------|

@@ -79,7 +79,7 @@ The plan is to add a structural representation for rest and intervals first, wit
 options, and only then let the agent use it. Until that exists, a rest stage will either
 be dropped or be absorbed into an adjacent step's interval, and neither is good.
 
-This is a known gap. It is listed again in `App-Tasks-Context.md`.
+This is a known gap (see the archived task ledger `docs/archive/App-Tasks-Context.md`).
 
 ---
 

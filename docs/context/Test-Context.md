@@ -69,7 +69,7 @@ Test files are co-located with source files in `__tests__/` directories (75 file
 
 ### What NOT to Unit Test
 - Dexie/IndexedDB internals (covered indirectly by service tests on the real schema)
-- Express route handlers (server currently has no test suite)
+- Vestigial Express route handlers (server currently has no test suite; client never calls them)
 - Full page flows / routing (use Playwright)
 
 ---
