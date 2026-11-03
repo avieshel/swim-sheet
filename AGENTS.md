@@ -32,7 +32,7 @@ This is the entry point for any coding agent working on SwimSheet. Read it first
 | Past sessions table + swimmer-filtered history (Initiative 2) | `docs/context/Past-Sessions-Data-Context.md` |
 | Implementation plan for both initiatives (sequenced tasks) | `docs/context/Session-Initiatives-PLAN.md` |
 
-Archived plans and audits: `docs/archive/`
+Archived plans and audits: `docs/archive/` — **do not read unless explicitly instructed.** It contains stale, superseded docs that contradict the current code and will mislead you. The active context lives only in `docs/context/`.
 
 ---
 
