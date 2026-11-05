@@ -17,7 +17,7 @@ full-height shell. Three sections share the viewport:
 
 | Section | Component | Default | Height behavior |
 |---------|-----------|---------|-----------------|
-| Session details | `live/LiveSessionHeader.tsx` | collapsed | `shrink-0`. Collapsed bar: template name + live/paused dot, Play/Pause+ timer circle, elapsed (`font-display-timer`), expand chevron. Expanded panel capped at `max-h-[45dvh] md:max-h-[60dvh]` with internal scroll: status / start time (wall clock) / pool size (editable inline, 25m·50m presets) / total drills / **total distance** (`{completedDistance}/{totalDistance}m`, summed from drills whose lane results are `completed`), plus Start–Pause / Complete, Edit Session, Reset. |
+| Session details | `live/LiveSessionHeader.tsx` | collapsed | `shrink-0`. Collapsed bar: template name + live/paused/not-started status dot, a circular play/stop button, the elapsed timer (`font-display-timer`), and an expand chevron. The circular button is the primary start/complete control from the main screen: when not started it is a `play_arrow` that starts the session (or opens the lane editor if no swimmers are assigned); once started (running **or** paused) it becomes a `stop` button that opens a **completion confirmation** dialog (`ConfirmDialog`, non-destructive, label "Complete") owned by `ActiveRunView` — it no longer pauses. Pause is available only in the expanded panel. Expanded panel capped at `max-h-[45dvh] md:max-h-[60dvh]` with internal scroll: status / start time (wall clock) / pool size (editable inline, 25m·50m presets) / total drills / **total distance** (`{completedDistance}/{totalDistance}m`, summed from drills whose lane results are `completed`), plus Start–Pause / Complete (also confirmation-gated), Edit Session, Reset. |
 | Drills | `live/DrillsSection.tsx` | expanded | `flex-1 min-h-0`; list is `flex-1 min-h-0 overflow-y-auto`. Takes all space down to the swimmers bar. |
 | Lane Swimmers | `live/LaneSwimmersSection.tsx` | collapsed | `shrink-0` (sits above mobile bottom nav); `flex-1 min-h-0` with internal `overflow-y-auto` body when expanded. |
 
@@ -141,8 +141,10 @@ if one exists it becomes the active run and groups are rebuilt from the persiste
 the session clock only happens on explicit play (`START_SESSION_TIMER`).
 
 **Session header box**: session name, "Live" indicator with pulsing dot, wall-time start
-(e.g. "Started 14:30"), date/pool/drill count, Play/Pause toggle, Lane Editor (pencil
-icon), Reset, Complete buttons. Group cards in responsive grid (1–4 columns). Each group:
+(e.g. "Started 14:30"), date/pool/drill count. The collapsed circular play/stop button starts
+the session (play) or confirms completion (stop); pause lives in the expanded panel. Expanded
+panel adds Start–Pause toggle, Lane Editor (pencil icon), Reset, and Complete (confirmation-
+gated). Group cards in responsive grid (1–4 columns). Each group:
 name (pencil opens LaneEditorModal for name editing, swimmer management, lane reset),
 lane number, drill timer display, drill selector — no inline editing on the card. No
 per-lane timers — a single global session clock ticks once per 10ms via `tick()`

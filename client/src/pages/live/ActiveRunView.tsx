@@ -64,6 +64,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const [confirmMove, setConfirmMove] = useState<{ swimmer: DbSwimmer; fromGroupId: string; toGroupId: string } | null>(null)
   const [showResetSessionConfirm, setShowResetSessionConfirm] = useState(false)
   const [resetClearSwimmers, setResetClearSwimmers] = useState(false)
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [showLaneEditor, setShowLaneEditor] = useState(false)
   const [editorScrollToLane, setEditorScrollToLane] = useState<number | null>(null)
   const [rosterSwimmers, setRosterSwimmers] = useState<DbSwimmer[]>([])
@@ -493,7 +494,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
          onToggleSession={() => {
            dispatch({ type: sessionRunning ? 'PAUSE_SESSION_TIMER' : 'START_SESSION_TIMER' })
          }}
-         onComplete={handleComplete}
+         onRequestComplete={() => setShowCompleteConfirm(true)}
          onReset={() => setShowResetSessionConfirm(true)}
          onOpenLaneEditor={() => openLaneEditor()}
           onEditSession={() => navigate(`/sessions/${run.sessionId}`)}
@@ -681,6 +682,20 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
           </div>
         </label>
       </ConfirmDialog>
+
+      <ConfirmDialog
+        open={showCompleteConfirm}
+        title="Complete Session?"
+        message="This saves all recorded timing data and ends the live session. You'll be returned to the session picker."
+        confirmLabel="Complete"
+        cancelLabel="Cancel"
+        destructive={false}
+        onConfirm={() => {
+          setShowCompleteConfirm(false)
+          void handleComplete()
+        }}
+        onCancel={() => setShowCompleteConfirm(false)}
+      />
 
       {showLaneEditor && <LaneEditorModal
         state={{ groups, runId: run.id }}

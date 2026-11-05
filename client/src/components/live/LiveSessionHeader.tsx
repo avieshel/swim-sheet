@@ -14,7 +14,7 @@ interface LiveSessionHeaderProps {
   sessionElapsed: number
   sessionStartedAt: number
   onToggleSession: () => void
-  onComplete: () => void
+  onRequestComplete: () => void
   onReset: () => void
   onOpenLaneEditor: () => void
   onEditSession: () => void
@@ -23,7 +23,7 @@ interface LiveSessionHeaderProps {
 
 export function LiveSessionHeader({
   templateName, run, drillCount, totalDistance, completedDistance, sessionRunning, sessionElapsed, sessionStartedAt,
-  onToggleSession, onComplete, onReset, onOpenLaneEditor, onEditSession,
+  onToggleSession, onRequestComplete, onReset, onOpenLaneEditor, onEditSession,
   onCommitPoolLength
 }: LiveSessionHeaderProps) {
   const { groups } = useContext(LiveSessionContext)
@@ -75,15 +75,15 @@ export function LiveSessionHeader({
 
         <div className="flex items-center gap-2.5 shrink-0">
           <button
-            onClick={handleMainAction}
+            onClick={sessionRunning || sessionElapsed > 0 ? onRequestComplete : handleMainAction}
             className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
               sessionRunning
                 ? 'bg-primary border-primary text-on-primary'
                 : 'border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary'
             }`}
-            title={sessionRunning ? 'Pause session' : sessionElapsed > 0 ? 'Resume session' : 'Start session'}
+            title={sessionRunning || sessionElapsed > 0 ? 'Complete session' : 'Start session'}
           >
-            <Icon name={sessionRunning ? 'stop' : 'play_arrow'} size="xs" />
+            <Icon name={sessionRunning || sessionElapsed > 0 ? 'stop' : 'play_arrow'} size="xs" />
           </button>
           <span className={`font-display-timer text-xl md:text-2xl font-bold tabular-nums leading-none ${sessionRunning ? 'text-on-surface' : 'text-on-surface-variant/60'}`}>
             {formatSessionTime(sessionElapsed)}
@@ -114,10 +114,10 @@ export function LiveSessionHeader({
               {sessionRunning ? 'Pause' : sessionElapsed > 0 ? 'Resume' : 'Start'}
             </button>
             <button
-              onClick={onComplete}
+              onClick={onRequestComplete}
               className="flex items-center justify-center gap-1.5 h-10 px-4 text-label-sm rounded-full font-bold transition-all cursor-pointer active:scale-95 bg-surface-variant text-on-surface hover:brightness-95"
             >
-              <Icon name="stop" size="xs" />
+              <Icon name="check" size="xs" />
               Complete
             </button>
           </div>
