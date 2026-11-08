@@ -2,8 +2,8 @@
 // No real Supabase client or network is touched — every side effect is injected.
 
 import { assertEquals } from 'jsr:@std/assert@1'
-import { createHandler, type HandlerDeps } from './handler.ts'
-import type { ServiceRoleClient } from './deps.ts'
+import { createHandler } from './handler.ts'
+import type { HandlerDeps, ServiceRoleClient } from './deps.ts'
 
 const fakeClient = ({} as unknown) as ServiceRoleClient
 
@@ -322,6 +322,23 @@ Deno.test('POST with query ?path=/status returns the isOwner response', async ()
   )
   assertEquals(res.status, 200)
   assertEquals(await res.json(), { isOwner: true })
+})
+
+Deno.test('non-owner routed via body.path is rejected with 403', async () => {
+  const h = createHandler(
+    makeDeps({
+      getCallerUid: () => Promise.resolve('evil'),
+      isOwner: (u) => u === 'owner',
+    }),
+  )
+  const res = await h(
+    new Request('https://x/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/status' }),
+    }),
+  )
+  assertEquals(res.status, 403)
 })
 
 Deno.test('URL-path routing takes priority over a body.path when a path is present', async () => {

@@ -251,7 +251,7 @@ export async function materializeDraft(
         name: drill.name,
         stroke,
         distance,
-        order: i,
+        drill_order: i,
         created_at: now,
         updated_at: now,
       },

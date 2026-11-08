@@ -5,8 +5,7 @@
 
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import { getOwnerAllowlist, isOwner } from '../model/config.ts'
-
-type EnvGet = (key: string) => string | undefined
+import type { EnvGet } from '../model/types.ts'
 
 const DEFAULT_ENV: EnvGet = (key) => Deno.env.get(key)
 

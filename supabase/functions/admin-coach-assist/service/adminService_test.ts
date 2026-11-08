@@ -103,6 +103,7 @@ interface WriteFakeRecorder {
   client: ServiceRoleClient
   inserted: Record<string, Array<Record<string, unknown>>>
   updated: Array<{ table: string; row: Record<string, unknown> }>
+  deleted: Array<{ table: string; id?: unknown; org?: unknown }>
   dataByTable: Record<string, unknown[]>
 }
 
@@ -111,8 +112,10 @@ function makeWriteFakeClient(
 ): WriteFakeRecorder {
   const inserted: Record<string, Array<Record<string, unknown>>> = {}
   const updated: Array<{ table: string; row: Record<string, unknown> }> = []
+  const deleted: Array<{ table: string; id?: unknown; org?: unknown }> = []
 
   function makeBuilder(table: string) {
+    let pendingDelete: { table: string; id?: unknown; org?: unknown } | null = null
     const builder = {
       insert(row: Record<string, unknown>) {
         inserted[table] = [...(inserted[table] ?? []), row]
@@ -123,12 +126,18 @@ function makeWriteFakeClient(
         return builder
       },
       delete() {
+        pendingDelete = { table }
+        deleted.push(pendingDelete)
         return builder
       },
       select(_columns?: string) {
         return builder
       },
-      eq(_column: string, _value: unknown) {
+      eq(column: string, value: unknown) {
+        if (pendingDelete) {
+          if (column === 'id') pendingDelete.id = value
+          else if (column === 'organization_id') pendingDelete.org = value
+        }
         return builder
       },
       single() {
@@ -155,6 +164,7 @@ function makeWriteFakeClient(
     client: (client as unknown) as ServiceRoleClient,
     inserted,
     updated,
+    deleted,
     dataByTable,
   }
 }
@@ -200,10 +210,13 @@ Deno.test('updateRow stamps org/owner and scopes by id', async () => {
   assertEquals(updated[0].row.name, 'Updated')
 })
 
-Deno.test('deleteRow scopes the delete by id and org without error', async () => {
-  const { client } = makeWriteFakeClient()
+Deno.test('deleteRow scopes the delete by id and org', async () => {
+  const { client, deleted } = makeWriteFakeClient()
   await deleteRow(client, 'org-D', 'drills', 'drill-9')
-  assertEquals(true, true)
+  assertEquals(deleted.length, 1)
+  assertEquals(deleted[0].table, 'drills')
+  assertEquals(deleted[0].id, 'drill-9')
+  assertEquals(deleted[0].org, 'org-D')
 })
 
 Deno.test('getCoachData returns rows scoped to the org across the four tables', async () => {
@@ -266,11 +279,11 @@ Deno.test('materializeDraft creates one session + N drills, all scoped and uniqu
   assertEquals(inserted['drills'][0].distance, (50 * 4) * 2)
   assertEquals(inserted['drills'][1].distance, (100 * 2 + 25 * 8) * 3)
 
-  // Stroke comes from the first item; order is the index.
+  // Stroke comes from the first item; drill_order is the index.
   assertEquals(inserted['drills'][0].stroke, 'freestyle')
   assertEquals(inserted['drills'][1].stroke, 'backstroke')
-  assertEquals(inserted['drills'][0].order, 0)
-  assertEquals(inserted['drills'][1].order, 1)
+  assertEquals(inserted['drills'][0].drill_order, 0)
+  assertEquals(inserted['drills'][1].drill_order, 1)
 
   // Every generated id is distinct and fresh (no collisions across the batch).
   const allIds = [sessionId, ...drillIds]

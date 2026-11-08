@@ -6,7 +6,7 @@
 // later tasks append more routes to this same handler.
 
 import { json } from './http.ts'
-import type { ServiceRoleClient } from './deps.ts'
+import type { HandlerDeps, ServiceRoleClient } from './deps.ts'
 import type { SessionDraftV1 } from '../shared/sessionDraft/types.ts'
 import {
   listCoaches,
@@ -20,17 +20,6 @@ import {
 } from '../service/adminService.ts'
 import { ScopedWriteError } from '../model/validate.ts'
 import type { ScopedTable } from '../model/types.ts'
-
-export interface HandlerDeps {
-  // Resolve the caller's authenticated user id from their JWT. null means the
-  // token was absent, malformed, or unverifiable — treated as "not an owner".
-  getCallerUid(req: Request): Promise<string | null>
-  // Whether a user id is a configured owner.
-  isOwner(uid: string): boolean
-  // Service-role client factory (used by later tasks; injected, never built
-  // inside the handler).
-  createServiceRoleClient(): ServiceRoleClient
-}
 
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {
   return async function handle(req: Request): Promise<Response> {
@@ -119,12 +108,9 @@ async function withOwner(
 }
 
 async function handleStatus(deps: HandlerDeps, req: Request): Promise<Response> {
-  const callerUid = await deps.getCallerUid(req)
-  // Owner gate: a missing/unverifiable token (null) or a non-owner id is 403.
-  if (callerUid === null || !deps.isOwner(callerUid)) {
-    return json({ error: 'forbidden' }, 403)
-  }
-  return json({ isOwner: true }, 200)
+  // The owner gate is identical to every other route; reuse withOwner so the
+  // 403 rule lives in exactly one place.
+  return withOwner(deps, req, async () => json({ isOwner: true }, 200))
 }
 
 async function handleListCoaches(deps: HandlerDeps): Promise<Response> {

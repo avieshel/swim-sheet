@@ -1,9 +1,7 @@
 // Tunable configuration for the admin coach-assist function. Every bound that a
 // later task would otherwise inline as a magic number lives here.
 
-import type { ScopedTable } from './types.ts'
-
-type EnvGet = (key: string) => string | undefined
+import type { EnvGet, ScopedTable } from './types.ts'
 
 const DEFAULT_ENV: EnvGet = (key) => Deno.env.get(key)
 

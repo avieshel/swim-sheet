@@ -23,6 +23,46 @@ One tenant abstraction supports all three confirmed coaching patterns:
 created for tagging; login **claims** local organizations into Supabase (same UUID).
 Sync/collab only for claimed organizations.
 
+### Owner Coach-Assist (admin write path)
+
+The `admin-coach-assist` Edge Function lets the **app owner** create/edit/delete
+sessions, drills, swimmers, and library drills inside a specific coach's personal
+organization, so the owner can assist a coach without touching other coaches' data
+or their own account. The assisted rows are then delivered to the coach's device via
+the normal sync path.
+
+**Access control (strict, owner-only):**
+- Deployed with JWT verification ON. The caller's identity is resolved from the
+  request JWT (`getCallerUid`); a missing/unverifiable token is treated as
+  "not an owner".
+- The caller must be in the `OWNER_USER_IDS` allowlist (`isOwner`) or the request is
+  rejected with `403` on every route (the gate lives in exactly one place,
+  `withOwner`).
+- The `service_role` key is used only inside the function (owner write path); it is
+  never exposed to clients, and the function is **never** invoked with
+  `--no-verify-jwt`.
+
+**Scoping invariants (why it cannot corrupt other coaches):**
+- Writes never trust a client-supplied organization. The target coach's personal
+  org is resolved **server-side** via `resolveCoachOrg(coachUserId)` (SELECT
+  `organizations` WHERE `created_by = <coach>`); a mutation fails closed if the coach
+  owns none or more than one.
+- `normalizeScopedWrite` always stamps `organization_id = <resolved org>` and
+  `created_by = <coachUserId>`. Any `organization_id`/`created_by` present in the
+  caller payload are **ignored** (reserved keys), so a caller can never smuggle a
+  foreign org or a different owner.
+- `deleteRow` additionally scopes the delete by both `id` and `organization_id`.
+
+**Delivery + isolation:** because `created_by` and `organization_id` are stamped to
+the *coach*, the row is indistinguishable from one the coach created themselves. The
+coach's normal PWA `pull` (`SupabaseSyncTransport.pull` → `select * from <table>
+where organization_id = <coach org>`, authenticated as the coach) returns it; another
+coach's pull cannot see it because RLS `is_organization_member(organization_id)` is
+false across tenants. End-to-end proof:
+`supabase/functions/admin-coach-assist/integration/isolation_check.ts` writes a
+session to Coach A via the real service, then asserts Coach A's pull includes it
+while Coach B's pull (RLS) excludes it.
+
 ## Sync Dependency Order
 
 Pending cloud writes are ordered with parent rows before dependents. `sessions`

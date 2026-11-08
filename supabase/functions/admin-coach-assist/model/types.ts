@@ -1,6 +1,10 @@
 // Domain types for the admin coach-assist Edge Function. Shared by the handler
 // route table (added incrementally across tasks) and the service-layer deps.
 
+// A minimal environment-getter abstraction so config/deps stay injectable and
+// testable without touching Deno.env directly.
+export type EnvGet = (key: string) => string | undefined
+
 // Tables a coach may write to on behalf of an owner. The allowlist is the
 // single source of truth for which scopes an admin action may target; later
 // tasks extend the route table to consume it.
