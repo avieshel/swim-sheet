@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { Layout } from './components/Layout'
 import { RouteMeta } from './components/RouteMeta'
 import { UpdatePrompt } from './components/UpdatePrompt'
@@ -24,6 +24,10 @@ import { testSupabaseConnection } from './api/supabase'
 import { AuthProvider } from './context/AuthProvider'
 import { AuthCallback } from './pages/AuthCallback'
 
+const AdminCoachAssist = lazy(() =>
+  import('./pages/AdminCoachAssist').then((m) => ({ default: m.AdminCoachAssist })),
+)
+
 function App() {
   useEffect(() => {
     if (isNewSession()) {
@@ -42,6 +46,14 @@ function App() {
         <Route path="/auth/callback" element={<AuthCallback />} />
         <Route element={<Layout />}>
           <Route path="/" element={<LiveDeck />} />
+          <Route
+            path="/admin/coach-assist"
+            element={
+              <Suspense fallback={null}>
+                <AdminCoachAssist />
+              </Suspense>
+            }
+          />
           <Route path="/dashboard" element={<CoachDashboard />} />
           <Route path="/swimmers" element={<SwimmersList />} />
           <Route path="/swimmers/:id" element={<SwimmerDetail />} />
