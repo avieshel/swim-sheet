@@ -35,50 +35,73 @@ export interface HandlerDeps {
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url)
+    // When the URL carries no usable path (e.g. supabase.functions.invoke, which
+    // hits the function root), resolve the route from a `path` field in the JSON
+    // body or a `?path=` query — while the URL-path route table stays intact for
+    // direct/test calls. The request body is read once here and threaded into the
+    // handlers, since a Request body stream can only be consumed a single time.
+    const fromBody = url.pathname === '/' || url.pathname === ''
+    const body = await readJsonBody<Record<string, unknown>>(req)
+    const routePath = fromBody ? resolveRoutePath(url, body) : url.pathname
+
+    // With URL-path routing the HTTP method is part of the contract (existing
+    // tests rely on it). When routed via body/query path the client cannot set a
+    // URL path, so the method is intentionally ignored and routing is by path.
+    const allow = (expected: string) => fromBody || req.method === expected
 
     // Additive route table — later tasks register more routes here.
-    if (req.method === 'GET' && url.pathname === '/status') {
+    if (allow('GET') && routePath === '/status') {
       return handleStatus(deps, req)
     }
 
     // Owner-gated routes (Task 2+). The gate is enforced before any work is
     // done, so non-owners are rejected with 403 on these routes too.
-    if (req.method === 'GET' && url.pathname === '/coaches') {
+    if (allow('GET') && routePath === '/coaches') {
       return withOwner(deps, req, () => handleListCoaches(deps))
     }
 
     // Owner-gated coach-data + scoped write routes (Task 4). The coach's org is
     // always resolved server-side via resolveCoachOrg; a client may never supply
     // a foreign org for a mutation.
-    const coachDataMatch = url.pathname.match(/^\/coaches\/([^/]+)\/data$/)
-    if (req.method === 'GET' && coachDataMatch) {
+    const coachDataMatch = routePath.match(/^\/coaches\/([^/]+)\/data$/)
+    if (allow('GET') && coachDataMatch) {
       return withOwner(deps, req, () => handleCoachData(deps, coachDataMatch[1]))
     }
 
-    const coachDraftMatch = url.pathname.match(/^\/coaches\/([^/]+)\/draft$/)
-    if (req.method === 'POST' && coachDraftMatch) {
-      return withOwner(deps, req, () => handleCoachDraft(deps, req, coachDraftMatch[1]))
+    const coachDraftMatch = routePath.match(/^\/coaches\/([^/]+)\/draft$/)
+    if (allow('POST') && coachDraftMatch) {
+      return withOwner(deps, req, () => handleCoachDraft(deps, body, coachDraftMatch[1]))
     }
 
-    const coachMatch = url.pathname.match(/^\/coaches\/([^/]+)$/)
-    if (req.method === 'GET' && coachMatch) {
+    const coachMatch = routePath.match(/^\/coaches\/([^/]+)$/)
+    if (allow('GET') && coachMatch) {
       return withOwner(deps, req, () => handleCoachOrg(deps, coachMatch[1]))
     }
 
-    if (req.method === 'POST' && url.pathname === '/row') {
-      return withOwner(deps, req, () => handleCreateRow(deps, req))
+    if (allow('POST') && routePath === '/row') {
+      return withOwner(deps, req, () => handleCreateRow(deps, body))
     }
 
-    const rowIdMatch = url.pathname.match(/^\/row\/([^/]+)$/)
-    if (req.method === 'PATCH' && rowIdMatch) {
-      return withOwner(deps, req, () => handleUpdateRow(deps, req, rowIdMatch[1]))
+    const rowIdMatch = routePath.match(/^\/row\/([^/]+)$/)
+    if (allow('PATCH') && rowIdMatch) {
+      return withOwner(deps, req, () => handleUpdateRow(deps, body, rowIdMatch[1]))
     }
-    if (req.method === 'DELETE' && rowIdMatch) {
-      return withOwner(deps, req, () => handleDeleteRow(deps, req, rowIdMatch[1]))
+    if (allow('DELETE') && rowIdMatch) {
+      return withOwner(deps, req, () => handleDeleteRow(deps, body, rowIdMatch[1]))
     }
 
     return json({ error: 'not_found' }, 404)
   }
+}
+
+// Resolve the route path from a body `path` field or a `?path=` query, falling
+// back to empty (→ 404) when neither is present. URL-path routing takes priority
+// and is handled by the caller before this is reached.
+function resolveRoutePath(url: URL, body: Record<string, unknown> | null): string {
+  const fromQuery = url.searchParams.get('path')
+  if (fromQuery) return fromQuery
+  if (body && typeof body.path === 'string') return body.path
+  return ''
 }
 
 // Run the owner gate, then the action on success; a missing/unverifiable token
@@ -153,24 +176,19 @@ async function withCoachScope(
   }
 }
 
-async function handleCreateRow(deps: HandlerDeps, req: Request): Promise<Response> {
-  const body = await readJsonBody<{
-    coachUserId?: string
-    table?: string
-    payload?: Record<string, unknown>
-  }>(req)
+async function handleCreateRow(
+  deps: HandlerDeps,
+  body: Record<string, unknown> | null,
+): Promise<Response> {
   if (!body || !body.coachUserId || !body.table || !body.payload) {
     return json({ error: 'bad_request' }, 400)
   }
+  const coachUserId = body.coachUserId as string
+  const table = body.table as ScopedTable
+  const payload = body.payload as Record<string, unknown>
   try {
-    return await withCoachScope(deps, body.coachUserId, async (client, orgId) => {
-      const { id } = await createRow(
-        client,
-        orgId,
-        body.table as ScopedTable,
-        body.payload as Record<string, unknown>,
-        body.coachUserId as string,
-      )
+    return await withCoachScope(deps, coachUserId, async (client, orgId) => {
+      const { id } = await createRow(client, orgId, table, payload, coachUserId)
       return json({ id }, 200)
     })
   } catch (err) {
@@ -181,27 +199,18 @@ async function handleCreateRow(deps: HandlerDeps, req: Request): Promise<Respons
 
 async function handleUpdateRow(
   deps: HandlerDeps,
-  req: Request,
+  body: Record<string, unknown> | null,
   id: string,
 ): Promise<Response> {
-  const body = await readJsonBody<{
-    coachUserId?: string
-    table?: string
-    patch?: Record<string, unknown>
-  }>(req)
   if (!body || !body.coachUserId || !body.table || !body.patch) {
     return json({ error: 'bad_request' }, 400)
   }
+  const coachUserId = body.coachUserId as string
+  const table = body.table as ScopedTable
+  const patch = body.patch as Record<string, unknown>
   try {
-    return await withCoachScope(deps, body.coachUserId, async (client, orgId) => {
-      await updateRow(
-        client,
-        orgId,
-        body.table as ScopedTable,
-        id,
-        body.patch as Record<string, unknown>,
-        body.coachUserId as string,
-      )
+    return await withCoachScope(deps, coachUserId, async (client, orgId) => {
+      await updateRow(client, orgId, table, id, patch, coachUserId)
       return json({ ok: true }, 200)
     })
   } catch (err) {
@@ -212,19 +221,17 @@ async function handleUpdateRow(
 
 async function handleDeleteRow(
   deps: HandlerDeps,
-  req: Request,
+  body: Record<string, unknown> | null,
   id: string,
 ): Promise<Response> {
-  const body = await readJsonBody<{
-    coachUserId?: string
-    table?: string
-  }>(req)
   if (!body || !body.coachUserId || !body.table) {
     return json({ error: 'bad_request' }, 400)
   }
+  const coachUserId = body.coachUserId as string
+  const table = body.table as ScopedTable
   try {
-    return await withCoachScope(deps, body.coachUserId, async (client, orgId) => {
-      await deleteRow(client, orgId, body.table as ScopedTable, id)
+    return await withCoachScope(deps, coachUserId, async (client, orgId) => {
+      await deleteRow(client, orgId, table, id)
       return json({ ok: true }, 200)
     })
   } catch (err) {
@@ -245,11 +252,11 @@ async function handleCoachData(
 
 async function handleCoachDraft(
   deps: HandlerDeps,
-  req: Request,
+  body: Record<string, unknown> | null,
   coachId: string,
 ): Promise<Response> {
-  const body = await readJsonBody<{ draft?: SessionDraftV1 }>(req)
-  if (!body || !body.draft) {
+  const draft = body?.draft as SessionDraftV1 | undefined
+  if (!body || !draft) {
     return json({ error: 'bad_request' }, 400)
   }
   return withCoachScope(deps, coachId, async (client, orgId) => {

@@ -282,3 +282,64 @@ Deno.test('POST /coaches/:id/draft materializes a session + drills for an owner'
   assertEquals(rec.inserted['sessions'][0].organization_id, 'org-1')
   assertEquals(rec.inserted['drills'][0].created_by, 'coach-1')
 })
+
+// --- Body-path routing (Task 5): supabase.functions.invoke hits the function
+// root with no URL path, so the route must be resolved from a `path` field in
+// the JSON body. This keeps the existing URL-path routing intact (above) while
+// making the routes reachable from the client.
+
+Deno.test('POST with body.path /status returns the isOwner response', async () => {
+  const h = createHandler(
+    makeDeps({
+      getCallerUid: () => Promise.resolve('owner'),
+      isOwner: (u) => u === 'owner',
+    }),
+  )
+  const res = await h(
+    new Request('https://x/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/status' }),
+    }),
+  )
+  assertEquals(res.status, 200)
+  assertEquals(await res.json(), { isOwner: true })
+})
+
+Deno.test('POST with query ?path=/status returns the isOwner response', async () => {
+  const h = createHandler(
+    makeDeps({
+      getCallerUid: () => Promise.resolve('owner'),
+      isOwner: (u) => u === 'owner',
+    }),
+  )
+  const res = await h(
+    new Request('https://x/?path=/status', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ignored: true }),
+    }),
+  )
+  assertEquals(res.status, 200)
+  assertEquals(await res.json(), { isOwner: true })
+})
+
+Deno.test('URL-path routing takes priority over a body.path when a path is present', async () => {
+  // A POST to the real URL path /status (GET-only) carrying body.path=/coaches
+  // must be routed by the URL path, ignoring body.path entirely — so it 404s
+  // rather than listing coaches.
+  const h = createHandler(
+    makeDeps({
+      getCallerUid: () => Promise.resolve('owner'),
+      isOwner: (u) => u === 'owner',
+    }),
+  )
+  const res = await h(
+    new Request('https://x/status', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/coaches' }),
+    }),
+  )
+  assertEquals(res.status, 404)
+})
