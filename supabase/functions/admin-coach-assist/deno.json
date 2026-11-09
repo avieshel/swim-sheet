@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "check": "deno check index.ts",
+    "test": "deno test --allow-env=OWNER_USER_IDS,SUPABASE_URL,SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY",
+    "integration": "deno run --allow-net --allow-env --allow-read integration/isolation_check.ts"
+  }
+}
