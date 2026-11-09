@@ -53,3 +53,29 @@ jobs:
           build-directory: client/dist
           branch: main
           production-branch: main
+
+  deploy-supabase:
+    needs: quality
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      secrets.SUPABASE_ACCESS_TOKEN != '' &&
+      secrets.SUPABASE_PROJECT_REF != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Deploy admin-coach-assist Edge Function
+        run: supabase functions deploy admin-coach-assist --project-ref "$SUPABASE_PROJECT_REF"
+      - name: Sync OWNER_USER_IDS secret
+        if: ${{ secrets.SUPABASE_OWNER_USER_IDS != '' }}
+        run: supabase secrets set OWNER_USER_IDS="$SUPABASE_OWNER_USER_IDS" --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_OWNER_USER_IDS: ${{ secrets.SUPABASE_OWNER_USER_IDS }}

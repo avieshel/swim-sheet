@@ -17,6 +17,9 @@ function makeCoachClient(rows: unknown[]): ServiceRoleClient {
     eq(_column: string, _value: unknown) {
       return builder
     },
+    is(_column: string, _value: unknown) {
+      return builder
+    },
     then(onfulfilled: (value: { data: unknown[]; error: null }) => unknown) {
       return Promise.resolve().then(() => onfulfilled({ data: rows, error: null }))
     },
@@ -161,6 +164,9 @@ function makeFullClient(
       eq(_column: string, _value: unknown) {
         return builder
       },
+      is(_column: string, _value: unknown) {
+        return builder
+      },
       single() {
         const rows = inserted[table]
         const raw = rows && rows.length ? rows[rows.length - 1].id : undefined
@@ -297,6 +303,28 @@ Deno.test('POST with body.path /status returns the isOwner response', async () =
   )
   const res = await h(
     new Request('https://x/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: '/status' }),
+    }),
+  )
+  assertEquals(res.status, 200)
+  assertEquals(await res.json(), { isOwner: true })
+})
+
+Deno.test('POST to the real mount pathname /<slug> routes from body.path', async () => {
+  // Mirrors production exactly: the Edge runtime hands the handler a pathname of
+  // `/admin-coach-assist` (the slug, with `/functions/v1/` already stripped), and
+  // the route travels in the JSON body's `path` field. This is the request shape
+  // that previously fell through to a 404.
+  const h = createHandler(
+    makeDeps({
+      getCallerUid: () => Promise.resolve('owner'),
+      isOwner: (u) => u === 'owner',
+    }),
+  )
+  const res = await h(
+    new Request('https://x/admin-coach-assist', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ path: '/status' }),

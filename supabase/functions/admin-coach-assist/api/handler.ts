@@ -24,18 +24,18 @@ import type { ScopedTable } from '../model/types.ts'
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url)
-    // Supabase serves this function at `/functions/v1/<slug>`, and
-    // `supabase.functions.invoke` POSTs to that mount path with the real route
-    // carried in the JSON body's `path` field (or a `?path=` query). The raw
-    // URL pathname is therefore the function mount, NOT the intended route, so we
-    // strip the prefix. An empty remainder means "route comes from the body"
-    // (the invoke contract); a non-empty remainder is a direct URL-path route and
-    // the existing route table applies with the HTTP method as part of the
-    // contract. The body is read once here and threaded into the handlers, since
-    // a Request body stream can only be consumed a single time.
+    // The Edge runtime presents `req.url` as `/<slug>` when invoked at the function
+    // mount (the `/functions/v1/` prefix is stripped before the handler runs), or
+    // `/<slug>/<route>` for a direct URL-path call. `supabase.functions.invoke`
+    // POSTs to the mount with the real route in the JSON body's `path` field (or a
+    // `?path=` query). So the mount pathname is the function root — "route comes
+    // from the body"; a non-empty remainder (e.g. `/<slug>/coaches`) is a direct
+    // URL-path route, and the existing route table applies with the HTTP method as
+    // part of the contract. The body is read once here and threaded into the
+    // handlers, since a Request body stream can only be consumed a single time.
     const subpath = stripFunctionPrefix(url.pathname)
     const body = await readJsonBody<Record<string, unknown>>(req)
-    const fromBody = subpath === '' || subpath === '/'
+    const fromBody = subpath === '' || url.pathname === '/' || url.pathname === ''
     const routePath = fromBody ? resolveRoutePath(url, body) : subpath
 
     // With URL-path routing the HTTP method is part of the contract (existing
@@ -101,11 +101,20 @@ function resolveRoutePath(url: URL, body: Record<string, unknown> | null): strin
 // Strip the Supabase function mount prefix (`/functions/v1/<slug>`), returning the
 // remainder — '' for the function root, or e.g. '/coaches' for a direct sub-path
 // call. Paths without the prefix (unit-test URLs such as `/status`) are returned
-// unchanged so URL-path routing keeps working in tests.
+// This handler is deployed once under a fixed name; the runtime hands the handler
+// a pathname of `/<slug>` at the function root, or `/<slug>/<route>` for a direct
+// URL-path call. Strip that mount prefix so the remainder is the intended route —
+// '' means "route comes from the body" (the invoke contract). Other paths (e.g.
+// unit-test URLs such as `/status`) are returned unchanged so URL-path routing keeps
+// working in tests.
+const FUNCTION_SLUG = 'admin-coach-assist'
+
 function stripFunctionPrefix(pathname: string): string {
-  const m = pathname.match(/^\/functions\/v1\/[^/]+(.*)$/)
+  const m = pathname.match(
+    new RegExp(`^/functions/v1/${FUNCTION_SLUG}(/.*)?$|^/${FUNCTION_SLUG}(/.*)?$`),
+  )
   if (!m) return pathname
-  return m[1]
+  return m[1] ?? m[2] ?? ''
 }
 
 // Run the owner gate, then the action on success; a missing/unverifiable token

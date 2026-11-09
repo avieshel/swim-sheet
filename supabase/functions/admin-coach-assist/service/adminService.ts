@@ -63,9 +63,13 @@ export async function resolveCoachOrg(
 export async function listCoaches(
   client: ServiceRoleClient,
 ): Promise<CoachSummary[]> {
+  // Pin the embed to the created_by foreign key: there are two relationships
+  // between organizations and profiles (created_by, plus a many-to-many via
+  // organization_memberships), so PostgREST otherwise refuses the embed with
+  // PGRST201. The explicit `!organizations_created_by_fkey` selects the owner.
   const result = await client
     .from('organizations')
-    .select('id, created_by, profiles(id, full_name, email)')
+    .select('id, created_by, profiles!organizations_created_by_fkey(id, full_name, email)')
 
   if (result.error) {
     throw new Error(`Failed to list coaches: ${result.error.message}`)
@@ -75,8 +79,8 @@ export async function listCoaches(
   return rows
     .map((row) => ({
       userId: row.created_by,
-      name: row.profiles.full_name,
-      email: row.profiles.email,
+      name: row.profiles?.full_name ?? '',
+      email: row.profiles?.email ?? '',
       orgId: row.id,
     }))
     .slice(0, ADMIN_BATCH_CAP)
@@ -155,22 +159,29 @@ export async function getCoachData(
   client: ServiceRoleClient,
   orgId: string,
 ): Promise<CoachData> {
+  // Every coach table uses soft deletes via `deleted_at`; the app's normal client
+  // hides those rows, so the admin view must too — otherwise the owner sees
+  // tombstoned rows (which read as duplicate/old entries). Filter them out.
   const sessions = await client
     .from('sessions')
     .select('*')
     .eq('organization_id', orgId)
+    .is('deleted_at', null)
   const drills = await client
     .from('drills')
     .select('*')
     .eq('organization_id', orgId)
+    .is('deleted_at', null)
   const swimmers = await client
     .from('swimmers')
     .select('*')
     .eq('organization_id', orgId)
+    .is('deleted_at', null)
   const libraryDrills = await client
     .from('library_drills')
     .select('*')
     .eq('organization_id', orgId)
+    .is('deleted_at', null)
 
   for (const [key, res] of [
     ['sessions', sessions],

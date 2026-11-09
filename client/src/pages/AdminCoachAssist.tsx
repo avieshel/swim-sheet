@@ -36,6 +36,12 @@ const EMPTY_DRAFT: SessionDraftV1 = {
 
 type DataKey = 'sessions' | 'drills' | 'swimmers'
 
+const COACH_DATA_TABS: { key: DataKey; label: string }[] = [
+  { key: 'sessions', label: 'Sessions' },
+  { key: 'drills', label: 'Drills' },
+  { key: 'swimmers', label: 'Swimmers' },
+]
+
 interface DisplayRow {
   id: string
   name: string
@@ -84,6 +90,7 @@ export function AdminCoachAssist() {
   const [confirmDelete, setConfirmDelete] = useState<{ table: ScopedTable; id: string; name: string } | null>(null)
   const [draft, setDraft] = useState<SessionDraftV1>(EMPTY_DRAFT)
   const [draftSaving, setDraftSaving] = useState(false)
+  const [tab, setTab] = useState<DataKey>('sessions')
 
   useEffect(() => {
     if (isOwner && coaches.length === 0) {
@@ -220,7 +227,6 @@ export function AdminCoachAssist() {
 
   const drillsForSession = (sessionId: string) =>
     allDrills.filter((d) => d.sessionId === sessionId)
-  const ungroupedDrills = allDrills.filter((d) => !d.sessionId)
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
@@ -255,6 +261,34 @@ export function AdminCoachAssist() {
 
       {selectedCoachId && (
         <>
+          <div
+            role="tablist"
+            aria-label="Coach data sections"
+            className="flex gap-1 border-b border-outline-variant"
+          >
+            {COACH_DATA_TABS.map((t) => {
+              const active = tab === t.key
+              return (
+                <button
+                  key={t.key}
+                  role="tab"
+                  type="button"
+                  aria-selected={active}
+                  onClick={() => setTab(t.key)}
+                  className={
+                    'px-4 py-2 -mb-px border-b-2 font-label-sm cursor-pointer ' +
+                    (active
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-on-surface-variant hover:text-on-surface')
+                  }
+                >
+                  {t.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {tab === 'sessions' && (
           <section className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-headline-sm text-on-surface">Sessions</h2>
@@ -333,7 +367,9 @@ export function AdminCoachAssist() {
               </div>
             ))}
           </section>
+          )}
 
+          {tab === 'swimmers' && (
           <section className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-headline-sm text-on-surface">Swimmers</h2>
@@ -373,36 +409,56 @@ export function AdminCoachAssist() {
               </div>
             ))}
           </section>
-
-          {ungroupedDrills.length > 0 && (
-            <section className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant space-y-2">
-              <h2 className="font-headline-sm text-on-surface">Ungrouped drills</h2>
-              {ungroupedDrills.map((drill) => (
-                <div key={drill.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-container-low p-3">
-                  <span className="font-body-md text-on-surface">{drill.name}</span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={controlsDisabled}
-                      onClick={() => setDrillModal({ open: true, editing: drill, sessionId: '' })}
-                      className="h-9 px-3 rounded-lg font-label-sm border border-outline text-on-surface disabled:opacity-40 cursor-pointer"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      disabled={controlsDisabled}
-                      onClick={() => setConfirmDelete({ table: 'drills', id: drill.id, name: drill.name })}
-                      className="h-9 px-3 rounded-lg font-label-sm bg-error text-on-error disabled:opacity-40 cursor-pointer"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </section>
           )}
 
+          {tab === 'drills' && (
+          <section className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-headline-sm text-on-surface">Drills</h2>
+              <button
+                type="button"
+                disabled={controlsDisabled}
+                onClick={() => setDrillModal({ open: true, editing: null, sessionId: '' })}
+                className="h-10 px-4 rounded-lg font-label-sm bg-primary text-on-primary disabled:opacity-40 cursor-pointer"
+              >
+                Add drill
+              </button>
+            </div>
+            {allDrills.length === 0 && (
+              <p className="text-label-sm text-on-surface-variant">No drills.</p>
+            )}
+            {allDrills.map((drill) => (
+              <div key={drill.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-container-low p-3">
+                <div className="min-w-0">
+                  <span className="font-body-md text-on-surface">{drill.name}</span>
+                  <p className="text-label-sm text-on-surface-variant truncate">
+                    {drill.sessionId ? 'In a session' : 'Ungrouped'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={controlsDisabled}
+                    onClick={() => setDrillModal({ open: true, editing: drill, sessionId: drill.sessionId ?? '' })}
+                    className="h-9 px-3 rounded-lg font-label-sm border border-outline text-on-surface disabled:opacity-40 cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    disabled={controlsDisabled}
+                    onClick={() => setConfirmDelete({ table: 'drills', id: drill.id, name: drill.name })}
+                    className="h-9 px-3 rounded-lg font-label-sm bg-error text-on-error disabled:opacity-40 cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </section>
+          )}
+
+          {tab === 'sessions' && (
           <section className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant">
             <h2 className="font-headline-sm text-on-surface mb-3">Place AI draft</h2>
             <DraftSessionPanel
@@ -413,6 +469,7 @@ export function AdminCoachAssist() {
               saving={draftSaving}
             />
           </section>
+          )}
         </>
       )}
 

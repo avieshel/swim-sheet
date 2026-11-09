@@ -30,6 +30,9 @@ function makeFakeClient(rows: unknown[]): ServiceRoleClient {
     eq(_column: string, _value: unknown) {
       return builder
     },
+    is(_column: string, _value: unknown) {
+      return builder
+    },
     then(onfulfilled: (value: { data: unknown[]; error: null }) => unknown) {
       return Promise.resolve().then(() => onfulfilled({ data: rows, error: null }))
     },
@@ -138,6 +141,9 @@ function makeWriteFakeClient(
           if (column === 'id') pendingDelete.id = value
           else if (column === 'organization_id') pendingDelete.org = value
         }
+        return builder
+      },
+      is(_column: string, _value: unknown) {
         return builder
       },
       single() {
