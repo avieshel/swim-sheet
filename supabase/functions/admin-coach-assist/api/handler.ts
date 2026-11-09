@@ -24,14 +24,19 @@ import type { ScopedTable } from '../model/types.ts'
 export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Response> {
   return async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url)
-    // When the URL carries no usable path (e.g. supabase.functions.invoke, which
-    // hits the function root), resolve the route from a `path` field in the JSON
-    // body or a `?path=` query — while the URL-path route table stays intact for
-    // direct/test calls. The request body is read once here and threaded into the
-    // handlers, since a Request body stream can only be consumed a single time.
-    const fromBody = url.pathname === '/' || url.pathname === ''
+    // Supabase serves this function at `/functions/v1/<slug>`, and
+    // `supabase.functions.invoke` POSTs to that mount path with the real route
+    // carried in the JSON body's `path` field (or a `?path=` query). The raw
+    // URL pathname is therefore the function mount, NOT the intended route, so we
+    // strip the prefix. An empty remainder means "route comes from the body"
+    // (the invoke contract); a non-empty remainder is a direct URL-path route and
+    // the existing route table applies with the HTTP method as part of the
+    // contract. The body is read once here and threaded into the handlers, since
+    // a Request body stream can only be consumed a single time.
+    const subpath = stripFunctionPrefix(url.pathname)
     const body = await readJsonBody<Record<string, unknown>>(req)
-    const routePath = fromBody ? resolveRoutePath(url, body) : url.pathname
+    const fromBody = subpath === '' || subpath === '/'
+    const routePath = fromBody ? resolveRoutePath(url, body) : subpath
 
     // With URL-path routing the HTTP method is part of the contract (existing
     // tests rely on it). When routed via body/query path the client cannot set a
@@ -91,6 +96,16 @@ function resolveRoutePath(url: URL, body: Record<string, unknown> | null): strin
   if (fromQuery) return fromQuery
   if (body && typeof body.path === 'string') return body.path
   return ''
+}
+
+// Strip the Supabase function mount prefix (`/functions/v1/<slug>`), returning the
+// remainder — '' for the function root, or e.g. '/coaches' for a direct sub-path
+// call. Paths without the prefix (unit-test URLs such as `/status`) are returned
+// unchanged so URL-path routing keeps working in tests.
+function stripFunctionPrefix(pathname: string): string {
+  const m = pathname.match(/^\/functions\/v1\/[^/]+(.*)$/)
+  if (!m) return pathname
+  return m[1]
 }
 
 // Run the owner gate, then the action on success; a missing/unverifiable token
