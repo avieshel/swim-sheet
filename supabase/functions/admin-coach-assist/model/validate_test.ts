@@ -58,6 +58,36 @@ Deno.test('preserves non-reserved payload fields', () => {
   assertEquals(r.created_by, 'c')
 })
 
+// Coach-mode drill edits must survive the server validation verbatim — this is
+// the contract that lets the client persist full drill fidelity (items,
+// repeat_count, focus, labels, description) without a migration.
+Deno.test('forwards rich drill fields verbatim', () => {
+  const r = normalizeScopedWrite({
+    orgId: 'o',
+    table: 'drills',
+    coachUserId: 'c',
+    payload: {
+      name: 'A',
+      drill_order: 0,
+      items: '[{"distance":25,"stroke":"freestyle"}]',
+      repeat_count: 2,
+      focus: 'technique',
+      labels: ['x'],
+      description: 'd',
+      library_drill_id: 'lib',
+    },
+  })
+  assertEquals(r.drill_order, 0)
+  assertEquals(r.items, '[{"distance":25,"stroke":"freestyle"}]')
+  assertEquals(r.repeat_count, 2)
+  assertEquals(r.focus, 'technique')
+  assertEquals(r.labels, ['x'])
+  assertEquals(r.description, 'd')
+  assertEquals(r.library_drill_id, 'lib')
+  assertEquals(r.organization_id, 'o')
+  assertEquals(r.created_by, 'c')
+})
+
 Deno.test('throws ScopedWriteError with clear message on bad table', () => {
   let caught: unknown
   try {
