@@ -58,8 +58,8 @@ pull delivers the new or updated rows to their device.
   Assist because live-run persistence is not target-scoped.
 - `client/src/db/dao.ts` is the existing DAO facade. In normal mode it uses
   Dexie; in Coach Assist mode it delegates to `client/src/db/adminDao.ts`.
-- Existing session pages also trigger local-only side effects unrelated to
-  authored session rows: starter-template seeding, active-run subscriptions,
+- Existing session pages and the shared app layout also trigger local-only side
+  effects unrelated to authored session rows: starter-template seeding, active-run subscriptions,
   run-history reads, local library seeding, and run-aware session deletion. These
   must be disabled in the Coach Assist session flow; the editor may read the
   selected coach's library through the scoped DAO for its similarity warning.
@@ -92,12 +92,12 @@ tests needed to make the existing modules safe to reuse.
 6. Writes go to the selected coach's Supabase organization. Exiting Coach Assist
    restores the owner's normal Dexie-backed experience.
 
-In Coach Assist mode, opening the session list/detail does not seed starter
-sessions or library drills in the owner's Dexie, subscribe to owner-local active
-runs, or fetch owner-local run history. Session-template deletion is hidden in
-this scope rather than consulting or mutating owner-local run data. The
-session-detail similarity mirror, when loaded, comes from the selected coach's
-scoped library read.
+In Coach Assist mode, the shared layout and session list/detail do not seed
+starter sessions or library drills in the owner's Dexie, subscribe to owner-local
+active runs, or fetch owner-local run history. Session-template deletion is
+hidden in this scope rather than consulting or mutating owner-local run data.
+The session-detail similarity mirror, when loaded, comes from the selected
+coach's scoped library read.
 
 ## Data flow and trust boundaries
 
