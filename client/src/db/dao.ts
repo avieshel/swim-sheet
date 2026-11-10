@@ -107,10 +107,20 @@ export async function deleteSession(id: string): Promise<void> {
 // Atomic session + drills insert for AI drafts. It writes directly to the drills
 // table and must NOT call addDrill(), which also writes to libraryDrills. A
 // failure at any point rolls the whole transaction back — no partial session.
-export function addSessionWithDrills(
+export async function addSessionWithDrills(
   session: SafeSession,
   drills: Array<Omit<SafeDrill, 'sessionId'>>,
 ): Promise<string> {
+  // In coach mode the session + drills must be written to the coach's tenant,
+  // not the owner's Dexie. Reuse the already-swapped addSession/addDrill so the
+  // data lands in the admin Edge Function's scope (used by AI draft + import).
+  if (isCoachAssistMode()) {
+    const sessionId = await addSession(session)
+    for (const drill of drills) {
+      await addDrill({ ...drill, sessionId })
+    }
+    return sessionId
+  }
   return writeSessionWithDrills(session, drills)
 }
 
@@ -119,6 +129,14 @@ export async function addSessionWithDrillsIf(
   drills: Array<Omit<SafeDrill, 'sessionId'>>,
   canCreate: (existingSessions: Session[]) => boolean,
 ): Promise<string | null> {
+  if (isCoachAssistMode()) {
+    if (!canCreate(await getAllSessions())) return null
+    const sessionId = await addSession(session)
+    for (const drill of drills) {
+      await addDrill({ ...drill, sessionId })
+    }
+    return sessionId
+  }
   return writeSessionWithDrills(session, drills, canCreate)
 }
 
