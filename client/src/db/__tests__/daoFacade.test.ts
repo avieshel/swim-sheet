@@ -7,6 +7,7 @@ import { db } from '../schema'
 
 describe('dao facade — coach-assist delegation', () => {
   const sessionSpy = vi.spyOn(adminDao, 'getAllSessions')
+  const addSessionSpy = vi.spyOn(adminDao, 'addSession')
   const addDrillSpy = vi.spyOn(adminDao, 'addDrill')
   const libSpy = vi.spyOn(adminDao, 'getAllLibraryDrills')
   const getDrillSpy = vi.spyOn(adminDao, 'getDrill')
@@ -15,6 +16,7 @@ describe('dao facade — coach-assist delegation', () => {
   beforeEach(() => {
     configureCoachAssist({ userId: 'c1', orgId: 'o1' })
     sessionSpy.mockResolvedValue([{ id: 'admin-s' } as never])
+    addSessionSpy.mockResolvedValue('admin-s-id')
     addDrillSpy.mockResolvedValue('admin-d')
     libSpy.mockResolvedValue([{ id: 'admin-l' } as never])
     getDrillSpy.mockResolvedValue({ id: 'admin-d' } as never)
@@ -48,6 +50,29 @@ describe('dao facade — coach-assist delegation', () => {
     const result = await dao.getDrill('x')
     expect(getDrillSpy).toHaveBeenCalledWith('x')
     expect(result).toEqual({ id: 'admin-d' })
+  })
+
+  it('in coach mode, addSessionWithDrills delegates to adminDao (session + each drill)', async () => {
+    const id = await dao.addSessionWithDrills(
+      { name: 'AI Session' } as never,
+      [{ name: 'D1' }, { name: 'D2' }] as never,
+    )
+    expect(addSessionSpy).toHaveBeenCalledOnce()
+    expect(addDrillSpy).toHaveBeenCalledTimes(2)
+    expect(dexieDrillsSpy).not.toHaveBeenCalled()
+    expect(id).toBe('admin-s-id')
+  })
+
+  it('in local mode, addSessionWithDrills writes Dexie and skips adminDao', async () => {
+    configureCoachAssist(null)
+    expect(isCoachAssistMode()).toBe(false)
+    const result = await dao.addSessionWithDrills(
+      { name: 'Local Session' } as never,
+      [{ name: 'D1' }] as never,
+    )
+    expect(addSessionSpy).not.toHaveBeenCalled()
+    expect(addDrillSpy).not.toHaveBeenCalled()
+    expect(typeof result).toBe('string')
   })
 
   it('in local mode, getAllSessions reads Dexie and skips adminDao', async () => {
