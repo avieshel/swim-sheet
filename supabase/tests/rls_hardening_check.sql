@@ -10,6 +10,7 @@ begin;
 do $$
 declare
   r record;
+  session_bundle_fn regprocedure;
 begin
   for r in
     select c.relname
@@ -84,6 +85,22 @@ begin
   loop
     raise exception 'ANON_CAN_INSERT_TABLE: public.%', r.relname;
   end loop;
+
+  session_bundle_fn := to_regprocedure(
+    'public.admin_create_session_bundle(uuid,uuid,jsonb,jsonb,boolean)'
+  );
+  if session_bundle_fn is null then
+    raise exception 'MISSING_ADMIN_SESSION_BUNDLE_FUNCTION';
+  end if;
+  if has_function_privilege('anon', session_bundle_fn, 'execute') then
+    raise exception 'ANON_CAN_EXECUTE_ADMIN_SESSION_BUNDLE';
+  end if;
+  if has_function_privilege('authenticated', session_bundle_fn, 'execute') then
+    raise exception 'AUTHENTICATED_CAN_EXECUTE_ADMIN_SESSION_BUNDLE';
+  end if;
+  if not has_function_privilege('service_role', session_bundle_fn, 'execute') then
+    raise exception 'SERVICE_ROLE_CANNOT_EXECUTE_ADMIN_SESSION_BUNDLE';
+  end if;
 end $$;
 
 select 'RLS_HARDENING_OK' as result;
