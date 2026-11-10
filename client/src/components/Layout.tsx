@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { useActiveRun } from '../hooks/useActiveRun';
 import { settingsService } from '../services/settingsService';
 import { Icon } from './Icon';
 import { AccountIndicator } from './AccountIndicator';
+import { useCoachAssist } from '../context/coachAssistShared';
 
 const navItems = [
   { path: '/swimmers', label: 'Swimmers', icon: 'groups' },
@@ -15,7 +16,13 @@ const navItems = [
 
 export const Layout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const activeRun = useActiveRun();
+  const { isOwner, coach, exit } = useCoachAssist();
+
+  // In coach mode the Live tab is suppressed: starting a live session would
+  // write run/lap rows to the owner's local Dexie, not the coach's tenant.
+  const visibleNavItems = navItems.filter((item) => !(coach && item.path === '/live'));
 
   const isActive = (path: string) => location.pathname.startsWith(path);
   const isLiveRoute = location.pathname === '/' || location.pathname === '/live';
@@ -53,7 +60,7 @@ export const Layout: React.FC = () => {
           </Link>
           <div className="hidden md:flex items-center">
             <nav className="flex gap-2 lg:gap-4 mr-2">
-              {navItems.map(item => (
+              {visibleNavItems.map(item => (
                 <Link
                   key={item.path}
                   to={item.path}
@@ -69,11 +76,42 @@ export const Layout: React.FC = () => {
                   )}
                 </Link>
               ))}
+              {isOwner && (
+                <Link
+                  to="/admin/coach-assist"
+                  className={`relative font-label-sm transition-colors px-3 py-1.5 rounded-full h-10 flex items-center ${
+                    isActive('/admin/coach-assist')
+                      ? 'text-primary font-bold bg-primary-container/10'
+                      : 'text-on-surface-variant hover:bg-surface-container-high'
+                  }`}
+                >
+                  Coach Assist
+                </Link>
+              )}
             </nav>
             <AccountIndicator />
           </div>
         </div>
       </header>
+
+      {coach && (
+        <div className="bg-secondary-container text-on-secondary-container text-label-sm px-4 py-2 flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 min-w-0">
+            <Icon name="supervisor_account" size="sm" />
+            <span className="truncate">Coach Assist — editing {coach.name}'s data</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              exit()
+              navigate('/admin/coach-assist')
+            }}
+            className="shrink-0 font-label-sm underline underline-offset-2 cursor-pointer"
+          >
+            Exit
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       <main
@@ -88,7 +126,7 @@ export const Layout: React.FC = () => {
 
       {/* BottomNavBar (Mobile) */}
       <nav className="md:hidden fixed bottom-0 start-0 w-full flex justify-around items-end px-2 pb-3 pt-1 bg-surface-container shadow-[0px_-4px_20px_rgba(0,0,0,0.12)] z-50 rounded-t-xl safe-area-bottom">
-        {navItems.map(item => (
+        {visibleNavItems.map(item => (
           <Link
             key={item.path}
             to={item.path}
@@ -110,6 +148,19 @@ export const Layout: React.FC = () => {
             <span className="font-label-sm leading-none mt-0.5">{item.label}</span>
           </Link>
         ))}
+        {isOwner && (
+          <Link
+            to="/admin/coach-assist"
+            className={`relative flex flex-col items-center justify-center min-h-[44px] min-w-[44px] px-3 py-1 rounded-xl transition-all duration-200 active:scale-90 tap-highlight-none ${
+              isActive('/admin/coach-assist')
+                ? 'bg-secondary-container text-on-secondary-container'
+                : 'text-on-surface-variant hover:bg-surface-variant'
+            }`}
+          >
+            <Icon name="supervisor_account" fill={isActive('/admin/coach-assist')} />
+            <span className="font-label-sm leading-none mt-0.5">Assist</span>
+          </Link>
+        )}
       </nav>
     </div>
   );

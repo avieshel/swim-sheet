@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+
+# Mirror .github/workflows/pr-title.yml locally. If this branch already has an
+# open PR, block the push when its title does not follow Conventional Commits —
+# so a bad title is caught before CI does. When there is no open PR yet, the
+# script skips (validate the proposed title with `npm run check:pr-title`
+# before running `gh pr create`).
+node scripts/check-pr-title.mjs

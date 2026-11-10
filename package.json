@@ -4,7 +4,8 @@
     "prepare": "husky",
     "commitlint": "commitlint --edit",
     "db:push": "supabase db push",
-    "test:e2e": "NODE_PATH=./client/node_modules ./client/node_modules/.bin/playwright test"
+    "test:e2e": "NODE_PATH=./client/node_modules ./client/node_modules/.bin/playwright test",
+    "check:pr-title": "node scripts/check-pr-title.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",

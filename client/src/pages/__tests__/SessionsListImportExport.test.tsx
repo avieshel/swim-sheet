@@ -42,6 +42,7 @@ vi.mock('../../services/analyticsEvents', () => ({
 }))
 
 import { SessionsList } from '../SessionsList'
+import { CoachAssistProvider } from '../../context/CoachAssistContext'
 
 const packageData = {
   format: 'swimsheet-session',
@@ -54,7 +55,9 @@ const packageData = {
 function renderSessionsList() {
   render(
     <MemoryRouter>
-      <SessionsList />
+      <CoachAssistProvider>
+        <SessionsList />
+      </CoachAssistProvider>
     </MemoryRouter>,
   )
 }

@@ -14,6 +14,7 @@ import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
 import { SessionPackageImportModal } from '../components/SessionPackageImportModal'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useCoachAssist } from '../context/coachAssistShared'
 import type { Stroke } from '../types/swimming'
 import { exportSessionPackage } from '../api/sessionPackages'
 import { downloadSessionPackageFile } from '../utils/sessionPackageFile'
@@ -28,6 +29,7 @@ interface SessionWithTotals extends Session {
 export const SessionsList: React.FC = () => {
   const navigate = useNavigate()
   const activeRun = useActiveRun()
+  const { coach } = useCoachAssist()
   const { startLiveSession } = useStartLiveSession()
   const [sessions, setSessions] = useState<SessionWithTotals[]>([])
   const [recentRuns, setRecentRuns] = useState<RunSummary[]>([])
@@ -460,6 +462,7 @@ export const SessionsList: React.FC = () => {
                 {/* Action buttons */}
                 <div className="pt-3 border-t border-outline-variant/30">
                   <div className="flex items-center justify-between gap-2">
+                    {!coach && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); void handleStartLive(s) }}
@@ -469,6 +472,7 @@ export const SessionsList: React.FC = () => {
                       <Icon name={isLive ? 'visibility' : 'play_arrow'} size="sm" />
                       {isLive ? 'View Live' : startingSessionId === s.id ? 'Starting...' : 'Start Live'}
                     </button>
+                    )}
                     <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
                       Open Template
                       <Icon name="arrow_forward" size="sm" />
@@ -494,7 +498,7 @@ export const SessionsList: React.FC = () => {
         )}
       </section>
 
-      {/* Recently Completed Section */}
+      {!coach && (
       <div className="mt-8 md:mt-12">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-headline-md text-on-surface flex items-center gap-2">
@@ -557,6 +561,7 @@ export const SessionsList: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

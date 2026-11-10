@@ -1,10 +1,34 @@
 import { db, createBackupPayload, restoreAllTables, saveBackup, clearBackup, getLastBackupTime, getStoragePersistence, requestPersistentStorage, DB_SCHEMA_VERSION, BACKUP_FORMAT_VERSION } from './schema'
 import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
 import { drillCatalog, sessionsCatalog } from '../data/catalog'
+import {
+  isCoachAssistMode,
+  getAllSwimmers as adminGetAllSwimmers,
+  getSwimmer as adminGetSwimmer,
+  addSwimmer as adminAddSwimmer,
+  updateSwimmer as adminUpdateSwimmer,
+  deleteSwimmer as adminDeleteSwimmer,
+  getAllSessions as adminGetAllSessions,
+  getSession as adminGetSession,
+  addSession as adminAddSession,
+  updateSession as adminUpdateSession,
+  deleteSession as adminDeleteSession,
+  getDrillsForSession as adminGetDrillsForSession,
+  getDrill as adminGetDrill,
+  addDrill as adminAddDrill,
+  updateDrill as adminUpdateDrill,
+  deleteDrill as adminDeleteDrill,
+  getAllLibraryDrills as adminGetAllLibraryDrills,
+  getLibraryDrill as adminGetLibraryDrill,
+  addLibraryDrill as adminAddLibraryDrill,
+  updateLibraryDrill as adminUpdateLibraryDrill,
+  deleteLibraryDrill as adminDeleteLibraryDrill,
+} from './adminDao'
 
 // ── Swimmers ──────────────────────────────────────────────
 
 export async function getAllSwimmers(): Promise<Swimmer[]> {
+  if (isCoachAssistMode()) return adminGetAllSwimmers()
   return db.swimmers.orderBy('name').toArray()
 }
 
@@ -18,10 +42,12 @@ export async function searchSwimmers(query: string): Promise<Swimmer[]> {
 }
 
 export async function getSwimmer(id: string): Promise<Swimmer | undefined> {
+  if (isCoachAssistMode()) return adminGetSwimmer(id)
   return db.swimmers.get(id)
 }
 
 export async function addSwimmer(data: SafeSwimmer): Promise<string> {
+  if (isCoachAssistMode()) return adminAddSwimmer(data)
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
   await db.swimmers.add({ ...data, status: data.status ?? 'active', id, createdAt: now, updatedAt: now })
@@ -29,10 +55,12 @@ export async function addSwimmer(data: SafeSwimmer): Promise<string> {
 }
 
 export async function updateSwimmer(id: string, data: Partial<SafeSwimmer>): Promise<void> {
+  if (isCoachAssistMode()) return adminUpdateSwimmer(id, data)
   await db.swimmers.update(id, { ...data, updatedAt: new Date().toISOString() })
 }
 
 export async function deleteSwimmer(id: string): Promise<void> {
+  if (isCoachAssistMode()) return adminDeleteSwimmer(id)
   // Surgical hard-delete: remove the swimmer's run links and timing laps so no
   // orphaned references remain, but keep runs and laneResult data blobs (they
   // store the swimmer's name + times, so history stays readable).
@@ -46,14 +74,17 @@ export async function deleteSwimmer(id: string): Promise<void> {
 // ── Session Templates ─────────────────────────────────────
 
 export async function getAllSessions(): Promise<Session[]> {
+  if (isCoachAssistMode()) return adminGetAllSessions()
   return db.sessions.orderBy('createdAt').reverse().toArray()
 }
 
 export async function getSession(id: string): Promise<Session | undefined> {
+  if (isCoachAssistMode()) return adminGetSession(id)
   return db.sessions.get(id)
 }
 
 export async function addSession(data: SafeSession): Promise<string> {
+  if (isCoachAssistMode()) return adminAddSession(data)
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
   await db.sessions.add({ ...data, id, createdAt: now, updatedAt: now })
@@ -61,10 +92,12 @@ export async function addSession(data: SafeSession): Promise<string> {
 }
 
 export async function updateSession(id: string, data: Partial<SafeSession>): Promise<void> {
+  if (isCoachAssistMode()) return adminUpdateSession(id, data)
   await db.sessions.update(id, { ...data, updatedAt: new Date().toISOString() })
 }
 
 export async function deleteSession(id: string): Promise<void> {
+  if (isCoachAssistMode()) return adminDeleteSession(id)
   await db.transaction('rw', [db.sessions, db.drills], async () => {
     await db.drills.where('sessionId').equals(id).delete()
     await db.sessions.delete(id)
@@ -124,18 +157,22 @@ async function writeSessionWithDrills(
 // ── Template Drills ────────────────────────────────────────
 
 export async function getDrillsForSession(sessionId: string): Promise<Drill[]> {
+  if (isCoachAssistMode()) return adminGetDrillsForSession(sessionId)
   return db.drills.where('sessionId').equals(sessionId).toArray()
 }
 
 export async function getDrill(id: string): Promise<Drill | undefined> {
+  if (isCoachAssistMode()) return adminGetDrill(id)
   return db.drills.get(id)
 }
 
 export async function updateLibraryDrill(id: string, data: Partial<SafeLibraryDrill>): Promise<void> {
+  if (isCoachAssistMode()) return adminUpdateLibraryDrill(id, data)
   await db.libraryDrills.update(id, { ...data, updatedAt: new Date().toISOString() })
 }
 
 export async function addDrill(data: SafeDrill): Promise<string> {
+  if (isCoachAssistMode()) return adminAddDrill(data)
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
   const drill: Drill = {
@@ -179,10 +216,12 @@ export async function addDrill(data: SafeDrill): Promise<string> {
 }
 
 export async function updateDrill(id: string, data: Partial<SafeDrill>): Promise<void> {
+  if (isCoachAssistMode()) return adminUpdateDrill(id, data)
   await db.drills.update(id, { ...data, updatedAt: new Date().toISOString() })
 }
 
 export async function deleteDrill(id: string): Promise<void> {
+  if (isCoachAssistMode()) return adminDeleteDrill(id)
   await db.drills.delete(id)
 }
 
@@ -412,12 +451,14 @@ export async function addLap(data: SafeLap): Promise<string> {
   // ── Library Drills ─────────────────────────────────────────
 
 export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
+  if (isCoachAssistMode()) return adminGetAllLibraryDrills()
   return db.libraryDrills.orderBy('name').toArray()
 }
 
 export const DEFAULT_EQUIPMENT = ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard']
 
 export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
+  if (isCoachAssistMode()) return adminAddLibraryDrill(data)
   const now = new Date().toISOString()
 
   // Upsert by name: if a drill with the same name already exists, update it
@@ -458,10 +499,12 @@ export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
 }
 
 export async function deleteLibraryDrill(id: string): Promise<void> {
+  if (isCoachAssistMode()) return adminDeleteLibraryDrill(id)
   await db.libraryDrills.delete(id)
 }
 
 export async function getLibraryDrill(id: string): Promise<LibraryDrill | undefined> {
+  if (isCoachAssistMode()) return adminGetLibraryDrill(id)
   return db.libraryDrills.get(id)
 }
 
