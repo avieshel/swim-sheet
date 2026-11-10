@@ -26,6 +26,8 @@ export const SessionDetail: React.FC = () => {
   const [drills, setDrills] = useState<Drill[]>([])
   const [loading, setLoading] = useState(true)
   const [editingMeta, setEditingMeta] = useState(false)
+  const [metadataSaveError, setMetadataSaveError] = useState<string | null>(null)
+  const [drillSaveError, setDrillSaveError] = useState<string | null>(null)
 
   // The library stays loaded here only as a similarity mirror for the editor's
   // duplicate warning; its own UI lives on the /drills page.
@@ -112,7 +114,13 @@ export const SessionDetail: React.FC = () => {
 
   const handleSaveMeta = async (data: { name: string; notes: string }) => {
     if (!id || !data.name.trim()) return
-    await updateSession(id, { name: data.name.trim(), notes: data.notes })
+    setMetadataSaveError(null)
+    try {
+      await updateSession(id, { name: data.name.trim(), notes: data.notes })
+    } catch {
+      setMetadataSaveError('Could not save the session. Check your connection and try again.')
+      return
+    }
     analytics.track(Events.SessionUpdated())
     setEditingMeta(false)
     await loadData()
@@ -129,6 +137,7 @@ export const SessionDetail: React.FC = () => {
   }
 
   const openRichEditor = (drill?: Drill) => {
+    setDrillSaveError(null)
     if (drill) {
       setRichDrill({ ...drill })
     } else {
@@ -278,6 +287,7 @@ export const SessionDetail: React.FC = () => {
             <button
               onClick={(event) => {
                 event.currentTarget.focus()
+                setMetadataSaveError(null)
                 setEditingMeta(true)
               }}
               aria-label="Edit template name and notes"
@@ -294,6 +304,7 @@ export const SessionDetail: React.FC = () => {
           initialData={{ name: session.name, notes: session.notes || '' }}
           onSave={handleSaveMeta}
           onClose={() => setEditingMeta(false)}
+          error={metadataSaveError}
         />
       )}
 
@@ -355,15 +366,21 @@ export const SessionDetail: React.FC = () => {
             if (!id || !data.name?.trim()) return
             const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
             const drillData = { ...data, sessionId: id, order: data.id ? (richDrill.order ?? nextOrder) : nextOrder }
-            if (data.id) {
-              await updateDrill(data.id, drillData as unknown as Partial<SafeDrill>)
-              analytics.track(Events.DrillUpdated('session'))
-            } else {
-              await createDrill(drillData as unknown as SafeDrill)
-              analytics.track(Events.DrillCreated('session', data.stroke ?? '', data.distance ?? 0))
+            setDrillSaveError(null)
+            try {
+              if (data.id) {
+                await updateDrill(data.id, drillData as unknown as Partial<SafeDrill>)
+                analytics.track(Events.DrillUpdated('session'))
+              } else {
+                await createDrill(drillData as unknown as SafeDrill)
+                analytics.track(Events.DrillCreated('session', data.stroke ?? '', data.distance ?? 0))
+              }
+            } catch {
+              setDrillSaveError('Could not save the drill. Check your connection and try again.')
+              return
             }
             setShowRichEditor(false)
-            loadData()
+            void loadData()
           }
           const excludeId = data.id ?? undefined
           const similars = findSimilarDrills(
@@ -394,6 +411,7 @@ export const SessionDetail: React.FC = () => {
           })
         }) : undefined}
         onClose={() => setShowRichEditor(false)}
+        error={drillSaveError}
       />
 
       {/* Totals View — intrinsic grid */}

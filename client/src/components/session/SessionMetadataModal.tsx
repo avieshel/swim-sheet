@@ -10,9 +10,10 @@ interface SessionMetadataModalProps {
   initialData: SessionMetadata
   onSave: (data: SessionMetadata) => void | Promise<void>
   onClose: () => void
+  error?: string | null
 }
 
-export function SessionMetadataModal({ initialData, onSave, onClose }: SessionMetadataModalProps) {
+export function SessionMetadataModal({ initialData, onSave, onClose, error }: SessionMetadataModalProps) {
   const [name, setName] = useState(initialData.name)
   const [notes, setNotes] = useState(initialData.notes)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -59,6 +60,12 @@ export function SessionMetadataModal({ initialData, onSave, onClose }: SessionMe
             className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
           />
         </div>
+
+        {error && (
+          <p role="alert" className="rounded-lg bg-error-container/40 p-3 text-label-sm text-error">
+            {error}
+          </p>
+        )}
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
           <button

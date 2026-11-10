@@ -144,4 +144,19 @@ describe('SessionsList import and export actions', () => {
     expect(screen.getByRole('link', { name: /Create with AI/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Import session' })).toBeTruthy()
   })
+
+  it('keeps the new-template form open and reports a target save failure', async () => {
+    const user = userEvent.setup()
+    mocks.sessions.createSession.mockRejectedValueOnce(new Error('target write failed'))
+    renderSessionsList({ userId: 'coach-1', name: 'Coach One', email: 'coach@example.com', orgId: 'org-1' })
+
+    await user.click(await screen.findByRole('button', { name: /New Template/ }))
+    const nameInput = screen.getByLabelText('Template Name')
+    await user.type(nameInput, 'Coach Tuesday')
+    await user.click(screen.getByRole('button', { name: 'Create Template' }))
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/could not create the session/i)
+    expect((nameInput as HTMLInputElement).value).toBe('Coach Tuesday')
+    expect(screen.getByLabelText('Template Name')).toBeTruthy()
+  })
 })

@@ -7,11 +7,13 @@
 // delivered to Coach A (via the same query shape the PWA's sync pull uses) and
 // is invisible to Coach B — at both the function-query layer and the RLS layer.
 //
-// The owner is simulated here by the service-role client calling the transaction
-// primitive with a server-resolved target scope. Local dev keys are used as a
-// fallback only; override with env vars to target another stack.
+// The owner is simulated through the owner-gated handler with an injected caller
+// identity and service-role client. Local dev keys are used as a fallback only;
+// override with env vars to target another stack.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createHandler } from "../api/handler.ts";
+import type { HandlerDeps, ServiceRoleClient as EdgeServiceRoleClient } from "../api/deps.ts";
 import { resolveCoachOrg, getCoachData } from "../service/adminService.ts";
 
 type ServiceRoleClient = {
@@ -69,41 +71,52 @@ async function main(): Promise<void> {
   assert(orgA !== orgB, "coach A and coach B resolve to distinct orgs");
 
   const sessionName = `Owner-assisted Session ${runId}`;
-  const bundle = await svc.rpc("admin_create_session_bundle", {
-    p_organization_id: orgA,
-    p_coach_user_id: coachA,
-    p_session: {
-      name: sessionName,
-      notes: "Target-scoped notes",
-      visibility: "private",
-      organization_id: orgB,
-      created_by: coachB,
-    },
-    p_drills: [{
-      name: "Warmup 4x100",
-      stroke: "freestyle",
-      distance: 400,
-      drill_order: 0,
-      items: [{
-        id: crypto.randomUUID(),
-        distance: 100,
+  const deps: HandlerDeps = {
+    getCallerUid: () => Promise.resolve("app-owner"),
+    isOwner: (uid) => uid === "app-owner",
+    createServiceRoleClient: () => svc as unknown as EdgeServiceRoleClient,
+  };
+  const handler = createHandler(deps);
+  const response = await handler(new Request("https://x/", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      path: `/coaches/${coachA}/session-bundle`,
+      coachUserId: coachA,
+      session: {
+        name: sessionName,
+        notes: "Target-scoped notes",
+        visibility: "private",
+        organization_id: orgB,
+        created_by: coachB,
+      },
+      drills: [{
+        name: "Warmup 4x100",
         stroke: "freestyle",
-        repeatCount: 4,
-        intensity: "v2",
-        equipment: ["fins"],
-        segments: [{ name: "Underwater", distance: 10, stroke: "freestyle" }],
+        distance: 400,
+        drill_order: 0,
+        items: [{
+          id: crypto.randomUUID(),
+          distance: 100,
+          stroke: "freestyle",
+          repeatCount: 4,
+          intensity: "v2",
+          equipment: ["fins"],
+          segments: [{ name: "Underwater", distance: 10, stroke: "freestyle" }],
+        }],
+        repeat_count: 1,
+        focus: "fitness",
+        labels: ["aerobic"],
+        description: "Preserve the authored drill fields",
+        session_id: "foreign-session",
+        organization_id: orgB,
+        created_by: coachB,
       }],
-      repeat_count: 1,
-      focus: "fitness",
-      labels: ["aerobic"],
-      description: "Preserve the authored drill fields",
-      organization_id: orgB,
-      created_by: coachB,
-    }],
-    p_reject_name_conflict: false,
-  });
-  if (bundle.error) throw new Error(`create session bundle: ${bundle.error.message}`);
-  const created = bundle.data as { outcome: string; sessionId?: string; drillIds?: string[] };
+      rejectNameConflict: false,
+    }),
+  }));
+  if (!response.ok) throw new Error(`create session bundle: ${response.status} ${await response.text()}`);
+  const created = await response.json() as { outcome: string; sessionId?: string; drillIds?: string[] };
   assert(created.outcome === "created", "session bundle returns created outcome");
   const sessionId = created.sessionId;
   const drillIds = created.drillIds ?? [];
@@ -181,12 +194,26 @@ async function main(): Promise<void> {
     (aSessions ?? []).some((s) => s.id === sessionId),
     "coach A's pull includes the owner-assisted session",
   );
+  const { data: aDrills, error: aDrillsError } = await aClient
+    .from("drills")
+    .select("id, session_id, items")
+    .eq("organization_id", orgA);
+  if (aDrillsError) throw new Error(`A drill pull: ${aDrillsError.message}`);
+  const pulledDrill = (aDrills ?? []).find((d) => d.id === drillIds[0]);
+  assert(pulledDrill?.session_id === sessionId, "coach A's pull includes the linked drill");
+  assert(
+    ((pulledDrill?.items as Array<Record<string, unknown>> | undefined)?.[0]?.intensity) === "v2",
+    "coach A's pull includes the rich drill item fields",
+  );
 
   const bClient = createClient(URL, ANON, authOpts);
   await bClient.auth.signInWithPassword({ email: emailB, password: "password123" });
   const { data: bAll, error: bErr } = await bClient.from("sessions").select("id");
   if (bErr) throw new Error(`B pull: ${bErr.message}`);
   assert(!bAll.some((s) => s.id === sessionId), "coach B cannot read coach A's session (RLS isolation)");
+  const { data: bDrills, error: bDrillErr } = await bClient.from("drills").select("id");
+  if (bDrillErr) throw new Error(`B drill pull: ${bDrillErr.message}`);
+  assert(!bDrills.some((d) => d.id === drillIds[0]), "coach B cannot read coach A's drill (RLS isolation)");
   const { data: bInA } = await bClient.from("sessions").select("id").eq("organization_id", orgA);
   assert((bInA ?? []).length === 0, "coach B querying org A returns nothing");
 

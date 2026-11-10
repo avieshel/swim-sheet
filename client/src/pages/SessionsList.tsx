@@ -37,6 +37,7 @@ export const SessionsList: React.FC = () => {
   const [showNewForm, setShowNewForm] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [formName, setFormName] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [templateSearch, setTemplateSearch] = useState('')
   const [showAllTemplates, setShowAllTemplates] = useState(false)
@@ -111,10 +112,16 @@ export const SessionsList: React.FC = () => {
 
   const handleCreate = async () => {
     if (!formName.trim()) return
-    await createSession({
-      name: formName.trim(),
-      notes: '',
-    })
+    setCreateError(null)
+    try {
+      await createSession({
+        name: formName.trim(),
+        notes: '',
+      })
+    } catch {
+      setCreateError('Could not create the session. Check your connection and try again.')
+      return
+    }
     analytics.track(Events.SessionCreated(sessions.length + 1))
     setShowNewForm(false)
     setFormName('')
@@ -289,7 +296,10 @@ export const SessionsList: React.FC = () => {
               Browse Catalog
             </Link>
             <button
-              onClick={() => setShowNewForm(true)}
+              onClick={() => {
+                setCreateError(null)
+                setShowNewForm(true)
+              }}
               className="h-11 inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold shadow-sm hover:brightness-110 active:scale-[0.98] transition-all"
             >
               <Icon name="add" />
@@ -325,16 +335,24 @@ export const SessionsList: React.FC = () => {
                   className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
                 />
               </div>
-            </div>
-            <div className="flex gap-3 mt-6">
+          </div>
+          {createError && (
+            <p role="alert" className="mt-3 rounded-lg bg-error-container/40 p-3 text-label-sm text-error">
+              {createError}
+            </p>
+          )}
+          <div className="flex gap-3 mt-6">
               <button
                 onClick={handleCreate}
                 className="h-11 bg-primary text-on-primary px-5 rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all"
               >
                 Create Template
               </button>
-              <button
-                onClick={() => setShowNewForm(false)}
+          <button
+            onClick={() => {
+              setCreateError(null)
+              setShowNewForm(false)
+            }}
                 className="h-11 border border-outline text-on-surface px-5 rounded-xl font-label-sm hover:bg-surface-container-low transition-colors"
               >
                 Cancel

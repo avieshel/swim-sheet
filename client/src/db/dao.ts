@@ -115,8 +115,6 @@ export async function addSessionWithDrills(
   session: SafeSession,
   drills: Array<Omit<SafeDrill, 'sessionId'>>,
 ): Promise<string> {
-  // In coach mode the session + drills must be written to the coach's tenant,
-  // not the owner's Dexie. One admin bundle request keeps the target write atomic.
   if (isCoachAssistMode()) {
     return adminAddSessionWithDrills(session, drills)
   }

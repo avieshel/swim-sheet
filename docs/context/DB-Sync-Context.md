@@ -59,9 +59,10 @@ coach's normal PWA `pull` (`SupabaseSyncTransport.pull` → `select * from <tabl
 where organization_id = <coach org>`, authenticated as the coach) returns it; another
 coach's pull cannot see it because RLS `is_organization_member(organization_id)` is
 false across tenants. End-to-end proof:
-`supabase/functions/admin-coach-assist/integration/isolation_check.ts` writes a
-session to Coach A via the real service, then asserts Coach A's pull includes it
-while Coach B's pull (RLS) excludes it.
+`supabase/functions/admin-coach-assist/integration/isolation_check.ts` invokes the
+owner-gated handler with an injected owner identity and the real local service-role
+client, then asserts Coach A's pull includes the complete session/drill bundle while
+Coach B's pull (RLS) excludes both rows.
 
 **Session bundle writes:** Coach Assist AI saves and `.swimsheet` imports call the
 owner-gated Edge Function, which resolves the target organization server-side and
