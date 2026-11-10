@@ -14,10 +14,12 @@ import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrill
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useCoachAssist } from '../context/coachAssistShared'
 
 export const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { coach } = useCoachAssist()
   const { startLiveSession, starting: startingStart } = useStartLiveSession()
   const activeRun = useActiveRun()
   const [session, setSession] = useState<Session | null>(null)
@@ -261,6 +263,7 @@ export const SessionDetail: React.FC = () => {
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {!coach && (
             <button
               type="button"
               onClick={() => { void handleStartLive() }}
@@ -271,6 +274,7 @@ export const SessionDetail: React.FC = () => {
               <Icon name={activeRun?.sessionId === session.id ? 'visibility' : 'play_arrow'} size="sm" />
               {activeRun?.sessionId === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
             </button>
+            )}
             <button
               onClick={(event) => {
                 event.currentTarget.focus()

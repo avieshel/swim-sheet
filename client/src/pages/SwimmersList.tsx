@@ -7,6 +7,7 @@ import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useCoachAssist } from '../context/coachAssistShared'
 
 interface SwimmerStats {
   lastRun: { runId: string; date: string; templateName: string } | null
@@ -30,6 +31,7 @@ function computeSwimmerStats(runs: RunSummary[], swimmer: Swimmer): SwimmerStats
 }
 
 export const SwimmersList: React.FC = () => {
+  const { coach } = useCoachAssist()
   const [swimmers, setSwimmers] = useState<Swimmer[]>([])
   const [historyRuns, setHistoryRuns] = useState<RunSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -264,7 +266,7 @@ export const SwimmersList: React.FC = () => {
                   </div>
                 </div>
               </div>
-              {(() => {
+              {!coach && (() => {
                 const stats = statsBySwimmer.get(s.id) ?? { lastRun: null, sessions30d: 0 }
                 return (
                   <div className="flex flex-col gap-3 mb-6">
