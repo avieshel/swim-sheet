@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   files: { downloadSessionPackageFile: vi.fn(), readSessionPackageFile: vi.fn() },
   analytics: { track: vi.fn() },
   startLiveSession: vi.fn(),
+  useActiveRun: vi.fn((enabled?: boolean) => enabled ? { sessionId: 'active' } : undefined),
 }))
 
 vi.mock('../../api/sessions', () => mocks.sessions)
@@ -28,7 +29,7 @@ vi.mock('../../api/drills', () => mocks.drills)
 vi.mock('../../api/runs', () => mocks.runs)
 vi.mock('../../api/sessionPackages', () => mocks.packages)
 vi.mock('../../utils/sessionPackageFile', () => mocks.files)
-vi.mock('../../hooks/useActiveRun', () => ({ useActiveRun: () => undefined }))
+vi.mock('../../hooks/useActiveRun', () => ({ useActiveRun: mocks.useActiveRun }))
 vi.mock('../../hooks/useStartLiveSession', () => ({
   useStartLiveSession: () => ({ startLiveSession: mocks.startLiveSession }),
 }))
@@ -42,7 +43,7 @@ vi.mock('../../services/analyticsEvents', () => ({
 }))
 
 import { SessionsList } from '../SessionsList'
-import { CoachAssistProvider } from '../../context/CoachAssistContext'
+import { CoachAssistContext } from '../../context/coachAssistShared'
 
 const packageData = {
   format: 'swimsheet-session',
@@ -52,12 +53,20 @@ const packageData = {
   drills: [],
 }
 
-function renderSessionsList() {
+function renderSessionsList(coach: { userId: string; name: string; email: string; orgId: string } | null = null) {
+  const coachAssistValue = {
+    isOwner: true,
+    ownerLoading: false,
+    coaches: [],
+    coach,
+    selectCoach: vi.fn(),
+    exit: vi.fn(),
+  }
   render(
     <MemoryRouter>
-      <CoachAssistProvider>
+      <CoachAssistContext.Provider value={coachAssistValue}>
         <SessionsList />
-      </CoachAssistProvider>
+      </CoachAssistContext.Provider>
     </MemoryRouter>,
   )
 }
@@ -65,6 +74,7 @@ function renderSessionsList() {
 describe('SessionsList import and export actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.useActiveRun.mockClear()
     mocks.sessions.listSessions.mockResolvedValue([
       {
         id: 'session-1',
@@ -121,5 +131,17 @@ describe('SessionsList import and export actions', () => {
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/could not export/i)
     expect(mocks.files.downloadSessionPackageFile).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch owner history, subscribe to owner runs, or offer template deletion in Coach Assist', async () => {
+    renderSessionsList({ userId: 'coach-1', name: 'Coach One', email: 'coach@example.com', orgId: 'org-1' })
+
+    expect(await screen.findByRole('heading', { name: 'Sample Session' })).toBeTruthy()
+    expect(mocks.runs.getRunHistory).not.toHaveBeenCalled()
+    expect(mocks.useActiveRun).toHaveBeenCalledWith(false)
+    expect(screen.queryByRole('button', { name: 'Delete Sample Session' })).toBeNull()
+    expect(screen.getByRole('button', { name: /New Template/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Create with AI/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Import session' })).toBeTruthy()
   })
 })

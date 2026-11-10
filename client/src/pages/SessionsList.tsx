@@ -28,8 +28,8 @@ interface SessionWithTotals extends Session {
 
 export const SessionsList: React.FC = () => {
   const navigate = useNavigate()
-  const activeRun = useActiveRun()
   const { coach } = useCoachAssist()
+  const activeRun = useActiveRun(!coach)
   const { startLiveSession } = useStartLiveSession()
   const [sessions, setSessions] = useState<SessionWithTotals[]>([])
   const [recentRuns, setRecentRuns] = useState<RunSummary[]>([])
@@ -77,6 +77,11 @@ export const SessionsList: React.FC = () => {
     )
   }, [])
 
+  const loadRecentRuns = useCallback(async (): Promise<RunSummary[]> => {
+    if (coach) return []
+    return (await getRunHistory()).runs
+  }, [coach])
+
   const applySessions = (withTotals: SessionWithTotals[]) => {
     setSessions(withTotals)
     setLoading(false)
@@ -85,24 +90,24 @@ export const SessionsList: React.FC = () => {
   const loadAll = useCallback(async () => {
     const [templates, history] = await Promise.all([
       loadSessionData(),
-      getRunHistory(),
+      loadRecentRuns(),
     ])
     applySessions(templates)
-    setRecentRuns(history.runs)
-  }, [loadSessionData])
+    setRecentRuns(history)
+  }, [loadRecentRuns, loadSessionData])
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([loadSessionData(), getRunHistory()])
+    Promise.all([loadSessionData(), loadRecentRuns()])
       .then(([templates, history]) => {
         if (cancelled) return
         applySessions(templates)
-        setRecentRuns(history.runs)
-        analytics.track(Events.ViewSessions(templates.length, history.runs.length))
+        setRecentRuns(history)
+        analytics.track(Events.ViewSessions(templates.length, history.length))
       })
       .catch(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [loadSessionData])
+  }, [loadRecentRuns, loadSessionData])
 
   const handleCreate = async () => {
     if (!formName.trim()) return
@@ -144,6 +149,7 @@ export const SessionsList: React.FC = () => {
   }
 
   const handleDelete = (id: string, name: string) => {
+    if (coach) return
     setConfirmState({
       open: true,
       title: 'Delete Template',
@@ -414,14 +420,16 @@ export const SessionsList: React.FC = () => {
                         >
                           <Icon name="file_upload" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                          aria-label={`Delete ${s.name}`}
-                          className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        >
-                          <Icon name="delete" />
-                        </button>
+                        {!coach && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
+                            aria-label={`Delete ${s.name}`}
+                            className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            <Icon name="delete" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">

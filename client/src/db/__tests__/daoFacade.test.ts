@@ -23,6 +23,7 @@ describe('dao facade — coach-assist delegation', () => {
     sessionId: 'imported-s-id',
     drillIds: ['imported-d1'],
   }))
+  const adminCreateRow = vi.fn(async () => 'admin-row')
 
   beforeEach(() => {
     configureCoachAssist({ userId: 'c1', orgId: 'o1' })
@@ -35,7 +36,7 @@ describe('dao facade — coach-assist delegation', () => {
     dexieDrillsSpy.mockResolvedValue('')
     setAdminService({
       getCoachData: vi.fn(async () => ({ sessions: [], drills: [], swimmers: [], libraryDrills: [] })),
-      adminCreate: vi.fn(async () => 'admin-row'),
+      adminCreate: adminCreateRow,
       adminUpdate: vi.fn(async () => {}),
       adminDelete: vi.fn(async () => {}),
       adminCreateSessionBundle: bundleWrite,
@@ -106,6 +107,16 @@ describe('dao facade — coach-assist delegation', () => {
     expect(dexieSessionsAddSpy).not.toHaveBeenCalled()
     expect(dexieDrillsSpy).not.toHaveBeenCalled()
     expect(id).toBe('imported-s-id')
+  })
+
+  it('does not seed starter sessions or read local dismissal metadata in Coach Assist', async () => {
+    const metaGet = vi.spyOn(db._meta, 'get')
+
+    await dao.seedDefaultSessions()
+
+    expect(metaGet).not.toHaveBeenCalled()
+    expect(dexieSessionsAddSpy).not.toHaveBeenCalled()
+    expect(adminCreateRow).not.toHaveBeenCalled()
   })
 
   it('in local mode, addSessionWithDrills writes Dexie and skips adminDao', async () => {

@@ -644,6 +644,7 @@ export async function seedLibraryDrills(): Promise<void> {
 let seedingSessionsPromise: Promise<void> | null = null
 
 export async function seedDefaultSessions(): Promise<void> {
+  if (isCoachAssistMode()) return
   if (seedingSessionsPromise) return seedingSessionsPromise
   seedingSessionsPromise = seedDefaultSessionsOnce()
   try {

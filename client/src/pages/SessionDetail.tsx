@@ -21,7 +21,7 @@ export const SessionDetail: React.FC = () => {
   const navigate = useNavigate()
   const { coach } = useCoachAssist()
   const { startLiveSession, starting: startingStart } = useStartLiveSession()
-  const activeRun = useActiveRun()
+  const activeRun = useActiveRun(!coach)
   const [session, setSession] = useState<Session | null>(null)
   const [drills, setDrills] = useState<Drill[]>([])
   const [loading, setLoading] = useState(true)
@@ -102,13 +102,13 @@ export const SessionDetail: React.FC = () => {
       })
       .catch(() => { if (!cancelled) setLoading(false) })
     const seedAndLoad = async () => {
-      await seedLibraryDrills()
+      if (!coach) await seedLibraryDrills()
       await loadLibrary(() => cancelled)
     }
     void seedAndLoad()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, coach])
 
   const handleSaveMeta = async (data: { name: string; notes: string }) => {
     if (!id || !data.name.trim()) return

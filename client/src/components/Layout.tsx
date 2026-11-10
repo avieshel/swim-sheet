@@ -17,8 +17,8 @@ const navItems = [
 export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const activeRun = useActiveRun();
   const { isOwner, coach, exit } = useCoachAssist();
+  const activeRun = useActiveRun(!coach);
 
   // In coach mode the Live tab is suppressed: starting a live session would
   // write run/lap rows to the owner's local Dexie, not the coach's tenant.

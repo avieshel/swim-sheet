@@ -2,18 +2,20 @@
 
 ## Overview
 
-Offline-first PWA that lets swim coaches manage their data (swimmers, session templates and their drills) and track live sessions to record actual training data per swimmer. The client is a browser PWA: all coach data lives in IndexedDB (Dexie) on the device, and the client never calls the Express server's API. The Express server only serves the built PWA; cloud features (auth, sync, AI generation, analytics) go directly to Supabase.
+Offline-first PWA that lets swim coaches manage their data (swimmers, session templates and their drills) and track live sessions to record actual training data per swimmer. In normal coach mode, data lives in IndexedDB (Dexie) and syncs optionally to Supabase; the app owner’s Coach Assist session workspace is an explicit exception that writes to a selected coach’s Supabase tenant. The client never calls the Express server's API. The Express server only serves the built PWA; cloud features go directly to Supabase.
 
-**Optional cloud features** — a coach can sign in with their Google account for: (1) **auth** (Google OAuth via Supabase Auth), (2) **sync** of selected tables across devices (Supabase Postgres + RLS, driven by `syncService`/`SupabaseSyncTransport`), (3) **AI session generation** (Supabase Edge Function `ai-session-harness` + `shared/sessionDraft/` contract), and (4) **analytics** (anonymous device/context events written to `analytics_events`). Supabase holds no business logic — only storage, RLS, two sync RPCs (`ensure_personal_organization`, `sync_pulse`), updated-at triggers, and the AI Edge Function. Collaboration between coaches is currently via manual session-template import/export (`.swimsheet` packages). Server-backed sharing with other coaches is planned but **not built** (design in `docs/context/Session-Sharing-Design.md`).
+**Optional cloud features** — a coach can sign in with their Google account for: (1) **auth** (Google OAuth via Supabase Auth), (2) **sync** of selected tables across devices (Supabase Postgres + RLS, driven by `syncService`/`SupabaseSyncTransport`), (3) **AI session generation** (Supabase Edge Function `ai-session-harness` + `shared/sessionDraft/` contract), and (4) **analytics** (anonymous device/context events written to `analytics_events`). The app owner also has an owner-only **Coach Assist** path for creating, editing, AI-generating, and importing session templates in a selected coach’s tenant. Supabase provides storage/RLS, identity and sync RPCs, and the transactional session-bundle RPC; the `admin-coach-assist` Edge Function authorizes the owner and stamps the target tenant. Coach devices receive assisted rows through their normal sync pull. Coach-to-coach sharing remains via manual `.swimsheet` packages; server-backed sharing is planned but **not built** (design in `docs/context/Session-Sharing-Design.md`).
 
 ## Architecture
 
-The app is a **client-side PWA**. All coach data lives in the browser's IndexedDB
-(Dexie) on the device; the client never calls the Express server's `/api/v1/*`
-routes. Supabase is the only remote dependency, and only for optional cloud
-features (auth, sync, AI generation, analytics). The Express server is a
-vestigial dev/static host: it serves the built PWA in production and exposes
-unused `/api/v1` CRUD routes against a throwaway SQLite file.
+The app is a **client-side PWA**. In normal coach mode, coach data lives in the
+browser's IndexedDB (Dexie) on the device and syncs to Supabase when enabled. In
+owner Coach Assist mode, the same session UI uses the admin DAO and
+`admin-coach-assist` Edge Function to read/write a selected coach's Supabase
+tenant directly. The client never calls the Express server's `/api/v1/*` routes.
+The Express server is a vestigial dev/static host: it serves the built PWA in
+production and exposes unused `/api/v1` CRUD routes against a throwaway SQLite
+file.
 
 ```
 ┌────────────────────────────────────────┐
@@ -26,8 +28,8 @@ unused `/api/v1` CRUD routes against a throwaway SQLite file.
 ┌────────────────────────────────────────┐
 │           Supabase (cloud)             │
 │  Auth · Postgres sync (selected tables)│
-│  · analytics_events · ai-session-      │
-│    harness Edge Function               │
+│  · analytics_events · AI harness ·      │
+│    owner-only Coach Assist Edge Function│
 └────────────────────────────────────────┘
 
 ┌────────────────────────────────────────┐
