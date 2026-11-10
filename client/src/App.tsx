@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect } from 'react'
 import { Layout } from './components/Layout'
 import { RouteMeta } from './components/RouteMeta'
 import { UpdatePrompt } from './components/UpdatePrompt'
@@ -22,11 +22,9 @@ import { RunDetail } from './pages/RunDetail'
 import { Events, analytics, isNewSession } from './services/analyticsEvents'
 import { testSupabaseConnection } from './api/supabase'
 import { AuthProvider } from './context/AuthProvider'
+import { CoachAssistProvider } from './context/CoachAssistContext'
 import { AuthCallback } from './pages/AuthCallback'
-
-const AdminCoachAssist = lazy(() =>
-  import('./pages/AdminCoachAssist').then((m) => ({ default: m.AdminCoachAssist })),
-)
+import { CoachAssistEntry } from './pages/CoachAssistEntry'
 
 function App() {
   useEffect(() => {
@@ -37,23 +35,17 @@ function App() {
   }, [])
   return (
     <AuthProvider>
-      <Router>
-        <RouteMeta />
-        <Routes>
-        <Route path="/about" element={<Landing />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route element={<Layout />}>
-          <Route path="/" element={<LiveDeck />} />
-          <Route
-            path="/admin/coach-assist"
-            element={
-              <Suspense fallback={null}>
-                <AdminCoachAssist />
-              </Suspense>
-            }
-          />
+      <CoachAssistProvider>
+        <Router>
+          <RouteMeta />
+          <Routes>
+          <Route path="/about" element={<Landing />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route element={<Layout />}>
+            <Route path="/" element={<LiveDeck />} />
+            <Route path="/admin/coach-assist" element={<CoachAssistEntry />} />
           <Route path="/dashboard" element={<CoachDashboard />} />
           <Route path="/swimmers" element={<SwimmersList />} />
           <Route path="/swimmers/:id" element={<SwimmerDetail />} />
@@ -72,6 +64,7 @@ function App() {
         </Routes>
         <UpdatePrompt />
       </Router>
+      </CoachAssistProvider>
     </AuthProvider>
   )
 }
