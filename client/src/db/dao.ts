@@ -16,6 +16,9 @@ import {
   getDrillsForSession as adminGetDrillsForSession,
   getDrill as adminGetDrill,
   addDrill as adminAddDrill,
+  addSessionWithDrills as adminAddSessionWithDrills,
+  addSessionWithDrillsIf as adminAddSessionWithDrillsIf,
+  addImportedSessionWithDrillsIf as adminAddImportedSessionWithDrillsIf,
   updateDrill as adminUpdateDrill,
   deleteDrill as adminDeleteDrill,
   getAllLibraryDrills as adminGetAllLibraryDrills,
@@ -24,6 +27,7 @@ import {
   updateLibraryDrill as adminUpdateLibraryDrill,
   deleteLibraryDrill as adminDeleteLibraryDrill,
 } from './adminDao'
+import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
 
 // ── Swimmers ──────────────────────────────────────────────
 
@@ -112,14 +116,9 @@ export async function addSessionWithDrills(
   drills: Array<Omit<SafeDrill, 'sessionId'>>,
 ): Promise<string> {
   // In coach mode the session + drills must be written to the coach's tenant,
-  // not the owner's Dexie. Reuse the already-swapped addSession/addDrill so the
-  // data lands in the admin Edge Function's scope (used by AI draft + import).
+  // not the owner's Dexie. One admin bundle request keeps the target write atomic.
   if (isCoachAssistMode()) {
-    const sessionId = await addSession(session)
-    for (const drill of drills) {
-      await addDrill({ ...drill, sessionId })
-    }
-    return sessionId
+    return adminAddSessionWithDrills(session, drills)
   }
   return writeSessionWithDrills(session, drills)
 }
@@ -130,14 +129,21 @@ export async function addSessionWithDrillsIf(
   canCreate: (existingSessions: Session[]) => boolean,
 ): Promise<string | null> {
   if (isCoachAssistMode()) {
-    if (!canCreate(await getAllSessions())) return null
-    const sessionId = await addSession(session)
-    for (const drill of drills) {
-      await addDrill({ ...drill, sessionId })
-    }
-    return sessionId
+    return adminAddSessionWithDrillsIf(session, drills, canCreate)
   }
   return writeSessionWithDrills(session, drills, canCreate)
+}
+
+export async function addImportedSessionWithDrillsIf(
+  packageValue: SessionPackageV1,
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  if (isCoachAssistMode()) {
+    return adminAddImportedSessionWithDrillsIf(packageValue, session, drills, canCreate)
+  }
+  return addSessionWithDrillsIf(session, drills, canCreate)
 }
 
 function writeSessionWithDrills(

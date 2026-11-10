@@ -1,5 +1,5 @@
 import {
-  addSessionWithDrillsIf,
+  addImportedSessionWithDrillsIf,
   getAllSessions,
   getDrillsForSession,
   getSession,
@@ -171,7 +171,8 @@ export async function importSessionPackage(
     assignedTo: null,
   }
   const drills = validation.value.drills.map(mapImportedDrill)
-  const sessionId = await addSessionWithDrillsIf(
+  const sessionId = await addImportedSessionWithDrillsIf(
+    validation.value,
     session,
     drills,
     (existingSessions) => !isNameTaken(importName, existingSessions.map((existing) => existing.name)),

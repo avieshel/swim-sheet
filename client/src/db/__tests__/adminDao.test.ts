@@ -4,8 +4,11 @@ import {
   getDrillsForSession,
   getAllSessions,
   addDrill,
+  updateSession,
+  updateDrill,
   setAdminService,
 } from '../adminDao'
+import * as adminDao from '../adminDao'
 import type { CoachData } from '../../services/admin/adminCoachService'
 import type { SafeDrill } from '../schema'
 
@@ -14,6 +17,8 @@ interface FakeService {
   adminCreate: ReturnType<typeof vi.fn>
   adminUpdate: ReturnType<typeof vi.fn>
   adminDelete: ReturnType<typeof vi.fn>
+  adminCreateSessionBundle: ReturnType<typeof vi.fn>
+  adminImportSessionPackage: ReturnType<typeof vi.fn>
 }
 
 function makeFake(): FakeService {
@@ -50,6 +55,16 @@ function makeFake(): FakeService {
     adminCreate: vi.fn(async () => 'gen'),
     adminUpdate: vi.fn(async () => {}),
     adminDelete: vi.fn(async () => {}),
+    adminCreateSessionBundle: vi.fn(async () => ({
+      outcome: 'created',
+      sessionId: 'bulk-session',
+      drillIds: ['bulk-drill'],
+    })),
+    adminImportSessionPackage: vi.fn(async () => ({
+      outcome: 'created',
+      sessionId: 'imported-session',
+      drillIds: ['imported-drill'],
+    })),
   }
 }
 
@@ -95,6 +110,91 @@ describe('adminDao', () => {
     expect(payload.items).toBe('[{"distance":25,"stroke":"freestyle"}]')
     expect(payload.organization_id).toBe('o1')
     expect(payload.created_by).toBe('c1')
+  })
+
+  it('updateSession and updateDrill delegate to the admin service', async () => {
+    configureCoachAssist({ userId: 'c1', orgId: 'o1' })
+    const fake = makeFake()
+    setAdminService(fake)
+
+    await updateSession('s1', { name: 'Updated session' })
+    await updateDrill('d1', { name: 'Updated drill' })
+
+    expect(fake.adminUpdate).toHaveBeenCalledTimes(2)
+    expect(fake.adminUpdate.mock.calls[0][1]).toBe('sessions')
+    expect(fake.adminUpdate.mock.calls[1][1]).toBe('drills')
+  })
+
+  it('addSessionWithDrills uses one admin bundle call', async () => {
+    configureCoachAssist({ userId: 'c1', orgId: 'o1' })
+    const fake = makeFake()
+    setAdminService(fake)
+    const addBundle = Reflect.get(adminDao, 'addSessionWithDrills') as (
+      session: Record<string, unknown>,
+      drills: Array<Record<string, unknown>>,
+    ) => Promise<string>
+
+    expect(typeof addBundle).toBe('function')
+    const sessionId = await addBundle(
+      { name: 'AI Set', notes: '' },
+      [{ name: 'Warmup', stroke: 'freestyle', distance: 100, order: 0, items: [], repeatCount: 1, focus: 'none', labels: [], description: '' }],
+    )
+
+    expect(sessionId).toBe('bulk-session')
+    expect(fake.adminCreateSessionBundle).toHaveBeenCalledOnce()
+    expect(fake.adminCreate).not.toHaveBeenCalled()
+  })
+
+  it('addSessionWithDrillsIf returns null on a server name conflict', async () => {
+    configureCoachAssist({ userId: 'c1', orgId: 'o1' })
+    const fake = makeFake()
+    fake.adminCreateSessionBundle.mockResolvedValue({ outcome: 'name_conflict' })
+    setAdminService(fake)
+    const addBundleIf = Reflect.get(adminDao, 'addSessionWithDrillsIf') as (
+      session: Record<string, unknown>,
+      drills: Array<Record<string, unknown>>,
+      canCreate: (existingSessions: Array<{ name: string }>) => boolean,
+    ) => Promise<string | null>
+
+    expect(typeof addBundleIf).toBe('function')
+    const sessionId = await addBundleIf(
+      { name: 'Copy', notes: '' },
+      [],
+      () => true,
+    )
+
+    expect(sessionId).toBeNull()
+    expect(fake.adminCreateSessionBundle).toHaveBeenCalledOnce()
+    expect(fake.adminCreate).not.toHaveBeenCalled()
+  })
+
+  it('addImportedSessionWithDrillsIf delegates the original package and selected name', async () => {
+    configureCoachAssist({ userId: 'c1', orgId: 'o1' })
+    const fake = makeFake()
+    setAdminService(fake)
+    const packageValue = { format: 'swimsheet-session', version: 1 } as never
+    const importBundleIf = Reflect.get(adminDao, 'addImportedSessionWithDrillsIf') as (
+      packageValue: unknown,
+      session: Record<string, unknown>,
+      drills: Array<Record<string, unknown>>,
+      canCreate: (existingSessions: Array<{ name: string }>) => boolean,
+    ) => Promise<string | null>
+
+    expect(typeof importBundleIf).toBe('function')
+    const sessionId = await importBundleIf(
+      packageValue,
+      { name: 'Imported Set', notes: '' },
+      [],
+      () => true,
+    )
+
+    expect(sessionId).toBe('imported-session')
+    expect(fake.adminImportSessionPackage).toHaveBeenCalledExactlyOnceWith(
+      'c1',
+      packageValue,
+      'Imported Set',
+    )
+    expect(fake.adminCreate).not.toHaveBeenCalled()
   })
 
   it('methods throw when no coach configured', async () => {
