@@ -99,8 +99,16 @@ export async function getDrillsForSession(sessionId: string): Promise<Drill[]> {
     .sort((a, b) => a.order - b.order)
 }
 
+export async function getDrill(id: string): Promise<Drill | undefined> {
+  return (await mapTable<Drill>('drills', (await fetchAll()).drills)).find((d) => d.id === id)
+}
+
 export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
   return mapTable<LibraryDrill>('libraryDrills', (await fetchAll()).libraryDrills)
+}
+
+export async function getLibraryDrill(id: string): Promise<LibraryDrill | undefined> {
+  return (await getAllLibraryDrills()).find((l) => l.id === id)
 }
 
 // ── Writes (coach scope via the admin Edge Function, no Dexie) ──────────
