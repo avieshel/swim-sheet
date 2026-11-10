@@ -21,7 +21,8 @@
 ## Reuse decisions (carry into every task)
 
 - **No `dexieDao` extraction.** `dao.ts` stays in place; each coach-relevant function gets a one-line delegation branch. Zero existing logic moved.
-- **No custom cloud mappers.** Reads use `fromCloudRow(table, row)`; writes build their payload with `toCloudRow(table, change, orgId, userId)`. Both already exported from `client/src/sync/SupabaseSyncTransport.ts`. (One minor judgment call: `db/` importing a pure converter from `sync/` is a light cross-layer import; it avoids creating a new mapping module. Flagged for review — acceptable because the functions are pure and side-effect-free.)
+- **No custom cloud mappers.** Reads use `fromCloudRow(table, row)`; writes build their payload with `toCloudRow(table, change, orgId, userId)`. Both already exported from `client/src/sync/SupabaseSyncTransport.ts`. `db/adminDao.ts` imports them **in place** (confirmed: reuse over extraction — the functions are pure and side-effect-free, so the light cross-layer import is acceptable).
+- **`addDrill` in coach mode creates only the session drill** (no automatic library-drill write). Confirmed simplification per the "don't over-complicate" directive; local mode's copy-on-use library side-effect is intentionally not reproduced for coaches.
 - **No migration, no Edge Function validation change.** `normalizeScopedWrite` already forwards `items`/`repeat_count`/`focus`/`labels`/`description`/`library_drill_id`; the cloud `drills`/`library_drills` tables already have those columns.
 - **New modules are additive only:** `client/src/db/adminDao.ts` and `client/src/context/CoachAssistContext.tsx`. Both implement the *existing* `dao` function-signature interface — a textbook Strategy/Adapter pattern, not a risky refactor.
 
