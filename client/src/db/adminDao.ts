@@ -1,12 +1,19 @@
 import { fromCloudRow, toCloudRow } from '../sync/SupabaseSyncTransport'
 import type { SyncTable, LocalChange } from '../sync/types'
-import type { CoachData, ScopedTable } from '../services/admin/adminCoachService'
+import type {
+  AdminSessionBundleResult,
+  CoachData,
+  ScopedTable,
+} from '../services/admin/adminCoachService'
 import {
   getCoachData,
   adminCreate,
   adminUpdate,
   adminDelete,
+  adminCreateSessionBundle,
+  adminImportSessionPackage,
 } from '../services/admin/adminCoachService'
+import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
 import type {
   Swimmer,
   Session,
@@ -24,9 +31,27 @@ interface AdminServiceLike {
   adminCreate(coachUserId: string, table: ScopedTable, payload: Record<string, unknown>): Promise<string>
   adminUpdate(coachUserId: string, table: ScopedTable, id: string, patch: Record<string, unknown>): Promise<void>
   adminDelete(coachUserId: string, table: ScopedTable, id: string): Promise<void>
+  adminCreateSessionBundle(
+    coachUserId: string,
+    session: Record<string, unknown>,
+    drills: Array<Record<string, unknown>>,
+    rejectNameConflict: boolean,
+  ): Promise<AdminSessionBundleResult>
+  adminImportSessionPackage(
+    coachUserId: string,
+    packageValue: SessionPackageV1,
+    name: string,
+  ): Promise<AdminSessionBundleResult>
 }
 
-let service: AdminServiceLike = { getCoachData, adminCreate, adminUpdate, adminDelete }
+let service: AdminServiceLike = {
+  getCoachData,
+  adminCreate,
+  adminUpdate,
+  adminDelete,
+  adminCreateSessionBundle,
+  adminImportSessionPackage,
+}
 
 export function setAdminService(svc: AdminServiceLike): void {
   service = svc
@@ -72,6 +97,25 @@ function toRow(table: SyncTable, id: string, payload: Record<string, unknown>): 
   const c = requireCoach()
   const change: LocalChange = { table, id, op: 'upsert', payload, rev: null }
   return toCloudRow(table, change, c.orgId, c.userId)
+}
+
+function toSessionBundleRows(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+): { session: Record<string, unknown>; drills: Array<Record<string, unknown>> } {
+  const now = new Date().toISOString()
+  const sessionId = crypto.randomUUID()
+  return {
+    session: toRow('sessions', sessionId, { ...session, createdAt: now, updatedAt: now }),
+    drills: drills.map((drill) =>
+      toRow('drills', crypto.randomUUID(), {
+        ...drill,
+        sessionId,
+        createdAt: now,
+        updatedAt: now,
+      })
+    ),
+  }
 }
 
 // ── Reads (coach scope, served from a per-page-view cache) ──────────────
@@ -120,6 +164,46 @@ export async function addSession(data: SafeSession): Promise<string> {
   const newId = await service.adminCreate(c.userId, 'sessions', row)
   cache = null
   return newId || id
+}
+
+export async function addSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+): Promise<string> {
+  const c = requireCoach()
+  const bundle = toSessionBundleRows(session, drills)
+  const result = await service.adminCreateSessionBundle(c.userId, bundle.session, bundle.drills, false)
+  cache = null
+  if (result.outcome === 'name_conflict') {
+    throw new Error('Unexpected name conflict while creating a session')
+  }
+  return result.sessionId
+}
+
+export async function addSessionWithDrillsIf(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  const c = requireCoach()
+  if (!canCreate(await getAllSessions())) return null
+  const bundle = toSessionBundleRows(session, drills)
+  const result = await service.adminCreateSessionBundle(c.userId, bundle.session, bundle.drills, true)
+  cache = null
+  return result.outcome === 'created' ? result.sessionId : null
+}
+
+export async function addImportedSessionWithDrillsIf(
+  packageValue: SessionPackageV1,
+  session: SafeSession,
+  _drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  const c = requireCoach()
+  if (!canCreate(await getAllSessions())) return null
+  const result = await service.adminImportSessionPackage(c.userId, packageValue, session.name)
+  cache = null
+  return result.outcome === 'created' ? result.sessionId : null
 }
 
 export async function updateSession(id: string, data: Partial<SafeSession>): Promise<void> {

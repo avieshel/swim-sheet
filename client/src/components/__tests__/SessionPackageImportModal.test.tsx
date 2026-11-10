@@ -138,6 +138,19 @@ describe('SessionPackageImportModal', () => {
     expect(handlers.onViewSession).toHaveBeenCalledExactlyOnceWith('imported-session')
   })
 
+  it('reports a remote import failure without claiming success', async () => {
+    const user = userEvent.setup()
+    const handlers = renderModal()
+    mockApi.importSessionPackage.mockRejectedValueOnce(new Error('target write failed'))
+
+    await selectFile(user)
+    await user.click(await screen.findByRole('button', { name: 'Import session' }))
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Import Complete' })).toBeNull()
+    expect(handlers.onImported).not.toHaveBeenCalled()
+  })
+
   it('uses a named keyboard-dismissible dialog with visible focus', async () => {
     const user = userEvent.setup()
     const handlers = renderModal()

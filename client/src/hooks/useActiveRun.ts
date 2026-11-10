@@ -5,6 +5,7 @@ import type { SessionRun } from '../db/schema'
 
 let cached: SessionRun | null = null
 const listeners = new Set<() => void>()
+let subscription: { unsubscribe: () => void } | null = null
 
 function notify(): void {
   for (const listener of listeners) listener()
@@ -15,18 +16,17 @@ function getSnapshot(): SessionRun | null {
 }
 
 function subscribe(listener: () => void): () => void {
-  start()
   listeners.add(listener)
+  start()
   return () => {
     listeners.delete(listener)
+    if (listeners.size === 0) stop()
   }
 }
 
-let started = false
 function start(): void {
-  if (started) return
-  started = true
-  void liveQuery(async (): Promise<SessionRun | null> => {
+  if (subscription) return
+  subscription = liveQuery(async (): Promise<SessionRun | null> => {
     const run = await db.sessionRuns.where('status').equals('active').first()
     return run ?? null
   }).subscribe({
@@ -41,6 +41,25 @@ function start(): void {
   })
 }
 
-export function useActiveRun(): SessionRun | null {
-  return useSyncExternalStore(subscribe, getSnapshot)
+function stop(): void {
+  if (!subscription) return
+  subscription.unsubscribe()
+  subscription = null
+  cached = null
+  notify()
+}
+
+function subscribeDisabled(): () => void {
+  return () => {}
+}
+
+function getDisabledSnapshot(): null {
+  return null
+}
+
+export function useActiveRun(enabled = true): SessionRun | null {
+  return useSyncExternalStore(
+    enabled ? subscribe : subscribeDisabled,
+    enabled ? getSnapshot : getDisabledSnapshot,
+  )
 }

@@ -137,14 +137,20 @@ interface FullRecorder {
   client: ServiceRoleClient
   inserted: Record<string, Array<Record<string, unknown>>>
   updated: Array<{ table: string; row: Record<string, unknown> }>
+  rpcCalls: Array<{ name: string; args: Record<string, unknown> }>
 }
 
 function makeFullClient(
   orgId: string,
   dataByTable: Record<string, unknown[]> = {},
+  rpcResult: { data: unknown; error: { message: string } | null } = {
+    data: { outcome: 'created', sessionId: 'session-1', drillIds: ['drill-1'] },
+    error: null,
+  },
 ): FullRecorder {
   const inserted: Record<string, Array<Record<string, unknown>>> = {}
   const updated: Array<{ table: string; row: Record<string, unknown> }> = []
+  const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = []
   function makeBuilder(table: string) {
     const builder = {
       insert(row: Record<string, unknown>) {
@@ -184,11 +190,16 @@ function makeFullClient(
     from(table: string) {
       return makeBuilder(table)
     },
+    rpc(name: string, args: Record<string, unknown>) {
+      rpcCalls.push({ name, args })
+      return Promise.resolve(rpcResult)
+    },
   }
   return {
     client: (client as unknown) as ServiceRoleClient,
     inserted,
     updated,
+    rpcCalls,
   }
 }
 
@@ -287,6 +298,86 @@ Deno.test('POST /coaches/:id/draft materializes a session + drills for an owner'
   assertEquals(body.drillIds.length, 1)
   assertEquals(rec.inserted['sessions'][0].organization_id, 'org-1')
   assertEquals(rec.inserted['drills'][0].created_by, 'coach-1')
+})
+
+Deno.test('POST /coaches/:id/session-bundle rejects a non-owner', async () => {
+  const rec = makeFullClient('org-1')
+  const h = createHandler(
+    makeDeps({
+      getCallerUid: () => Promise.resolve('evil'),
+      isOwner: (u) => u === 'owner',
+      createServiceRoleClient: () => rec.client,
+    }),
+  )
+  const res = await h(
+    new Request('https://x/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: '/coaches/coach-1/session-bundle',
+        session: { name: 'Monday' },
+        drills: [],
+      }),
+    }),
+  )
+  assertEquals(res.status, 403)
+  assertEquals(rec.rpcCalls.length, 0)
+})
+
+Deno.test('POST /coaches/:id/session-bundle stamps resolved target ownership', async () => {
+  const rec = makeFullClient('org-resolved')
+  const h = createHandler(recorderDeps(rec))
+  const res = await h(
+    new Request('https://x/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: '/coaches/coach-1/session-bundle',
+        session: { name: 'Monday', notes: '', organization_id: 'org-foreign', created_by: 'foreign-user' },
+        drills: [{
+          name: 'Warmup',
+          stroke: 'freestyle',
+          distance: 100,
+          drill_order: 0,
+          items: [],
+          repeat_count: 1,
+          focus: 'fitness',
+          labels: [],
+          description: '',
+          session_id: 'foreign-session',
+          organization_id: 'org-foreign',
+          created_by: 'foreign-user',
+        }],
+      }),
+    }),
+  )
+  assertEquals(res.status, 200)
+  assertEquals(await res.json(), { outcome: 'created', sessionId: 'session-1', drillIds: ['drill-1'] })
+  assertEquals(rec.rpcCalls.length, 1)
+  assertEquals(rec.rpcCalls[0].name, 'admin_create_session_bundle')
+  assertEquals(rec.rpcCalls[0].args.p_organization_id, 'org-resolved')
+  assertEquals(rec.rpcCalls[0].args.p_coach_user_id, 'coach-1')
+  const session = rec.rpcCalls[0].args.p_session as Record<string, unknown>
+  assertEquals('organization_id' in session, false)
+  assertEquals('created_by' in session, false)
+})
+
+Deno.test('POST /coaches/:id/import-session rejects an invalid package before RPC', async () => {
+  const rec = makeFullClient('org-1')
+  const h = createHandler(recorderDeps(rec))
+  const res = await h(
+    new Request('https://x/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: '/coaches/coach-1/import-session',
+        name: 'Copy',
+        package: { format: 'swimsheet-session', version: 1, unexpected: true },
+      }),
+    }),
+  )
+  assertEquals(res.status, 400)
+  assertEquals(rec.rpcCalls.length, 0)
 })
 
 // --- Body-path routing (Task 5): supabase.functions.invoke hits the function

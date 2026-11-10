@@ -19,6 +19,8 @@ vi.mock('../../services/admin/adminCoachService', () => ({
   adminUpdate: vi.fn(async () => {}),
   adminDelete: vi.fn(async () => {}),
   adminMaterializeDraft: vi.fn(async () => ({ sessionId: '', drillIds: [] })),
+  adminCreateSessionBundle: vi.fn(async () => ({ outcome: 'created', sessionId: '', drillIds: [] })),
+  adminImportSessionPackage: vi.fn(async () => ({ outcome: 'created', sessionId: '', drillIds: [] })),
 }))
 
 describe('CoachAssistContext', () => {

@@ -105,6 +105,19 @@ describe('AiSessionDraft', () => {
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/sessions'))
   })
 
+  it('keeps the proposal and reports a target-save failure without navigating', async () => {
+    const user = userEvent.setup()
+    applySessionDraft.mockRejectedValueOnce(new Error('target write failed'))
+    renderPage()
+    await generateDraft()
+
+    await user.click(await screen.findByRole('button', { name: /Save session/ }))
+
+    expect(await screen.findByText(/something went wrong saving/i)).toBeTruthy()
+    expect(screen.getByText('Proposed session')).toBeTruthy()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
   it('saves the edited proposal rather than the generated one', async () => {
     const user = userEvent.setup()
     renderPage()

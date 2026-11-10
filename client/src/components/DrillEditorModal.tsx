@@ -42,6 +42,7 @@ interface DrillEditorModalProps {
   onDelete?: () => void
   onClose: () => void
   restoreFocusRef?: RefObject<HTMLElement | null>
+  error?: string | null
 }
 
 const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
@@ -65,7 +66,7 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
   }
 }
 
-export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose, restoreFocusRef }) => {
+export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose, restoreFocusRef, error }) => {
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
@@ -394,6 +395,11 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             </div>
 
             <div className="sticky bottom-0 -mx-4 sm:-mx-5 md:-mx-6 mt-5 px-4 sm:px-5 md:px-6 pt-4 pb-4 -mb-4 sm:-mb-5 md:-mb-6 bg-surface-container-lowest border-t border-outline-variant">
+              {error && (
+                <p role="alert" className="mb-3 rounded-lg bg-error-container/40 p-3 text-label-sm text-error">
+                  {error}
+                </p>
+              )}
               <div className="flex items-center gap-3">
                 {onDelete ? (
                   <button

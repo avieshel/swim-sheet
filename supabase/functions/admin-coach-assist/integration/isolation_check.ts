@@ -7,21 +7,18 @@
 // delivered to Coach A (via the same query shape the PWA's sync pull uses) and
 // is invisible to Coach B — at both the function-query layer and the RLS layer.
 //
-// The owner is simulated here by the service-role client writing through the
-// REAL admin service (normalizeScopedWrite + resolveCoachOrg + materializeDraft),
-// exactly as the deployed function does. Local dev keys are used as a fallback
-// only; override with env vars to target another stack.
+// The owner is simulated through the owner-gated handler with an injected caller
+// identity and service-role client. Local dev keys are used as a fallback only;
+// override with env vars to target another stack.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import type { SessionDraftV1 } from "../shared/sessionDraft/types.ts";
-import {
-  resolveCoachOrg,
-  getCoachData,
-  materializeDraft,
-} from "../service/adminService.ts";
+import { createHandler } from "../api/handler.ts";
+import type { HandlerDeps, ServiceRoleClient as EdgeServiceRoleClient } from "../api/deps.ts";
+import { resolveCoachOrg, getCoachData } from "../service/adminService.ts";
 
 type ServiceRoleClient = {
   from: ReturnType<typeof createClient>["from"];
+  rpc: ReturnType<typeof createClient>["rpc"];
   auth: { admin: { createUser: ReturnType<typeof createClient>["auth"]["admin"]["createUser"] } };
 };
 
@@ -73,15 +70,101 @@ async function main(): Promise<void> {
   const orgB = await resolveCoachOrg(svc, coachB);
   assert(orgA !== orgB, "coach A and coach B resolve to distinct orgs");
 
-  // Owner writes a session + drill into Coach A's tenant (real service path).
-  const draft: SessionDraftV1 = {
-    session: { name: "Owner-assisted Session" },
-    drills: [
-      { name: "Warmup 4x100", repeatCount: 1, items: [{ distance: 100, stroke: "freestyle", repeatCount: 4 }] },
-    ],
+  const sessionName = `Owner-assisted Session ${runId}`;
+  const deps: HandlerDeps = {
+    getCallerUid: () => Promise.resolve("app-owner"),
+    isOwner: (uid) => uid === "app-owner",
+    createServiceRoleClient: () => svc as unknown as EdgeServiceRoleClient,
   };
-  const { sessionId, drillIds } = await materializeDraft(svc, orgA, coachA, draft);
-  assert(!!sessionId && drillIds.length === 1, "materializeDraft created one session + one drill");
+  const handler = createHandler(deps);
+  const response = await handler(new Request("https://x/", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      path: `/coaches/${coachA}/session-bundle`,
+      coachUserId: coachA,
+      session: {
+        name: sessionName,
+        notes: "Target-scoped notes",
+        visibility: "private",
+        organization_id: orgB,
+        created_by: coachB,
+      },
+      drills: [{
+        name: "Warmup 4x100",
+        stroke: "freestyle",
+        distance: 400,
+        drill_order: 0,
+        items: [{
+          id: crypto.randomUUID(),
+          distance: 100,
+          stroke: "freestyle",
+          repeatCount: 4,
+          intensity: "v2",
+          equipment: ["fins"],
+          segments: [{ name: "Underwater", distance: 10, stroke: "freestyle" }],
+        }],
+        repeat_count: 1,
+        focus: "fitness",
+        labels: ["aerobic"],
+        description: "Preserve the authored drill fields",
+        session_id: "foreign-session",
+        organization_id: orgB,
+        created_by: coachB,
+      }],
+      rejectNameConflict: false,
+    }),
+  }));
+  if (!response.ok) throw new Error(`create session bundle: ${response.status} ${await response.text()}`);
+  const created = await response.json() as { outcome: string; sessionId?: string; drillIds?: string[] };
+  assert(created.outcome === "created", "session bundle returns created outcome");
+  const sessionId = created.sessionId;
+  const drillIds = created.drillIds ?? [];
+  assert(typeof sessionId === "string" && drillIds.length === 1, "session bundle creates one session + one drill");
+
+  const { data: drillRows, error: drillReadError } = await svc
+    .from("drills")
+    .select("organization_id, created_by, session_id, items, repeat_count, focus, labels, description")
+    .eq("id", drillIds[0])
+    .single();
+  if (drillReadError) throw new Error(`read drill: ${drillReadError.message}`);
+  assert(drillRows.organization_id === orgA, "drill.organization_id === coach A's org");
+  assert(drillRows.created_by === coachA, "drill.created_by === coach A");
+  assert(drillRows.session_id === sessionId, "drill links to the new session");
+  const storedItems = drillRows.items as Array<Record<string, unknown>>;
+  assert(storedItems[0].intensity === "v2", "drill intensity survives the bundle write");
+  assert(JSON.stringify(storedItems[0].segments).includes("Underwater"), "drill segments survive the bundle write");
+
+  const conflictName = `Concurrent import ${runId}`;
+  const duplicateRequest = () => svc.rpc("admin_create_session_bundle", {
+    p_organization_id: orgA,
+    p_coach_user_id: coachA,
+    p_session: { name: conflictName, visibility: "private" },
+    p_drills: [],
+    p_reject_name_conflict: true,
+  });
+  const duplicateResults = await Promise.all([duplicateRequest(), duplicateRequest()]);
+  assert(duplicateResults.every((result) => !result.error), "concurrent imports return outcomes, not errors");
+  const duplicateOutcomes = duplicateResults.map((result) => (result.data as { outcome: string }).outcome);
+  assert(duplicateOutcomes.filter((outcome) => outcome === "created").length === 1, "one same-name import is created");
+  assert(duplicateOutcomes.filter((outcome) => outcome === "name_conflict").length === 1, "one same-name import conflicts");
+
+  const rollbackName = `Rollback session ${runId}`;
+  const failedBundle = await svc.rpc("admin_create_session_bundle", {
+    p_organization_id: orgA,
+    p_coach_user_id: coachA,
+    p_session: { name: rollbackName, visibility: "private" },
+    p_drills: [{ name: null, stroke: "freestyle", distance: 50, drill_order: 0 }],
+    p_reject_name_conflict: false,
+  });
+  assert(failedBundle.error !== null, "invalid drill causes the bundle transaction to fail");
+  const { data: rollbackRows, error: rollbackReadError } = await svc
+    .from("sessions")
+    .select("id")
+    .eq("organization_id", orgA)
+    .eq("name", rollbackName);
+  if (rollbackReadError) throw new Error(`read rollback session: ${rollbackReadError.message}`);
+  assert((rollbackRows ?? []).length === 0, "failed drill insert rolls back the session");
 
   // The row is stamped with the TARGET coach's org and identity, never the owner's.
   const { data: row, error: readErr } = await svc
@@ -111,12 +194,26 @@ async function main(): Promise<void> {
     (aSessions ?? []).some((s) => s.id === sessionId),
     "coach A's pull includes the owner-assisted session",
   );
+  const { data: aDrills, error: aDrillsError } = await aClient
+    .from("drills")
+    .select("id, session_id, items")
+    .eq("organization_id", orgA);
+  if (aDrillsError) throw new Error(`A drill pull: ${aDrillsError.message}`);
+  const pulledDrill = (aDrills ?? []).find((d) => d.id === drillIds[0]);
+  assert(pulledDrill?.session_id === sessionId, "coach A's pull includes the linked drill");
+  assert(
+    ((pulledDrill?.items as Array<Record<string, unknown>> | undefined)?.[0]?.intensity) === "v2",
+    "coach A's pull includes the rich drill item fields",
+  );
 
   const bClient = createClient(URL, ANON, authOpts);
   await bClient.auth.signInWithPassword({ email: emailB, password: "password123" });
   const { data: bAll, error: bErr } = await bClient.from("sessions").select("id");
   if (bErr) throw new Error(`B pull: ${bErr.message}`);
   assert(!bAll.some((s) => s.id === sessionId), "coach B cannot read coach A's session (RLS isolation)");
+  const { data: bDrills, error: bDrillErr } = await bClient.from("drills").select("id");
+  if (bDrillErr) throw new Error(`B drill pull: ${bDrillErr.message}`);
+  assert(!bDrills.some((d) => d.id === drillIds[0]), "coach B cannot read coach A's drill (RLS isolation)");
   const { data: bInA } = await bClient.from("sessions").select("id").eq("organization_id", orgA);
   assert((bInA ?? []).length === 0, "coach B querying org A returns nothing");
 

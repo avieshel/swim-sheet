@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '../../db/schema'
+import { configureCoachAssist, setAdminService } from '../../db/adminDao'
 import type { Drill, Session } from '../../db/schema'
 import { defaultSessionPackageConfig } from '../../../../shared/sessionPackage/config'
 import type { SessionPackageV1 } from '../../../../shared/sessionPackage/types'
@@ -100,6 +101,7 @@ async function clearTables(): Promise<void> {
 
 beforeEach(async () => {
   if (!db.isOpen()) await db.open()
+  configureCoachAssist(null)
   await clearTables()
 })
 
@@ -284,5 +286,34 @@ describe('session package service import', () => {
     expect(await db.drills.count()).toBe(0)
     expect(await db.libraryDrills.count()).toBe(0)
     addDrill.mockRestore()
+  })
+
+  it('uses the target package import path in Coach Assist without writing Dexie', async () => {
+    const importPackage = vi.fn(async () => ({
+      outcome: 'created' as const,
+      sessionId: 'coach-session',
+      drillIds: ['coach-drill'],
+    }))
+    setAdminService({
+      getCoachData: vi.fn(async () => ({ sessions: [], drills: [], swimmers: [], libraryDrills: [] })),
+      adminCreate: vi.fn(async () => 'local-row'),
+      adminUpdate: vi.fn(async () => {}),
+      adminDelete: vi.fn(async () => {}),
+      adminCreateSessionBundle: vi.fn(),
+      adminImportSessionPackage: importPackage,
+    } as never)
+    configureCoachAssist({ userId: 'coach-1', orgId: 'coach-org' })
+
+    const result = await importSessionPackage(packageFixture(), 'My Copy')
+
+    expect(result).toEqual({ outcome: 'created', sessionId: 'coach-session' })
+    expect(importPackage).toHaveBeenCalledExactlyOnceWith(
+      'coach-1',
+      expect.objectContaining({ session: { name: 'Imported Set', notes: 'Aerobic technique' } }),
+      'My Copy',
+    )
+    expect(await db.sessions.count()).toBe(0)
+    expect(await db.drills.count()).toBe(0)
+    configureCoachAssist(null)
   })
 })

@@ -59,9 +59,22 @@ coach's normal PWA `pull` (`SupabaseSyncTransport.pull` → `select * from <tabl
 where organization_id = <coach org>`, authenticated as the coach) returns it; another
 coach's pull cannot see it because RLS `is_organization_member(organization_id)` is
 false across tenants. End-to-end proof:
-`supabase/functions/admin-coach-assist/integration/isolation_check.ts` writes a
-session to Coach A via the real service, then asserts Coach A's pull includes it
-while Coach B's pull (RLS) excludes it.
+`supabase/functions/admin-coach-assist/integration/isolation_check.ts` invokes the
+owner-gated handler with an injected owner identity and the real local service-role
+client, then asserts Coach A's pull includes the complete session/drill bundle while
+Coach B's pull (RLS) excludes both rows.
+
+**Session bundle writes:** Coach Assist AI saves and `.swimsheet` imports call the
+owner-gated Edge Function, which resolves the target organization server-side and
+invokes `public.admin_create_session_bundle`. The Postgres function accepts only
+allowlisted session/drill fields, stamps the target organization and coach identity,
+and inserts the session plus all drills in one transaction. Its execute grant is
+revoked from `PUBLIC`, `anon`, and `authenticated`; only `service_role` may call it,
+and that key stays in the Edge Function. Package imports are validated again in the
+Edge Function using the shared `sessionPackage` contract. Name-conflict imports are
+serialized by target organization and normalized session name, returning a conflict
+without inserting rows. The coach receives the records through the normal sync pull;
+the owner's Dexie and other coach tenants are not write targets.
 
 ## Sync Dependency Order
 
@@ -155,6 +168,13 @@ Hosted project `pcdmtsafwmlqdwjxbajc`,
 - `20261019000000_ai_session_harness_trace.sql` / `20261019000100_..._signature_fix.sql`
   add the `ai_private.ai_analytics_trace` table + `ai_analytics_trace_insert` RPC for
   AI generation telemetry.
+- `20261110000000_admin_session_bundle.sql` adds the service-role-only transactional
+  session-bundle RPC. It is present in the migration directory but has not been
+  applied to the hosted project. The local function was applied directly for
+  integration verification; the local migration history still has an unmatched
+  `20261020000000` entry, so `supabase migration up` cannot run until that divergence
+  is resolved. Do not deploy code that calls the RPC until the migration is applied
+  to the intended hosted project.
 
 ## Migration Ordering Rule
 

@@ -14,6 +14,7 @@ import {
   adminDelete,
   adminMaterializeDraft,
 } from './adminCoachService'
+import * as adminCoachService from './adminCoachService'
 
 const invoke = supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>
 
@@ -113,6 +114,65 @@ describe('adminCoachService', () => {
       expect.objectContaining({
         method: 'POST',
         body: { path: '/coaches/coach-1/draft', coachUserId: 'coach-1', draft },
+      }),
+    )
+  })
+
+  test('adminCreateSessionBundle invokes the scoped route and maps its result', async () => {
+    const session = { name: 'Tuesday' }
+    const drills = [{ name: 'Warmup' }]
+    invoke.mockResolvedValue(ok({ outcome: 'created', sessionId: 's1', drillIds: ['d1'] }))
+    const create = Reflect.get(adminCoachService, 'adminCreateSessionBundle') as (
+      coachUserId: string,
+      session: Record<string, unknown>,
+      drills: Array<Record<string, unknown>>,
+      rejectNameConflict: boolean,
+    ) => Promise<unknown>
+
+    expect(typeof create).toBe('function')
+    await expect(create('coach-1', session, drills, false)).resolves.toEqual({
+      outcome: 'created',
+      sessionId: 's1',
+      drillIds: ['d1'],
+    })
+    expect(invoke).toHaveBeenCalledWith(
+      'admin-coach-assist',
+      expect.objectContaining({
+        method: 'POST',
+        body: {
+          path: '/coaches/coach-1/session-bundle',
+          coachUserId: 'coach-1',
+          session,
+          drills,
+          rejectNameConflict: false,
+        },
+      }),
+    )
+  })
+
+  test('adminImportSessionPackage sends the package and selected name', async () => {
+    const packageValue = { format: 'swimsheet-session', version: 1 }
+    invoke.mockResolvedValue(ok({ outcome: 'name_conflict' }))
+    const importPackage = Reflect.get(adminCoachService, 'adminImportSessionPackage') as (
+      coachUserId: string,
+      packageValue: unknown,
+      name: string,
+    ) => Promise<unknown>
+
+    expect(typeof importPackage).toBe('function')
+    await expect(importPackage('coach-1', packageValue, 'Aerobic Copy')).resolves.toEqual({
+      outcome: 'name_conflict',
+    })
+    expect(invoke).toHaveBeenCalledWith(
+      'admin-coach-assist',
+      expect.objectContaining({
+        method: 'POST',
+        body: {
+          path: '/coaches/coach-1/import-session',
+          coachUserId: 'coach-1',
+          package: packageValue,
+          name: 'Aerobic Copy',
+        },
       }),
     )
   })

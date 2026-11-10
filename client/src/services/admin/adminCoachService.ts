@@ -1,4 +1,5 @@
 import { supabase } from '../../api/supabase'
+import type { SessionPackageV1 } from '../../../../shared/sessionPackage/types'
 
 // Tables a coach may write to on behalf of an owner. Mirrors the Edge Function's
 // `ScopedTable` allowlist (model/types.ts). Defined locally rather than imported
@@ -23,6 +24,10 @@ export interface MaterializedDraft {
   sessionId: string
   drillIds: string[]
 }
+
+export type AdminSessionBundleResult =
+  | { outcome: 'created'; sessionId: string; drillIds: string[] }
+  | { outcome: 'name_conflict' }
 
 // Single source of truth for the function name; the client can never set a URL
 // path via `functions.invoke`, so every route travels in the body `path` field.
@@ -105,4 +110,47 @@ export async function adminMaterializeDraft(
     sessionId: typeof data.sessionId === 'string' ? data.sessionId : '',
     drillIds: Array.isArray(data.drillIds) ? (data.drillIds as string[]) : [],
   }
+}
+
+function readSessionBundleResult(data: Record<string, unknown>): AdminSessionBundleResult {
+  if (data.outcome === 'name_conflict') return { outcome: 'name_conflict' }
+  if (
+    data.outcome !== 'created'
+    || typeof data.sessionId !== 'string'
+    || !Array.isArray(data.drillIds)
+    || !data.drillIds.every((id) => typeof id === 'string')
+  ) {
+    throw new Error('admin-coach-assist returned an invalid session bundle result')
+  }
+  return { outcome: 'created', sessionId: data.sessionId, drillIds: data.drillIds as string[] }
+}
+
+export async function adminCreateSessionBundle(
+  coachUserId: string,
+  session: Record<string, unknown>,
+  drills: Array<Record<string, unknown>>,
+  rejectNameConflict: boolean,
+): Promise<AdminSessionBundleResult> {
+  const data = await invokeAdmin('POST', {
+    path: `/coaches/${coachUserId}/session-bundle`,
+    coachUserId,
+    session,
+    drills,
+    rejectNameConflict,
+  })
+  return readSessionBundleResult(data)
+}
+
+export async function adminImportSessionPackage(
+  coachUserId: string,
+  packageValue: SessionPackageV1,
+  name: string,
+): Promise<AdminSessionBundleResult> {
+  const data = await invokeAdmin('POST', {
+    path: `/coaches/${coachUserId}/import-session`,
+    coachUserId,
+    package: packageValue,
+    name,
+  })
+  return readSessionBundleResult(data)
 }

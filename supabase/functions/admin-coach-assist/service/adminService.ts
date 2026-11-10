@@ -7,9 +7,12 @@
 
 import type { ServiceRoleClient } from '../api/deps.ts'
 import { ADMIN_BATCH_CAP } from '../model/config.ts'
-import type { CoachSummary, ScopedTable } from '../model/types.ts'
-import { normalizeScopedWrite } from '../model/validate.ts'
+import type { CoachSummary, ScopedTable, SessionBundleResult } from '../model/types.ts'
+import { normalizeScopedWrite, ScopedWriteError } from '../model/validate.ts'
 import type { SessionDraftV1 } from '../shared/sessionDraft/types.ts'
+import { defaultSessionPackageConfig } from '../shared/sessionPackage/config.ts'
+import type { SessionPackageItemV1, SessionPackageV1 } from '../shared/sessionPackage/types.ts'
+import { validateSessionPackage } from '../shared/sessionPackage/validate.ts'
 
 // Thrown when a coach cannot be mapped to exactly one personal organization:
 // either they own none, or the data is ambiguous (more than one).
@@ -279,4 +282,190 @@ export async function materializeDraft(
   }
 
   return { sessionId, drillIds }
+}
+
+type Row = Record<string, unknown>
+
+function asRow(value: unknown): Row | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Row
+    : null
+}
+
+function parseItems(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string') throw new ScopedWriteError('drill items must be an array')
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (Array.isArray(parsed)) return parsed
+  } catch {
+    throw new ScopedWriteError('drill items must be valid JSON')
+  }
+  throw new ScopedWriteError('drill items must be an array')
+}
+
+function mapItems(items: unknown[]): SessionPackageItemV1[] {
+  return items.map((value) => {
+    const item = asRow(value)
+    if (!item) throw new ScopedWriteError('drill item must be an object')
+    const mapped: Record<string, unknown> = {}
+    for (const key of [
+      'distance',
+      'stroke',
+      'repeatCount',
+      'intensity',
+      'interval',
+      'equipment',
+      'description',
+      'segments',
+    ]) {
+      if (Object.hasOwn(item, key)) mapped[key] = item[key]
+    }
+    return mapped as unknown as SessionPackageItemV1
+  })
+}
+
+function checkPackageByteLimit(value: unknown): void {
+  let serialized: string | undefined
+  try {
+    serialized = JSON.stringify(value)
+  } catch {
+    throw new ScopedWriteError('session package is not serializable')
+  }
+  if (serialized === undefined) throw new ScopedWriteError('session package is not serializable')
+  const size = new TextEncoder().encode(serialized).byteLength
+  if (size > defaultSessionPackageConfig.limits.maxFileBytes) {
+    throw new ScopedWriteError('session package exceeds the configured byte limit')
+  }
+}
+
+function validatePackage(input: unknown): SessionPackageV1 {
+  const validation = validateSessionPackage(input)
+  if (!validation.ok) throw new ScopedWriteError(validation.error.message)
+  return validation.value
+}
+
+function packageFromBundle(sessionInput: unknown, drillsInput: unknown): SessionPackageV1 {
+  const session = asRow(sessionInput)
+  if (!session) throw new ScopedWriteError('session must be an object')
+  if (!Array.isArray(drillsInput)) throw new ScopedWriteError('drills must be an array')
+
+  const packageDrills = drillsInput.map((value) => {
+    const drill = asRow(value)
+    if (!drill) throw new ScopedWriteError('each drill must be an object')
+    return {
+      name: drill.name,
+      stroke: drill.stroke,
+      distance: drill.distance,
+      order: drill.drill_order,
+      items: mapItems(parseItems(drill.items)),
+      repeatCount: drill.repeat_count,
+      focus: drill.focus ?? 'none',
+      labels: drill.labels ?? [],
+      description: drill.description ?? '',
+    }
+  })
+
+  const candidate = {
+    format: defaultSessionPackageConfig.format,
+    version: defaultSessionPackageConfig.version,
+    exportedAt: new Date().toISOString(),
+    session: {
+      name: session.name,
+      notes: session.notes ?? '',
+    },
+    drills: packageDrills,
+  }
+  checkPackageByteLimit(candidate)
+  return validatePackage(candidate)
+}
+
+function mapPackageToBundle(
+  packageValue: SessionPackageV1,
+): { session: Row; drills: Row[] } {
+  return {
+    session: {
+      name: packageValue.session.name,
+      notes: packageValue.session.notes,
+      visibility: 'private',
+    },
+    drills: packageValue.drills.map((drill) => ({
+      name: drill.name,
+      stroke: drill.stroke,
+      distance: drill.distance,
+      drill_order: drill.order,
+      items: drill.items.map((item) => ({ id: crypto.randomUUID(), ...item })),
+      repeat_count: drill.repeatCount,
+      focus: drill.focus,
+      labels: [...drill.labels],
+      description: drill.description,
+    })),
+  }
+}
+
+async function persistSessionBundle(
+  client: ServiceRoleClient,
+  orgId: string,
+  coachUserId: string,
+  packageValue: SessionPackageV1,
+  rejectNameConflict: boolean,
+): Promise<SessionBundleResult> {
+  const bundle = mapPackageToBundle(packageValue)
+  const result = await client.rpc('admin_create_session_bundle', {
+    p_organization_id: orgId,
+    p_coach_user_id: coachUserId,
+    p_session: bundle.session,
+    p_drills: bundle.drills,
+    p_reject_name_conflict: rejectNameConflict,
+  })
+
+  if (result.error) {
+    throw new Error(`Failed to create session bundle: ${result.error.message}`)
+  }
+
+  const data = asRow(result.data)
+  if (data?.outcome === 'name_conflict') return { outcome: 'name_conflict' }
+  if (
+    data?.outcome !== 'created'
+    || typeof data.sessionId !== 'string'
+    || !Array.isArray(data.drillIds)
+    || !data.drillIds.every((id) => typeof id === 'string')
+  ) {
+    throw new Error('Session bundle RPC returned an invalid result')
+  }
+  return {
+    outcome: 'created',
+    sessionId: data.sessionId,
+    drillIds: data.drillIds as string[],
+  }
+}
+
+export async function createSessionBundle(
+  client: ServiceRoleClient,
+  orgId: string,
+  coachUserId: string,
+  session: Record<string, unknown>,
+  drills: Array<Record<string, unknown>>,
+  rejectNameConflict: boolean,
+): Promise<SessionBundleResult> {
+  checkPackageByteLimit({ session, drills })
+  const packageValue = packageFromBundle(session, drills)
+  return persistSessionBundle(client, orgId, coachUserId, packageValue, rejectNameConflict)
+}
+
+export async function importSessionPackage(
+  client: ServiceRoleClient,
+  orgId: string,
+  coachUserId: string,
+  input: unknown,
+  name: string,
+): Promise<SessionBundleResult> {
+  checkPackageByteLimit(input)
+  const packageValue = validatePackage(input)
+  const importName = typeof name === 'string' ? name.trim() : ''
+  const namedPackage = validatePackage({
+    ...packageValue,
+    session: { ...packageValue.session, name: importName },
+  })
+  return persistSessionBundle(client, orgId, coachUserId, namedPackage, true)
 }

@@ -39,6 +39,9 @@ pull delivers the new or updated rows to their device.
 - Copying sessions directly from the owner's session list or cloud account. The
   import source in this scope is an uploaded `.swimsheet` JSON file.
 - Live runs, completed history, run editing, or live timing in Coach Assist.
+- Deleting session templates in Coach Assist. The current delete-safety check
+  depends on owner-local run data, and deletion is not needed for the first
+  session-authoring workflow.
 - Changes to swimmer management, the standalone drill bank, settings, or other
   non-session features. Existing navigation and behavior outside this session
   work are not redesigned here.
@@ -55,6 +58,11 @@ pull delivers the new or updated rows to their device.
   Assist because live-run persistence is not target-scoped.
 - `client/src/db/dao.ts` is the existing DAO facade. In normal mode it uses
   Dexie; in Coach Assist mode it delegates to `client/src/db/adminDao.ts`.
+- Existing session pages and the shared app layout also trigger local-only side
+  effects unrelated to authored session rows: starter-template seeding, active-run subscriptions,
+  run-history reads, local library seeding, and run-aware session deletion. These
+  must be disabled in the Coach Assist session flow; the editor may read the
+  selected coach's library through the scoped DAO for its similarity warning.
 - `adminDao.ts` and `adminCoachService.ts` already route owner-assisted reads and
   writes through `admin-coach-assist`, whose Edge Function holds the service-role
   client and resolves the selected coach's organization server-side.
@@ -83,6 +91,13 @@ tests needed to make the existing modules safe to reuse.
    overwrites a target session.
 6. Writes go to the selected coach's Supabase organization. Exiting Coach Assist
    restores the owner's normal Dexie-backed experience.
+
+In Coach Assist mode, the shared layout and session list/detail do not seed
+starter sessions or library drills in the owner's Dexie, subscribe to owner-local
+active runs, or fetch owner-local run history. Session-template deletion is
+hidden in this scope rather than consulting or mutating owner-local run data.
+The session-detail similarity mirror, when loaded, comes from the selected
+coach's scoped library read.
 
 ## Data flow and trust boundaries
 
