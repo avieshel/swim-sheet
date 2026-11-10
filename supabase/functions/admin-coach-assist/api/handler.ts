@@ -16,6 +16,8 @@ import {
   deleteRow,
   getCoachData,
   materializeDraft,
+  createSessionBundle,
+  importSessionPackage,
   CoachResolutionError,
 } from '../service/adminService.ts'
 import { ScopedWriteError } from '../model/validate.ts'
@@ -65,6 +67,16 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     const coachDraftMatch = routePath.match(/^\/coaches\/([^/]+)\/draft$/)
     if (allow('POST') && coachDraftMatch) {
       return withOwner(deps, req, () => handleCoachDraft(deps, body, coachDraftMatch[1]))
+    }
+
+    const sessionBundleMatch = routePath.match(/^\/coaches\/([^/]+)\/session-bundle$/)
+    if (allow('POST') && sessionBundleMatch) {
+      return withOwner(deps, req, () => handleSessionBundle(deps, body, sessionBundleMatch[1]))
+    }
+
+    const sessionImportMatch = routePath.match(/^\/coaches\/([^/]+)\/import-session$/)
+    if (allow('POST') && sessionImportMatch) {
+      return withOwner(deps, req, () => handleSessionPackageImport(deps, body, sessionImportMatch[1]))
     }
 
     const coachMatch = routePath.match(/^\/coaches\/([^/]+)$/)
@@ -273,4 +285,56 @@ async function handleCoachDraft(
     const result = await materializeDraft(client, orgId, coachId, body.draft as SessionDraftV1)
     return json(result, 200)
   })
+}
+
+async function handleSessionBundle(
+  deps: HandlerDeps,
+  body: Record<string, unknown> | null,
+  coachId: string,
+): Promise<Response> {
+  if (
+    !body
+    || !body.session
+    || !Array.isArray(body.drills)
+    || (body.rejectNameConflict !== undefined && typeof body.rejectNameConflict !== 'boolean')
+  ) {
+    return json({ error: 'bad_request' }, 400)
+  }
+
+  try {
+    return await withCoachScope(deps, coachId, async (client, orgId) => {
+      const result = await createSessionBundle(
+        client,
+        orgId,
+        coachId,
+        body.session as Record<string, unknown>,
+        body.drills as Array<Record<string, unknown>>,
+        body.rejectNameConflict === true,
+      )
+      return json(result, 200)
+    })
+  } catch (err) {
+    if (err instanceof ScopedWriteError) return json({ error: 'bad_request' }, 400)
+    throw err
+  }
+}
+
+async function handleSessionPackageImport(
+  deps: HandlerDeps,
+  body: Record<string, unknown> | null,
+  coachId: string,
+): Promise<Response> {
+  if (!body || !('package' in body) || typeof body.name !== 'string') {
+    return json({ error: 'bad_request' }, 400)
+  }
+
+  try {
+    return await withCoachScope(deps, coachId, async (client, orgId) => {
+      const result = await importSessionPackage(client, orgId, coachId, body.package, body.name as string)
+      return json(result, 200)
+    })
+  } catch (err) {
+    if (err instanceof ScopedWriteError) return json({ error: 'bad_request' }, 400)
+    throw err
+  }
 }

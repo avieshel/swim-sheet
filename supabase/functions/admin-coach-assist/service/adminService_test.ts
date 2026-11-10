@@ -12,11 +12,14 @@ import {
   deleteRow,
   getCoachData,
   materializeDraft,
+  createSessionBundle,
+  importSessionPackage,
   CoachResolutionError,
 } from './adminService.ts'
 import type { ServiceRoleClient } from '../api/deps.ts'
 import type { SessionDraftV1 } from '../shared/sessionDraft/types.ts'
 import { ADMIN_BATCH_CAP } from '../model/config.ts'
+import { defaultSessionPackageConfig } from '../shared/sessionPackage/config.ts'
 
 // A chainable fake builder. `.select()` / `.eq()` are no-ops that return the
 // same builder; awaiting it resolves to the rows the test configured. This is
@@ -38,6 +41,52 @@ function makeFakeClient(rows: unknown[]): ServiceRoleClient {
     },
   }
   return ({ from: () => builder } as unknown) as ServiceRoleClient
+}
+
+interface RpcCall {
+  name: string
+  args: Record<string, unknown>
+}
+
+function makeRpcClient(result: { data: unknown; error: { message: string } | null }): {
+  client: ServiceRoleClient
+  calls: RpcCall[]
+} {
+  const calls: RpcCall[] = []
+  const client = {
+    rpc(name: string, args: Record<string, unknown>) {
+      calls.push({ name, args })
+      return Promise.resolve(result)
+    },
+  } as unknown as ServiceRoleClient
+  return { client, calls }
+}
+
+function packageFixture(): Record<string, unknown> {
+  return {
+    format: 'swimsheet-session',
+    version: 1,
+    exportedAt: '2026-10-21T12:00:00.000Z',
+    session: { name: 'Aerobic Set', notes: 'Steady effort' },
+    drills: [{
+      name: 'Freestyle',
+      stroke: 'freestyle',
+      distance: 100,
+      order: 0,
+      items: [{
+        distance: 50,
+        stroke: 'freestyle',
+        repeatCount: 2,
+        intensity: 'v2',
+        equipment: ['fins'],
+        segments: [{ name: 'Underwater', distance: 10, stroke: 'freestyle' }],
+      }],
+      repeatCount: 1,
+      focus: 'fitness',
+      labels: ['aerobic'],
+      description: 'Steady repeats',
+    }],
+  }
 }
 
 Deno.test('resolveCoachOrg returns the org whose created_by matches', async () => {
@@ -294,4 +343,135 @@ Deno.test('materializeDraft creates one session + N drills, all scoped and uniqu
   // Every generated id is distinct and fresh (no collisions across the batch).
   const allIds = [sessionId, ...drillIds]
   assertEquals(new Set(allIds).size, allIds.length)
+})
+
+Deno.test('createSessionBundle calls the transaction RPC with server-resolved scope', async () => {
+  const rpcResult = {
+    data: { outcome: 'created', sessionId: 'session-1', drillIds: ['drill-1'] } as const,
+    error: null,
+  }
+  const { client, calls } = makeRpcClient(rpcResult)
+  const result = await createSessionBundle(
+    client,
+    'org-A',
+    'coach-A',
+    { name: 'Monday', notes: '', organization_id: 'org-B', created_by: 'coach-B' },
+    [{
+      name: 'Warmup',
+      stroke: 'freestyle',
+      distance: 100,
+      drill_order: 0,
+      items: '[{"distance":50,"stroke":"freestyle","repeatCount":2,"intensity":"v2"}]',
+      repeat_count: 1,
+      focus: 'fitness',
+      labels: [],
+      description: '',
+      session_id: 'foreign-session',
+      organization_id: 'org-B',
+      created_by: 'coach-B',
+    }],
+    false,
+  )
+
+  assertEquals(result, { outcome: 'created', sessionId: 'session-1', drillIds: ['drill-1'] })
+  assertEquals(calls.length, 1)
+  assertEquals(calls[0].name, 'admin_create_session_bundle')
+  assertEquals(calls[0].args.p_organization_id, 'org-A')
+  assertEquals(calls[0].args.p_coach_user_id, 'coach-A')
+  const session = calls[0].args.p_session as Record<string, unknown>
+  const drills = calls[0].args.p_drills as Array<Record<string, unknown>>
+  assertEquals(session.name, 'Monday')
+  assertEquals('organization_id' in session, false)
+  assertEquals('created_by' in session, false)
+  assertEquals('session_id' in drills[0], false)
+  assertEquals('organization_id' in drills[0], false)
+  assertEquals('created_by' in drills[0], false)
+})
+
+Deno.test('importSessionPackage validates and maps rich fields before the transaction RPC', async () => {
+  const rpcResult = {
+    data: { outcome: 'created', sessionId: 'session-2', drillIds: ['drill-2'] } as const,
+    error: null,
+  }
+  const { client, calls } = makeRpcClient(rpcResult)
+  const result = await importSessionPackage(client, 'org-A', 'coach-A', packageFixture(), 'My Copy')
+
+  assertEquals(result, { outcome: 'created', sessionId: 'session-2', drillIds: ['drill-2'] })
+  assertEquals(calls.length, 1)
+  assertEquals(calls[0].name, 'admin_create_session_bundle')
+  assertEquals(calls[0].args.p_reject_name_conflict, true)
+  const session = calls[0].args.p_session as Record<string, unknown>
+  const drills = calls[0].args.p_drills as Array<Record<string, unknown>>
+  const items = drills[0].items as Array<Record<string, unknown>>
+  assertEquals(session.name, 'My Copy')
+  assertEquals(session.notes, 'Steady effort')
+  assertEquals(session.visibility, 'private')
+  assertEquals(drills[0].drill_order, 0)
+  assertEquals(items[0].intensity, 'v2')
+  assertEquals(items[0].equipment, ['fins'])
+  assertEquals(items[0].segments, [{ name: 'Underwater', distance: 10, stroke: 'freestyle' }])
+  assertEquals(typeof items[0].id, 'string')
+})
+
+Deno.test('importSessionPackage rejects unknown fields before the transaction RPC', async () => {
+  const { client, calls } = makeRpcClient({ data: null, error: null })
+  const input = { ...packageFixture(), unexpected: true }
+
+  await assertRejects(
+    () => importSessionPackage(client, 'org-A', 'coach-A', input, 'Copy'),
+    Error,
+  )
+  assertEquals(calls.length, 0)
+})
+
+Deno.test('importSessionPackage rejects packages over the shared byte limit before the transaction RPC', async () => {
+  const { client, calls } = makeRpcClient({ data: null, error: null })
+  const input = {
+    ...packageFixture(),
+    extra: 'x'.repeat(defaultSessionPackageConfig.limits.maxFileBytes),
+  }
+
+  await assertRejects(
+    () => importSessionPackage(client, 'org-A', 'coach-A', input, 'Copy'),
+    Error,
+  )
+  assertEquals(calls.length, 0)
+})
+
+Deno.test('createSessionBundle maps a database name conflict without reporting a created session', async () => {
+  const { client } = makeRpcClient({ data: { outcome: 'name_conflict' }, error: null })
+  const result = await createSessionBundle(
+    client,
+    'org-A',
+    'coach-A',
+    { name: 'Duplicate', notes: '' },
+    [],
+    true,
+  )
+  assertEquals(result, { outcome: 'name_conflict' })
+})
+
+Deno.test('createSessionBundle propagates database errors', async () => {
+  const { client } = makeRpcClient({ data: null, error: { message: 'database unavailable' } })
+  await assertRejects(
+    () => createSessionBundle(client, 'org-A', 'coach-A', { name: 'Monday' }, [], false),
+    Error,
+    'database unavailable',
+  )
+})
+
+Deno.test('createSessionBundle rejects oversized transport fields before the transaction RPC', async () => {
+  const { client, calls } = makeRpcClient({ data: null, error: null })
+  await assertRejects(
+    () => createSessionBundle(
+      client,
+      'org-A',
+      'coach-A',
+      { name: 'Monday', oversized: 'x'.repeat(defaultSessionPackageConfig.limits.maxFileBytes) },
+      [],
+      false,
+    ),
+    Error,
+  )
+  assertEquals(calls.length, 0)
 })

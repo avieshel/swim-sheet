@@ -25,3 +25,7 @@ export interface ScopedWrite {
   coachUserId: string
   payload: Record<string, unknown>
 }
+
+export type SessionBundleResult =
+  | { outcome: 'created'; sessionId: string; drillIds: string[] }
+  | { outcome: 'name_conflict' }
