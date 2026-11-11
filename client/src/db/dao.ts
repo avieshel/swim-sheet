@@ -1,884 +1,396 @@
-import { db, createBackupPayload, restoreAllTables, saveBackup, clearBackup, getLastBackupTime, getStoragePersistence, requestPersistentStorage, DB_SCHEMA_VERSION, BACKUP_FORMAT_VERSION } from './schema'
-import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
-import { drillCatalog, sessionsCatalog } from '../data/catalog'
-import {
-  isCoachAssistMode,
-  getAllSwimmers as adminGetAllSwimmers,
-  getSwimmer as adminGetSwimmer,
-  addSwimmer as adminAddSwimmer,
-  updateSwimmer as adminUpdateSwimmer,
-  deleteSwimmer as adminDeleteSwimmer,
-  getAllSessions as adminGetAllSessions,
-  getSession as adminGetSession,
-  addSession as adminAddSession,
-  updateSession as adminUpdateSession,
-  deleteSession as adminDeleteSession,
-  getDrillsForSession as adminGetDrillsForSession,
-  getDrill as adminGetDrill,
-  addDrill as adminAddDrill,
-  addSessionWithDrills as adminAddSessionWithDrills,
-  addSessionWithDrillsIf as adminAddSessionWithDrillsIf,
-  addImportedSessionWithDrillsIf as adminAddImportedSessionWithDrillsIf,
-  updateDrill as adminUpdateDrill,
-  deleteDrill as adminDeleteDrill,
-  getAllLibraryDrills as adminGetAllLibraryDrills,
-  getLibraryDrill as adminGetLibraryDrill,
-  addLibraryDrill as adminAddLibraryDrill,
-  updateLibraryDrill as adminUpdateLibraryDrill,
-  deleteLibraryDrill as adminDeleteLibraryDrill,
-} from './adminDao'
-import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
-
-// ── Swimmers ──────────────────────────────────────────────
-
-export async function getAllSwimmers(): Promise<Swimmer[]> {
-  if (isCoachAssistMode()) return adminGetAllSwimmers()
-  return db.swimmers.orderBy('name').toArray()
-}
-
-export async function searchSwimmers(query: string): Promise<Swimmer[]> {
-  if (!query.trim()) return []
-  const q = query.toLowerCase()
-  return db.swimmers
-    .filter(s => s.name.toLowerCase().includes(q))
-    .limit(10)
-    .toArray()
-}
-
-export async function getSwimmer(id: string): Promise<Swimmer | undefined> {
-  if (isCoachAssistMode()) return adminGetSwimmer(id)
-  return db.swimmers.get(id)
-}
-
-export async function addSwimmer(data: SafeSwimmer): Promise<string> {
-  if (isCoachAssistMode()) return adminAddSwimmer(data)
-  const now = new Date().toISOString()
-  const id = crypto.randomUUID()
-  await db.swimmers.add({ ...data, status: data.status ?? 'active', id, createdAt: now, updatedAt: now })
-  return id
-}
-
-export async function updateSwimmer(id: string, data: Partial<SafeSwimmer>): Promise<void> {
-  if (isCoachAssistMode()) return adminUpdateSwimmer(id, data)
-  await db.swimmers.update(id, { ...data, updatedAt: new Date().toISOString() })
-}
-
-export async function deleteSwimmer(id: string): Promise<void> {
-  if (isCoachAssistMode()) return adminDeleteSwimmer(id)
-  // Surgical hard-delete: remove the swimmer's run links and timing laps so no
-  // orphaned references remain, but keep runs and laneResult data blobs (they
-  // store the swimmer's name + times, so history stays readable).
-  await db.transaction('rw', [db.runSwimmers, db.laps, db.swimmers], async () => {
-    await db.runSwimmers.where('swimmerId').equals(id).delete()
-    await db.laps.where('swimmerId').equals(id).delete()
-    await db.swimmers.delete(id)
-  })
-}
-
-// ── Session Templates ─────────────────────────────────────
-
-export async function getAllSessions(): Promise<Session[]> {
-  if (isCoachAssistMode()) return adminGetAllSessions()
-  return db.sessions.orderBy('createdAt').reverse().toArray()
-}
-
-export async function getSession(id: string): Promise<Session | undefined> {
-  if (isCoachAssistMode()) return adminGetSession(id)
-  return db.sessions.get(id)
-}
-
-export async function addSession(data: SafeSession): Promise<string> {
-  if (isCoachAssistMode()) return adminAddSession(data)
-  const now = new Date().toISOString()
-  const id = crypto.randomUUID()
-  await db.sessions.add({ ...data, id, createdAt: now, updatedAt: now })
-  return id
-}
-
-export async function updateSession(id: string, data: Partial<SafeSession>): Promise<void> {
-  if (isCoachAssistMode()) return adminUpdateSession(id, data)
-  await db.sessions.update(id, { ...data, updatedAt: new Date().toISOString() })
-}
+import * as dexieDao from './dexieDao'
+import * as adminDao from './adminDao'
+
+type TemplateDao = Pick<typeof dexieDao,
+  | 'addDrill'
+  | 'addImportedSessionWithDrillsIf'
+  | 'addLibraryDrill'
+  | 'addSession'
+  | 'addSessionWithDrills'
+  | 'addSessionWithDrillsIf'
+  | 'addSwimmer'
+  | 'deleteDrill'
+  | 'deleteLibraryDrill'
+  | 'deleteSession'
+  | 'deleteSwimmer'
+  | 'getAllLibraryDrills'
+  | 'getAllSessions'
+  | 'getAllSwimmers'
+  | 'getDrill'
+  | 'getDrillsForSession'
+  | 'getLibraryDrill'
+  | 'getSession'
+  | 'getSwimmer'
+  | 'searchSwimmers'
+  | 'seedDefaultSessions'
+  | 'updateDrill'
+  | 'updateLibraryDrill'
+  | 'updateSession'
+  | 'updateSwimmer'
+>
 
-export async function deleteSession(id: string): Promise<void> {
-  if (isCoachAssistMode()) return adminDeleteSession(id)
-  await db.transaction('rw', [db.sessions, db.drills], async () => {
-    await db.drills.where('sessionId').equals(id).delete()
-    await db.sessions.delete(id)
-  })
-}
-
-// Atomic session + drills insert for AI drafts. It writes directly to the drills
-// table and must NOT call addDrill(), which also writes to libraryDrills. A
-// failure at any point rolls the whole transaction back — no partial session.
-export async function addSessionWithDrills(
-  session: SafeSession,
-  drills: Array<Omit<SafeDrill, 'sessionId'>>,
-): Promise<string> {
-  if (isCoachAssistMode()) {
-    return adminAddSessionWithDrills(session, drills)
-  }
-  return writeSessionWithDrills(session, drills)
-}
-
-export async function addSessionWithDrillsIf(
-  session: SafeSession,
-  drills: Array<Omit<SafeDrill, 'sessionId'>>,
-  canCreate: (existingSessions: Session[]) => boolean,
-): Promise<string | null> {
-  if (isCoachAssistMode()) {
-    return adminAddSessionWithDrillsIf(session, drills, canCreate)
-  }
-  return writeSessionWithDrills(session, drills, canCreate)
-}
-
-export async function addImportedSessionWithDrillsIf(
-  packageValue: SessionPackageV1,
-  session: SafeSession,
-  drills: Array<Omit<SafeDrill, 'sessionId'>>,
-  canCreate: (existingSessions: Session[]) => boolean,
-): Promise<string | null> {
-  if (isCoachAssistMode()) {
-    return adminAddImportedSessionWithDrillsIf(packageValue, session, drills, canCreate)
-  }
-  return addSessionWithDrillsIf(session, drills, canCreate)
-}
-
-function writeSessionWithDrills(
-  session: SafeSession,
-  drills: Array<Omit<SafeDrill, 'sessionId'>>,
-): Promise<string>
-function writeSessionWithDrills(
-  session: SafeSession,
-  drills: Array<Omit<SafeDrill, 'sessionId'>>,
-  canCreate: (existingSessions: Session[]) => boolean,
-): Promise<string | null>
-async function writeSessionWithDrills(
-  session: SafeSession,
-  drills: Array<Omit<SafeDrill, 'sessionId'>>,
-  canCreate?: (existingSessions: Session[]) => boolean,
-): Promise<string | null> {
-  const now = new Date().toISOString()
-  const sessionId = crypto.randomUUID()
-  return db.transaction('rw', [db.sessions, db.drills], async () => {
-    if (canCreate && !canCreate(await db.sessions.toArray())) return null
-    await db.sessions.add({ ...session, id: sessionId, createdAt: now, updatedAt: now })
-    for (const drill of drills) {
-      await db.drills.add({
-        ...drill,
-        sessionId,
-        id: crypto.randomUUID(),
-        createdAt: now,
-        updatedAt: now,
-      })
-    }
-    return sessionId
-  })
-}
-
-// ── Template Drills ────────────────────────────────────────
-
-export async function getDrillsForSession(sessionId: string): Promise<Drill[]> {
-  if (isCoachAssistMode()) return adminGetDrillsForSession(sessionId)
-  return db.drills.where('sessionId').equals(sessionId).toArray()
-}
-
-export async function getDrill(id: string): Promise<Drill | undefined> {
-  if (isCoachAssistMode()) return adminGetDrill(id)
-  return db.drills.get(id)
-}
-
-export async function updateLibraryDrill(id: string, data: Partial<SafeLibraryDrill>): Promise<void> {
-  if (isCoachAssistMode()) return adminUpdateLibraryDrill(id, data)
-  await db.libraryDrills.update(id, { ...data, updatedAt: new Date().toISOString() })
-}
-
-export async function addDrill(data: SafeDrill): Promise<string> {
-  if (isCoachAssistMode()) return adminAddDrill(data)
-  const now = new Date().toISOString()
-  const id = crypto.randomUUID()
-  const drill: Drill = {
-    ...data,
-    id,
-    items: data.items || [
-      {
-        id: crypto.randomUUID(),
-        distance: data.distance || 0,
-        stroke: data.stroke || 'freestyle',
-        repeatCount: 1,
-      },
-    ],
-    repeatCount: data.repeatCount || 1,
-    focus: data.focus || 'none',
-    labels: data.labels || [],
-    description: data.description || '',
-    createdAt: now,
-    updatedAt: now,
-  }
-  await db.drills.add(drill)
-
-  // Also save to library
-  const libDrill: SafeLibraryDrill = {
-    name: drill.name,
-    stroke: drill.stroke,
-    distance: drill.distance,
-    items: drill.items,
-    repeatCount: drill.repeatCount,
-    focus: drill.focus,
-    labels: drill.labels,
-    description: drill.description,
-  }
-  // Record which library entry this copy came from, so deleting that entry can
-  // warn about the sessions still using it. addLibraryDrill upserts by name, so
-  // this may resolve to an existing entry rather than a new one.
-  const libraryDrillId = await addLibraryDrill(libDrill)
-  await db.drills.update(id, { libraryDrillId })
-
-  return id
-}
-
-export async function updateDrill(id: string, data: Partial<SafeDrill>): Promise<void> {
-  if (isCoachAssistMode()) return adminUpdateDrill(id, data)
-  await db.drills.update(id, { ...data, updatedAt: new Date().toISOString() })
-}
-
-export async function deleteDrill(id: string): Promise<void> {
-  if (isCoachAssistMode()) return adminDeleteDrill(id)
-  await db.drills.delete(id)
-}
-
-// ── Session Runs ──────────────────────────────────────────
-
-export async function getActiveRun(): Promise<SessionRun | undefined> {
-  return db.sessionRuns.where('status').equals('active').first()
-}
-
-export async function getActiveRunsForSession(sessionId: string): Promise<SessionRun[]> {
-  return db.sessionRuns
-    .where('sessionId')
-    .equals(sessionId)
-    .filter(r => r.status === 'active')
-    .toArray()
-}
-
-export async function getCompletedRunCountForSession(sessionId: string): Promise<number> {
-  return db.sessionRuns
-    .where('sessionId')
-    .equals(sessionId)
-    .filter(r => r.status === 'completed')
-    .count()
-}
-
-export async function getSessionRun(id: string): Promise<SessionRun | undefined> {
-  return db.sessionRuns.get(id)
-}
-
-export async function getCompletedRuns(): Promise<SessionRun[]> {
-  const runs = await db.sessionRuns.where('status').equals('completed').toArray()
-  return runs.sort((a, b) => b.date.localeCompare(a.date))
-}
-
-export async function getSessionRunUsage(): Promise<{ sessionId: string; count: number; lastUsedAt: number }[]> {
-  const runs = await db.sessionRuns.toArray()
-  const usage = new Map<string, { count: number; lastUsedAt: number }>()
-  for (const run of runs) {
-    const current = usage.get(run.sessionId) ?? { count: 0, lastUsedAt: 0 }
-    current.count += 1
-    const ts = run.sessionStartedAt ?? new Date(run.createdAt).getTime()
-    if (ts > current.lastUsedAt) current.lastUsedAt = ts
-    usage.set(run.sessionId, current)
-  }
-  return Array.from(usage.entries()).map(([sessionId, value]) => ({
-    sessionId,
-    count: value.count,
-    lastUsedAt: value.lastUsedAt,
-  }))
-}
-
-export async function addSessionRun(data: SafeSessionRun): Promise<string> {
-  const now = new Date().toISOString()
-  const id = crypto.randomUUID()
-
-  // Only one active run allowed — auto-complete any existing active run
-  if (data.status === 'active') {
-    const existing = await getActiveRun()
-    if (existing) {
-      await completeSessionRun(existing.id!)
-    }
-  }
+// Select the active implementation lazily so that flipping
+// adminDao's coach state is reflected without notifying the facade.
+const activeData: TemplateDao = new Proxy({} as TemplateDao, {
+  get(_target, prop) {
+    const impl = adminDao.isCoachAssistMode() ? (adminDao as unknown as TemplateDao) : (dexieDao as unknown as TemplateDao)
+    return (impl as Record<string, unknown>)[prop as string]
+  },
+})
 
-  await db.sessionRuns.add({ ...data, id, createdAt: now, updatedAt: now })
-  return id
+// Static references so knip recognizes adminDao's data exports as used
+// (they are reached through activeData at runtime).
+const _adminDaoUsed = {
+  addDrill: adminDao.addDrill,
+  addImportedSessionWithDrillsIf: adminDao.addImportedSessionWithDrillsIf,
+  addLibraryDrill: adminDao.addLibraryDrill,
+  addSession: adminDao.addSession,
+  addSessionWithDrills: adminDao.addSessionWithDrills,
+  addSessionWithDrillsIf: adminDao.addSessionWithDrillsIf,
+  addSwimmer: adminDao.addSwimmer,
+  deleteDrill: adminDao.deleteDrill,
+  deleteLibraryDrill: adminDao.deleteLibraryDrill,
+  deleteSession: adminDao.deleteSession,
+  deleteSwimmer: adminDao.deleteSwimmer,
+  getAllLibraryDrills: adminDao.getAllLibraryDrills,
+  getAllSessions: adminDao.getAllSessions,
+  getAllSwimmers: adminDao.getAllSwimmers,
+  getDrill: adminDao.getDrill,
+  getDrillsForSession: adminDao.getDrillsForSession,
+  getLibraryDrill: adminDao.getLibraryDrill,
+  getSession: adminDao.getSession,
+  getSwimmer: adminDao.getSwimmer,
+  searchSwimmers: adminDao.searchSwimmers,
+  updateDrill: adminDao.updateDrill,
+  updateLibraryDrill: adminDao.updateLibraryDrill,
+  updateSession: adminDao.updateSession,
+  updateSwimmer: adminDao.updateSwimmer,
+  seedDefaultSessions: adminDao.seedDefaultSessions,
 }
+void _adminDaoUsed
 
-export async function updateSessionRun(id: string, data: Partial<SafeSessionRun>): Promise<void> {
-  await db.sessionRuns.update(id, { ...data, updatedAt: new Date().toISOString() })
+export function getAllSwimmers(...args: Parameters<typeof dexieDao.getAllSwimmers>): ReturnType<typeof dexieDao.getAllSwimmers> {
+  return activeData.getAllSwimmers(...args)
 }
 
-export async function completeSessionRun(id: string): Promise<void> {
-  await db.sessionRuns.update(id, { status: 'completed', updatedAt: new Date().toISOString() })
-}
+export function searchSwimmers(...args: Parameters<typeof dexieDao.searchSwimmers>): ReturnType<typeof dexieDao.searchSwimmers> {
+  return activeData.searchSwimmers(...args)
+}
+
+export function getSwimmer(...args: Parameters<typeof dexieDao.getSwimmer>): ReturnType<typeof dexieDao.getSwimmer> {
+  return activeData.getSwimmer(...args)
+}
+
+export function addSwimmer(...args: Parameters<typeof dexieDao.addSwimmer>): ReturnType<typeof dexieDao.addSwimmer> {
+  return activeData.addSwimmer(...args)
+}
+
+export function updateSwimmer(...args: Parameters<typeof dexieDao.updateSwimmer>): ReturnType<typeof dexieDao.updateSwimmer> {
+  return activeData.updateSwimmer(...args)
+}
+
+export function deleteSwimmer(...args: Parameters<typeof dexieDao.deleteSwimmer>): ReturnType<typeof dexieDao.deleteSwimmer> {
+  return activeData.deleteSwimmer(...args)
+}
+
+export function getAllSessions(...args: Parameters<typeof dexieDao.getAllSessions>): ReturnType<typeof dexieDao.getAllSessions> {
+  return activeData.getAllSessions(...args)
+}
+
+export function getSession(...args: Parameters<typeof dexieDao.getSession>): ReturnType<typeof dexieDao.getSession> {
+  return activeData.getSession(...args)
+}
+
+export function addSession(...args: Parameters<typeof dexieDao.addSession>): ReturnType<typeof dexieDao.addSession> {
+  return activeData.addSession(...args)
+}
+
+export function updateSession(...args: Parameters<typeof dexieDao.updateSession>): ReturnType<typeof dexieDao.updateSession> {
+  return activeData.updateSession(...args)
+}
+
+export function deleteSession(...args: Parameters<typeof dexieDao.deleteSession>): ReturnType<typeof dexieDao.deleteSession> {
+  return activeData.deleteSession(...args)
+}
+
+export function addSessionWithDrills(...args: Parameters<typeof dexieDao.addSessionWithDrills>): ReturnType<typeof dexieDao.addSessionWithDrills> {
+  return activeData.addSessionWithDrills(...args)
+}
+
+export function addImportedSessionWithDrillsIf(...args: Parameters<typeof dexieDao.addImportedSessionWithDrillsIf>): ReturnType<typeof dexieDao.addImportedSessionWithDrillsIf> {
+  return activeData.addImportedSessionWithDrillsIf(...args)
+}
+
+export function getDrillsForSession(...args: Parameters<typeof dexieDao.getDrillsForSession>): ReturnType<typeof dexieDao.getDrillsForSession> {
+  return activeData.getDrillsForSession(...args)
+}
+
+export function getDrill(...args: Parameters<typeof dexieDao.getDrill>): ReturnType<typeof dexieDao.getDrill> {
+  return activeData.getDrill(...args)
+}
+
+export function updateLibraryDrill(...args: Parameters<typeof dexieDao.updateLibraryDrill>): ReturnType<typeof dexieDao.updateLibraryDrill> {
+  return activeData.updateLibraryDrill(...args)
+}
+
+export function addDrill(...args: Parameters<typeof dexieDao.addDrill>): ReturnType<typeof dexieDao.addDrill> {
+  return activeData.addDrill(...args)
+}
+
+export function updateDrill(...args: Parameters<typeof dexieDao.updateDrill>): ReturnType<typeof dexieDao.updateDrill> {
+  return activeData.updateDrill(...args)
+}
+
+export function deleteDrill(...args: Parameters<typeof dexieDao.deleteDrill>): ReturnType<typeof dexieDao.deleteDrill> {
+  return activeData.deleteDrill(...args)
+}
+
+export function getActiveRun(...args: Parameters<typeof dexieDao.getActiveRun>): ReturnType<typeof dexieDao.getActiveRun> {
+  return dexieDao.getActiveRun(...args)
+}
+
+export function getActiveRunsForSession(...args: Parameters<typeof dexieDao.getActiveRunsForSession>): ReturnType<typeof dexieDao.getActiveRunsForSession> {
+  return dexieDao.getActiveRunsForSession(...args)
+}
+
+export function getCompletedRunCountForSession(...args: Parameters<typeof dexieDao.getCompletedRunCountForSession>): ReturnType<typeof dexieDao.getCompletedRunCountForSession> {
+  return dexieDao.getCompletedRunCountForSession(...args)
+}
+
+export function getSessionRun(...args: Parameters<typeof dexieDao.getSessionRun>): ReturnType<typeof dexieDao.getSessionRun> {
+  return dexieDao.getSessionRun(...args)
+}
+
+export function getCompletedRuns(...args: Parameters<typeof dexieDao.getCompletedRuns>): ReturnType<typeof dexieDao.getCompletedRuns> {
+  return dexieDao.getCompletedRuns(...args)
+}
+
+export function getSessionRunUsage(...args: Parameters<typeof dexieDao.getSessionRunUsage>): ReturnType<typeof dexieDao.getSessionRunUsage> {
+  return dexieDao.getSessionRunUsage(...args)
+}
+
+export function addSessionRun(...args: Parameters<typeof dexieDao.addSessionRun>): ReturnType<typeof dexieDao.addSessionRun> {
+  return dexieDao.addSessionRun(...args)
+}
+
+export function updateSessionRun(...args: Parameters<typeof dexieDao.updateSessionRun>): ReturnType<typeof dexieDao.updateSessionRun> {
+  return dexieDao.updateSessionRun(...args)
+}
+
+export function completeSessionRun(...args: Parameters<typeof dexieDao.completeSessionRun>): ReturnType<typeof dexieDao.completeSessionRun> {
+  return dexieDao.completeSessionRun(...args)
+}
+
+export function deleteSessionRunCascade(...args: Parameters<typeof dexieDao.deleteSessionRunCascade>): ReturnType<typeof dexieDao.deleteSessionRunCascade> {
+  return dexieDao.deleteSessionRunCascade(...args)
+}
+
+export function getRunDrillsForRun(...args: Parameters<typeof dexieDao.getRunDrillsForRun>): ReturnType<typeof dexieDao.getRunDrillsForRun> {
+  return dexieDao.getRunDrillsForRun(...args)
+}
+
+export function getRunDrill(...args: Parameters<typeof dexieDao.getRunDrill>): ReturnType<typeof dexieDao.getRunDrill> {
+  return dexieDao.getRunDrill(...args)
+}
+
+export function addRunDrill(...args: Parameters<typeof dexieDao.addRunDrill>): ReturnType<typeof dexieDao.addRunDrill> {
+  return dexieDao.addRunDrill(...args)
+}
+
+export function deleteRunDrill(...args: Parameters<typeof dexieDao.deleteRunDrill>): ReturnType<typeof dexieDao.deleteRunDrill> {
+  return dexieDao.deleteRunDrill(...args)
+}
+
+export function updateRunDrill(...args: Parameters<typeof dexieDao.updateRunDrill>): ReturnType<typeof dexieDao.updateRunDrill> {
+  return dexieDao.updateRunDrill(...args)
+}
+
+export function getLaneDrillResults(...args: Parameters<typeof dexieDao.getLaneDrillResults>): ReturnType<typeof dexieDao.getLaneDrillResults> {
+  return dexieDao.getLaneDrillResults(...args)
+}
+
+export function getLaneDrillResult(...args: Parameters<typeof dexieDao.getLaneDrillResult>): ReturnType<typeof dexieDao.getLaneDrillResult> {
+  return dexieDao.getLaneDrillResult(...args)
+}
+
+export function deleteLaneDrillResult(...args: Parameters<typeof dexieDao.deleteLaneDrillResult>): ReturnType<typeof dexieDao.deleteLaneDrillResult> {
+  return dexieDao.deleteLaneDrillResult(...args)
+}
+
+export function deleteLaneDrillResultsForGroup(...args: Parameters<typeof dexieDao.deleteLaneDrillResultsForGroup>): ReturnType<typeof dexieDao.deleteLaneDrillResultsForGroup> {
+  return dexieDao.deleteLaneDrillResultsForGroup(...args)
+}
+
+export function deleteLaneDrillResultsForRun(...args: Parameters<typeof dexieDao.deleteLaneDrillResultsForRun>): ReturnType<typeof dexieDao.deleteLaneDrillResultsForRun> {
+  return dexieDao.deleteLaneDrillResultsForRun(...args)
+}
+
+export function deleteLaneDrillResultsForDrills(...args: Parameters<typeof dexieDao.deleteLaneDrillResultsForDrills>): ReturnType<typeof dexieDao.deleteLaneDrillResultsForDrills> {
+  return dexieDao.deleteLaneDrillResultsForDrills(...args)
+}
+
+export function deleteLapsForDrills(...args: Parameters<typeof dexieDao.deleteLapsForDrills>): ReturnType<typeof dexieDao.deleteLapsForDrills> {
+  return dexieDao.deleteLapsForDrills(...args)
+}
+
+export function getRunSwimmersForRun(...args: Parameters<typeof dexieDao.getRunSwimmersForRun>): ReturnType<typeof dexieDao.getRunSwimmersForRun> {
+  return dexieDao.getRunSwimmersForRun(...args)
+}
+
+export function addSwimmerToRun(...args: Parameters<typeof dexieDao.addSwimmerToRun>): ReturnType<typeof dexieDao.addSwimmerToRun> {
+  return dexieDao.addSwimmerToRun(...args)
+}
+
+export function removeSwimmerFromRun(...args: Parameters<typeof dexieDao.removeSwimmerFromRun>): ReturnType<typeof dexieDao.removeSwimmerFromRun> {
+  return dexieDao.removeSwimmerFromRun(...args)
+}
+
+export function getSwimmersForRun(...args: Parameters<typeof dexieDao.getSwimmersForRun>): ReturnType<typeof dexieDao.getSwimmersForRun> {
+  return dexieDao.getSwimmersForRun(...args)
+}
+
+export function getRunsForSwimmer(...args: Parameters<typeof dexieDao.getRunsForSwimmer>): ReturnType<typeof dexieDao.getRunsForSwimmer> {
+  return dexieDao.getRunsForSwimmer(...args)
+}
+
+export function getAllLaps(...args: Parameters<typeof dexieDao.getAllLaps>): ReturnType<typeof dexieDao.getAllLaps> {
+  return dexieDao.getAllLaps(...args)
+}
 
-export async function deleteSessionRunCascade(runId: string): Promise<void> {
-  const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
-  const runDrillIds = runDrills.map(d => d.id)
-  await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.laneDrillResults, db.sessionRuns], async () => {
-    if (runDrillIds.length > 0) {
-      await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
-    }
-    await db.runDrills.where('runId').equals(runId).delete()
-    await db.runSwimmers.where('runId').equals(runId).delete()
-    await db.laneDrillResults.where('runId').equals(runId).delete()
-    await db.sessionRuns.delete(runId)
-  })
+export function getLapsForRunDrill(...args: Parameters<typeof dexieDao.getLapsForRunDrill>): ReturnType<typeof dexieDao.getLapsForRunDrill> {
+  return dexieDao.getLapsForRunDrill(...args)
 }
 
-// ── Run Drills (snapshots) ────────────────────────────────
+export function getLapsForSwimmerInRun(...args: Parameters<typeof dexieDao.getLapsForSwimmerInRun>): ReturnType<typeof dexieDao.getLapsForSwimmerInRun> {
+  return dexieDao.getLapsForSwimmerInRun(...args)
+}
+
+export function getLapsForRun(...args: Parameters<typeof dexieDao.getLapsForRun>): ReturnType<typeof dexieDao.getLapsForRun> {
+  return dexieDao.getLapsForRun(...args)
+}
 
-export async function getRunDrillsForRun(runId: string): Promise<RunDrill[]> {
-  return db.runDrills.where('runId').equals(runId).toArray()
+export function addLap(...args: Parameters<typeof dexieDao.addLap>): ReturnType<typeof dexieDao.addLap> {
+  return dexieDao.addLap(...args)
 }
 
-export async function getRunDrill(id: string): Promise<RunDrill | undefined> {
-  return db.runDrills.get(id)
+export function getAllLibraryDrills(...args: Parameters<typeof dexieDao.getAllLibraryDrills>): ReturnType<typeof dexieDao.getAllLibraryDrills> {
+  return activeData.getAllLibraryDrills(...args)
 }
 
-export async function addRunDrill(
-  data: SafeRunDrill,
-  drillIndex: number | null = null,
-): Promise<string> {
-  const now = new Date().toISOString()
-  const id = crypto.randomUUID()
-  await db.runDrills.add({ ...data, id, drillIndex, createdAt: now, updatedAt: now })
-  return id
+export function addLibraryDrill(...args: Parameters<typeof dexieDao.addLibraryDrill>): ReturnType<typeof dexieDao.addLibraryDrill> {
+  return activeData.addLibraryDrill(...args)
 }
 
-export async function deleteRunDrill(id: string): Promise<void> {
-  await db.transaction('rw', [db.runDrills, db.laps], async () => {
-    await db.laps.where('runDrillId').equals(id).delete()
-    await db.runDrills.delete(id)
-  })
+export function deleteLibraryDrill(...args: Parameters<typeof dexieDao.deleteLibraryDrill>): ReturnType<typeof dexieDao.deleteLibraryDrill> {
+  return activeData.deleteLibraryDrill(...args)
 }
 
-export async function updateRunDrill(id: string, data: Partial<SafeRunDrill>): Promise<void> {
-  await db.runDrills.update(id, { ...data, updatedAt: new Date().toISOString() })
+export function getLibraryDrill(...args: Parameters<typeof dexieDao.getLibraryDrill>): ReturnType<typeof dexieDao.getLibraryDrill> {
+  return activeData.getLibraryDrill(...args)
 }
 
-// ── Lane Drill Results (per-group per-drill completion) ─────
+export function getDrillsByLibraryDrillId(...args: Parameters<typeof dexieDao.getDrillsByLibraryDrillId>): ReturnType<typeof dexieDao.getDrillsByLibraryDrillId> {
+  return dexieDao.getDrillsByLibraryDrillId(...args)
+}
+
+export function getDrillsWithLibraryRef(...args: Parameters<typeof dexieDao.getDrillsWithLibraryRef>): ReturnType<typeof dexieDao.getDrillsWithLibraryRef> {
+  return dexieDao.getDrillsWithLibraryRef(...args)
+}
 
-export async function getLaneDrillResults(runId: string): Promise<LaneDrillResult[]> {
-  return db.laneDrillResults.where('runId').equals(runId).toArray()
+export function deleteDrillsByIds(...args: Parameters<typeof dexieDao.deleteDrillsByIds>): ReturnType<typeof dexieDao.deleteDrillsByIds> {
+  return dexieDao.deleteDrillsByIds(...args)
 }
 
-export async function getLaneDrillResult(runId: string, groupId: string, runDrillId: string): Promise<LaneDrillResult | undefined> {
-  return db.laneDrillResults.where({ runId, groupId, runDrillId }).first()
+export function updateDrillLibraryRef(...args: Parameters<typeof dexieDao.updateDrillLibraryRef>): ReturnType<typeof dexieDao.updateDrillLibraryRef> {
+  return dexieDao.updateDrillLibraryRef(...args)
 }
 
-export async function deleteLaneDrillResult(id: string): Promise<void> {
-  await db.laneDrillResults.delete(id)
+export function bumpDrillPopularity(...args: Parameters<typeof dexieDao.bumpDrillPopularity>): ReturnType<typeof dexieDao.bumpDrillPopularity> {
+  return dexieDao.bumpDrillPopularity(...args)
 }
 
-export async function deleteLaneDrillResultsForGroup(runId: string, groupId: string): Promise<void> {
-  await db.laneDrillResults.where({ runId, groupId }).delete()
+export function getPopularDrills(...args: Parameters<typeof dexieDao.getPopularDrills>): ReturnType<typeof dexieDao.getPopularDrills> {
+  return dexieDao.getPopularDrills(...args)
 }
 
-export async function deleteLaneDrillResultsForRun(runId: string): Promise<void> {
-  await db.laneDrillResults.where('runId').equals(runId).delete()
+export function patchLibraryDrills(...args: Parameters<typeof dexieDao.patchLibraryDrills>): ReturnType<typeof dexieDao.patchLibraryDrills> {
+  return dexieDao.patchLibraryDrills(...args)
 }
 
-export async function deleteLaneDrillResultsForDrills(runId: string, groupId: string, runDrillIds: string[]): Promise<void> {
-  if (runDrillIds.length === 0) return
-  await db.laneDrillResults
-    .where('runId')
-    .equals(runId)
-    .and(r => r.groupId === groupId && runDrillIds.includes(r.runDrillId))
-    .delete()
+export function deduplicateLibraryDrills(...args: Parameters<typeof dexieDao.deduplicateLibraryDrills>): ReturnType<typeof dexieDao.deduplicateLibraryDrills> {
+  return dexieDao.deduplicateLibraryDrills(...args)
 }
 
-export async function deleteLapsForDrills(runDrillIds: string[]): Promise<void> {
-  if (runDrillIds.length === 0) return
-  await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+export function resetLibraryToDefaults(...args: Parameters<typeof dexieDao.resetLibraryToDefaults>): ReturnType<typeof dexieDao.resetLibraryToDefaults> {
+  return dexieDao.resetLibraryToDefaults(...args)
 }
 
-// ── Run ↔ Swimmer ──────────────────────────────────────────
+export function seedLibraryDrills(...args: Parameters<typeof dexieDao.seedLibraryDrills>): ReturnType<typeof dexieDao.seedLibraryDrills> {
+  return dexieDao.seedLibraryDrills(...args)
+}
 
-export async function getRunSwimmersForRun(runId: string): Promise<RunSwimmer[]> {
-  return db.runSwimmers.where('runId').equals(runId).toArray()
+export function seedDefaultSessions(...args: Parameters<typeof dexieDao.seedDefaultSessions>): ReturnType<typeof dexieDao.seedDefaultSessions> {
+  return activeData.seedDefaultSessions(...args)
 }
 
-export async function addSwimmerToRun(runId: string, swimmerId: string, lane: number): Promise<void> {
-  const existing = await db.runSwimmers
-    .where({ runId, swimmerId })
-    .first()
-  const now = new Date().toISOString()
-  if (existing) {
-    // A swimmer is allocated to exactly one lane per run — move them rather than duplicate.
-    await db.runSwimmers.update(existing.id, { lane, updatedAt: now })
-  } else {
-    await db.runSwimmers.add({ id: crypto.randomUUID(), runId, swimmerId, lane, createdAt: now, updatedAt: now })
-  }
-}
-
-export async function removeSwimmerFromRun(runId: string, swimmerId: string): Promise<void> {
-  await db.runSwimmers
-    .where({ runId, swimmerId })
-    .delete()
-}
+export function markSeedSessionDismissed(...args: Parameters<typeof dexieDao.markSeedSessionDismissed>): ReturnType<typeof dexieDao.markSeedSessionDismissed> {
+  return dexieDao.markSeedSessionDismissed(...args)
+}
 
-export async function getSwimmersForRun(runId: string): Promise<Swimmer[]> {
-  const links = await db.runSwimmers.where('runId').equals(runId).toArray()
-  const ids = links.map(l => l.swimmerId)
-  if (ids.length === 0) return []
-  return db.swimmers.where('id').anyOf(ids).toArray()
+export function getDismissedSeedSessions(...args: Parameters<typeof dexieDao.getDismissedSeedSessions>): ReturnType<typeof dexieDao.getDismissedSeedSessions> {
+  return dexieDao.getDismissedSeedSessions(...args)
 }
 
-export async function getRunsForSwimmer(swimmerId: string): Promise<SessionRun[]> {
-  const links = await db.runSwimmers.where('swimmerId').equals(swimmerId).toArray()
-  const ids = links.map(l => l.runId)
-  if (ids.length === 0) return []
-  return db.sessionRuns.where('id').anyOf(ids).toArray()
+export function getEquipmentOptions(...args: Parameters<typeof dexieDao.getEquipmentOptions>): ReturnType<typeof dexieDao.getEquipmentOptions> {
+  return dexieDao.getEquipmentOptions(...args)
 }
 
-// ── Laps ───────────────────────────────────────────────────
+export function setEquipmentOptions(...args: Parameters<typeof dexieDao.setEquipmentOptions>): ReturnType<typeof dexieDao.setEquipmentOptions> {
+  return dexieDao.setEquipmentOptions(...args)
+}
 
-export async function getAllLaps(): Promise<Lap[]> {
-  return db.laps.toArray()
+export function estimateDbSize(...args: Parameters<typeof dexieDao.estimateDbSize>): ReturnType<typeof dexieDao.estimateDbSize> {
+  return dexieDao.estimateDbSize(...args)
 }
 
-export async function getLapsForRunDrill(runDrillId: string): Promise<Lap[]> {
-  return db.laps.where('runDrillId').equals(runDrillId).toArray()
+export function exportSwimmerData(...args: Parameters<typeof dexieDao.exportSwimmerData>): ReturnType<typeof dexieDao.exportSwimmerData> {
+  return dexieDao.exportSwimmerData(...args)
 }
 
-export async function getLapsForSwimmerInRun(runId: string, swimmerId: string): Promise<Lap[]> {
-  const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
-  const drillIds = runDrills.map(d => d.id)
-  if (drillIds.length === 0) return []
-  return db.laps.where('runDrillId').anyOf(drillIds).and(l => l.swimmerId === swimmerId).toArray()
+export function deleteSwimmerWithData(...args: Parameters<typeof dexieDao.deleteSwimmerWithData>): ReturnType<typeof dexieDao.deleteSwimmerWithData> {
+  return dexieDao.deleteSwimmerWithData(...args)
 }
 
-export async function getLapsForRun(runId: string): Promise<Lap[]> {
-  const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
-  const drillIds = runDrills.map(d => d.id)
-  if (drillIds.length === 0) return []
-  return db.laps.where('runDrillId').anyOf(drillIds).toArray()
+export function cleanupOldData(...args: Parameters<typeof dexieDao.cleanupOldData>): ReturnType<typeof dexieDao.cleanupOldData> {
+  return dexieDao.cleanupOldData(...args)
 }
 
-export async function addLap(data: SafeLap): Promise<string> {
-  const now = new Date().toISOString()
-  const id = crypto.randomUUID()
-  await db.laps.add({ ...data, id, createdAt: now, updatedAt: now })
-  return id
+export function deleteAllSwimmers(...args: Parameters<typeof dexieDao.deleteAllSwimmers>): ReturnType<typeof dexieDao.deleteAllSwimmers> {
+  return dexieDao.deleteAllSwimmers(...args)
 }
 
-  // ── Library Drills ─────────────────────────────────────────
+export function deleteAllSessions(...args: Parameters<typeof dexieDao.deleteAllSessions>): ReturnType<typeof dexieDao.deleteAllSessions> {
+  return dexieDao.deleteAllSessions(...args)
+}
 
-export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
-  if (isCoachAssistMode()) return adminGetAllLibraryDrills()
-  return db.libraryDrills.orderBy('name').toArray()
+export function exportDatabase(...args: Parameters<typeof dexieDao.exportDatabase>): ReturnType<typeof dexieDao.exportDatabase> {
+  return dexieDao.exportDatabase(...args)
 }
 
-export const DEFAULT_EQUIPMENT = ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard']
+export function importDatabase(...args: Parameters<typeof dexieDao.importDatabase>): ReturnType<typeof dexieDao.importDatabase> {
+  return dexieDao.importDatabase(...args)
+}
 
-export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
-  if (isCoachAssistMode()) return adminAddLibraryDrill(data)
-  const now = new Date().toISOString()
+export function getBackupInfo(...args: Parameters<typeof dexieDao.getBackupInfo>): ReturnType<typeof dexieDao.getBackupInfo> {
+  return dexieDao.getBackupInfo(...args)
+}
 
-  // Upsert by name: if a drill with the same name already exists, update it
-  const existing = await db.libraryDrills.where('name').equals(data.name).first()
-  if (existing) {
-    await db.libraryDrills.update(existing.id, {
-      ...data,
-      source: data.source || existing.source || 'personal',
-      updatedAt: now,
-    })
-    return existing.id
-  }
+export function getStoragePersistenceStatus(...args: Parameters<typeof dexieDao.getStoragePersistenceStatus>): ReturnType<typeof dexieDao.getStoragePersistenceStatus> {
+  return dexieDao.getStoragePersistenceStatus(...args)
+}
 
-  const id = crypto.randomUUID()
-  const drill: LibraryDrill = {
-    ...data,
-    source: data.source || 'personal',
-    ...data,
-    id,
-    items: data.items || [
-      {
-        id: crypto.randomUUID(),
-        distance: data.distance || 0,
-        stroke: data.stroke || 'freestyle',
-        repeatCount: 1,
-      },
-    ],
-    repeatCount: data.repeatCount || 1,
-    focus: data.focus || 'none',
-    labels: data.labels || [],
-    description: data.description || '',
-    popularity: data.popularity ?? (data.source === 'builtin' ? 0 : 1),
-    createdAt: now,
-    updatedAt: now,
-  }
-  await db.libraryDrills.add(drill)
-  return id
-}
-
-export async function deleteLibraryDrill(id: string): Promise<void> {
-  if (isCoachAssistMode()) return adminDeleteLibraryDrill(id)
-  await db.libraryDrills.delete(id)
-}
-
-export async function getLibraryDrill(id: string): Promise<LibraryDrill | undefined> {
-  if (isCoachAssistMode()) return adminGetLibraryDrill(id)
-  return db.libraryDrills.get(id)
-}
-
-export async function getDrillsByLibraryDrillId(libraryDrillId: string): Promise<Drill[]> {
-  return db.drills.where('libraryDrillId').equals(libraryDrillId).toArray()
-}
-
-// Dexie omits records from an index when the key is absent, so this returns
-// exactly the drills that carry a library reference.
-export async function getDrillsWithLibraryRef(): Promise<Drill[]> {
-  return db.drills.where('libraryDrillId').above('').toArray()
-}
-
-export async function deleteDrillsByIds(ids: string[]): Promise<void> {
-  if (ids.length === 0) return
-  await db.drills.bulkDelete(ids)
-}
-
-export async function updateDrillLibraryRef(
-  drillId: string,
-  libraryDrillId: string | undefined,
-): Promise<void> {
-  await db.drills.update(drillId, { libraryDrillId, updatedAt: new Date().toISOString() })
-}
-
-export async function bumpDrillPopularity(id: string): Promise<void> {
-  const drill = await db.libraryDrills.get(id)
-  if (drill) {
-    await db.libraryDrills.update(id, {
-      popularity: (drill.popularity ?? 0) + 1,
-      updatedAt: new Date().toISOString(),
-    })
-  }
-}
-
-export async function getPopularDrills(limit?: number): Promise<LibraryDrill[]> {
-  return db.libraryDrills.orderBy('popularity').reverse().limit(limit ?? 20).toArray()
-}
-
-export async function patchLibraryDrills(): Promise<void> {
-  for (const d of drillCatalog) {
-    const existing = await db.libraryDrills.where('name').equals(d.name).first()
-    if (!existing) {
-      await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
-      continue
-    }
-    if (!existing.description || existing.labels?.length === 0 || existing.focus === 'none' || !existing.source) {
-      await db.libraryDrills.update(existing.id, {
-        focus: d.focus,
-        labels: d.labels,
-        description: d.description,
-        source: 'builtin',
-        catalogKey: d.name,
-        updatedAt: new Date().toISOString()
-      })
-    }
-  }
-}
-
-export async function deduplicateLibraryDrills(): Promise<number> {
-  const all = await db.libraryDrills.toArray()
-  const groups = new Map<string, LibraryDrill[]>()
-  for (const d of all) {
-    const g = groups.get(d.name) || []
-    g.push(d)
-    groups.set(d.name, g)
-  }
-
-  let removed = 0
-  for (const [, drills] of groups) {
-    if (drills.length <= 1) continue
-
-    // Keep the best entry: prefer builtin source, then most complete data
-    drills.sort((a, b) => {
-      const aScore = (a.source === 'builtin' ? 2 : 0)
-        + (a.description ? 1 : 0)
-        + ((a.labels?.length || 0) > 0 ? 1 : 0)
-        + (a.focus && a.focus !== 'none' ? 1 : 0)
-      const bScore = (b.source === 'builtin' ? 2 : 0)
-        + (b.description ? 1 : 0)
-        + ((b.labels?.length || 0) > 0 ? 1 : 0)
-        + (b.focus && b.focus !== 'none' ? 1 : 0)
-      return bScore - aScore
-    })
-    const [keep, ...rest] = drills
-
-    for (const dup of rest) {
-      // Merge items from duplicate if the kept drill has no items
-      if (dup.items && dup.items.length > 0 && (!keep.items || keep.items.length === 0)) {
-        await db.libraryDrills.update(keep.id, { items: dup.items, updatedAt: new Date().toISOString() })
-      }
-      await db.libraryDrills.delete(dup.id)
-      removed++
-    }
-  }
-  return removed
-}
-
-export async function resetLibraryToDefaults(): Promise<void> {
-  await db.libraryDrills.clear()
-  await seedLibraryDrills()
-}
-
-export async function seedLibraryDrills(): Promise<void> {
-  const count = await db.libraryDrills.count()
-  if (count > 0) return
-
-  for (const d of drillCatalog) {
-    await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
-  }
-}
-
-let seedingSessionsPromise: Promise<void> | null = null
-
-export async function seedDefaultSessions(): Promise<void> {
-  if (isCoachAssistMode()) return
-  if (seedingSessionsPromise) return seedingSessionsPromise
-  seedingSessionsPromise = seedDefaultSessionsOnce()
-  try {
-    await seedingSessionsPromise
-  } finally {
-    seedingSessionsPromise = null
-  }
-}
-
-async function seedDefaultSessionsOnce(): Promise<void> {
-  const existingNames = new Set((await getAllSessions()).map(s => s.name))
-  const dismissed = await getDismissedSeedSessions()
-  for (const catalog of sessionsCatalog) {
-    if (existingNames.has(catalog.name)) continue
-    // A starter template the coach explicitly deleted must stay deleted. Without
-    // this, the delete removes the row and the next list load re-seeds it,
-    // making default sessions impossible to remove.
-    if (dismissed.has(catalog.name)) continue
-
-    const sessionId = await addSession({
-      name: catalog.name,
-      notes: catalog.notes,
-      catalogKey: catalog.name,
-    })
-
-    for (const d of catalog.drills) {
-      await addDrill({
-        sessionId,
-        name: d.name,
-        order: d.order,
-        stroke: d.stroke,
-        distance: d.distance,
-        items: d.items.map(item => ({ id: crypto.randomUUID(), ...item })),
-        repeatCount: d.repeatCount,
-        focus: d.focus,
-        labels: d.labels,
-        description: d.description,
-      })
-    }
-  }
-}
-
-const DISMISSED_SEED_SESSIONS_KEY = 'dismissedSeedSessions'
-
-// Record that the coach removed a starter template so seeding never brings it
-// back. Keyed by catalog name (the catalogKey used at seed time).
-export async function markSeedSessionDismissed(catalogKey: string): Promise<void> {
-  const dismissed = await getDismissedSeedSessions()
-  if (dismissed.has(catalogKey)) return
-  dismissed.add(catalogKey)
-  await db._meta.put({ key: DISMISSED_SEED_SESSIONS_KEY, value: JSON.stringify([...dismissed]) })
-}
-
-export async function getDismissedSeedSessions(): Promise<Set<string>> {
-  const meta = await db._meta.get(DISMISSED_SEED_SESSIONS_KEY)
-  if (!meta) return new Set()
-  try {
-    return new Set(JSON.parse(meta.value) as string[])
-  } catch {
-    return new Set()
-  }
-}
-
-// ── Equipment Options ──────────────────────────────────────
-
-export async function getEquipmentOptions(): Promise<string[]> {
-  const meta = await db._meta.get('equipment')
-  if (meta) return JSON.parse(meta.value)
-  return DEFAULT_EQUIPMENT
-}
-
-export async function setEquipmentOptions(items: string[]): Promise<void> {
-  await db._meta.put({ key: 'equipment', value: JSON.stringify(items) })
-}
-
-// ── DB Management ───────────────────────────────────────────
-
-export async function estimateDbSize(): Promise<{ bytes: number; tables: Record<string, number> }> {
-  const tables = db.tables.filter(t => !t.name.startsWith('_'))
-  const tableSizes: Record<string, number> = {}
-  let totalBytes = 0
-
-  for (const table of tables) {
-    const rows = await table.toArray()
-    const bytes = new Blob([JSON.stringify(rows)]).size
-    tableSizes[table.name] = bytes
-    totalBytes += bytes
-  }
-
-  // Include localStorage backup blob if present
-  const backupRaw = localStorage.getItem('swimsheet_db_backup')
-  if (backupRaw) {
-    totalBytes += new Blob([backupRaw]).size
-  }
-
-  return { bytes: totalBytes, tables: tableSizes }
-}
-
-export async function exportSwimmerData(swimmerId: string): Promise<Blob> {
-  const swimmer = await db.swimmers.get(swimmerId)
-  if (!swimmer) throw new Error('Swimmer not found')
-
-  const runLinks = await db.runSwimmers.where('swimmerId').equals(swimmerId).toArray()
-  const runIds = runLinks.map(l => l.runId)
-
-  const runs = runIds.length > 0
-    ? await db.sessionRuns.where('id').anyOf(runIds).toArray()
-    : []
-
-  const runDrills = runIds.length > 0
-    ? await db.runDrills.where('runId').anyOf(runIds).toArray()
-    : []
-
-  const runDrillIds = runDrills.map(d => d.id)
-  const laps = runDrillIds.length > 0
-    ? await db.laps.where('runDrillId').anyOf(runDrillIds).toArray()
-    : []
-
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    appVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown',
-    swimmer,
-    runs,
-    runDrills,
-    laps,
-  }
-
-  return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-}
-
-export async function deleteSwimmerWithData(swimmerId: string): Promise<Blob | null> {
-  const swimmer = await db.swimmers.get(swimmerId)
-  if (!swimmer) return null
-
-  // Export data first
-  const blob = await exportSwimmerData(swimmerId)
-
-  // Find and remove all associations
-  const runLinks = await db.runSwimmers.where('swimmerId').equals(swimmerId).toArray()
-  const runIds = runLinks.map(l => l.runId)
-
-  if (runIds.length > 0) {
-    const runDrills = await db.runDrills.where('runId').anyOf(runIds).toArray()
-    const runDrillIds = runDrills.map(d => d.id)
-
-    await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.sessionRuns, db.laneDrillResults, db.swimmers], async () => {
-      if (runDrillIds.length > 0) {
-        await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
-      }
-      await db.runDrills.where('runId').anyOf(runIds).delete()
-      await db.runSwimmers.where('swimmerId').equals(swimmerId).delete()
-      await db.sessionRuns.where('id').anyOf(runIds).delete()
-      // Clean lane drill results for these runs
-      await db.laneDrillResults.where('runId').anyOf(runIds).delete()
-      await db.swimmers.delete(swimmerId)
-    })
-  } else {
-    await db.swimmers.delete(swimmerId)
-  }
-
-  return blob
-}
-
-export async function cleanupOldData(retentionDays: number): Promise<number> {
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - retentionDays)
-  const cutoffStr = cutoff.toISOString()
-
-  // Find old completed runs
-  const oldRuns = await db.sessionRuns
-    .where('status').equals('completed')
-    .and(r => r.date < cutoffStr)
-    .toArray()
-
-  if (oldRuns.length === 0) return 0
-
-  const runIds = oldRuns.map(r => r.id)
-  const runDrills = await db.runDrills.where('runId').anyOf(runIds).toArray()
-  const runDrillIds = runDrills.map(d => d.id)
-
-  await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.sessionRuns, db.laneDrillResults], async () => {
-    if (runDrillIds.length > 0) {
-      await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
-    }
-    await db.runDrills.where('runId').anyOf(runIds).delete()
-    await db.runSwimmers.where('runId').anyOf(runIds).delete()
-    await db.laneDrillResults.where('runId').anyOf(runIds).delete()
-    await db.sessionRuns.where('id').anyOf(runIds).delete()
-  })
-
-  return oldRuns.length
-}
-
-export async function deleteAllSwimmers(): Promise<void> {
-  await db.transaction('rw', [db.runSwimmers, db.laps, db.swimmers], async () => {
-    await db.runSwimmers.clear()
-    await db.laps.clear()
-    await db.swimmers.clear()
-  })
-  clearBackup()
-}
-
-export async function deleteAllSessions(): Promise<void> {
-  await db.transaction('rw', [db.sessions, db.drills], async () => {
-    await db.drills.clear()
-    await db.sessions.clear()
-  })
-  clearBackup()
-}
-
-// ── DB Backup & Restore ─────────────────────────────────────
-
-export async function exportDatabase(): Promise<string> {
-  const payload = await createBackupPayload()
-  await saveBackup()
-  return JSON.stringify(payload, null, 2)
-}
-
-export async function importDatabase(json: string): Promise<void> {
-  const payload = JSON.parse(json) as { formatVersion?: number; schemaVersion?: number; tables?: Record<string, unknown[]> }
-  if (!payload || payload.formatVersion !== BACKUP_FORMAT_VERSION) throw new Error('Unsupported backup format')
-  if (!payload.tables) throw new Error('Invalid backup file')
-  if (payload.schemaVersion && payload.schemaVersion > DB_SCHEMA_VERSION) throw new Error('Backup is from a newer app version')
-  await restoreAllTables(payload.tables)
-  await saveBackup()
-}
-
-export function getBackupInfo(): { savedAt: string } | null {
-  const savedAt = getLastBackupTime()
-  return savedAt ? { savedAt } : null
-}
-
-export function getStoragePersistenceStatus(): Promise<boolean> {
-  return getStoragePersistence()
-}
-
-export function requestStoragePersistence(): Promise<boolean> {
-  return requestPersistentStorage()
+export function requestStoragePersistence(...args: Parameters<typeof dexieDao.requestStoragePersistence>): ReturnType<typeof dexieDao.requestStoragePersistence> {
+  return dexieDao.requestStoragePersistence(...args)
 }
+
+export const DEFAULT_EQUIPMENT = dexieDao.DEFAULT_EQUIPMENT

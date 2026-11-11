@@ -1,0 +1,828 @@
+import { db, createBackupPayload, restoreAllTables, saveBackup, clearBackup, getLastBackupTime, getStoragePersistence, requestPersistentStorage, DB_SCHEMA_VERSION, BACKUP_FORMAT_VERSION } from './schema'
+import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
+import { drillCatalog, sessionsCatalog } from '../data/catalog'
+import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
+
+// ── Swimmers ──────────────────────────────────────────────
+
+export async function getAllSwimmers(): Promise<Swimmer[]> {
+  return db.swimmers.orderBy('name').toArray()
+}
+
+export async function searchSwimmers(query: string): Promise<Swimmer[]> {
+  if (!query.trim()) return []
+  const q = query.toLowerCase()
+  return db.swimmers
+    .filter(s => s.name.toLowerCase().includes(q))
+    .limit(10)
+    .toArray()
+}
+
+export async function getSwimmer(id: string): Promise<Swimmer | undefined> {
+  return db.swimmers.get(id)
+}
+
+export async function addSwimmer(data: SafeSwimmer): Promise<string> {
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+  await db.swimmers.add({ ...data, status: data.status ?? 'active', id, createdAt: now, updatedAt: now })
+  return id
+}
+
+export async function updateSwimmer(id: string, data: Partial<SafeSwimmer>): Promise<void> {
+  await db.swimmers.update(id, { ...data, updatedAt: new Date().toISOString() })
+}
+
+export async function deleteSwimmer(id: string): Promise<void> {
+  // Surgical hard-delete: remove the swimmer's run links and timing laps so no
+  // orphaned references remain, but keep runs and laneResult data blobs (they
+  // store the swimmer's name + times, so history stays readable).
+  await db.transaction('rw', [db.runSwimmers, db.laps, db.swimmers], async () => {
+    await db.runSwimmers.where('swimmerId').equals(id).delete()
+    await db.laps.where('swimmerId').equals(id).delete()
+    await db.swimmers.delete(id)
+  })
+}
+
+// ── Session Templates ─────────────────────────────────────
+
+export async function getAllSessions(): Promise<Session[]> {
+  return db.sessions.orderBy('createdAt').reverse().toArray()
+}
+
+export async function getSession(id: string): Promise<Session | undefined> {
+  return db.sessions.get(id)
+}
+
+export async function addSession(data: SafeSession): Promise<string> {
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+  await db.sessions.add({ ...data, id, createdAt: now, updatedAt: now })
+  return id
+}
+
+export async function updateSession(id: string, data: Partial<SafeSession>): Promise<void> {
+  await db.sessions.update(id, { ...data, updatedAt: new Date().toISOString() })
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await db.transaction('rw', [db.sessions, db.drills], async () => {
+    await db.drills.where('sessionId').equals(id).delete()
+    await db.sessions.delete(id)
+  })
+}
+
+// Atomic session + drills insert for AI drafts. It writes directly to the drills
+// table and must NOT call addDrill(), which also writes to libraryDrills. A
+// failure at any point rolls the whole transaction back — no partial session.
+export async function addSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+): Promise<string> {
+  return writeSessionWithDrills(session, drills)
+}
+
+export async function addSessionWithDrillsIf(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  return writeSessionWithDrills(session, drills, canCreate)
+}
+
+export async function addImportedSessionWithDrillsIf(
+  _packageValue: SessionPackageV1,
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  return addSessionWithDrillsIf(session, drills, canCreate)
+}
+
+function writeSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+): Promise<string>
+function writeSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate: (existingSessions: Session[]) => boolean,
+): Promise<string | null>
+async function writeSessionWithDrills(
+  session: SafeSession,
+  drills: Array<Omit<SafeDrill, 'sessionId'>>,
+  canCreate?: (existingSessions: Session[]) => boolean,
+): Promise<string | null> {
+  const now = new Date().toISOString()
+  const sessionId = crypto.randomUUID()
+  return db.transaction('rw', [db.sessions, db.drills], async () => {
+    if (canCreate && !canCreate(await db.sessions.toArray())) return null
+    await db.sessions.add({ ...session, id: sessionId, createdAt: now, updatedAt: now })
+    for (const drill of drills) {
+      await db.drills.add({
+        ...drill,
+        sessionId,
+        id: crypto.randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      })
+    }
+    return sessionId
+  })
+}
+
+// ── Template Drills ────────────────────────────────────────
+
+export async function getDrillsForSession(sessionId: string): Promise<Drill[]> {
+  return db.drills.where('sessionId').equals(sessionId).toArray()
+}
+
+export async function getDrill(id: string): Promise<Drill | undefined> {
+  return db.drills.get(id)
+}
+
+export async function updateLibraryDrill(id: string, data: Partial<SafeLibraryDrill>): Promise<void> {
+  await db.libraryDrills.update(id, { ...data, updatedAt: new Date().toISOString() })
+}
+
+export async function addDrill(data: SafeDrill): Promise<string> {
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+  const drill: Drill = {
+    ...data,
+    id,
+    items: data.items || [
+      {
+        id: crypto.randomUUID(),
+        distance: data.distance || 0,
+        stroke: data.stroke || 'freestyle',
+        repeatCount: 1,
+      },
+    ],
+    repeatCount: data.repeatCount || 1,
+    focus: data.focus || 'none',
+    labels: data.labels || [],
+    description: data.description || '',
+    createdAt: now,
+    updatedAt: now,
+  }
+  await db.drills.add(drill)
+
+  // Also save to library
+  const libDrill: SafeLibraryDrill = {
+    name: drill.name,
+    stroke: drill.stroke,
+    distance: drill.distance,
+    items: drill.items,
+    repeatCount: drill.repeatCount,
+    focus: drill.focus,
+    labels: drill.labels,
+    description: drill.description,
+  }
+  // Record which library entry this copy came from, so deleting that entry can
+  // warn about the sessions still using it. addLibraryDrill upserts by name, so
+  // this may resolve to an existing entry rather than a new one.
+  const libraryDrillId = await addLibraryDrill(libDrill)
+  await db.drills.update(id, { libraryDrillId })
+
+  return id
+}
+
+export async function updateDrill(id: string, data: Partial<SafeDrill>): Promise<void> {
+  await db.drills.update(id, { ...data, updatedAt: new Date().toISOString() })
+}
+
+export async function deleteDrill(id: string): Promise<void> {
+  await db.drills.delete(id)
+}
+
+// ── Session Runs ──────────────────────────────────────────
+
+export async function getActiveRun(): Promise<SessionRun | undefined> {
+  return db.sessionRuns.where('status').equals('active').first()
+}
+
+export async function getActiveRunsForSession(sessionId: string): Promise<SessionRun[]> {
+  return db.sessionRuns
+    .where('sessionId')
+    .equals(sessionId)
+    .filter(r => r.status === 'active')
+    .toArray()
+}
+
+export async function getCompletedRunCountForSession(sessionId: string): Promise<number> {
+  return db.sessionRuns
+    .where('sessionId')
+    .equals(sessionId)
+    .filter(r => r.status === 'completed')
+    .count()
+}
+
+export async function getSessionRun(id: string): Promise<SessionRun | undefined> {
+  return db.sessionRuns.get(id)
+}
+
+export async function getCompletedRuns(): Promise<SessionRun[]> {
+  const runs = await db.sessionRuns.where('status').equals('completed').toArray()
+  return runs.sort((a, b) => b.date.localeCompare(a.date))
+}
+
+export async function getSessionRunUsage(): Promise<{ sessionId: string; count: number; lastUsedAt: number }[]> {
+  const runs = await db.sessionRuns.toArray()
+  const usage = new Map<string, { count: number; lastUsedAt: number }>()
+  for (const run of runs) {
+    const current = usage.get(run.sessionId) ?? { count: 0, lastUsedAt: 0 }
+    current.count += 1
+    const ts = run.sessionStartedAt ?? new Date(run.createdAt).getTime()
+    if (ts > current.lastUsedAt) current.lastUsedAt = ts
+    usage.set(run.sessionId, current)
+  }
+  return Array.from(usage.entries()).map(([sessionId, value]) => ({
+    sessionId,
+    count: value.count,
+    lastUsedAt: value.lastUsedAt,
+  }))
+}
+
+export async function addSessionRun(data: SafeSessionRun): Promise<string> {
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+
+  // Only one active run allowed — auto-complete any existing active run
+  if (data.status === 'active') {
+    const existing = await getActiveRun()
+    if (existing) {
+      await completeSessionRun(existing.id!)
+    }
+  }
+
+  await db.sessionRuns.add({ ...data, id, createdAt: now, updatedAt: now })
+  return id
+}
+
+export async function updateSessionRun(id: string, data: Partial<SafeSessionRun>): Promise<void> {
+  await db.sessionRuns.update(id, { ...data, updatedAt: new Date().toISOString() })
+}
+
+export async function completeSessionRun(id: string): Promise<void> {
+  await db.sessionRuns.update(id, { status: 'completed', updatedAt: new Date().toISOString() })
+}
+
+export async function deleteSessionRunCascade(runId: string): Promise<void> {
+  const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
+  const runDrillIds = runDrills.map(d => d.id)
+  await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.laneDrillResults, db.sessionRuns], async () => {
+    if (runDrillIds.length > 0) {
+      await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+    }
+    await db.runDrills.where('runId').equals(runId).delete()
+    await db.runSwimmers.where('runId').equals(runId).delete()
+    await db.laneDrillResults.where('runId').equals(runId).delete()
+    await db.sessionRuns.delete(runId)
+  })
+}
+
+// ── Run Drills (snapshots) ────────────────────────────────
+
+export async function getRunDrillsForRun(runId: string): Promise<RunDrill[]> {
+  return db.runDrills.where('runId').equals(runId).toArray()
+}
+
+export async function getRunDrill(id: string): Promise<RunDrill | undefined> {
+  return db.runDrills.get(id)
+}
+
+export async function addRunDrill(
+  data: SafeRunDrill,
+  drillIndex: number | null = null,
+): Promise<string> {
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+  await db.runDrills.add({ ...data, id, drillIndex, createdAt: now, updatedAt: now })
+  return id
+}
+
+export async function deleteRunDrill(id: string): Promise<void> {
+  await db.transaction('rw', [db.runDrills, db.laps], async () => {
+    await db.laps.where('runDrillId').equals(id).delete()
+    await db.runDrills.delete(id)
+  })
+}
+
+export async function updateRunDrill(id: string, data: Partial<SafeRunDrill>): Promise<void> {
+  await db.runDrills.update(id, { ...data, updatedAt: new Date().toISOString() })
+}
+
+// ── Lane Drill Results (per-group per-drill completion) ─────
+
+export async function getLaneDrillResults(runId: string): Promise<LaneDrillResult[]> {
+  return db.laneDrillResults.where('runId').equals(runId).toArray()
+}
+
+export async function getLaneDrillResult(runId: string, groupId: string, runDrillId: string): Promise<LaneDrillResult | undefined> {
+  return db.laneDrillResults.where({ runId, groupId, runDrillId }).first()
+}
+
+export async function deleteLaneDrillResult(id: string): Promise<void> {
+  await db.laneDrillResults.delete(id)
+}
+
+export async function deleteLaneDrillResultsForGroup(runId: string, groupId: string): Promise<void> {
+  await db.laneDrillResults.where({ runId, groupId }).delete()
+}
+
+export async function deleteLaneDrillResultsForRun(runId: string): Promise<void> {
+  await db.laneDrillResults.where('runId').equals(runId).delete()
+}
+
+export async function deleteLaneDrillResultsForDrills(runId: string, groupId: string, runDrillIds: string[]): Promise<void> {
+  if (runDrillIds.length === 0) return
+  await db.laneDrillResults
+    .where('runId')
+    .equals(runId)
+    .and(r => r.groupId === groupId && runDrillIds.includes(r.runDrillId))
+    .delete()
+}
+
+export async function deleteLapsForDrills(runDrillIds: string[]): Promise<void> {
+  if (runDrillIds.length === 0) return
+  await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+}
+
+// ── Run ↔ Swimmer ──────────────────────────────────────────
+
+export async function getRunSwimmersForRun(runId: string): Promise<RunSwimmer[]> {
+  return db.runSwimmers.where('runId').equals(runId).toArray()
+}
+
+export async function addSwimmerToRun(runId: string, swimmerId: string, lane: number): Promise<void> {
+  const existing = await db.runSwimmers
+    .where({ runId, swimmerId })
+    .first()
+  const now = new Date().toISOString()
+  if (existing) {
+    // A swimmer is allocated to exactly one lane per run — move them rather than duplicate.
+    await db.runSwimmers.update(existing.id, { lane, updatedAt: now })
+  } else {
+    await db.runSwimmers.add({ id: crypto.randomUUID(), runId, swimmerId, lane, createdAt: now, updatedAt: now })
+  }
+}
+
+export async function removeSwimmerFromRun(runId: string, swimmerId: string): Promise<void> {
+  await db.runSwimmers
+    .where({ runId, swimmerId })
+    .delete()
+}
+
+export async function getSwimmersForRun(runId: string): Promise<Swimmer[]> {
+  const links = await db.runSwimmers.where('runId').equals(runId).toArray()
+  const ids = links.map(l => l.swimmerId)
+  if (ids.length === 0) return []
+  return db.swimmers.where('id').anyOf(ids).toArray()
+}
+
+export async function getRunsForSwimmer(swimmerId: string): Promise<SessionRun[]> {
+  const links = await db.runSwimmers.where('swimmerId').equals(swimmerId).toArray()
+  const ids = links.map(l => l.runId)
+  if (ids.length === 0) return []
+  return db.sessionRuns.where('id').anyOf(ids).toArray()
+}
+
+// ── Laps ───────────────────────────────────────────────────
+
+export async function getAllLaps(): Promise<Lap[]> {
+  return db.laps.toArray()
+}
+
+export async function getLapsForRunDrill(runDrillId: string): Promise<Lap[]> {
+  return db.laps.where('runDrillId').equals(runDrillId).toArray()
+}
+
+export async function getLapsForSwimmerInRun(runId: string, swimmerId: string): Promise<Lap[]> {
+  const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
+  const drillIds = runDrills.map(d => d.id)
+  if (drillIds.length === 0) return []
+  return db.laps.where('runDrillId').anyOf(drillIds).and(l => l.swimmerId === swimmerId).toArray()
+}
+
+export async function getLapsForRun(runId: string): Promise<Lap[]> {
+  const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
+  const drillIds = runDrills.map(d => d.id)
+  if (drillIds.length === 0) return []
+  return db.laps.where('runDrillId').anyOf(drillIds).toArray()
+}
+
+export async function addLap(data: SafeLap): Promise<string> {
+  const now = new Date().toISOString()
+  const id = crypto.randomUUID()
+  await db.laps.add({ ...data, id, createdAt: now, updatedAt: now })
+  return id
+}
+
+  // ── Library Drills ─────────────────────────────────────────
+
+export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
+  return db.libraryDrills.orderBy('name').toArray()
+}
+
+export const DEFAULT_EQUIPMENT = ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard']
+
+export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
+  const now = new Date().toISOString()
+
+  // Upsert by name: if a drill with the same name already exists, update it
+  const existing = await db.libraryDrills.where('name').equals(data.name).first()
+  if (existing) {
+    await db.libraryDrills.update(existing.id, {
+      ...data,
+      source: data.source || existing.source || 'personal',
+      updatedAt: now,
+    })
+    return existing.id
+  }
+
+  const id = crypto.randomUUID()
+  const drill: LibraryDrill = {
+    ...data,
+    source: data.source || 'personal',
+    ...data,
+    id,
+    items: data.items || [
+      {
+        id: crypto.randomUUID(),
+        distance: data.distance || 0,
+        stroke: data.stroke || 'freestyle',
+        repeatCount: 1,
+      },
+    ],
+    repeatCount: data.repeatCount || 1,
+    focus: data.focus || 'none',
+    labels: data.labels || [],
+    description: data.description || '',
+    popularity: data.popularity ?? (data.source === 'builtin' ? 0 : 1),
+    createdAt: now,
+    updatedAt: now,
+  }
+  await db.libraryDrills.add(drill)
+  return id
+}
+
+export async function deleteLibraryDrill(id: string): Promise<void> {
+  await db.libraryDrills.delete(id)
+}
+
+export async function getLibraryDrill(id: string): Promise<LibraryDrill | undefined> {
+  return db.libraryDrills.get(id)
+}
+
+export async function getDrillsByLibraryDrillId(libraryDrillId: string): Promise<Drill[]> {
+  return db.drills.where('libraryDrillId').equals(libraryDrillId).toArray()
+}
+
+// Dexie omits records from an index when the key is absent, so this returns
+// exactly the drills that carry a library reference.
+export async function getDrillsWithLibraryRef(): Promise<Drill[]> {
+  return db.drills.where('libraryDrillId').above('').toArray()
+}
+
+export async function deleteDrillsByIds(ids: string[]): Promise<void> {
+  if (ids.length === 0) return
+  await db.drills.bulkDelete(ids)
+}
+
+export async function updateDrillLibraryRef(
+  drillId: string,
+  libraryDrillId: string | undefined,
+): Promise<void> {
+  await db.drills.update(drillId, { libraryDrillId, updatedAt: new Date().toISOString() })
+}
+
+export async function bumpDrillPopularity(id: string): Promise<void> {
+  const drill = await db.libraryDrills.get(id)
+  if (drill) {
+    await db.libraryDrills.update(id, {
+      popularity: (drill.popularity ?? 0) + 1,
+      updatedAt: new Date().toISOString(),
+    })
+  }
+}
+
+export async function getPopularDrills(limit?: number): Promise<LibraryDrill[]> {
+  return db.libraryDrills.orderBy('popularity').reverse().limit(limit ?? 20).toArray()
+}
+
+export async function patchLibraryDrills(): Promise<void> {
+  for (const d of drillCatalog) {
+    const existing = await db.libraryDrills.where('name').equals(d.name).first()
+    if (!existing) {
+      await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
+      continue
+    }
+    if (!existing.description || existing.labels?.length === 0 || existing.focus === 'none' || !existing.source) {
+      await db.libraryDrills.update(existing.id, {
+        focus: d.focus,
+        labels: d.labels,
+        description: d.description,
+        source: 'builtin',
+        catalogKey: d.name,
+        updatedAt: new Date().toISOString()
+      })
+    }
+  }
+}
+
+export async function deduplicateLibraryDrills(): Promise<number> {
+  const all = await db.libraryDrills.toArray()
+  const groups = new Map<string, LibraryDrill[]>()
+  for (const d of all) {
+    const g = groups.get(d.name) || []
+    g.push(d)
+    groups.set(d.name, g)
+  }
+
+  let removed = 0
+  for (const [, drills] of groups) {
+    if (drills.length <= 1) continue
+
+    // Keep the best entry: prefer builtin source, then most complete data
+    drills.sort((a, b) => {
+      const aScore = (a.source === 'builtin' ? 2 : 0)
+        + (a.description ? 1 : 0)
+        + ((a.labels?.length || 0) > 0 ? 1 : 0)
+        + (a.focus && a.focus !== 'none' ? 1 : 0)
+      const bScore = (b.source === 'builtin' ? 2 : 0)
+        + (b.description ? 1 : 0)
+        + ((b.labels?.length || 0) > 0 ? 1 : 0)
+        + (b.focus && b.focus !== 'none' ? 1 : 0)
+      return bScore - aScore
+    })
+    const [keep, ...rest] = drills
+
+    for (const dup of rest) {
+      // Merge items from duplicate if the kept drill has no items
+      if (dup.items && dup.items.length > 0 && (!keep.items || keep.items.length === 0)) {
+        await db.libraryDrills.update(keep.id, { items: dup.items, updatedAt: new Date().toISOString() })
+      }
+      await db.libraryDrills.delete(dup.id)
+      removed++
+    }
+  }
+  return removed
+}
+
+export async function resetLibraryToDefaults(): Promise<void> {
+  await db.libraryDrills.clear()
+  await seedLibraryDrills()
+}
+
+export async function seedLibraryDrills(): Promise<void> {
+  const count = await db.libraryDrills.count()
+  if (count > 0) return
+
+  for (const d of drillCatalog) {
+    await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
+  }
+}
+
+let seedingSessionsPromise: Promise<void> | null = null
+
+export async function seedDefaultSessions(): Promise<void> {
+  if (seedingSessionsPromise) return seedingSessionsPromise
+  seedingSessionsPromise = seedDefaultSessionsOnce()
+  try {
+    await seedingSessionsPromise
+  } finally {
+    seedingSessionsPromise = null
+  }
+}
+
+async function seedDefaultSessionsOnce(): Promise<void> {
+  const existingNames = new Set((await getAllSessions()).map(s => s.name))
+  const dismissed = await getDismissedSeedSessions()
+  for (const catalog of sessionsCatalog) {
+    if (existingNames.has(catalog.name)) continue
+    // A starter template the coach explicitly deleted must stay deleted. Without
+    // this, the delete removes the row and the next list load re-seeds it,
+    // making default sessions impossible to remove.
+    if (dismissed.has(catalog.name)) continue
+
+    const sessionId = await addSession({
+      name: catalog.name,
+      notes: catalog.notes,
+      catalogKey: catalog.name,
+    })
+
+    for (const d of catalog.drills) {
+      await addDrill({
+        sessionId,
+        name: d.name,
+        order: d.order,
+        stroke: d.stroke,
+        distance: d.distance,
+        items: d.items.map(item => ({ id: crypto.randomUUID(), ...item })),
+        repeatCount: d.repeatCount,
+        focus: d.focus,
+        labels: d.labels,
+        description: d.description,
+      })
+    }
+  }
+}
+
+const DISMISSED_SEED_SESSIONS_KEY = 'dismissedSeedSessions'
+
+// Record that the coach removed a starter template so seeding never brings it
+// back. Keyed by catalog name (the catalogKey used at seed time).
+export async function markSeedSessionDismissed(catalogKey: string): Promise<void> {
+  const dismissed = await getDismissedSeedSessions()
+  if (dismissed.has(catalogKey)) return
+  dismissed.add(catalogKey)
+  await db._meta.put({ key: DISMISSED_SEED_SESSIONS_KEY, value: JSON.stringify([...dismissed]) })
+}
+
+export async function getDismissedSeedSessions(): Promise<Set<string>> {
+  const meta = await db._meta.get(DISMISSED_SEED_SESSIONS_KEY)
+  if (!meta) return new Set()
+  try {
+    return new Set(JSON.parse(meta.value) as string[])
+  } catch {
+    return new Set()
+  }
+}
+
+// ── Equipment Options ──────────────────────────────────────
+
+export async function getEquipmentOptions(): Promise<string[]> {
+  const meta = await db._meta.get('equipment')
+  if (meta) return JSON.parse(meta.value)
+  return DEFAULT_EQUIPMENT
+}
+
+export async function setEquipmentOptions(items: string[]): Promise<void> {
+  await db._meta.put({ key: 'equipment', value: JSON.stringify(items) })
+}
+
+// ── DB Management ───────────────────────────────────────────
+
+export async function estimateDbSize(): Promise<{ bytes: number; tables: Record<string, number> }> {
+  const tables = db.tables.filter(t => !t.name.startsWith('_'))
+  const tableSizes: Record<string, number> = {}
+  let totalBytes = 0
+
+  for (const table of tables) {
+    const rows = await table.toArray()
+    const bytes = new Blob([JSON.stringify(rows)]).size
+    tableSizes[table.name] = bytes
+    totalBytes += bytes
+  }
+
+  // Include localStorage backup blob if present
+  const backupRaw = localStorage.getItem('swimsheet_db_backup')
+  if (backupRaw) {
+    totalBytes += new Blob([backupRaw]).size
+  }
+
+  return { bytes: totalBytes, tables: tableSizes }
+}
+
+export async function exportSwimmerData(swimmerId: string): Promise<Blob> {
+  const swimmer = await db.swimmers.get(swimmerId)
+  if (!swimmer) throw new Error('Swimmer not found')
+
+  const runLinks = await db.runSwimmers.where('swimmerId').equals(swimmerId).toArray()
+  const runIds = runLinks.map(l => l.runId)
+
+  const runs = runIds.length > 0
+    ? await db.sessionRuns.where('id').anyOf(runIds).toArray()
+    : []
+
+  const runDrills = runIds.length > 0
+    ? await db.runDrills.where('runId').anyOf(runIds).toArray()
+    : []
+
+  const runDrillIds = runDrills.map(d => d.id)
+  const laps = runDrillIds.length > 0
+    ? await db.laps.where('runDrillId').anyOf(runDrillIds).toArray()
+    : []
+
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    appVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'unknown',
+    swimmer,
+    runs,
+    runDrills,
+    laps,
+  }
+
+  return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+}
+
+export async function deleteSwimmerWithData(swimmerId: string): Promise<Blob | null> {
+  const swimmer = await db.swimmers.get(swimmerId)
+  if (!swimmer) return null
+
+  // Export data first
+  const blob = await exportSwimmerData(swimmerId)
+
+  // Find and remove all associations
+  const runLinks = await db.runSwimmers.where('swimmerId').equals(swimmerId).toArray()
+  const runIds = runLinks.map(l => l.runId)
+
+  if (runIds.length > 0) {
+    const runDrills = await db.runDrills.where('runId').anyOf(runIds).toArray()
+    const runDrillIds = runDrills.map(d => d.id)
+
+    await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.sessionRuns, db.laneDrillResults, db.swimmers], async () => {
+      if (runDrillIds.length > 0) {
+        await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+      }
+      await db.runDrills.where('runId').anyOf(runIds).delete()
+      await db.runSwimmers.where('swimmerId').equals(swimmerId).delete()
+      await db.sessionRuns.where('id').anyOf(runIds).delete()
+      // Clean lane drill results for these runs
+      await db.laneDrillResults.where('runId').anyOf(runIds).delete()
+      await db.swimmers.delete(swimmerId)
+    })
+  } else {
+    await db.swimmers.delete(swimmerId)
+  }
+
+  return blob
+}
+
+export async function cleanupOldData(retentionDays: number): Promise<number> {
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - retentionDays)
+  const cutoffStr = cutoff.toISOString()
+
+  // Find old completed runs
+  const oldRuns = await db.sessionRuns
+    .where('status').equals('completed')
+    .and(r => r.date < cutoffStr)
+    .toArray()
+
+  if (oldRuns.length === 0) return 0
+
+  const runIds = oldRuns.map(r => r.id)
+  const runDrills = await db.runDrills.where('runId').anyOf(runIds).toArray()
+  const runDrillIds = runDrills.map(d => d.id)
+
+  await db.transaction('rw', [db.laps, db.runDrills, db.runSwimmers, db.sessionRuns, db.laneDrillResults], async () => {
+    if (runDrillIds.length > 0) {
+      await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+    }
+    await db.runDrills.where('runId').anyOf(runIds).delete()
+    await db.runSwimmers.where('runId').anyOf(runIds).delete()
+    await db.laneDrillResults.where('runId').anyOf(runIds).delete()
+    await db.sessionRuns.where('id').anyOf(runIds).delete()
+  })
+
+  return oldRuns.length
+}
+
+export async function deleteAllSwimmers(): Promise<void> {
+  await db.transaction('rw', [db.runSwimmers, db.laps, db.swimmers], async () => {
+    await db.runSwimmers.clear()
+    await db.laps.clear()
+    await db.swimmers.clear()
+  })
+  clearBackup()
+}
+
+export async function deleteAllSessions(): Promise<void> {
+  await db.transaction('rw', [db.sessions, db.drills], async () => {
+    await db.drills.clear()
+    await db.sessions.clear()
+  })
+  clearBackup()
+}
+
+// ── DB Backup & Restore ─────────────────────────────────────
+
+export async function exportDatabase(): Promise<string> {
+  const payload = await createBackupPayload()
+  await saveBackup()
+  return JSON.stringify(payload, null, 2)
+}
+
+export async function importDatabase(json: string): Promise<void> {
+  const payload = JSON.parse(json) as { formatVersion?: number; schemaVersion?: number; tables?: Record<string, unknown[]> }
+  if (!payload || payload.formatVersion !== BACKUP_FORMAT_VERSION) throw new Error('Unsupported backup format')
+  if (!payload.tables) throw new Error('Invalid backup file')
+  if (payload.schemaVersion && payload.schemaVersion > DB_SCHEMA_VERSION) throw new Error('Backup is from a newer app version')
+  await restoreAllTables(payload.tables)
+  await saveBackup()
+}
+
+export function getBackupInfo(): { savedAt: string } | null {
+  const savedAt = getLastBackupTime()
+  return savedAt ? { savedAt } : null
+}
+
+export function getStoragePersistenceStatus(): Promise<boolean> {
+  return getStoragePersistence()
+}
+
+export function requestStoragePersistence(): Promise<boolean> {
+  return requestPersistentStorage()
+}
