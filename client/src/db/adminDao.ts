@@ -219,6 +219,12 @@ export async function deleteSession(id: string): Promise<void> {
   cache = null
 }
 
+export async function searchSwimmers(query: string): Promise<Swimmer[]> {
+  if (!query.trim()) return []
+  const q = query.toLowerCase()
+  return (await getAllSwimmers()).filter((s) => s.name.toLowerCase().includes(q)).slice(0, 10)
+}
+
 export async function addSwimmer(data: SafeSwimmer): Promise<string> {
   const c = requireCoach()
   const id = crypto.randomUUID()
@@ -283,4 +289,9 @@ export async function deleteLibraryDrill(id: string): Promise<void> {
   const c = requireCoach()
   await service.adminDelete(c.userId, 'library_drills', id)
   cache = null
+}
+
+export async function seedDefaultSessions(): Promise<void> {
+  // Coach Assist reads a selected coach's data; never seed local starter sessions.
+  return
 }

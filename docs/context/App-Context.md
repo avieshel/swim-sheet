@@ -12,7 +12,9 @@ The app is a **client-side PWA**. In normal coach mode, coach data lives in the
 browser's IndexedDB (Dexie) on the device and syncs to Supabase when enabled. In
 owner Coach Assist mode, the same session UI uses the admin DAO and
 `admin-coach-assist` Edge Function to read/write a selected coach's Supabase
-tenant directly. The client never calls the Express server's `/api/v1/*` routes.
+tenant directly. The client DAO layer is now a facade (`client/src/db/dao.ts`) that
+delegates to `dexieDao.ts` (Dexie) in normal mode and `adminDao.ts` (Edge
+Function) in Coach Assist mode, selected via `adminDao.isCoachAssistMode()`. The client never calls the Express server's `/api/v1/*` routes.
 The Express server is a vestigial dev/static host: it serves the built PWA in
 production and exposes unused `/api/v1` CRUD routes against a throwaway SQLite
 file.
