@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Mock } from 'vitest'
 
 const mockService = vi.hoisted(() => ({
   exportSessionPackage: vi.fn(),
@@ -15,32 +16,51 @@ import {
 } from '../sessionPackages'
 import type { SessionPackageV1 } from '../../../../shared/sessionPackage/types'
 
-describe('session package API', () => {
+describe('session package API — delegation to sessionPackageService', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('delegates export to the package service', async () => {
-    const expected = { format: 'swimsheet-session', version: 1 } as SessionPackageV1
-    mockService.exportSessionPackage.mockResolvedValue(expected)
+  type Delegation = {
+    name: string
+    run: () => Promise<unknown>
+    mock: Mock
+    calledWith: unknown[]
+    ret: unknown
+  }
 
-    await expect(exportSessionPackage('session-1')).resolves.toBe(expected)
-    expect(mockService.exportSessionPackage).toHaveBeenCalledExactlyOnceWith('session-1')
-  })
+  const expectedExport = { format: 'swimsheet-session', version: 1 } as SessionPackageV1
+  const inspectInput = { format: 'swimsheet-session' }
+  const inspectResult = { outcome: 'invalid' }
+  const importInput = { format: 'swimsheet-session' }
+  const importResult = { outcome: 'created', sessionId: 'new-session' }
 
-  it('delegates package inspection to the package service', async () => {
-    const input = { format: 'swimsheet-session' }
-    const expected = { outcome: 'invalid' }
-    mockService.inspectSessionPackage.mockResolvedValue(expected)
+  const cases: Delegation[] = [
+    {
+      name: 'exportSessionPackage → exportSessionPackage',
+      run: () => exportSessionPackage('session-1'),
+      mock: mockService.exportSessionPackage,
+      calledWith: ['session-1'],
+      ret: expectedExport,
+    },
+    {
+      name: 'inspectSessionPackage → inspectSessionPackage',
+      run: () => inspectSessionPackage(inspectInput),
+      mock: mockService.inspectSessionPackage,
+      calledWith: [inspectInput],
+      ret: inspectResult,
+    },
+    {
+      name: 'importSessionPackage → importSessionPackage',
+      run: () => importSessionPackage(importInput, 'Imported Copy'),
+      mock: mockService.importSessionPackage,
+      calledWith: [importInput, 'Imported Copy'],
+      ret: importResult,
+    },
+  ]
 
-    await expect(inspectSessionPackage(input)).resolves.toBe(expected)
-    expect(mockService.inspectSessionPackage).toHaveBeenCalledExactlyOnceWith(input)
-  })
-
-  it('delegates import with the confirmed session name', async () => {
-    const input = { format: 'swimsheet-session' }
-    const expected = { outcome: 'created', sessionId: 'new-session' }
-    mockService.importSessionPackage.mockResolvedValue(expected)
-
-    await expect(importSessionPackage(input, 'Imported Copy')).resolves.toBe(expected)
-    expect(mockService.importSessionPackage).toHaveBeenCalledExactlyOnceWith(input, 'Imported Copy')
+  it.each(cases)('$name', async (c) => {
+    c.mock.mockResolvedValue(c.ret)
+    const result = await c.run()
+    expect(c.mock).toHaveBeenCalledExactlyOnceWith(...c.calledWith)
+    expect(result).toBe(c.ret)
   })
 })

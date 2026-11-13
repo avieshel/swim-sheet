@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { Mock } from 'vitest'
 
 vi.mock('../../services/sessionService', () => ({
   sessionService: {
@@ -24,52 +25,70 @@ import { listSessions, getSession, createSession, updateSession, deleteSession, 
 import { sessionService } from '../../services/sessionService'
 import type { SafeSession } from '../../db/schema'
 
-describe('sessions API', () => {
+describe('sessions API — delegation to sessionService', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('listSessions delegates to sessionService.list', async () => {
-    const expected = [{ id: 's1' }]
-    vi.mocked(sessionService.list).mockResolvedValue(expected)
-    const result = await listSessions()
-    expect(sessionService.list).toHaveBeenCalledOnce()
-    expect(result).toBe(expected)
-  })
+  type Delegation = {
+    name: string
+    run: () => Promise<unknown>
+    mock: Mock
+    calledWith: unknown[]
+    ret: unknown
+  }
 
-  it('getSession delegates to sessionService.get', async () => {
-    const expected = { id: 's1' }
-    vi.mocked(sessionService.get).mockResolvedValue(expected)
-    const result = await getSession('s1')
-    expect(sessionService.get).toHaveBeenCalledWith('s1')
-    expect(result).toBe(expected)
-  })
+  const createData = { name: 'Test' } as SafeSession
+  const updateData = { name: 'Updated' }
 
-  it('createSession delegates to sessionService.create', async () => {
-    const data = { name: 'Test' }
-    vi.mocked(sessionService.create).mockResolvedValue('new-id')
-    const result = await createSession(data as SafeSession)
-    expect(sessionService.create).toHaveBeenCalledWith(data)
-    expect(result).toBe('new-id')
-  })
+  const cases: Delegation[] = [
+    {
+      name: 'listSessions → list',
+      run: () => listSessions(),
+      mock: vi.mocked(sessionService.list),
+      calledWith: [],
+      ret: [{ id: 's1' }],
+    },
+    {
+      name: 'getSession → get',
+      run: () => getSession('s1'),
+      mock: vi.mocked(sessionService.get),
+      calledWith: ['s1'],
+      ret: { id: 's1' },
+    },
+    {
+      name: 'createSession → create',
+      run: () => createSession(createData),
+      mock: vi.mocked(sessionService.create),
+      calledWith: [createData],
+      ret: 'new-id',
+    },
+    {
+      name: 'updateSession → update',
+      run: () => updateSession('s1', updateData),
+      mock: vi.mocked(sessionService.update),
+      calledWith: ['s1', updateData],
+      ret: undefined,
+    },
+    {
+      name: 'deleteSession → delete',
+      run: () => deleteSession('s1'),
+      mock: vi.mocked(sessionService.delete),
+      calledWith: ['s1'],
+      ret: undefined,
+    },
+    {
+      name: 'listCompletedRuns → getCompletedRuns',
+      run: () => listCompletedRuns(),
+      mock: vi.mocked(sessionService.getCompletedRuns),
+      calledWith: [],
+      ret: [{ id: 'r1' }],
+    },
+  ]
 
-  it('updateSession delegates to sessionService.update', async () => {
-    const data = { name: 'Updated' }
-    vi.mocked(sessionService.update).mockResolvedValue(undefined)
-    await updateSession('s1', data)
-    expect(sessionService.update).toHaveBeenCalledWith('s1', data)
-  })
-
-  it('deleteSession delegates to sessionService.delete', async () => {
-    vi.mocked(sessionService.delete).mockResolvedValue(undefined)
-    await deleteSession('s1')
-    expect(sessionService.delete).toHaveBeenCalledWith('s1')
-  })
-
-  it('listCompletedRuns delegates to sessionService.getCompletedRuns', async () => {
-    const expected = [{ id: 'r1' }]
-    vi.mocked(sessionService.getCompletedRuns).mockResolvedValue(expected)
-    const result = await listCompletedRuns()
-    expect(sessionService.getCompletedRuns).toHaveBeenCalledOnce()
-    expect(result).toBe(expected)
+  it.each(cases)('$name', async (c) => {
+    c.mock.mockResolvedValue(c.ret)
+    const result = await c.run()
+    expect(c.mock).toHaveBeenCalledExactlyOnceWith(...c.calledWith)
+    expect(result).toBe(c.ret)
   })
 })
 

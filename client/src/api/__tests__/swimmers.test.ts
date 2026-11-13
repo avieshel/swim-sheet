@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { Mock } from 'vitest'
 
 vi.mock('../../services/swimmerService', () => ({
   swimmerService: {
@@ -15,51 +16,68 @@ import { listSwimmers, searchSwimmers, getSwimmer, createSwimmer, updateSwimmer,
 import { swimmerService } from '../../services/swimmerService'
 import type { SafeSwimmer } from '../../db/schema'
 
-describe('swimmers API', () => {
+describe('swimmers API — delegation to swimmerService', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('listSwimmers delegates to swimmerService.list', async () => {
-    const expected = [{ id: '1', name: 'Alice' }]
-    vi.mocked(swimmerService.list).mockResolvedValue(expected)
-    const result = await listSwimmers()
-    expect(swimmerService.list).toHaveBeenCalledOnce()
-    expect(result).toBe(expected)
-  })
+  type Delegation = {
+    name: string
+    run: () => Promise<unknown>
+    mock: Mock
+    calledWith: unknown[]
+    ret: unknown
+  }
 
-  it('searchSwimmers delegates to swimmerService.search', async () => {
-    const expected = [{ id: '2', name: 'Bob' }]
-    vi.mocked(swimmerService.search).mockResolvedValue(expected)
-    const result = await searchSwimmers('Bob')
-    expect(swimmerService.search).toHaveBeenCalledWith('Bob')
-    expect(result).toBe(expected)
-  })
+  const createData = { name: 'Charlie', groupId: 'g1' } as SafeSwimmer
 
-  it('getSwimmer delegates to swimmerService.get', async () => {
-    const expected = { id: '1', name: 'Alice' }
-    vi.mocked(swimmerService.get).mockResolvedValue(expected)
-    const result = await getSwimmer('1')
-    expect(swimmerService.get).toHaveBeenCalledWith('1')
-    expect(result).toBe(expected)
-  })
+  const cases: Delegation[] = [
+    {
+      name: 'listSwimmers → list',
+      run: () => listSwimmers(),
+      mock: vi.mocked(swimmerService.list),
+      calledWith: [],
+      ret: [{ id: '1', name: 'Alice' }],
+    },
+    {
+      name: 'searchSwimmers → search',
+      run: () => searchSwimmers('Bob'),
+      mock: vi.mocked(swimmerService.search),
+      calledWith: ['Bob'],
+      ret: [{ id: '2', name: 'Bob' }],
+    },
+    {
+      name: 'getSwimmer → get',
+      run: () => getSwimmer('1'),
+      mock: vi.mocked(swimmerService.get),
+      calledWith: ['1'],
+      ret: { id: '1', name: 'Alice' },
+    },
+    {
+      name: 'createSwimmer → create',
+      run: () => createSwimmer(createData),
+      mock: vi.mocked(swimmerService.create),
+      calledWith: [createData],
+      ret: 'new-id',
+    },
+    {
+      name: 'updateSwimmer → update',
+      run: () => updateSwimmer('1', { name: 'Updated' }),
+      mock: vi.mocked(swimmerService.update),
+      calledWith: ['1', { name: 'Updated' }],
+      ret: undefined,
+    },
+    {
+      name: 'deleteSwimmer → delete',
+      run: () => deleteSwimmer('1'),
+      mock: vi.mocked(swimmerService.delete),
+      calledWith: ['1'],
+      ret: undefined,
+    },
+  ]
 
-  it('createSwimmer delegates to swimmerService.create', async () => {
-    const data = { name: 'Charlie', groupId: 'g1' }
-    vi.mocked(swimmerService.create).mockResolvedValue('new-id')
-    const result = await createSwimmer(data as SafeSwimmer)
-    expect(swimmerService.create).toHaveBeenCalledWith(data)
-    expect(result).toBe('new-id')
-  })
-
-  it('updateSwimmer delegates to swimmerService.update', async () => {
-    const data = { name: 'Updated' }
-    vi.mocked(swimmerService.update).mockResolvedValue(undefined)
-    await updateSwimmer('1', data)
-    expect(swimmerService.update).toHaveBeenCalledWith('1', data)
-  })
-
-  it('deleteSwimmer delegates to swimmerService.delete', async () => {
-    vi.mocked(swimmerService.delete).mockResolvedValue(undefined)
-    await deleteSwimmer('1')
-    expect(swimmerService.delete).toHaveBeenCalledWith('1')
+  it.each(cases)('$name', async (c) => {
+    c.mock.mockResolvedValue(c.ret)
+    const result = await c.run()
+    expect(c.mock).toHaveBeenCalledExactlyOnceWith(...c.calledWith)
+    expect(result).toBe(c.ret)
   })
 })
