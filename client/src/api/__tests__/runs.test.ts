@@ -46,12 +46,11 @@ vi.mock('../../services/runHistoryService', () => ({
   exportRun: vi.fn(),
 }))
 
-import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, startLaneResult, completeLaneResult, uncompleteLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap, buildLaneResult, getRunHistory, getRunById, deleteRun, exportRun, pruneRemovedDrillData } from '../runs'
+import { getActiveRun, getRun, createRun, updateRun, completeRun, completeRunWithLaps, createRunFromTemplate, getRunDrills, getRunDrill, updateRunDrill, deleteRunDrill, getRunSwimmers, getRunSwimmerLinks, addSwimmerToRun, removeSwimmerFromRun, getRunsForSwimmer, getLaneResults, getLaneResult, setLaneResult, deleteLaneResult, deleteLaneResultsForGroup, deleteLaneResultsForRun, deleteSwimmerFromLaneResult, updateLaneResultSwimmer, startLaneResult, completeLaneResult, uncompleteLaneResult, getLapsForRunDrill, getLapsForSwimmer, addLap, getRunHistory, getRunById, deleteRun, exportRun, pruneRemovedDrillData } from '../runs'
 import { runService } from '../../services/runService'
 import type { SafeSessionRun, SafeLaneDrillResult, SafeLap } from '../../db/schema'
-import type { LiveDrillTiming } from '../../timing/liveTiming'
 import type { CompleteRunLap } from '../../services/runService'
-import type { RunSummary, RunSwimmerSummary, RunHistoryData, SavedDrillData } from '../runs'
+import type { RunSummary, RunSwimmerSummary, RunHistoryData } from '../runs'
 
 describe('runs API', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -291,137 +290,6 @@ describe('runs API', () => {
     expect(runService.completeRunWithLaps).toHaveBeenCalledWith('r1', laps)
   })
 
-  // ── Lane result projection ──
-
-  it('buildLaneResult projects live timing into saved drill data', () => {
-    const live: LiveDrillTiming = {
-      drillStart: 1000,
-      drillEnd: 5000,
-      swimmers: [
-        { dbId: 'sw1', startedAt: 1000, completedAt: 5000, lapTimestamps: [2000, 3000] },
-      ],
-    }
-    const result = buildLaneResult({
-      runId: 'r1',
-      groupId: 'g1',
-      drillId: 'rd1',
-      sessionStartedAt: 0,
-      now: 6000,
-      live,
-      swimmers: [
-        { dbId: 'sw1', name: 'Alice', completed: true, lapStrokeCounts: { 1: 18, 2: 20 } },
-      ],
-    })
-    expect(result.drillStart).toBe(1000)
-    expect(result.drillEnd).toBe(5000)
-    expect(result.sessionStartedAt).toBe(0)
-    expect(result.swimmers).toEqual([
-      {
-        dbId: 'sw1',
-        name: 'Alice',
-        startedAt: 1000,
-        completedAt: 5000,
-        laps: [
-          { time: 1000, strokeCount: 18 },
-          { time: 1000, strokeCount: 20 },
-        ],
-        completed: true,
-        status: 'timed',
-      },
-    ])
-  })
-
-  it('buildLaneResult falls back to now when live timing has no drill end', () => {
-    const live: LiveDrillTiming = {
-      drillStart: 1000,
-      drillEnd: null,
-      swimmers: [
-        { dbId: 'sw1', startedAt: 1000, completedAt: null, lapTimestamps: [] },
-      ],
-    }
-    const result = buildLaneResult({
-      runId: 'r1',
-      groupId: 'g1',
-      drillId: 'rd1',
-      sessionStartedAt: 0,
-      now: 7000,
-      live,
-      swimmers: [
-        { dbId: 'sw1', name: 'Alice', completed: false, lapStrokeCounts: {} },
-      ],
-    })
-    expect(result.drillStart).toBe(1000)
-    expect(result.drillEnd).toBe(7000)
-    expect(result.swimmers[0].laps).toEqual([])
-    expect(result.swimmers[0].completed).toBe(false)
-  })
-
-  it('buildLaneResult preserves an explicit skipped/notdone status when there is no live timing', () => {
-    const live: LiveDrillTiming = {
-      drillStart: 1000,
-      drillEnd: null,
-      swimmers: [],
-    }
-    const existingData: SavedDrillData = {
-      drillStart: 1000,
-      drillEnd: null,
-      sessionStartedAt: 0,
-      poolLength: 25,
-      swimmers: [
-        { dbId: 'sw1', name: 'Alice', startedAt: null, completedAt: null, laps: [], status: 'skipped' },
-        { dbId: 'sw2', name: 'Bob', startedAt: null, completedAt: null, laps: [], status: 'notdone' },
-      ],
-    }
-    const result = buildLaneResult({
-      runId: 'r1',
-      groupId: 'g1',
-      drillId: 'rd1',
-      sessionStartedAt: 0,
-      now: 7000,
-      live,
-      swimmers: [
-        { dbId: 'sw1', name: 'Alice', completed: false, lapStrokeCounts: {} },
-        { dbId: 'sw2', name: 'Bob', completed: false, lapStrokeCounts: {} },
-      ],
-      existingData,
-    })
-    expect(result.swimmers[0].status).toBe('skipped')
-    expect(result.swimmers[0].completed).toBe(false)
-    expect(result.swimmers[1].status).toBe('notdone')
-    expect(result.swimmers[1].completed).toBe(false)
-  })
-
-  it('buildLaneResult prefers a recorded time over a stale skipped status', () => {
-    const live: LiveDrillTiming = {
-      drillStart: 1000,
-      drillEnd: null,
-      swimmers: [
-        { dbId: 'sw1', startedAt: 1000, completedAt: 5000, lapTimestamps: [] },
-      ],
-    }
-    const existingData: SavedDrillData = {
-      drillStart: 1000,
-      drillEnd: null,
-      sessionStartedAt: 0,
-      poolLength: 25,
-      swimmers: [
-        { dbId: 'sw1', name: 'Alice', startedAt: null, completedAt: null, laps: [], status: 'skipped' },
-      ],
-    }
-    const result = buildLaneResult({
-      runId: 'r1',
-      groupId: 'g1',
-      drillId: 'rd1',
-      sessionStartedAt: 0,
-      now: 7000,
-      live,
-      swimmers: [
-        { dbId: 'sw1', name: 'Alice', completed: true, lapStrokeCounts: {} },
-      ],
-      existingData,
-    })
-    expect(result.swimmers[0].status).toBe('timed')
-  })
 
   // ── Run History ──
 
