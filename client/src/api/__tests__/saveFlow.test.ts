@@ -301,6 +301,47 @@ describe('buildLaneResult — projection from live timing to SavedDrillData', ()
     expect(splitTotal).toBeLessThan(actualTotal)
   })
 
+  it('preserves an explicit skipped/notdone status from existing data when there is no live timing', () => {
+    const result = buildLaneResult(makeInput({
+      now: 7000,
+      live: { drillStart: 1000, drillEnd: null, swimmers: [] },
+      swimmers: [
+        { dbId: 'sw1', name: 'Alice', completed: false, lapStrokeCounts: {} },
+        { dbId: 'sw2', name: 'Bob', completed: false, lapStrokeCounts: {} },
+      ],
+      existingData: {
+        drillStart: 1000,
+        drillEnd: null,
+        sessionStartedAt: 0,
+        poolLength: 25,
+        swimmers: [
+          { dbId: 'sw1', name: 'Alice', startedAt: null, completedAt: null, laps: [], status: 'skipped' },
+          { dbId: 'sw2', name: 'Bob', startedAt: null, completedAt: null, laps: [], status: 'notdone' },
+        ],
+      },
+    }))
+    expect(result.swimmers[0].status).toBe('skipped')
+    expect(result.swimmers[0].completed).toBe(false)
+    expect(result.swimmers[1].status).toBe('notdone')
+    expect(result.swimmers[1].completed).toBe(false)
+  })
+
+  it('prefers a recorded time over a stale skipped status from existing data', () => {
+    const result = buildLaneResult(makeInput({
+      now: 7000,
+      live: { drillStart: 1000, drillEnd: null, swimmers: [{ dbId: 'sw1', startedAt: 1000, completedAt: 5000, lapTimestamps: [] }] },
+      swimmers: [{ dbId: 'sw1', name: 'Alice', completed: true, lapStrokeCounts: {} }],
+      existingData: {
+        drillStart: 1000,
+        drillEnd: null,
+        sessionStartedAt: 0,
+        poolLength: 25,
+        swimmers: [{ dbId: 'sw1', name: 'Alice', startedAt: null, completedAt: null, laps: [], status: 'skipped' }],
+      },
+    }))
+    expect(result.swimmers[0].status).toBe('timed')
+  })
+
 })
 
 describe('end-to-end: LiveTimingStore → buildLaneResult', () => {
