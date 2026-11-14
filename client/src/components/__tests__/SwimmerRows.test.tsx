@@ -63,12 +63,40 @@ const baseProps = {
   handleMoveSwimmer: vi.fn(),
 }
 
+const baseSavedData = {
+  drillStart: 1000,
+  drillEnd: 5000,
+  sessionStartedAt: 0,
+  swimmers: [],
+}
+
+const savedProps = {
+  savedData: baseSavedData,
+  group: baseGroup,
+  runId: 'run-1',
+  runDrillId: 'd1',
+  sessionElapsed: 6000,
+  lapEditMode: {},
+  toggleLapEdit: vi.fn(),
+  onEditSavedSwimmer: vi.fn(),
+}
+
 function renderRow(props: Record<string, unknown>) {
   return render(
     React.createElement(
       LiveSessionContext.Provider,
       { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0 } },
       React.createElement(ActiveSwimmerRow, props as never),
+    ),
+  )
+}
+
+function renderSaved(props: Record<string, unknown>) {
+  return render(
+    React.createElement(
+      LiveSessionContext.Provider,
+      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0 } },
+      React.createElement(SavedSwimmerRow, props as never),
     ),
   )
 }
@@ -81,17 +109,50 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-describe('ActiveSwimmerRow swimmer modal flows', () => {
-  it('promotes a quick swimmer to a newly created roster swimmer', async () => {
+// The "promote a quick swimmer to a newly created roster swimmer" flow is
+// identical for the active and saved rows — same modal interaction, same service
+// calls, same onSwimmerSaved firing. It is tested once here, parametrized over
+// both row types, instead of being duplicated in each describe below. The only
+// row-specific outcome is what the promotion does to existing state: the active
+// row dispatches an id update, the saved row leaves onEditSavedSwimmer untouched
+// (promoteAndLinkSwimmer owns all DB persistence for saved rows).
+describe('promote a quick swimmer to a new roster swimmer (Active and Saved rows)', () => {
+  const rows = [
+    {
+      title: 'ActiveSwimmerRow',
+      render: renderRow,
+      rowProps: {
+        ...baseProps,
+        group: baseGroup,
+        swimmer: { id: 1, dbId: 'quick-1', name: 'Salty Sally', completed: false, lapStrokeCounts: {} },
+      },
+      quickDbId: 'quick-1',
+      expectPromotion: () =>
+        expect(mockDispatch).toHaveBeenCalledWith({
+          type: 'UPDATE_SWIMMER_DBID',
+          payload: { groupId: 'g1', swimmerId: 1, dbId: 'new-1' },
+        }),
+    },
+    {
+      title: 'SavedSwimmerRow',
+      render: renderSaved,
+      rowProps: {
+        ...savedProps,
+        saved: { dbId: 'quick-saved', name: 'Salty Sally', startedAt: 1000, completedAt: 5000, laps: [], completed: true },
+      },
+      quickDbId: 'quick-saved',
+      expectPromotion: () =>
+        expect(savedProps.onEditSavedSwimmer).not.toHaveBeenCalled(),
+    },
+  ]
+
+  it.each(rows)('$title promotes and fires onSwimmerSaved', async (row) => {
     const user = userEvent.setup()
+    const onSwimmerSaved = vi.fn()
     mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
     mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
 
-    renderRow({
-      ...baseProps,
-      group: baseGroup,
-      swimmer: { id: 1, dbId: 'quick-1', name: 'Salty Sally', completed: false, lapStrokeCounts: {} },
-    })
+    row.render({ ...row.rowProps, onSwimmerSaved })
 
     await user.click(screen.getByText('Salty Sally'))
     expect(await screen.findByText('New Athlete')).toBeTruthy()
@@ -103,13 +164,13 @@ describe('ActiveSwimmerRow swimmer modal flows', () => {
 
     await waitFor(() => expect(createSwimmerIfNotExists).toHaveBeenCalledOnce())
     expect(createSwimmerIfNotExists).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
-    expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', 'quick-1', 'Bubbles II', 'new-1', '')
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'UPDATE_SWIMMER_DBID',
-      payload: { groupId: 'g1', swimmerId: 1, dbId: 'new-1' },
-    })
+    expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', row.quickDbId, 'Bubbles II', 'new-1', '')
+    expect(onSwimmerSaved).toHaveBeenCalledOnce()
+    row.expectPromotion()
   })
+})
 
+describe('ActiveSwimmerRow swimmer modal flows', () => {
   it('re-links a quick swimmer to an existing roster swimmer via autocomplete', async () => {
     const user = userEvent.setup()
     mocks.promoteAndLinkSwimmer.mockResolvedValue('existing-1')
@@ -201,85 +262,9 @@ describe('ActiveSwimmerRow swimmer modal flows', () => {
     expect(promoteAndLinkSwimmer).not.toHaveBeenCalled()
     expect(mockDispatch).not.toHaveBeenCalled()
   })
-
-  it('fires onSwimmerSaved after creating a roster swimmer from a quick swimmer', async () => {
-    const user = userEvent.setup()
-    const onSwimmerSaved = vi.fn()
-    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
-    mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
-
-    renderRow({
-      ...baseProps,
-      group: baseGroup,
-      onSwimmerSaved,
-      swimmer: { id: 1, dbId: 'quick-1', name: 'Salty Sally', completed: false, lapStrokeCounts: {} },
-    })
-
-    await user.click(screen.getByText('Salty Sally'))
-    const nameInput = screen.getByPlaceholderText('e.g. Alex Rivera') as HTMLInputElement
-    await user.clear(nameInput)
-    await user.type(nameInput, 'Bubbles II')
-    await user.click(screen.getByText('Add Swimmer'))
-
-    await waitFor(() => expect(onSwimmerSaved).toHaveBeenCalledOnce())
-  })
 })
 
-const baseSavedData = {
-  drillStart: 1000,
-  drillEnd: 5000,
-  sessionStartedAt: 0,
-  swimmers: [],
-}
-
-function renderSaved(props: Record<string, unknown>) {
-  return render(
-    React.createElement(
-      LiveSessionContext.Provider,
-      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0 } },
-      React.createElement(SavedSwimmerRow, props as never),
-    ),
-  )
-}
-
 describe('SavedSwimmerRow swimmer modal flows', () => {
-  const savedProps = {
-    savedData: baseSavedData,
-    group: baseGroup,
-    runId: 'run-1',
-    runDrillId: 'd1',
-    sessionElapsed: 6000,
-    lapEditMode: {},
-    toggleLapEdit: vi.fn(),
-    onEditSavedSwimmer: vi.fn(),
-  }
-
-  it('promotes a quick saved swimmer to a newly created roster swimmer', async () => {
-    const user = userEvent.setup()
-    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
-    mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
-
-    renderSaved({
-      ...savedProps,
-      saved: { dbId: 'quick-saved', name: 'Salty Sally', startedAt: 1000, completedAt: 5000, laps: [], completed: true },
-    })
-
-    await user.click(screen.getByText('Salty Sally'))
-    expect(await screen.findByText('New Athlete')).toBeTruthy()
-
-    const nameInput = screen.getByPlaceholderText('e.g. Alex Rivera') as HTMLInputElement
-    await user.clear(nameInput)
-    await user.type(nameInput, 'Bubbles II')
-    await user.click(screen.getByText('Add Swimmer'))
-
-    await waitFor(() => expect(createSwimmerIfNotExists).toHaveBeenCalledOnce())
-    expect(createSwimmerIfNotExists).toHaveBeenCalledWith({ name: 'Bubbles II', group: '', notes: '', status: 'active' })
-    expect(promoteAndLinkSwimmer).toHaveBeenCalledWith('run-1', 'quick-saved', 'Bubbles II', 'new-1', '')
-    // Promotion does NOT call onEditSavedSwimmer: promoteAndLinkSwimmer handles
-    // all DB persistence (lane-result JSON blobs, lap records, run-swimmer links).
-    expect(savedProps.onEditSavedSwimmer).not.toHaveBeenCalled()
-  })
-
   it('edits an existing roster saved swimmer and updates their details', async () => {
     const user = userEvent.setup()
     mocks.getSwimmer.mockResolvedValue({ id: 'real-1', name: 'Alice', group: 'U17', notes: 'old', status: 'active' } as never)
@@ -305,26 +290,5 @@ describe('SavedSwimmerRow swimmer modal flows', () => {
       status: 'active',
     })
     expect(savedProps.onEditSavedSwimmer).toHaveBeenCalledWith('g1', 'd1', 'real-1', { name: 'Alice' })
-  })
-
-  it('fires onSwimmerSaved after creating a roster swimmer from a quick saved swimmer', async () => {
-    const user = userEvent.setup()
-    const onSwimmerSaved = vi.fn()
-    mocks.createSwimmerIfNotExists.mockResolvedValue('new-1')
-    mocks.promoteAndLinkSwimmer.mockResolvedValue('real-1')
-
-    renderSaved({
-      ...savedProps,
-      onSwimmerSaved,
-      saved: { dbId: 'quick-saved', name: 'Salty Sally', startedAt: 1000, completedAt: 5000, laps: [], completed: true },
-    })
-
-    await user.click(screen.getByText('Salty Sally'))
-    const nameInput = screen.getByPlaceholderText('e.g. Alex Rivera') as HTMLInputElement
-    await user.clear(nameInput)
-    await user.type(nameInput, 'Bubbles II')
-    await user.click(screen.getByText('Add Swimmer'))
-
-    await waitFor(() => expect(onSwimmerSaved).toHaveBeenCalledOnce())
   })
 })
