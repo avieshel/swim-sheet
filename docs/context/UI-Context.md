@@ -83,7 +83,7 @@ Template manager — grid of saved session templates.
   1. **Plain delete.** A template with no completed runs gets the single "Delete Template" confirmation.
   2. **Completed runs → informed, then allowed.** "`<name>` was used in N recorded sessions. Deleting it keeps that history — each run keeps its own snapshot of what was done."
   3. **Live run → delete-with-force.** If the template is being delivered right now the first delete attempt is refused (`performDelete`), and a follow-up dialog — "Delete live session and template?" — offers **Delete both**: ending the live run (its recorded results are kept as history) and removing the template (`force: true`, `SessionsList.tsx:127-139`).
-- In Coach Assist, template deletion is hidden because its existing safety check reads owner-local run state. The first assisted-session scope supports create/edit/generate/import, not deletion.
+- In Coach Assist, template deletion is available through the same confirmation flow as normal mode; the safety check reads owner-local run state, which is empty in assisted mode, so an active run on the assisted coach's tenant is not detected client-side.
 
 ### AiSessionDraft (`/sessions/ai`)
 The AI drafting entry point. The only sign-in-gated feature in the app.
