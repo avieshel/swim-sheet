@@ -89,10 +89,14 @@ export function createHandler(deps: HandlerDeps): (req: Request) => Promise<Resp
     }
 
     const rowIdMatch = routePath.match(/^\/row\/([^/]+)$/)
-    if (allow('PATCH') && rowIdMatch) {
+    // PATCH and DELETE share the `/row/:id` path; when routed via the body the
+    // HTTP method is still carried by the request, so disambiguate on it rather
+    // than on `allow()` (which ignores the method for body-routed calls and
+    // would otherwise collapse DELETE into PATCH).
+    if (req.method === 'PATCH' && rowIdMatch) {
       return withOwner(deps, req, () => handleUpdateRow(deps, body, rowIdMatch[1]))
     }
-    if (allow('DELETE') && rowIdMatch) {
+    if (req.method === 'DELETE' && rowIdMatch) {
       return withOwner(deps, req, () => handleDeleteRow(deps, body, rowIdMatch[1]))
     }
 
