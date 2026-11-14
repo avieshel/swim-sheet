@@ -3,7 +3,8 @@ import { describe, beforeEach, afterEach, test, expect, vi } from 'vitest'
 import { db } from '../../db/schema'
 import { markDirty } from '../syncStore'
 import { syncService } from '../syncService'
-import type { SyncTransport, LocalChange, CloudChange, SyncTable, SyncResult } from '../types'
+import type { SyncTransport, CloudChange, SyncResult } from '../types'
+import { makeFakeTransport } from './syncTestUtils'
 
 vi.mock('../../api/supabase', () => ({
   getCurrentUserId: () => 'user-1',
@@ -11,76 +12,10 @@ vi.mock('../../api/supabase', () => ({
   supabase: {},
 }))
 
-function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push' | 'pull'; pullFailures?: number; cloudChanges?: CloudChange[] } = {}): SyncTransport & { upserted: LocalChange[]; pulledTables: Array<SyncTable[] | undefined> } {
-  const upserted: LocalChange[] = []
-  const pulledTables: Array<SyncTable[] | undefined> = []
-  let pullFailuresRemaining = opts.pullFailures ?? 0
-  const transport: SyncTransport & { upserted: LocalChange[]; pulledTables: Array<SyncTable[] | undefined> } = {
-    upserted,
-    pulledTables,
-    ensurePersonalOrganization: async () => 'org-A',
-    push: async (changes: LocalChange[]) => {
-      if (opts.throwOn === 'push') throw new Error('push failed')
-      upserted.push(...changes)
-      // Echo back a server-assigned rev so syncService stores the rev the
-      // cloud would really hold (the real transport reads it from the row).
-      return {
-        conflicts: [],
-        applied: changes.map((c) => ({
-          table: c.table,
-          id: c.id,
-          updatedAt: `srv-${c.table}-${c.id}`,
-        })),
-      }
-    },
-    pull: async (_orgId: string, cursors: Record<SyncTable, string | null>, tables?: SyncTable[]) => {
-      if (opts.throwOn === 'pull' || pullFailuresRemaining > 0) {
-        pullFailuresRemaining--
-        throw new Error('pull failed')
-      }
-      pulledTables.push(tables)
-      const changes: CloudChange[] = [...(opts.cloudChanges ?? [])]
-      const n = opts.pulled ?? 0
-      for (let i = 0; i < n && (!tables || tables.includes('swimmers')); i++) {
-        const id = `pulled-${i}`
-        changes.push({
-          table: 'swimmers',
-          id,
-          op: 'upsert',
-          payload: { id, name: 'P', group: '', labels: [], notes: '', status: 'active', createdAt: 't', updatedAt: `t-pull-${i}` },
-          catalogKey: undefined,
-          updatedAt: `t-pull-${i}`,
-          deletedAt: null,
-        })
-      }
-      const nextCursors = {
-        swimmers: cursors.swimmers ?? '0001',
-        sessions: cursors.sessions ?? '0001',
-        drills: cursors.drills ?? '0001',
-        libraryDrills: cursors.libraryDrills ?? '0001',
-        sessionRuns: cursors.sessionRuns ?? '0001',
-        runDrills: cursors.runDrills ?? '0001',
-        runSwimmers: cursors.runSwimmers ?? '0001',
-        laps: cursors.laps ?? '0001',
-        laneDrillResults: cursors.laneDrillResults ?? '0001',
-      }
-      const requestedTables = tables ?? [
-        'swimmers', 'sessions', 'drills', 'libraryDrills', 'sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults',
-      ]
-      const page: CloudChange[] = []
-      for (const table of requestedTables) {
-        const cursor = cursors[table] ?? '0001'
-        const rows = changes
-          .filter((change) => change.table === table && change.updatedAt > cursor)
-          .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id))
-          .slice(0, 500)
-        page.push(...rows)
-        if (rows.length > 0) nextCursors[table] = rows[rows.length - 1].updatedAt
-      }
-      return { changes: page, nextCursors }
-    },
-  }
-  return transport
+function fakeTransport(opts: { pushed?: number; pulled?: number; throwOn?: 'push' | 'pull'; pullFailures?: number; cloudChanges?: CloudChange[] } = {}): ReturnType<typeof makeFakeTransport> {
+  // The syncService suite owns the cursor/nextCursors pull logic; makeFakeTransport
+  // reproduces it with a '0001' default cursor (matching the old local transport).
+  return makeFakeTransport({ pulled: opts.pulled, throwOn: opts.throwOn, pullFailures: opts.pullFailures, cloudChanges: opts.cloudChanges, cursorDefault: '0001' })
 }
 
 function remoteSession(id: string): CloudChange {
@@ -385,7 +320,7 @@ describe('syncService', () => {
     // push a delete for the merged-away local id, but every catalog-keyed session
     // push must target the single canonical cloud id.
     const catalogPushes = transport.upserted.filter(
-      (c) => c.table === 'sessions' && (c.payload as { catalogKey?: string })?.catalogKey === 'Distance Progression',
+      (c) => c.table === 'sessions' && (c.payload as { catalogKey?: string } | undefined)?.catalogKey === 'Distance Progression',
     )
     expect(catalogPushes.length).toBeGreaterThan(0)
     expect(new Set(catalogPushes.map((c) => c.id))).toEqual(new Set(['cloud-starter']))

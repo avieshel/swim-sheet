@@ -2,54 +2,38 @@ import 'fake-indexeddb/auto'
 import { describe, beforeEach, afterEach, test, expect } from 'vitest'
 import { db } from '../../db/schema'
 import { syncService } from '../syncService'
-import { toCloudRow } from '../SupabaseSyncTransport'
 import type {
   SyncTransport,
-  LocalChange,
   CloudChange,
-  SyncTable,
+  LocalChange,
   FirstMergeSummary,
   SyncResult,
 } from '../types'
+import { makeFakeTransport } from './syncTestUtils'
 
 type CloudRow = { id: string; catalogKey?: string; name: string; updated_at: string }
 
-function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: Array<Record<string, unknown>> } {
-  const upserted: Array<Record<string, unknown>> = []
-  const transport: SyncTransport & { upserted: Array<Record<string, unknown>> } = {
-    upserted,
-    ensurePersonalOrganization: async () => 'org-A',
-    push: async (changes: LocalChange[]) => {
-      for (const c of changes) upserted.push(toCloudRow(c.table, c, 'org-A', 'u-test'))
-      // Echo back a server-assigned rev so syncService stores the rev the
-      // cloud would really hold (the real transport reads it from the row).
-      return {
-        conflicts: [],
-        applied: changes.map((c) => ({
-          table: c.table,
-          id: c.id,
-          updatedAt: `srv-${c.table}-${c.id}`,
-        })),
-      }
+function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: LocalChange[] } {
+  const changes: CloudChange[] = rows.map((r) => ({
+    table: 'sessions',
+    id: r.id,
+    op: 'upsert',
+    payload: {
+      id: r.id,
+      name: r.name,
+      catalogKey: r.catalogKey,
+      notes: '',
+      createdAt: r.updated_at,
+      updatedAt: r.updated_at,
     },
-    pull: async (_orgId, _cursors, tables) => {
-      const changes: CloudChange[] = rows.map((r) => ({
-        table: 'sessions',
-        id: r.id,
-        op: 'upsert',
-        payload: {
-          id: r.id,
-          name: r.name,
-          catalogKey: r.catalogKey,
-          notes: '',
-          createdAt: r.updated_at,
-          updatedAt: r.updated_at,
-        },
-        catalogKey: r.catalogKey,
-        updatedAt: r.updated_at,
-        deletedAt: null,
-      }))
-      const nextCursors: Record<SyncTable, string> = {
+    catalogKey: r.catalogKey,
+    updatedAt: r.updated_at,
+    deletedAt: null,
+  }))
+  return makeFakeTransport({
+    pull: async (_orgId, _cursors, tables) => ({
+      changes: changes.filter((change) => !tables || tables.includes(change.table)),
+      nextCursors: {
         swimmers: 'tc',
         sessions: 'tc',
         drills: 'tc',
@@ -59,11 +43,9 @@ function fakeTransportWithCloud(rows: CloudRow[]): SyncTransport & { upserted: A
         runSwimmers: 'tc',
         laps: 'tc',
         laneDrillResults: 'tc',
-      }
-      return { changes: changes.filter((change) => !tables || tables.includes(change.table)), nextCursors }
-    },
-  }
-  return transport
+      },
+    }),
+  }) as SyncTransport & { upserted: LocalChange[] }
 }
 
 async function previewFirstMerge(transport: SyncTransport, orgId: string): Promise<FirstMergeSummary> {
@@ -108,7 +90,7 @@ describe('first merge', () => {
     const summary = await previewFirstMerge(transport, 'org-A')
     expect(summary.catalogMatches).toBeGreaterThanOrEqual(1)
     const result = await confirmFirstMerge(transport, 'org-A')
-    const pushedCatalogRows = transport.upserted.filter((r) => r.catalog_key === 'cat-distance')
+    const pushedCatalogRows = transport.upserted.filter((r) => r.payload?.catalogKey === 'cat-distance')
     expect(pushedCatalogRows).toHaveLength(1)
     expect(result.error).toBeUndefined()
   })
@@ -125,7 +107,7 @@ describe('first merge', () => {
     const result = await confirmFirstMerge(transport, 'org-A')
     expect(result.pushed).toBeGreaterThanOrEqual(1)
     const pushedWithoutCatalog = transport.upserted.filter(
-      (r) => r.catalog_key === undefined || r.catalog_key === null,
+      (r) => r.payload?.catalogKey === undefined || r.payload?.catalogKey === null,
     )
     expect(pushedWithoutCatalog.length).toBeGreaterThanOrEqual(1)
   })
