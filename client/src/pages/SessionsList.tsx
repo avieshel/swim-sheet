@@ -156,7 +156,6 @@ export const SessionsList: React.FC = () => {
   }
 
   const handleDelete = (id: string, name: string) => {
-    if (coach) return
     setConfirmState({
       open: true,
       title: 'Delete Template',
@@ -438,16 +437,14 @@ export const SessionsList: React.FC = () => {
                         >
                           <Icon name="file_upload" />
                         </button>
-                        {!coach && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                            aria-label={`Delete ${s.name}`}
-                            className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                          >
-                            <Icon name="delete" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
+                          aria-label={`Delete ${s.name}`}
+                          className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <Icon name="delete" />
+                        </button>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">

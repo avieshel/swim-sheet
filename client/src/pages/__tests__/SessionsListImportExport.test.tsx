@@ -133,13 +133,13 @@ describe('SessionsList import and export actions', () => {
     expect(mocks.files.downloadSessionPackageFile).not.toHaveBeenCalled()
   })
 
-  it('does not fetch owner history, subscribe to owner runs, or offer template deletion in Coach Assist', async () => {
+  it('does not fetch owner history or subscribe to owner runs in Coach Assist', async () => {
     renderSessionsList({ userId: 'coach-1', name: 'Coach One', email: 'coach@example.com', orgId: 'org-1' })
 
     expect(await screen.findByRole('heading', { name: 'Sample Session' })).toBeTruthy()
     expect(mocks.runs.getRunHistory).not.toHaveBeenCalled()
     expect(mocks.useActiveRun).toHaveBeenCalledWith(false)
-    expect(screen.queryByRole('button', { name: 'Delete Sample Session' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete Sample Session' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /New Template/ })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Create with AI/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Import session' })).toBeTruthy()
