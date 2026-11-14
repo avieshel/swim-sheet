@@ -3,34 +3,11 @@ import { describe, beforeEach, afterEach, test, expect, vi } from 'vitest'
 import { db } from '../../db/schema'
 import { markDirty, readSyncState } from '../syncStore'
 import { syncService } from '../syncService'
-import { toCloudRow } from '../SupabaseSyncTransport'
-import type { SyncTransport, LocalChange } from '../types'
+import type { SyncTransport } from '../types'
+import { makeFakeTransport } from './syncTestUtils'
 
-function fakeTransport(opts: { throwOn?: 'push' | 'pull' } = {}): SyncTransport & { upserted: Array<Record<string, unknown>> } {
-  const upserted: Array<Record<string, unknown>> = []
-  const transport = {
-    upserted,
-    ensurePersonalOrganization: async () => 'org-A',
-    push: async (changes: LocalChange[]) => {
-      if (opts.throwOn === 'push') throw new Error('network down')
-      for (const c of changes) upserted.push(toCloudRow(c.table, c, 'org-A', 'u-test'))
-      // Echo back a server-assigned rev so syncService stores the rev the
-      // cloud would really hold (the real transport reads it from the row).
-      return {
-        conflicts: [],
-        applied: changes.map((c) => ({
-          table: c.table,
-          id: c.id,
-          updatedAt: `srv-${c.table}-${c.id}`,
-        })),
-      }
-    },
-    pull: async () => {
-      if (opts.throwOn === 'pull') throw new Error('network down')
-      return { changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' } }
-    },
-  } as SyncTransport & { upserted: Array<Record<string, unknown>> }
-  return transport
+function fakeTransport(opts: { throwOn?: 'push' | 'pull' } = {}): ReturnType<typeof makeFakeTransport> {
+  return makeFakeTransport({ throwOn: opts.throwOn })
 }
 
 async function saveSwimmerWhileSyncing(transport: SyncTransport): Promise<void> {
@@ -83,14 +60,14 @@ describe('failure containment', () => {
   })
 
   test('local swimmer save commits and stays usable when push throws', async () => {
-    const transport = fakeTransport({ throwOn: 'push' })
+    const transport = makeFakeTransport({ throwOn: 'push' })
     await saveSwimmerWhileSyncing(transport)
     expect(await db.swimmers.get('s1')).toBeTruthy()
     expect((await readSyncState('org-A')).pendingCount).toBeGreaterThanOrEqual(1)
   })
 
   test('syncNow records error and keeps pending when push fails, then succeeds on retry', async () => {
-    const transport = fakeTransport({ throwOn: 'push' })
+    const transport = makeFakeTransport({ throwOn: 'push' })
     await saveSwimmerWhileSyncing(transport)
     const afterFail = syncService.getState()
     expect(afterFail.error).toBeTruthy()
@@ -143,7 +120,7 @@ describe('failure containment', () => {
       updatedAt: 't',
     })
     await markDirty('swimmers', 's2')
-    const failing = fakeTransport({ throwOn: 'pull' })
+    const failing = makeFakeTransport({ throwOn: 'pull' })
     syncService.init(failing, { autoSync: false })
     syncService.setActiveOrg('org-A')
     await syncService.syncNow() // push succeeds, pull throws

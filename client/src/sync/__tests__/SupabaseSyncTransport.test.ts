@@ -8,9 +8,8 @@ import {
   type SyncQueryBuilder,
 } from '../SupabaseSyncTransport'
 import { HISTORY_TABLES } from '../types'
-import type { LocalChange, SyncTable, SyncTransport } from '../types'
-
-const asSyncTable = (table: string): SyncTable => table as unknown as SyncTable
+import type { LocalChange, SyncTransport } from '../types'
+import { asSyncTable, emptyCursors } from './syncTestUtils'
 
 interface QueryTrace {
   table: string
@@ -23,20 +22,6 @@ interface QueryTrace {
 type StubSupabase = SupabaseLike & {
   queries: QueryTrace[]
   rpcCalls: Array<{ name: string; args?: Record<string, unknown> }>
-}
-
-function emptyCursors(): Record<SyncTable, string | null> {
-  return {
-    swimmers: null,
-    sessions: null,
-    drills: null,
-    libraryDrills: null,
-    sessionRuns: null,
-    runDrills: null,
-    runSwimmers: null,
-    laps: null,
-    laneDrillResults: null,
-  }
 }
 
 const mockAuth = vi.hoisted(() => ({ userId: 'u1' as string | null }))

@@ -3,35 +3,8 @@ import { describe, beforeEach, afterEach, test, expect } from 'vitest'
 import { db } from '../../db/schema'
 import { syncService } from '../syncService'
 import { setMetaConflict, readSyncState } from '../syncStore'
-import { toCloudRow } from '../SupabaseSyncTransport'
-import type { SyncTransport, LocalChange, SyncConflict } from '../types'
-
-function fakeTransport(opts: { pushed?: number } = {}): SyncTransport & { upserted: Array<Record<string, unknown>>; sent: LocalChange[] } {
-  const upserted: Array<Record<string, unknown>> = []
-  const sent: LocalChange[] = []
-  const transport: SyncTransport & { upserted: Array<Record<string, unknown>>; sent: LocalChange[] } = {
-    upserted,
-    sent,
-    ensurePersonalOrganization: async () => 'org-A',
-    push: async (changes: LocalChange[]) => {
-      sent.push(...changes)
-      for (const c of changes) upserted.push(toCloudRow(c.table, c, 'org-A', 'u-test'))
-      // Echo back a server-assigned rev so syncService stores the rev the
-      // cloud would really hold (the real transport reads it from the row).
-      return {
-        conflicts: [],
-        applied: changes.map((c) => ({
-          table: c.table,
-          id: c.id,
-          updatedAt: `srv-${c.table}-${c.id}`,
-        })),
-      }
-    },
-    pull: async () => ({ changes: [], nextCursors: { swimmers: '', sessions: '', drills: '', libraryDrills: '', sessionRuns: '', runDrills: '', runSwimmers: '', laps: '', laneDrillResults: '' } }),
-  }
-  void opts
-  return transport
-}
+import type { SyncTransport, SyncConflict } from '../types'
+import { makeFakeTransport } from './syncTestUtils'
 
 async function seedConflict(
   table: 'swimmers' | 'sessions' | 'drills' | 'libraryDrills',
@@ -104,9 +77,9 @@ describe('conflict resolution', () => {
 
   test("resolve 'local' re-pushes the local version", async () => {
     await seedConflict('swimmers', 's1', { name: 'Local' }, { name: 'Server' }, 'old', 'new')
-    const transport = fakeTransport({ pushed: 1 })
+    const transport = makeFakeTransport()
     await resolveConflict('org-A:swimmers:s1', 'local', transport)
-    expect(transport.upserted.some((r) => r.name === 'Local')).toBe(true)
+    expect(transport.upserted.some((r) => r.payload.name === 'Local')).toBe(true)
   })
 
   test('resolves a history delete conflict to the remote row', async () => {
@@ -120,7 +93,7 @@ describe('conflict resolution', () => {
 
   test('retries a local history tombstone against the latest revision', async () => {
     await seedDeleteConflict()
-    const transport = fakeTransport()
+    const transport = makeFakeTransport()
 
     await resolveConflict('org-A:sessionRuns:run-deleted', 'local', transport)
 
