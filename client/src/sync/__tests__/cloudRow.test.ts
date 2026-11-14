@@ -5,7 +5,8 @@
 import { describe, test, expect } from 'vitest'
 import { toCloudRow, fromCloudRow } from '../SupabaseSyncTransport'
 import type { LocalChange, SyncTable } from '../types'
-import { asSyncTable } from './syncTestUtils'
+
+const asSyncTable = (table: string): SyncTable => table as unknown as SyncTable
 
 describe('toCloudRow', () => {
   test('swimmer maps group -> group_name and adds org/user', () => {
