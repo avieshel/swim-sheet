@@ -199,6 +199,7 @@ tables — breakout is purely UI); timing is drill-scoped, not a page mode
 | Roster swimmer name duplicate | Blocked with inline error in SwimmerFormModal |
 | Delete template with active run | Plain delete blocked with confirm dialog; confirmed force delete ends the live run (cascade delete) and removes the template |
 | Delete starter/default template | Stays deleted — `catalogKey`-seeded sessions marked dismissed (`markSeedSessionDismissed`) |
-| Complete session with virtual swimmers | Guests with recorded times → promote (kept) or skip (discarded); only valid results persist; all-guest/empty session shows a warning and is discarded |
+| Complete session with virtual swimmers | Guests with recorded times → promote (kept) or skip (discarded); only valid results persist; an all-guest/no-activity session shows a warning and is discarded |
+| Complete session with no recorded times | Saved (not discarded) whenever the coach marked a drill complete or explicitly resolved any swimmer (done / skipped / not done), even with zero recorded times. "Empty" means no times AND no drill completions AND no resolved swimmers |
 | Browser offline | All CRUD works via Dexie; sync deferred |
 | Page refresh during active run | Recovery from `RunSwimmer` links + `notes.virtualSwimmers` |

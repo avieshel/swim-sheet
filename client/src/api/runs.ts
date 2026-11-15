@@ -373,6 +373,10 @@ export function updateLaneResultSwimmer(runId: string, groupId: string, runDrill
 export interface CollectSessionLapsResult {
   laps: CompleteRunLap[]
   tempWithTimings: Array<{ name: string; dbId: string }>
+  // Coach activity beyond raw timed laps: a drill they marked complete, or a
+  // swimmer they explicitly resolved (done / skipped / not done) without a time.
+  // A session with this is real and must be saved even when no times were recorded.
+  hasActivity: boolean
 }
 
 export async function collectSessionLaps(
@@ -382,11 +386,15 @@ export async function collectSessionLaps(
 ): Promise<CollectSessionLapsResult> {
   const laps: CompleteRunLap[] = []
   const tempWithTimings: Array<{ name: string; dbId: string }> = []
+  let hasActivity = false
   const laneResults = await runService.getLaneResults(runId)
   const persistedDrillIds = new Set<string>()
 
   for (const result of laneResults) {
-    if (!result.data) continue
+    if (!result.data) {
+      if (result.completed) hasActivity = true
+      continue
+    }
     let data: SavedDrillData
     try {
       data = JSON.parse(result.data)
@@ -394,11 +402,15 @@ export async function collectSessionLaps(
       continue
     }
     persistedDrillIds.add(result.runDrillId)
+    if (result.completed) hasActivity = true
     for (const sw of data.swimmers) {
       if (!sw.dbId) continue
       if (sw.dbId.startsWith('quick-')) {
         if (sw.laps.length > 0) tempWithTimings.push({ name: sw.name, dbId: sw.dbId })
         continue
+      }
+      if (sw.completed || sw.status === 'done' || sw.status === 'skipped' || sw.status === 'notdone') {
+        hasActivity = true
       }
       for (const lap of sw.laps) {
         laps.push({
@@ -435,7 +447,7 @@ export async function collectSessionLaps(
     }
   }
 
-  return { laps, tempWithTimings }
+  return { laps, tempWithTimings, hasActivity }
 }
 
 // ── Laps ──
