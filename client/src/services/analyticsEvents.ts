@@ -40,9 +40,19 @@ export const Events = {
     name: 'view_sessions',
     properties: { template_count: templateCount, completed_run_count: completedRunCount },
   }),
-  ViewSessionTemplate: (drillCount: number, totalDistance: number): TrackedEvent => ({
+  ViewSessionTemplate: (
+    sessionId: string,
+    sessionName: string,
+    drillCount: number,
+    totalDistance: number
+  ): TrackedEvent => ({
     name: 'view_session_template',
-    properties: { drill_count: drillCount, total_distance: totalDistance },
+    properties: {
+      session_id: sessionId,
+      session_name: sessionName,
+      drill_count: drillCount,
+      total_distance: totalDistance,
+    },
   }),
   ViewDrillBank: (drillCount: number): TrackedEvent => ({
     name: 'view_drill_bank',

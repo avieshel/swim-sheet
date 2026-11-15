@@ -48,7 +48,7 @@ Counts, enums, and action types only — no swimmer names, lap times, or free-te
 | `view_swimmers` | `swimmer_count` | SwimmersList mount (after roster loads) |
 | `view_swimmer_profile` | — | SwimmerDetail mount |
 | `view_sessions` | `template_count`, `completed_run_count` | SessionsList mount |
-| `view_session_template` | `drill_count`, `total_distance` | SessionDetail mount |
+| `view_session_template` | `session_id`, `session_name`, `drill_count`, `total_distance` | SessionDetail mount |
 | `view_drill_bank` | `drill_count` | DrillBank mount |
 | `view_dashboard` | `swimmer_count`, `template_count`, `completed_run_count`, `lap_count` | CoachDashboard mount |
 | `view_runs_history` | `run_count`, `swimmer_filter` (`all`\|`swimmer`) | RunsHistory mount |

@@ -97,6 +97,8 @@ export const SessionDetail: React.FC = () => {
         if (!cancelled && data) {
           applySessionData(data)
           analytics.track(Events.ViewSessionTemplate(
+            data[0].id,
+            data[0].name,
             data[1].length,
             data[1].reduce((sum, d) => sum + getDrillTotalDistance(d), 0)
           ))
