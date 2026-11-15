@@ -116,7 +116,7 @@ describe('syncService', () => {
     await syncService.syncNow()
 
     expect(transport.upserted.map(({ table }) => table)).toEqual([
-      'sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults',
+      'sessions', 'sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults',
     ])
   })
 
@@ -153,6 +153,7 @@ describe('syncService', () => {
 
     expect(transport.pulledTables[0]).toEqual(['sessionRuns', 'runDrills', 'runSwimmers', 'laps', 'laneDrillResults'])
     expect(transport.upserted.map(({ table, id }) => [table, id])).toEqual([
+      ['sessions', 'session-1'],
       ['sessionRuns', 'run-local'],
       ['runDrills', 'run-drill-local'],
       ['runSwimmers', 'run-swimmer-local'],

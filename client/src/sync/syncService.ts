@@ -59,6 +59,45 @@ function isCatalogKeyViolation(e: unknown): boolean {
   )
 }
 
+// The cloud enforces session_runs_session_id_fkey. When a run references a
+// session_id that is absent from the cloud sessions table, the push is rejected
+// with SQLSTATE 23503 and names "session_runs" — distinct from the 23505
+// catalog-key collision. This only fires on the run table, never on the session
+// table itself (sessions have no such FK), so the combination is unambiguous.
+function errorText(e: unknown): string {
+  const err = e as {
+    message?: string
+    cause?: { code?: string; message?: string; details?: string }
+  } | null
+  const parts: string[] = []
+  if (err?.message) parts.push(err.message)
+  const cause = err?.cause
+  if (cause?.code) parts.push(cause.code)
+  if (cause?.message) parts.push(cause.message)
+  if (cause?.details) parts.push(cause.details)
+  return parts.join(' | ')
+}
+
+function isSessionRunsFkViolation(e: unknown): boolean {
+  const text = errorText(e)
+  return (
+    text.includes('session_runs_session_id_fkey') ||
+    (text.includes('23503') && text.includes('session_runs'))
+  )
+}
+
+// Postgres reports the offending key as `Key (session_id)=(<uuid>) is not
+// present in table "sessions".` Extract every such uuid so we can quarantine
+// exactly the runs that point at a cloud-absent session, not all runs.
+function extractFkViolationSessionIds(e: unknown): Set<string> {
+  const text = errorText(e)
+  const ids = new Set<string>()
+  const re = /session_id\)=\(([^)]+)\)/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(text)) !== null) ids.add(match[1])
+  return ids
+}
+
 function classifyError(e: unknown): SyncError {
   const err = e as { kind?: string } | null
   const message = errorMessage(e)
@@ -668,16 +707,124 @@ class SyncService {
     }
   }
 
-  // Push the pending batch, recovering from a catalog-key unique violation
-  // instead of surfacing it as a hard failure. When the server rejects a
-  // session/libraryDrill insert because its catalogKey already exists under a
-  // different cloud id, we adopt that cloud id for the colliding local rows and
-  // retry — turning a corrupting 23505 into a silent reconcile.
+  // Delete a completed run and its full history graph locally. Used both by
+  // pruneOrphanRuns (parent missing on device) and the push-time 23503 recovery
+  // (parent missing in the cloud). The run can never be pushed, so dropping it
+  // locally is the only way to let the rest of the batch — and the pull that
+  // delivers coach-assist edits — proceed.
+  private async quarantineRuns(runIds: string[]): Promise<void> {
+    for (const runId of runIds) {
+      await db.transaction(
+        'rw',
+        [db.sessionRuns, db.runDrills, db.runSwimmers, db.laps, db.laneDrillResults],
+        async () => {
+          const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
+          const runDrillIds = runDrills.map((d) => d.id as string)
+          if (runDrillIds.length > 0) {
+            await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+          }
+          await db.runDrills.where('runId').equals(runId).delete()
+          await db.runSwimmers.where('runId').equals(runId).delete()
+          await db.laneDrillResults.where('runId').equals(runId).delete()
+          await db.sessionRuns.delete(runId)
+        },
+      )
+    }
+  }
+
+  // A completed run is only pushable if its parent session exists in the cloud.
+  // Backfill/enqueue can mark a run dirty without its (non-history) parent
+  // session ever being queued, so before pushing we ensure every pending run
+  // whose parent is not already pending or synced gets its local parent session
+  // enqueued — sessions precede runs in the batch, so the FK is satisfied. Runs
+  // whose parent session is gone entirely are quarantined in dropUnsafeRuns.
+  private async enqueueRunParentSessions(orgId: string): Promise<void> {
+    const runMetas = await db._sync_meta.where('table').equals('sessionRuns').toArray()
+    for (const m of runMetas) {
+      if (m.status !== 'pending' || (m.orgId !== '' && m.orgId !== orgId)) continue
+      const run = await db.sessionRuns.get(m.rowId)
+      if (!run || run.status !== 'completed') continue
+      const sid = run.sessionId as string | undefined
+      if (!sid) continue
+      const sessionMeta = await db._sync_meta.get(`sessions:${sid}`)
+      if (sessionMeta && (sessionMeta.status === 'pending' || sessionMeta.status === 'synced')) continue
+      const localSession = await db.sessions.get(sid)
+      if (localSession) await markDirty('sessions', sid)
+    }
+  }
+
+  // Final guard before the push: drop any pending run whose parent session is
+  // neither in this batch nor already synced and has no local row to enqueue.
+  // Such a run can only fail the cloud FK, so we quarantine it (delete locally)
+  // rather than let it abort the whole push.
+  private async dropUnsafeRuns(pending: LocalChange[]): Promise<LocalChange[]> {
+    const batchSessionIds = new Set<string>()
+    for (const c of pending) {
+      if (c.table === 'sessions' && (c.op === 'upsert' || c.op === 'delete')) batchSessionIds.add(c.id)
+    }
+    const safe: LocalChange[] = []
+    const toQuarantine: string[] = []
+    for (const c of pending) {
+      if (c.table === 'sessionRuns' && c.op === 'upsert') {
+        const sid = c.payload?.sessionId as string | undefined
+        if (sid && batchSessionIds.has(sid)) {
+          safe.push(c)
+          continue
+        }
+        const sessionMeta = await db._sync_meta.get(`sessions:${sid}`)
+        if (sessionMeta?.status === 'synced') {
+          safe.push(c)
+          continue
+        }
+        const localSession = sid ? await db.sessions.get(sid) : undefined
+        if (localSession) {
+          // Parent was enqueued by enqueueRunParentSessions and is now in the
+          // batch; keep the run so it is pushed after its parent.
+          safe.push(c)
+          continue
+        }
+        toQuarantine.push(c.id)
+      } else {
+        safe.push(c)
+      }
+    }
+    if (toQuarantine.length > 0) await this.quarantineRuns(toQuarantine)
+    return safe
+  }
+
+  // Push the pending batch, recovering from either of the two known
+  // server-side constraint violations instead of surfacing them as a hard
+  // failure:
+  //  - 23505 catalog-key unique violation: adopt the cloud's canonical id for
+  //    the colliding local rows and retry (turns a corrupting insert into a
+  //    silent reconcile).
+  //  - 23503 session_runs FK: the run references a session_id absent from the
+  //    cloud. Quarantine exactly those runs (delete locally) and retry the rest,
+  //    so the batch — and the pull that delivers coach-assist edits — can
+  //    proceed instead of being blocked by an unrecoverable row.
   private async pushChanges(pending: LocalChange[], orgId: string) {
     try {
       return await this.transport.push(pending, orgId)
     } catch (e) {
-      if (!isCatalogKeyViolation(e)) throw e
+      if (!isCatalogKeyViolation(e)) {
+        if (!isSessionRunsFkViolation(e)) throw e
+        const badSessionIds = extractFkViolationSessionIds(e)
+        const badRunIds = pending
+          .filter(
+            (c) =>
+              c.table === 'sessionRuns' &&
+              c.op === 'upsert' &&
+              badSessionIds.has(String(c.payload?.sessionId)),
+          )
+          .map((c) => c.id)
+        if (badRunIds.length === 0) throw e
+        await this.quarantineRuns(badRunIds)
+        const retry = await getPendingChanges(orgId, this.homeOrgId ?? orgId)
+        const safe = retry.filter(
+          (c) => !(c.table === 'sessionRuns' && badRunIds.includes(c.id)),
+        )
+        return this.transport.push(safe, orgId)
+      }
       await this.reconcileCatalogRows(orgId)
       const retry = await getPendingChanges(orgId, this.homeOrgId ?? orgId)
       return this.transport.push(retry, orgId)
@@ -719,10 +866,12 @@ class SyncService {
       await this.pruneOrphanRuns()
       await this.backfillCompletedHistory(orgId)
       await this.enqueueCompletedRunChildren(orgId)
+      await this.enqueueRunParentSessions(orgId)
       const pending = await getPendingChanges(orgId, homeOrg)
-      const res = await this.pushChanges(pending, orgId)
+      const safePending = await this.dropUnsafeRuns(pending)
+      const res = await this.pushChanges(safePending, orgId)
       conflicts = res.conflicts
-      pushed = pending.length - conflicts.length
+      pushed = safePending.length - conflicts.length
       for (const c of conflicts) await setMetaConflict(c)
       // Record the rev the SERVER assigned, not the one we sent. The
       // set_updated_at trigger rewrites updated_at on every write, so our own

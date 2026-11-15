@@ -109,7 +109,7 @@ therefore blocks the pull — so coach-assist edits never reach the device. The
 run referencing a `session_id` that no longer exists on the device raises a `23503` on
 push, wedging sync in the error phase.
 
-Three layers defend against this:
+Four layers defend against this:
 
 1. **Prevention — catalog remap** (`remapLocalRow` / `reconcileCatalogRows`): when a
    session is folded into a catalog-matching cloud row, `sessionRuns.sessionId` is
@@ -117,8 +117,24 @@ Three layers defend against this:
 2. **Prevention — `deleteSession` cascade**: deleting a session template now cascades to
    `sessionRuns` and its history graph (was only `drills`), so no orphan run is left behind.
 3. **Cure — `pruneOrphanRuns()`**: runs at the start of `syncNow`, before the push, and
-   deletes any completed run whose parent session is missing locally. This clears an
-   already-wedged device so the push succeeds and the pull (coach-assist delivery) runs.
+   deletes any completed run whose parent session is missing **locally**. The deferred
+   write-capture hook re-marks the wiped rows `pending_delete`, but `getPendingChanges`
+   skips changes with no local row, so nothing is re-pushed.
+4. **Cure — cloud-side FK (`session_runs_session_id_fkey`, 23503)**: `pruneOrphanRuns`
+   only checks the local sessions table; the real `23503` is a **cloud-side** FK — a
+   completed run referencing a `session_id` absent from the cloud `sessions` table (a
+   local-only parent the history backfill never queued, or a parent synced locally but
+   later deleted from the cloud). Three layers:
+   - **`enqueueRunParentSessions()`** (pre-push): for every pending completed run whose
+     parent is not already pending or synced, if the parent exists locally it is marked
+     dirty so it is pushed **before** the run (sessions precede runs in the batch).
+   - **`dropUnsafeRuns()`** (pre-push): any pending run whose parent is gone locally and
+     not in the batch is quarantined (deleted locally).
+   - **Push-time 23503 recovery** (`pushChanges`): if the cloud still rejects a run with
+     the FK violation, the offending `session_id`(s) are parsed from the error and exactly
+     those runs are quarantined, then the rest of the batch is retried. This is the
+     definitive guarantee that one bad run can never again abort the whole push and block
+     the pull that delivers coach-assist edits.
 
 **Escape hatch — `syncService.restoreFromCloud()`** is the last-resort recovery for any
 wedge the incremental path cannot clear. It is a **hard reset**: it wipes every local
