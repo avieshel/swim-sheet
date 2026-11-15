@@ -101,6 +101,36 @@ Domain rows always scoped by `organization_id` + membership. Session SELECT allo
 `visibility = 'organization'` OR creator OR `assigned_to` OR `organization:manage`.
 Deletes remain owner-only.
 
+## Failure Recovery (Reset from Cloud)
+
+`syncNow` runs **push before pull**. A single unpushable row aborts the whole push and
+therefore blocks the pull — so coach-assist edits never reach the device. The
+`session_runs` FK (`session_runs_session_id_fkey`) is the common culprit: a completed
+run referencing a `session_id` that no longer exists on the device raises a `23503` on
+push, wedging sync in the error phase.
+
+Three layers defend against this:
+
+1. **Prevention — catalog remap** (`remapLocalRow` / `reconcileCatalogRows`): when a
+   session is folded into a catalog-matching cloud row, `sessionRuns.sessionId` is
+   repointed alongside `drills.sessionId`, so the run never references the deleted local id.
+2. **Prevention — `deleteSession` cascade**: deleting a session template now cascades to
+   `sessionRuns` and its history graph (was only `drills`), so no orphan run is left behind.
+3. **Cure — `pruneOrphanRuns()`**: runs at the start of `syncNow`, before the push, and
+   deletes any completed run whose parent session is missing locally. This clears an
+   already-wedged device so the push succeeds and the pull (coach-assist delivery) runs.
+
+**Escape hatch — `syncService.restoreFromCloud()`** is the last-resort recovery for any
+wedge the incremental path cannot clear. It is a **hard reset**: it wipes every local
+sync row (including unpushed edits) plus `_sync_meta`/`_sync_cursor`, then re-pulls the
+entire cloud state for the active org (paging until exhausted) and re-seeds cursors. The
+device becomes an exact mirror of the cloud; the cloud is never modified. It is surfaced
+in the UI (`AccountSection`) as **Reset from cloud** — available both in the normal sync
+actions row and inside the sync-error alert, with a confirmation step, and fires the
+`Events.SyncReset` analytics event. Ghost `pending_delete` meta rows left by the
+deferred write-capture hook after the wipe are harmlessly skipped by `getPendingChanges`
+(changes with no local row are skipped), so the next incremental sync stays clean.
+
 ## Pull Cost (`sync_pulse` probe)
 
 `SupabaseSyncTransport.pull` used to issue one PostgREST select per sync table (9) on

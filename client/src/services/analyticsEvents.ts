@@ -212,6 +212,12 @@ export const Events = {
     name: 'app_settings',
     properties: { action, ...(extra ?? {}) },
   }),
+  // Fires when the user explicitly resets the device to cloud state as a
+  // last-resort recovery from a wedged sync (wipes local, re-pulls cloud).
+  SyncReset: (): TrackedEvent => ({
+    name: 'sync_reset',
+    properties: {},
+  }),
 }
 
 export { analytics, isNewSession } from './analyticsService'

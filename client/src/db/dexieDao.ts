@@ -66,10 +66,27 @@ export async function updateSession(id: string, data: Partial<SafeSession>): Pro
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  await db.transaction('rw', [db.sessions, db.drills], async () => {
-    await db.drills.where('sessionId').equals(id).delete()
-    await db.sessions.delete(id)
-  })
+  const runs = await db.sessionRuns.where('sessionId').equals(id).toArray()
+  await db.transaction(
+    'rw',
+    [db.sessions, db.drills, db.sessionRuns, db.runDrills, db.runSwimmers, db.laps, db.laneDrillResults],
+    async () => {
+      await db.drills.where('sessionId').equals(id).delete()
+      for (const run of runs) {
+        if (!run.id) continue
+        const runDrills = await db.runDrills.where('runId').equals(run.id).toArray()
+        const runDrillIds = runDrills.map((d) => d.id)
+        if (runDrillIds.length > 0) {
+          await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+        }
+        await db.runDrills.where('runId').equals(run.id).delete()
+        await db.runSwimmers.where('runId').equals(run.id).delete()
+        await db.laneDrillResults.where('runId').equals(run.id).delete()
+        await db.sessionRuns.delete(run.id)
+      }
+      await db.sessions.delete(id)
+    },
+  )
 }
 
 // Atomic session + drills insert for AI drafts. It writes directly to the drills

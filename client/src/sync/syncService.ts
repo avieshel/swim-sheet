@@ -326,11 +326,15 @@ class SyncService {
     if (!row) return
     const rest = { ...row } as Record<string, unknown>
     delete rest.id
-    await db.transaction('rw', [t as unknown as Table, db._sync_meta, ...(table === 'sessions' ? [db.drills] : [])], async () => {
+    await db.transaction('rw', [t as unknown as Table, db._sync_meta, ...(table === 'sessions' ? [db.drills, db.sessionRuns] : [])], async () => {
       await t.add({ ...rest, id: toId })
       await t.delete(fromId)
       if (table === 'sessions') {
         await db.drills.where('sessionId').equals(fromId).modify({ sessionId: toId })
+        // A completed run snapshots the session it belongs to; repoint it too,
+        // otherwise the run keeps referencing the deleted `fromId` and its next
+        // push violates session_runs_session_id_fkey, aborting the whole push.
+        await db.sessionRuns.where('sessionId').equals(fromId).modify({ sessionId: toId })
       }
       await db._sync_meta.delete(`${table}:${fromId}`)
       await setMetaSynced(table, toId, orgId, rev, false)
@@ -370,10 +374,13 @@ class SyncService {
           // row (which would collide on the local primary key).
           await db.transaction(
             'rw',
-            [t as unknown as Table, db._sync_meta, ...(table === 'sessions' ? [db.drills] : [])],
+            [t as unknown as Table, db._sync_meta, ...(table === 'sessions' ? [db.drills, db.sessionRuns] : [])],
             async () => {
               if (table === 'sessions') {
                 await db.drills.where('sessionId').equals(id).modify({ sessionId: cloudRow.id })
+                // Repoint completed runs too, or they keep referencing the folded
+                // local session id and fail the session_runs_session_id_fkey push.
+                await db.sessionRuns.where('sessionId').equals(id).modify({ sessionId: cloudRow.id })
               }
               await t.delete(id)
               await db._sync_meta.delete(`${table}:${id}`)
@@ -625,6 +632,42 @@ class SyncService {
     void this.refresh()
   }
 
+  // Remove completed runs whose parent session no longer exists on this device.
+  // These orphans are left behind by session deletes or catalog remaps performed
+  // before those paths repointed session_runs, and they can never be pushed: the
+  // session_runs_session_id_fkey FK rejects them and aborts the whole push, which
+  // in turn blocks the pull (so coach-assist edits never reach the device). The
+  // parent session is gone, so the run is unusable; deleting it locally lets the
+  // rest of the batch push and the pull run. The deferred sync-capture hook will
+  // re-mark the (now absent) rows pending_delete, but getPendingChanges skips
+  // changes with no local row, so nothing is re-pushed and sync completes.
+  private async pruneOrphanRuns(): Promise<void> {
+    const runs = await db.sessionRuns.toArray()
+    if (runs.length === 0) return
+    const orphanIds: string[] = []
+    for (const run of runs) {
+      const sid = run.sessionId as string | undefined
+      if (!sid || !(await db.sessions.get(sid))) orphanIds.push(run.id as string)
+    }
+    for (const runId of orphanIds) {
+      await db.transaction(
+        'rw',
+        [db.sessionRuns, db.runDrills, db.runSwimmers, db.laps, db.laneDrillResults],
+        async () => {
+          const runDrills = await db.runDrills.where('runId').equals(runId).toArray()
+          const runDrillIds = runDrills.map((d) => d.id as string)
+          if (runDrillIds.length > 0) {
+            await db.laps.where('runDrillId').anyOf(runDrillIds).delete()
+          }
+          await db.runDrills.where('runId').equals(runId).delete()
+          await db.runSwimmers.where('runId').equals(runId).delete()
+          await db.laneDrillResults.where('runId').equals(runId).delete()
+          await db.sessionRuns.delete(runId)
+        },
+      )
+    }
+  }
+
   // Push the pending batch, recovering from a catalog-key unique violation
   // instead of surfacing it as a hard failure. When the server rejects a
   // session/libraryDrill insert because its catalogKey already exists under a
@@ -673,6 +716,7 @@ class SyncService {
       const homeOrg = await this.resolveHomeOrg(orgId)
       this.homeOrgId = homeOrg
       await this.claimUnclaimed(homeOrg)
+      await this.pruneOrphanRuns()
       await this.backfillCompletedHistory(orgId)
       await this.enqueueCompletedRunChildren(orgId)
       const pending = await getPendingChanges(orgId, homeOrg)
@@ -725,6 +769,68 @@ class SyncService {
       this.state = { ...this.state, inFlight: false }
       // The refresh() above notified while inFlight was still true, so without
       // this the UI keeps rendering "Syncing…" and never re-enables the button.
+      this.notify()
+    }
+  }
+
+  // Last-resort recovery: discard every locally-stored sync row (including
+  // unpushed edits) and re-pull the entire cloud state for the active org. This
+  // is the "reset from cloud" escape hatch for when sync is wedged and the
+  // incremental path cannot make progress. It is intentionally destructive — the
+  // device becomes a clean mirror of the cloud.
+  async restoreFromCloud(): Promise<SyncResult> {
+    const userId = getCurrentUserId()
+    if (!userId) {
+      const error = this.recordError(Object.assign(new Error('not signed in'), { kind: 'auth' }))
+      return { pushed: 0, pulled: 0, conflicts: [], error }
+    }
+    if (!this.currentOrgId) {
+      try {
+        this.currentOrgId = await this.transport.ensurePersonalOrganization()
+      } catch (e) {
+        const error = this.recordError(e)
+        return { pushed: 0, pulled: 0, conflicts: [], error }
+      }
+    }
+    const orgId = this.currentOrgId
+    this.state = { ...this.state, inFlight: true }
+    this.notify()
+    try {
+      const syncTables = SYNC_TABLES.map((t) => localTable(t) as unknown as Table)
+      await db.transaction('rw', [...syncTables, db._meta, db._sync_meta, db._sync_cursor], async () => {
+        for (const t of SYNC_TABLES) await localTable(t).clear()
+        await db._sync_meta.clear()
+        await db._sync_cursor.clear()
+        // Drop completed-history backfill markers so a fresh backfill runs next sync.
+        const markers = await db._meta.where('key').startsWith(`sync:completed-history-backfill:v1:${orgId}`).toArray()
+        for (const m of markers) await db._meta.delete(m.key)
+      })
+
+      // Re-pull everything, paging until a pull returns no changes.
+      let cursors = emptyCursors()
+      let totalPulled = 0
+      for (let guard = 0; guard < 200; guard++) {
+        const pullRes = await this.transport.pull(orgId, cursors)
+        if (pullRes.changes.length === 0) break
+        await applyRemoteChanges(pullRes.changes, orgId)
+        totalPulled += pullRes.changes.length
+        cursors = pullRes.nextCursors
+      }
+      for (const t of SYNC_TABLES) await setCursor(orgId, t, cursors[t] ?? '')
+
+      this.lastSyncAt = new Date().toISOString()
+      this.errorReported = false
+      const result: SyncResult = { pushed: 0, pulled: totalPulled, conflicts: [] }
+      this.lastResult = result
+      this.state = { ...this.state, lastSyncAt: this.lastSyncAt, error: null }
+      this.setPhase('ready')
+      await this.refresh()
+      return result
+    } catch (e) {
+      const error = this.recordError(e)
+      return { pushed: 0, pulled: 0, conflicts: [], error }
+    } finally {
+      this.state = { ...this.state, inFlight: false }
       this.notify()
     }
   }

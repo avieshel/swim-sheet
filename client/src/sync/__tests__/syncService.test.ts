@@ -43,6 +43,22 @@ async function runSyncNow(transport: SyncTransport): Promise<SyncResult> {
   return result
 }
 
+// A completed run always references a real session. pruneOrphanRuns drops runs
+// whose session is absent locally, so history tests seed the parent session.
+// The row's write hook would mark it dirty; we let that settle, then drop its
+// meta so the parent exists locally (keeping the runs) without being pushed.
+async function seedParentSession(): Promise<void> {
+  await db.sessions.delete('session-1').catch(() => {})
+  await db.sessions.add({
+    id: 'session-1', name: 'Session 1', poolLength: 25, notes: '',
+    visibility: 'private', catalogKey: undefined, createdAt: 't', updatedAt: 't',
+  })
+  // Wait out the deferred write-capture hook (setTimeout(0) + its async meta
+  // write) so our meta deletion wins the race.
+  await new Promise<void>((resolve) => setTimeout(resolve, 25))
+  await db._sync_meta.delete('sessions:session-1')
+}
+
 describe('syncService', () => {
   beforeEach(async () => {
     await db.open()
@@ -92,6 +108,7 @@ describe('syncService', () => {
     await db.sessionRuns.update('run-transition', { status: 'completed', updatedAt: '2026-10-08T11:00:00.000Z' })
     await markDirty('sessionRuns', 'run-transition')
     await db._sync_meta.update('sessionRuns:run-transition', { orgId: 'org-A' })
+    await seedParentSession()
     const transport = fakeTransport()
     syncService.init(transport, { autoSync: false })
     syncService.setActiveOrg('org-A')
@@ -127,6 +144,7 @@ describe('syncService', () => {
     })
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
     await db._sync_meta.clear()
+    await seedParentSession()
     const transport = fakeTransport()
     syncService.init(transport, { autoSync: false })
     syncService.setActiveOrg('org-A')
@@ -160,6 +178,7 @@ describe('syncService', () => {
     }
     await markDirty('sessionRuns', 'run-shared')
     await db._sync_meta.update('sessionRuns:run-shared', { orgId: 'org-A' })
+    await seedParentSession()
     const transport = fakeTransport({ cloudChanges: [cloud] })
     syncService.init(transport, { autoSync: false })
     syncService.setActiveOrg('org-A')
@@ -200,6 +219,7 @@ describe('syncService', () => {
     })
     await markDirty('sessionRuns', 'run-after-page')
     await db._sync_meta.update('sessionRuns:run-after-page', { orgId: 'org-A' })
+    await seedParentSession()
     const transport = fakeTransport({ cloudChanges })
     syncService.init(transport, { autoSync: false })
     syncService.setActiveOrg('org-A')
@@ -257,6 +277,7 @@ describe('syncService', () => {
       notes: '', status: 'completed', sessionStartedAt: 100, sessionPausedAt: null, sessionPauseDuration: 0,
       createdAt: 'created', updatedAt: 'updated',
     })
+    await seedParentSession()
     const transport = fakeTransport()
     syncService.init(transport, { autoSync: false })
 

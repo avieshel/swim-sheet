@@ -121,9 +121,22 @@ export function AccountSection() {
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined
 
   const [dismissedFirstMerge, setDismissedFirstMerge] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const phase = syncState.phase
   const summary = syncState.firstMergeSummary
   const showFirstMerge = !!user && phase === 'needs_first_merge' && !!summary && !dismissedFirstMerge
+
+  const runResetFromCloud = async () => {
+    setResetting(true)
+    try {
+      await syncService.restoreFromCloud()
+      analytics.track(Events.SyncReset())
+    } finally {
+      setResetting(false)
+      setConfirmingReset(false)
+    }
+  }
 
   return (
     <section>
@@ -260,6 +273,44 @@ export function AccountSection() {
               >
                 Export backup
               </button>
+              {syncConfigured && !confirmingReset && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(true)}
+                  disabled={!online || syncState.inFlight || phase === 'initializing'}
+                  className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+                >
+                  Reset from cloud
+                </button>
+              )}
+            </div>
+          )}
+
+          {!!user && confirmingReset && (
+            <div role="alert" className="mt-4 border border-error/40 rounded-xl p-3">
+              <p className="font-bold text-error mb-1">Reset from cloud?</p>
+              <p className="text-sm text-on-surface-variant mb-3">
+                This wipes all local data on this device (including unsynced changes) and re-downloads
+                your cloud data. Use it only if sync is stuck. Your cloud data is not affected.
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => void runResetFromCloud()}
+                  disabled={resetting}
+                  className="min-h-11 bg-error text-on-error font-bold px-3 py-2 rounded-lg hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+                >
+                  {resetting ? 'Resetting…' : 'Reset from cloud'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(false)}
+                  disabled={resetting}
+                  className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
 
@@ -284,6 +335,14 @@ export function AccountSection() {
                   className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
                 >
                   Dismiss sync error
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingReset(true)}
+                  disabled={!online || syncState.inFlight || phase === 'initializing'}
+                  className="min-h-11 bg-error text-on-error font-bold px-3 py-2 rounded-lg hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
+                >
+                  Reset from cloud
                 </button>
               </div>
             </div>
