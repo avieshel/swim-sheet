@@ -833,5 +833,43 @@ describe('collectSessionLaps — session completion sanitize', () => {
 
     expect(result.laps).toEqual([])
     expect(result.tempWithTimings).toEqual([])
+    expect(result.hasActivity).toBe(false)
+  })
+
+  it('reports hasActivity when a drill is marked complete with no times', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      laneResult(DID, [
+        { dbId: 'sw-1', name: 'Alice', startedAt: null, completedAt: null, laps: [], completed: true, status: 'done' },
+      ]),
+    ])
+
+    const result = await collectSessionLaps(RID, [], createLiveTimingStore())
+
+    expect(result.laps).toEqual([])
+    expect(result.hasActivity).toBe(true)
+  })
+
+  it('reports hasActivity for a completed drill marker with no swimmer data yet', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      { id: 'lr-x', runId: RID, groupId: GID, lane: 1, runDrillId: DID, completed: true, data: null, updatedAt: '' },
+    ])
+
+    const result = await collectSessionLaps(RID, [], createLiveTimingStore())
+
+    expect(result.laps).toEqual([])
+    expect(result.hasActivity).toBe(true)
+  })
+
+  it('reports hasActivity when a swimmer is explicitly skipped without times', async () => {
+    vi.mocked(runService.getLaneResults).mockResolvedValue([
+      laneResult(DID, [
+        { dbId: 'sw-1', name: 'Alice', startedAt: null, completedAt: null, laps: [], completed: false, status: 'skipped' },
+      ]),
+    ])
+
+    const result = await collectSessionLaps(RID, [], createLiveTimingStore())
+
+    expect(result.laps).toEqual([])
+    expect(result.hasActivity).toBe(true)
   })
 })

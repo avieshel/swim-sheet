@@ -340,6 +340,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
   const [showEmptyWarning, setShowEmptyWarning] = useState(false)
   const [sessionLaps, setSessionLaps] = useState<CompleteRunLap[]>([])
   const [sessionTemps, setSessionTemps] = useState<Array<{ name: string; dbId: string }>>([])
+  const [sessionHasActivity, setSessionHasActivity] = useState(false)
 
   const finalizeSession = async (lapsToSave: CompleteRunLap[]) => {
     // Coherence pass: stamp a per-(swimmer, drill) status for every swimmer so
@@ -362,10 +363,11 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     // Drop results/laps for any drill the coach removed from the running
     // session, so removed drills (e.g. drill 10 of 13) leave no orphan data.
     await pruneRemovedDrillData(run.id, runDrills)
-    const { laps, tempWithTimings } = await collectSessionLaps(run.id, groups, store)
+    const { laps, tempWithTimings, hasActivity } = await collectSessionLaps(run.id, groups, store)
 
     setSessionLaps(laps)
     setSessionTemps(tempWithTimings)
+    setSessionHasActivity(hasActivity)
 
     // Temp swimmers recorded times → suggest promoting them (coach may skip).
     if (tempWithTimings.length > 0) {
@@ -373,8 +375,10 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       return
     }
 
-    // No temp swimmers: save valid results, or warn if there are none.
-    if (laps.length > 0) {
+    // No temp swimmers: save valid results, or warn if there are none. A session
+    // counts as non-empty when the coach marked drills complete or resolved
+    // swimmers (done / skipped / not done) — even without recording any times.
+    if (laps.length > 0 || hasActivity) {
       await finalizeSession(laps)
     } else {
       setShowEmptyWarning(true)
@@ -383,7 +387,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
   const handleSkipPromotion = async () => {
     // Coach skipped promoting the temp swimmers.
-    if (sessionLaps.length > 0) {
+    if (sessionLaps.length > 0 || sessionHasActivity) {
       // Valid results exist — discard the temp data and save the valid results.
       for (const swimmer of showPromotionModal) {
         await discardTempSwimmer(run.id, swimmer.dbId)
