@@ -61,6 +61,7 @@ Counts, enums, and action types only — no swimmer names, lap times, or free-te
 | `session_updated` | — | SessionDetail name/notes save |
 | `session_deleted` | `template_count` | SessionsList template delete |
 | `start_drill` | `session_name`, `drill_count`, `total_distance` | `useStartLiveSession` (template → live run) |
+| `live_session_opened` | `roster_count` (org roster), `assigned_swimmer_count` (from live `groups`) | `useStartLiveSession` (run opened from template; detects empty-deck dead-end) |
 | `quick_time_started` | `virtual_swimmer_count` | LiveDeck quick-time start |
 | `session_completed` | `swimmer_count`, `lap_count`, `drill_count`, `total_distance`, `duration_ms`, `is_quick_start` | ActiveRunView finalize (run saved) |
 | `session_discarded` | — | ActiveRunView empty-session discard |
@@ -73,6 +74,7 @@ Counts, enums, and action types only — no swimmer names, lap times, or free-te
 | `swimmer_started` | `lane`, `swimmer_count` | GroupCard start tap (individual or lane Go; only not-yet-started swimmers counted) |
 | `swimmer_completed` | `lane`, `swimmer_count` | GroupCard finish tap / lane stop |
 | `lap_recorded` | `lane`, `swimmer_count` | GroupCard lap tap (individual or group lap) |
+| `run_swimmer_added` | `lane`, `swimmer_count` (from live `groups`) | GroupCard add-to-lane (roster pick / create-new) |
 | `app_settings` | `action` (15 closed-set values), plus action-specific extras | Settings page + AccountSection |
 
 Future upgrade candidates (not yet implemented): swimmers-with-session counts over

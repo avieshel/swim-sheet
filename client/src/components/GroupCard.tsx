@@ -380,6 +380,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     if (data.selectedDbId) {
       dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: data.name, dbId: data.selectedDbId } })
       await addSwimmerToRun(runId, data.selectedDbId, liveGroup.lane).catch(() => {})
+      analytics.track(Events.RunSwimmerAdded(liveGroup.lane, liveGroup.swimmers.filter(s => s.dbId).length + 1))
       onSwimmerSaved?.()
       return
     }
@@ -387,6 +388,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
     analytics.track(Events.SwimmerCreated('live_session', rosterSwimmers?.length ?? 0))
     dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: data.name, dbId: newId } })
     await addSwimmerToRun(runId, newId, liveGroup.lane).catch(() => {})
+    analytics.track(Events.RunSwimmerAdded(liveGroup.lane, liveGroup.swimmers.filter(s => s.dbId).length + 1))
     onSwimmerSaved?.()
   }
 
@@ -654,6 +656,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
               dispatch({ type: 'ADD_SWIMMER', payload: { groupId: liveGroup.id, name: swimmer.name, dbId: swimmer.id } })
               if (runId) {
                 addSwimmerToRun(runId, swimmer.id, liveGroup.lane).catch(() => {})
+                analytics.track(Events.RunSwimmerAdded(liveGroup.lane, liveGroup.swimmers.filter(s => s.dbId).length + 1))
                 onSwimmerSaved?.()
               }
             }}
