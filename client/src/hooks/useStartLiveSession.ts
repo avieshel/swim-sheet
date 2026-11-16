@@ -4,6 +4,7 @@ import { createRunFromTemplate, updateRun, getRun } from '../api/runs'
 import { buildStartLanes } from '../api/runSetup'
 import { getSessionDrills } from '../api/drills'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
+import { listSwimmers } from '../api/swimmers'
 import type { Session } from '../api/sessions'
 import { Events, analytics } from '../services/analyticsEvents'
 
@@ -44,6 +45,9 @@ export function useStartLiveSession(): {
       const notes = { isQuickStart: false, version: 2, virtualSwimmers }
       await updateRun(runId, { notes: JSON.stringify(notes) })
       dispatch({ type: 'INIT_FROM_RUN', payload: { groups, runId } })
+      const assigned = groups.reduce((n, g) => n + g.swimmers.filter(s => s.dbId).length, 0)
+      const roster = (await listSwimmers()).length
+      analytics.track(Events.LiveSessionOpened(roster, assigned))
       return getRun(runId)
     } finally {
       setStarting(false)

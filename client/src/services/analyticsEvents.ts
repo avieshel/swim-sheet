@@ -106,6 +106,14 @@ export const Events = {
       ...(stats ? { drill_count: stats.drillCount, total_distance: stats.totalDistance } : {}),
     },
   }),
+  // Fires when a live session opens (run created from a template). Carries the
+  // org roster size alongside how many swimmers were pre-assigned to the run, so
+  // an empty deck (roster > 0 but assigned == 0) is detectable in aggregate —
+  // the dead-end where a coach opens a session but never populates swimmers.
+  LiveSessionOpened: (rosterCount: number, assignedSwimmerCount: number): TrackedEvent => ({
+    name: 'live_session_opened',
+    properties: { roster_count: rosterCount, assigned_swimmer_count: assignedSwimmerCount },
+  }),
   QuickTimeStarted: (virtualSwimmerCount: number): TrackedEvent => ({
     name: 'quick_time_started',
     properties: { virtual_swimmer_count: virtualSwimmerCount },
@@ -167,6 +175,13 @@ export const Events = {
   }),
   LapRecorded: (lane: number, swimmerCount: number): TrackedEvent => ({
     name: 'lap_recorded',
+    properties: { lane, swimmer_count: swimmerCount },
+  }),
+  // Fires each time a swimmer is added to a run (every UI entry point converges
+  // on api/runs.addSwimmerToRun). `swimmer_count` is the run's total after the
+  // add, so deck population per live session is measurable.
+  RunSwimmerAdded: (lane: number, swimmerCount: number): TrackedEvent => ({
+    name: 'run_swimmer_added',
     properties: { lane, swimmer_count: swimmerCount },
   }),
   // Fires once per sync failure, on the transition into the error phase (not on
