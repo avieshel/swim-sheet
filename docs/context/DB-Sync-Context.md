@@ -135,6 +135,13 @@ Four layers defend against this:
      those runs are quarantined, then the rest of the batch is retried. This is the
      definitive guarantee that one bad run can never again abort the whole push and block
      the pull that delivers coach-assist edits.
+      When the error text carries no parseable
+      `Key (session_id)=(...)` detail (the server `details` string is sometimes absent in
+      production, which is exactly what produced Avi Lugasi's 13 recurring `sync_error`
+      events), recovery instead re-pushes each `session_runs` upsert individually: only a
+      run referencing a `session_id` absent from the cloud fails the per-row push and is
+      quarantined, while a run referencing a present session is preserved — so recoverable
+      data is never discarded and the wedge clears on the next sync.
 
 **Escape hatch — `syncService.restoreFromCloud()`** is the last-resort recovery for any
 wedge the incremental path cannot clear. It is a **hard reset**: it wipes every local
@@ -172,6 +179,21 @@ because a rendering difference between the RPC and table-read paths would otherw
 fail in exactly that silent direction. Verified end-to-end through PostgREST:
 caught-up → `[]`, behind → only the affected table, non-member → `[]`, signed-out →
 `42501`.
+
+## Pull pagination cursor
+
+`pull` pages each table with a `BATCH` of 500 rows. The per-table cursor is stored
+locally as a composite `updated_at|id` rather than a bare timestamp. A plain
+`gt(updated_at, cursor)` bound drops every row that shares the boundary timestamp
+once a group exceeds one page — exactly the failure mode of a **bulk 3rd-party
+swimmer import**, which stamps all rows with the same `now()` in one transaction
+and would otherwise never reach the device in full. The composite cursor uses an
+`or(updated_at.gt.<ts>, and(updated_at.eq.<ts>, id.gt.<id>))` bound so tied rows are
+never skipped across a page boundary. A legacy bare-timestamp cursor (or the
+`MIN_CURSOR` seed) is read as having no id and uses an inclusive `gte(updated_at)`
+bound, so it re-captures boundary rows idempotently on the first post-upgrade pull.
+The `sync_pulse` probe is still sent the stripped `updated_at` component, preserving
+the RPC's timestamp-only contract.
 
 ## Supabase Security Baseline
 

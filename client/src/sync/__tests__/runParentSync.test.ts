@@ -164,6 +164,110 @@ describe('run parent sync (cloud-absent session_id)', () => {
     expect(transport.pushed.some((c) => c.table === 'sessionRuns' && c.id === 'run-1')).toBe(true)
   })
 
+  // Mirrors the production failure: the 23503 arrives WITHOUT a parseable
+  // `Key (session_id)=(...)` detail, so extractFkViolationSessionIds finds
+  // nothing and the old code re-threw forever. Recovery must identify the bad
+  // run by re-pushing each run individually instead of parsing the message.
+  class FkNoDetailTransport extends FkSimulatingTransport {
+    override async push(changes: LocalChange[]): Promise<{ conflicts: SyncConflict[]; applied: { table: SyncTable; id: string; updatedAt: string }[] }> {
+      const conflicts: SyncConflict[] = []
+      const applied: { table: SyncTable; id: string; updatedAt: string }[] = []
+      for (const c of changes) {
+        if (c.table === 'sessionRuns' && c.op === 'upsert') {
+          const sid = (c.payload?.sessionId as string | undefined) ?? ''
+          if (!this.cloudSessions.has(sid)) {
+            throw Object.assign(new Error('failed to push session_runs'), {
+              kind: 'network',
+              cause: {
+                code: '23503',
+                message:
+                  'insert or update on table "session_runs" violates foreign key constraint "session_runs_session_id_fkey"',
+              },
+            })
+          }
+        }
+        this.pushed.push(c)
+        applied.push({ table: c.table, id: c.id, updatedAt: new Date().toISOString() })
+        if (c.table === 'sessions' && c.op === 'upsert') this.cloudSessions.add(c.id)
+      }
+      return { conflicts, applied }
+    }
+  }
+
+  test('a 23503 without parseable detail quarantines only the orphan run, not a valid one', async () => {
+    const transport = new FkNoDetailTransport()
+    // Valid run: references a session the cloud already has.
+    await db.sessions.add({
+      id: 's-pre-pushed',
+      name: 'Coach Edited',
+      poolLength: 25,
+      notes: '',
+      visibility: 'private',
+      catalogKey: undefined,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    await db.sessionRuns.add({
+      id: 'run-ok',
+      sessionId: 's-pre-pushed',
+      date: '2026-01-02',
+      poolName: 'Pool',
+      poolLength: 25,
+      notes: '',
+      status: 'completed',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+    // Orphan run: parent session is marked synced locally but absent from the cloud.
+    await db.sessions.add({
+      id: 's-gone',
+      name: 'Session',
+      poolLength: 25,
+      notes: '',
+      visibility: 'private',
+      catalogKey: undefined,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    })
+    await db.sessionRuns.add({
+      id: 'run-gone',
+      sessionId: 's-gone',
+      date: '2026-01-02',
+      poolName: 'Pool',
+      poolLength: 25,
+      notes: '',
+      status: 'completed',
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    await markDirty('sessionRuns', 'run-ok')
+    await markDirty('sessionRuns', 'run-gone')
+    await db._sync_meta.put({
+      key: 'sessions:s-gone',
+      orgId: ORG,
+      table: 'sessions',
+      rowId: 's-gone',
+      catalogKey: undefined,
+      rev: '2026-01-01T00:00:00.000Z',
+      status: 'synced',
+      deleted: 0,
+    })
+
+    syncService.init(transport, { autoSync: false })
+    syncService.setActiveOrg(ORG)
+
+    const result = await syncService.syncNow()
+
+    expect(result.error).toBeUndefined()
+    expect(syncService.getState().phase).toBe('ready')
+    // Only the orphan run is quarantined; the valid run is pushed and kept.
+    expect(await db.sessionRuns.get('run-gone')).toBeUndefined()
+    expect(transport.pushed.some((c) => c.table === 'sessionRuns' && c.id === 'run-gone')).toBe(false)
+    expect(transport.pushed.some((c) => c.table === 'sessionRuns' && c.id === 'run-ok')).toBe(true)
+    expect(await db.sessionRuns.get('run-ok')).toBeDefined()
+  })
+
   test('a run whose parent is gone from the cloud but synced locally is quarantined at push time', async () => {
     // Parent session is marked synced locally, so dropUnsafeRuns keeps the run,
     // but the cloud no longer has it -> 23503 -> push-time recovery quarantines

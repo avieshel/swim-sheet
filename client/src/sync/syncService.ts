@@ -817,6 +817,25 @@ class SyncService {
               badSessionIds.has(String(c.payload?.sessionId)),
           )
           .map((c) => c.id)
+        if (badRunIds.length === 0) {
+          // The error text did not name the offending session_id (the server's
+          // detail string is sometimes absent), so the parsed set is empty. Find
+          // the bad runs directly: push each session_runs upsert on its own. Only
+          // a run that references a session_id missing from the cloud fails, and
+          // only those are quarantined — a run referencing a present session is
+          // left untouched, so no recoverable data is discarded.
+          const runChanges = pending.filter(
+            (c) => c.table === 'sessionRuns' && c.op === 'upsert',
+          )
+          for (const change of runChanges) {
+            try {
+              await this.transport.push([change], orgId)
+            } catch (runErr) {
+              if (isSessionRunsFkViolation(runErr)) badRunIds.push(change.id)
+              else throw e
+            }
+          }
+        }
         if (badRunIds.length === 0) throw e
         await this.quarantineRuns(badRunIds)
         const retry = await getPendingChanges(orgId, this.homeOrgId ?? orgId)

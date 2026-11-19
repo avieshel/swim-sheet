@@ -6,6 +6,18 @@ const SYNC_TABLES: SyncTable[] = ['swimmers', 'sessions', 'drills', 'libraryDril
 const BATCH = 500
 const MIN_CURSOR = '0001-01-01T00:00:00.000Z'
 
+// Pull cursors are stored as a composite `updated_at|id` so pagination never
+// skips rows that share an updated_at (e.g. a bulk insert stamping every row
+// with the same now()). A bare timestamp (a legacy cursor, or the seed
+// MIN_CURSOR) is parsed as having no id, which the pull path treats as an
+// inclusive bound.
+const CURSOR_SEP = '|'
+function parseCursor(cursor: string): { updatedAt: string; id: string | null } {
+  const sep = cursor.indexOf(CURSOR_SEP)
+  if (sep === -1) return { updatedAt: cursor, id: null }
+  return { updatedAt: cursor.slice(0, sep), id: cursor.slice(sep + 1) }
+}
+
 // Local Dexie name -> Postgres table name.
 const CLOUD_TABLE: Record<SyncTable, string> = {
   swimmers: 'swimmers',
@@ -29,6 +41,7 @@ export interface SyncQueryBuilder extends PromiseLike<BuilderResult> {
   eq: (column: string, value: unknown) => SyncQueryBuilder
   gt: (column: string, value: unknown) => SyncQueryBuilder
   gte: (column: string, value: unknown) => SyncQueryBuilder
+  or: (filter: string) => SyncQueryBuilder
   order: (column: string) => SyncQueryBuilder
   select: (columns?: string) => SyncQueryBuilder
   update: (row: Record<string, unknown>) => SyncQueryBuilder
@@ -493,9 +506,11 @@ export class SupabaseSyncTransport implements SyncTransport {
     tables: SyncTable[],
   ): Promise<SyncTable[]> {
     try {
+      const pulseCursors = {} as Record<SyncTable, string>
+      for (const t of SYNC_TABLES) pulseCursors[t] = parseCursor(nextCursors[t]).updatedAt
       const { data, error } = await this.client.rpc('sync_pulse', {
         p_organization: orgId,
-        p_cursors: nextCursors,
+        p_cursors: pulseCursors,
       })
       if (error || !Array.isArray(data)) return tables
       const dirty = new Set(data as SyncTable[])
@@ -530,11 +545,23 @@ export class SupabaseSyncTransport implements SyncTransport {
         : HISTORY_TABLES.includes(table) && table !== 'sessionRuns'
           ? '*,session_runs!inner(status)'
           : '*'
+      const cursorParsed = parseCursor(cursor)
       let query = this.client
         .from(CLOUD_TABLE[table])
         .select(columns)
         .eq('organization_id', orgId)
-        .gt('updated_at', cursor)
+      if (cursorParsed.id === null) {
+        // Legacy single-timestamp cursor (or first sync): an inclusive bound so
+        // any rows sharing the boundary timestamp are re-captured idempotently.
+        query = query.gte('updated_at', cursorParsed.updatedAt)
+      } else {
+        // Composite (updated_at, id) cursor: rows that share a timestamp are
+        // never skipped, which the plain gt(updated_at) bound could drop across a
+        // page boundary when a bulk insert stamps them all with the same value.
+        query = query.or(
+          `updated_at.gt.${cursorParsed.updatedAt},and(updated_at.eq.${cursorParsed.updatedAt},id.gt.${cursorParsed.id})`,
+        )
+      }
       if (table === 'sessionRuns') query = query.eq('status', 'completed')
       else if (table === 'laps') query = query.eq('run_drills.session_runs.status', 'completed')
       else if (HISTORY_TABLES.includes(table)) query = query.eq('session_runs.status', 'completed')
@@ -566,11 +593,8 @@ export class SupabaseSyncTransport implements SyncTransport {
         })
       }
       if (rows.length > 0) {
-        let max = cursor
-        for (const row of rows) {
-          if ((row.updated_at as string) > max) max = row.updated_at as string
-        }
-        nextCursors[table] = max
+        const last = rows[rows.length - 1]
+        nextCursors[table] = `${last.updated_at}|${last.id}`
       }
     }
     return { changes, nextCursors }
