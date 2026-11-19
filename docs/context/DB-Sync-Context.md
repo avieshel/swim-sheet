@@ -195,6 +195,29 @@ bound, so it re-captures boundary rows idempotently on the first post-upgrade pu
 The `sync_pulse` probe is still sent the stripped `updated_at` component, preserving
 the RPC's timestamp-only contract.
 
+## Phase 2 — session-plan editor tracking
+
+The session-plan layer (`sessions`, `drills`, `libraryDrills` — the reusable
+templates a coach and owner collaborate on) gets owner-aware semantics on top of
+the generic sync, without touching the bulk path (swimmers / history stay on plain
+last-write-wins).
+
+- **Editor tracking (migration `20261119000000_plan_editor_tracking.sql`)**: a
+  nullable `updated_by` on the three plan tables, set by a `set_plan_editor`
+  trigger from `auth.uid()` (mirrors `set_updated_at`). The client never sends it;
+  the cloud is the source of truth for *who* edited. `SupabaseSyncTransport.pull`
+  carries it back as `CloudChange.editorId`.
+- **Coach-assist signal**: when a pulled plan row's `editorId` is someone other
+  than the local user, `syncNow` records it in `SyncState.planUpdatesByOther` and
+  emits `plan_updated_by_other` (non-blocking — the row is already delivered by the
+  generic sync). The UI can surface "an owner tuned your plan" from that list.
+- **Owner-wins-on-conflict**: `SyncState.conflicts` carry
+  `recommendedResolution: 'remote'` for plan-table conflicts, advising the
+  conflict UI to default to the owner's (remote) edit rather than the coach's
+  local one. A recommendation only — the coach can still keep their local edit.
+
+`PLAN_TABLES` (in `types.ts`) is the single source of that scope.
+
 ## Supabase Security Baseline
 
 Hosted project `pcdmtsafwmlqdwjxbajc`,

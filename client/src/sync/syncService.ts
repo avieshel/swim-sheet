@@ -15,7 +15,7 @@ import {
   setCursor,
   readSyncState,
 } from './syncStore'
-import { HISTORY_TABLES } from './types'
+import { HISTORY_TABLES, PLAN_TABLES } from './types'
 import { analytics, Events } from '../services/analyticsEvents'
 import { sessionsCatalog } from '../data/catalog'
 import type {
@@ -155,7 +155,12 @@ class SyncService {
     error: null,
     conflicts: [],
     firstMergeSummary: null,
+    planUpdatesByOther: [],
   }
+
+  // Session-plan rows pulled during the current sync that were last edited by
+  // someone other than the local user — the coach-assist signal. Reset each sync.
+  private planUpdatesByOther: Array<{ table: SyncTable; id: string; editorId: string }> = []
 
   init(
     transport: SyncTransport = supabaseSyncTransport,
@@ -877,6 +882,7 @@ class SyncService {
     const orgId = this.currentOrgId
     let pushed = 0
     let conflicts: SyncConflict[] = []
+    this.planUpdatesByOther = []
     try {
       this.setPhase('pushing')
       const homeOrg = await this.resolveHomeOrg(orgId)
@@ -920,9 +926,28 @@ class SyncService {
       const pullRes = await this.transport.pull(orgId, cursors)
       await applyRemoteChanges(pullRes.changes, orgId)
       for (const table of SYNC_TABLES) await setCursor(orgId, table, pullRes.nextCursors[table])
+      // Coach-assist signal: a plan row edited by someone else (e.g. the owner
+      // tuning the coach's plan) is non-blocking, but worth surfacing. We never
+      // quarantine or block on it — the generic sync already delivered the row.
+      const localUserId = getCurrentUserId()
+      for (const change of pullRes.changes) {
+        if (
+          PLAN_TABLES.includes(change.table) &&
+          change.editorId &&
+          change.editorId !== localUserId
+        ) {
+          this.planUpdatesByOther.push({ table: change.table, id: change.id, editorId: change.editorId })
+          analytics.track(Events.PlanUpdatedByOther({ table: change.table, id: change.id, editorId: change.editorId }))
+        }
+      }
       this.lastSyncAt = new Date().toISOString()
       this.errorReported = false
-      this.state = { ...this.state, lastSyncAt: this.lastSyncAt, error: null }
+      this.state = {
+        ...this.state,
+        lastSyncAt: this.lastSyncAt,
+        error: null,
+        planUpdatesByOther: this.planUpdatesByOther,
+      }
       this.setPhase('ready')
       const result: SyncResult = { pushed, pulled: pullRes.changes.length, conflicts }
       this.lastResult = result
@@ -1065,7 +1090,13 @@ class SyncService {
       const org = this.currentOrgId
       if (org) {
         const snapshot = await readSyncState(org)
-        this.state = { ...this.state, signedIn, pendingCount: snapshot.pendingCount, conflicts: snapshot.conflicts }
+        // For plan-table conflicts the owner's edit is authoritative, so advise
+        // the conflict UI to default its selection to 'remote'. This is a
+        // recommendation only — the coach can still keep their local edit.
+        const conflicts = snapshot.conflicts.map((c) =>
+          PLAN_TABLES.includes(c.table) ? { ...c, recommendedResolution: 'remote' as const } : c,
+        )
+        this.state = { ...this.state, signedIn, pendingCount: snapshot.pendingCount, conflicts }
       } else {
         this.state = { ...this.state, signedIn, pendingCount: 0, conflicts: [] }
       }

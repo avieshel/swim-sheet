@@ -590,6 +590,7 @@ export class SupabaseSyncTransport implements SyncTransport {
           catalogKey: (row.catalog_key as string) ?? undefined,
           updatedAt: row.updated_at as string,
           deletedAt: (row.deleted_at as string) ?? null,
+          editorId: (row.updated_by as string) ?? undefined,
         })
       }
       if (rows.length > 0) {

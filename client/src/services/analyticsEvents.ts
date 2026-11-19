@@ -215,6 +215,18 @@ export const Events = {
       pending_count: stats.pendingCount,
     },
   }),
+  // Emitted during a pull when a session-plan row (sessions/drills/libraryDrills)
+  // arrives that was last edited by someone other than the local user. Surfaces
+  // the coach-assist signal "an owner (or teammate) tuned your plan" without
+  // blocking sync. editorId is the cloud updated_by of the editor.
+  PlanUpdatedByOther: (stats: {
+    table: string
+    id: string
+    editorId: string
+  }): TrackedEvent => ({
+    name: 'plan_updated_by_other',
+    properties: { table: stats.table, row_id: stats.id, editor_id: stats.editorId },
+  }),
   AppSettings: (
     action:
       | 'sign_in'

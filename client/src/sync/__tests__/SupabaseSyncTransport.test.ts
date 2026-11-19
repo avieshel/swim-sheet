@@ -522,5 +522,17 @@ describe('SupabaseSyncTransport.pull pagination across a shared timestamp', () =
     const res = await transport.pull('org-A', cursors)
     expect(res.changes.filter((c) => c.table === 'swimmers')).toHaveLength(0)
   })
+
+  test('carries the cloud updated_by as editorId on plan rows', async () => {
+    const stub = makeSupabaseStub({
+      rows: [{ id: 's1', updated_by: 'editor-owner', updated_at: 'rev-2', deleted_at: null }],
+    })
+    const transport = new SupabaseSyncTransport(stub)
+
+    const res = await transport.pull('org-A', emptyCursors(), ['sessions'])
+
+    const change = res.changes.find((c) => c.table === 'sessions' && c.id === 's1')
+    expect(change?.editorId).toBe('editor-owner')
+  })
 })
 
