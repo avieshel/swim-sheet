@@ -95,6 +95,7 @@ function makeSupabaseStub(opts: {
     },
     gt: () => b,
     gte: () => b,
+    or: () => b,
     order: () => b,
     select: (columns) => {
       if (activeQuery && columns !== undefined) activeQuery.columns = columns
@@ -130,6 +131,91 @@ function makeSupabaseStub(opts: {
       }
       return Promise.resolve({ data: 'org-x', error: opts.rpcError ?? null })
     },
+  }
+}
+
+// A stub that actually applies the cursor filters PostgREST would, so it can
+// exercise pagination. Without it, makeSupabaseStub ignores every filter and
+// returns all rows on the first page — which would hide the bulk-import data
+// loss where a plain gt(updated_at) bound skips rows sharing a timestamp.
+interface PaginationChain {
+  gteAt?: string
+  orExpr?: string
+  statusEq?: string
+  limit?: number
+}
+
+function makePaginatingStub(cloud: Record<string, unknown[]>) {
+  const queries: QueryTrace[] = []
+  let active: QueryTrace | undefined
+  let chain: PaginationChain = {}
+  const rowsFor = (table: string): Record<string, unknown>[] => (cloud[table] ?? []) as Record<string, unknown>[]
+  const apply = (table: string): Record<string, unknown>[] => {
+    let rows = rowsFor(table).slice()
+    if (chain.gteAt !== undefined) rows = rows.filter((r) => (r.updated_at as string) >= chain.gteAt!)
+    if (chain.orExpr !== undefined) {
+      const m = chain.orExpr.match(/updated_at\.gt\.([^,]+),and\(updated_at\.eq\.([^,]+),id\.gt\.([^)]+)\)/)
+      if (m) {
+        const [, gt, eqTs, gtId] = m
+        rows = rows.filter((r) => {
+          const ua = r.updated_at as string
+          return ua > gt || (ua === eqTs && (r.id as string) > gtId)
+        })
+      }
+    }
+    if (chain.statusEq !== undefined) rows = rows.filter((r) => r.status === chain.statusEq)
+    rows.sort((a, b) => {
+      const ua = a.updated_at as string
+      const ub = b.updated_at as string
+      if (ua !== ub) return ua < ub ? -1 : 1
+      const ia = a.id as string
+      const ib = b.id as string
+      return ia < ib ? -1 : ia > ib ? 1 : 0
+    })
+    if (chain.limit !== undefined) rows = rows.slice(0, chain.limit)
+    return rows
+  }
+  const b: SyncQueryBuilder = {
+    eq: (column, value) => {
+      if (column === 'status') chain.statusEq = value as string
+      return b
+    },
+    gt: () => b,
+    gte: (column, value) => {
+      if (column === 'updated_at') chain.gteAt = value as string
+      return b
+    },
+    or: (expr) => {
+      chain.orExpr = expr
+      return b
+    },
+    order: () => b,
+    select: () => b,
+    update: () => b,
+    delete: () => b,
+    upsert: () => b,
+    limit: (n) => {
+      chain.limit = n
+      const rows = apply(active!.table)
+      return Promise.resolve({ data: rows, error: null, count: rows.length })
+    },
+    single: () => Promise.resolve({ data: null, error: null, count: 0 }),
+    then: (onFulfilled) => {
+      const rows = apply(active!.table)
+      return Promise.resolve({ data: rows, error: null, count: rows.length }).then(onFulfilled)
+    },
+  }
+  return {
+    queries,
+    rpcCalls: [] as Array<{ name: string; args?: Record<string, unknown> }>,
+    from: (table: string) => {
+      active = { table, filters: [] }
+      queries.push(active)
+      chain = {}
+      return b
+    },
+    rpc: (name: string) =>
+      Promise.resolve({ data: name === 'sync_pulse' ? null : 'org-x', error: null }),
   }
 }
 
@@ -384,3 +470,69 @@ describe('SupabaseSyncTransport.pull history', () => {
     expect(fromCloudRow('sessionRuns', row)).toMatchObject({ sessionName: 'Squad Plan' })
   })
 })
+
+// A bulk 3rd-party import stamps every row with the same updated_at in one
+// transaction. With BATCH-sized (or larger) such groups, a plain
+// gt(updated_at, cursor) bound drops every tied row past the first page, so
+// server-originated swimmers never reach the device. The composite
+// (updated_at, id) cursor must capture all of them across pages.
+describe('SupabaseSyncTransport.pull pagination across a shared timestamp', () => {
+  const TS = '2026-01-01T00:00:00.000Z'
+  const makeRows = (count: number): Record<string, unknown>[] =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `sw-${String(i).padStart(4, '0')}`,
+      organization_id: 'org-A',
+      name: `Swimmer ${i}`,
+      updated_at: TS,
+      deleted_at: null,
+    }))
+
+  test('captures every row that shares a timestamp once the group spans pages', async () => {
+    // 600 rows all stamped with the same updated_at, more than BATCH (500).
+    const cloud = { swimmers: makeRows(600) }
+    const stub = makePaginatingStub(cloud)
+    const transport = new SupabaseSyncTransport(stub as unknown as SupabaseLike)
+
+    const captured = new Set<string>()
+    let cursors = emptyCursors()
+    for (let page = 0; page < 5; page++) {
+      const res = await transport.pull('org-A', cursors)
+      for (const c of res.changes) if (c.table === 'swimmers') captured.add(c.id)
+      cursors = res.nextCursors
+      if (res.changes.length === 0) break
+    }
+
+    expect(captured.size).toBe(600)
+    expect([...captured].sort()).toEqual(cloud.swimmers.map((r) => r.id).sort())
+  })
+
+  test('does not re-capture rows already delivered on a later run', async () => {
+    const cloud = { swimmers: makeRows(600) }
+    const stub = makePaginatingStub(cloud)
+    const transport = new SupabaseSyncTransport(stub as unknown as SupabaseLike)
+
+    // First full sync drains everything.
+    let cursors = emptyCursors()
+    for (let page = 0; page < 5; page++) {
+      const res = await transport.pull('org-A', cursors)
+      cursors = res.nextCursors
+      if (res.changes.length === 0) break
+    }
+    // A subsequent pull with the advanced cursor should yield nothing new.
+    const res = await transport.pull('org-A', cursors)
+    expect(res.changes.filter((c) => c.table === 'swimmers')).toHaveLength(0)
+  })
+
+  test('carries the cloud updated_by as editorId on plan rows', async () => {
+    const stub = makeSupabaseStub({
+      rows: [{ id: 's1', updated_by: 'editor-owner', updated_at: 'rev-2', deleted_at: null }],
+    })
+    const transport = new SupabaseSyncTransport(stub)
+
+    const res = await transport.pull('org-A', emptyCursors(), ['sessions'])
+
+    const change = res.changes.find((c) => c.table === 'sessions' && c.id === 's1')
+    expect(change?.editorId).toBe('editor-owner')
+  })
+})
+

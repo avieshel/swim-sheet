@@ -135,6 +135,13 @@ Four layers defend against this:
      those runs are quarantined, then the rest of the batch is retried. This is the
      definitive guarantee that one bad run can never again abort the whole push and block
      the pull that delivers coach-assist edits.
+      When the error text carries no parseable
+      `Key (session_id)=(...)` detail (the server `details` string is sometimes absent in
+      production, which is exactly what produced Avi Lugasi's 13 recurring `sync_error`
+      events), recovery instead re-pushes each `session_runs` upsert individually: only a
+      run referencing a `session_id` absent from the cloud fails the per-row push and is
+      quarantined, while a run referencing a present session is preserved — so recoverable
+      data is never discarded and the wedge clears on the next sync.
 
 **Escape hatch — `syncService.restoreFromCloud()`** is the last-resort recovery for any
 wedge the incremental path cannot clear. It is a **hard reset**: it wipes every local
@@ -172,6 +179,44 @@ because a rendering difference between the RPC and table-read paths would otherw
 fail in exactly that silent direction. Verified end-to-end through PostgREST:
 caught-up → `[]`, behind → only the affected table, non-member → `[]`, signed-out →
 `42501`.
+
+## Pull pagination cursor
+
+`pull` pages each table with a `BATCH` of 500 rows. The per-table cursor is stored
+locally as a composite `updated_at|id` rather than a bare timestamp. A plain
+`gt(updated_at, cursor)` bound drops every row that shares the boundary timestamp
+once a group exceeds one page — exactly the failure mode of a **bulk 3rd-party
+swimmer import**, which stamps all rows with the same `now()` in one transaction
+and would otherwise never reach the device in full. The composite cursor uses an
+`or(updated_at.gt.<ts>, and(updated_at.eq.<ts>, id.gt.<id>))` bound so tied rows are
+never skipped across a page boundary. A legacy bare-timestamp cursor (or the
+`MIN_CURSOR` seed) is read as having no id and uses an inclusive `gte(updated_at)`
+bound, so it re-captures boundary rows idempotently on the first post-upgrade pull.
+The `sync_pulse` probe is still sent the stripped `updated_at` component, preserving
+the RPC's timestamp-only contract.
+
+## Phase 2 — session-plan editor tracking
+
+The session-plan layer (`sessions`, `drills`, `libraryDrills` — the reusable
+templates a coach and owner collaborate on) gets owner-aware semantics on top of
+the generic sync, without touching the bulk path (swimmers / history stay on plain
+last-write-wins).
+
+- **Editor tracking (migration `20261119000000_plan_editor_tracking.sql`)**: a
+  nullable `updated_by` on the three plan tables, set by a `set_plan_editor`
+  trigger from `auth.uid()` (mirrors `set_updated_at`). The client never sends it;
+  the cloud is the source of truth for *who* edited. `SupabaseSyncTransport.pull`
+  carries it back as `CloudChange.editorId`.
+- **Coach-assist signal**: when a pulled plan row's `editorId` is someone other
+  than the local user, `syncNow` records it in `SyncState.planUpdatesByOther` and
+  emits `plan_updated_by_other` (non-blocking — the row is already delivered by the
+  generic sync). The UI can surface "an owner tuned your plan" from that list.
+- **Owner-wins-on-conflict**: `SyncState.conflicts` carry
+  `recommendedResolution: 'remote'` for plan-table conflicts, advising the
+  conflict UI to default to the owner's (remote) edit rather than the coach's
+  local one. A recommendation only — the coach can still keep their local edit.
+
+`PLAN_TABLES` (in `types.ts`) is the single source of that scope.
 
 ## Supabase Security Baseline
 
