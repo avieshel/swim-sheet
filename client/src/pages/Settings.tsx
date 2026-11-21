@@ -10,6 +10,7 @@ import { InfoDialog } from '../components/InfoDialog'
 import { Icon } from '../components/Icon'
 import { AccountSection } from '../components/AccountSection'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useI18n } from '../i18n'
 
 type AppSettingsAction = Parameters<typeof Events.AppSettings>[0]
 
@@ -43,6 +44,7 @@ function suggestTeamNames(name: string): string[] {
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate()
+  const { locale, setLocale } = useI18n()
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<SettingsForm>({
     team_name: '',
@@ -591,14 +593,13 @@ export const Settings: React.FC = () => {
                   Language
                 </label>
                 <CustomSelect
-                  value={localStorage.getItem('selectedLanguage') || 'en'}
+                  value={locale}
                   options={[
                     { value: 'en', label: 'English' },
                     { value: 'he', label: 'עברית', badge: <span className="text-caption-caps font-bold px-1 py-0.5 rounded bg-amber-200 text-amber-800">Beta</span> },
                   ]}
                   onChange={(val) => {
-                    localStorage.setItem('selectedLanguage', val as string);
-                    window.location.reload();
+                    if (val === 'en' || val === 'he') setLocale(val)
                   }}
                 />
               </div>
