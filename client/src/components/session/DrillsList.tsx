@@ -7,7 +7,7 @@ import { EquipmentIcons, type EquipmentType } from '../EquipmentIcons'
 // compact subtitle line, an inset fold for details — so a session reads the
 // same before and during a run. There are no progress affordances here; the
 // fold holds only what a coach reviews before starting.
-const FOLD_BOX = 'ml-8 md:ml-11 mr-4 md:mr-5 mb-2 rounded-xl border border-outline-variant/30 bg-surface-container-low/30 overflow-hidden'
+const FOLD_BOX = 'ms-8 md:ms-11 me-4 md:me-5 mb-2 rounded-xl border border-outline-variant/30 bg-surface-container-low/30 overflow-hidden'
 
 export interface DrillsListStep {
   label: string
@@ -120,7 +120,7 @@ function RowDetail({ row }: { row: DrillsListRow }) {
       {row.steps.length > 1 && (
         <div className="pt-0.5 pb-2">
           {row.steps.map(step => (
-            <div key={step.label} className="flex items-center gap-2 py-1 pr-6 pl-3">
+            <div key={step.label} className="flex items-center gap-2 py-1 pe-6 ps-3">
               <span className="text-label-sm font-semibold tabular-nums w-5 shrink-0 text-on-surface-variant">
                 {step.label}
               </span>

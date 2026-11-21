@@ -30,7 +30,7 @@ function GroupHeader({ name, lane, onEdit, collapsed, onToggleCollapsed }: {
           L{lane}
         </span>
         <button onClick={onEdit}
-          className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer ml-1">
+          className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer ms-1">
           <Icon name="edit" size="sm" />
         </button>
       </div>
@@ -109,7 +109,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
                   <div className="text-label-sm text-on-surface-variant">{nextDrill.distance}m {nextDrill.stroke}</div>
                 </div>
                 <button onClick={() => onSelectDrill(nextDrill.id)}
-                  className="h-11 px-4 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ml-2">
+                  className="h-11 px-4 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all cursor-pointer shrink-0 ms-2">
                   Go to drill
                 </button>
                 </div>
@@ -156,10 +156,10 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
           <div className="space-y-1">
             {runDrills.map((d, idx) => (
               <button key={d.id} onClick={() => onSelectDrill(d.id)}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm bg-surface-container-lowest hover:bg-primary-container/30 transition-colors cursor-pointer border border-outline-variant/20">
-                <span className="tabular-nums font-semibold text-on-surface-variant mr-1.5">{idx + 1}.</span>
+                className="w-full text-start px-3 py-2 rounded-lg text-sm bg-surface-container-lowest hover:bg-primary-container/30 transition-colors cursor-pointer border border-outline-variant/20">
+                <span className="tabular-nums font-semibold text-on-surface-variant me-1.5">{idx + 1}.</span>
                 <span className="text-on-surface">{d.name}</span>
-                <span className="ml-1.5 text-on-surface-variant">({d.distance}m {d.stroke})</span>
+                <span className="ms-1.5 text-on-surface-variant">({d.distance}m {d.stroke})</span>
               </button>
             ))}
           </div>
@@ -257,7 +257,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
       {showPopup && (
         <div 
           ref={popupRef}
-          className="absolute bottom-full left-0 right-0 mb-2 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg z-50 overflow-hidden"
+          className="absolute bottom-full start-0 end-0 mb-2 bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg z-50 overflow-hidden"
         >
           <div className="p-2">
             <button
@@ -279,7 +279,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
                     placeholder="Search roster..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full py-2 pl-9 pr-3 rounded-lg bg-surface-container text-on-surface text-sm border border-outline-variant focus:border-primary focus:outline-none"
+                    className="w-full py-2 ps-9 pe-3 rounded-lg bg-surface-container text-on-surface text-sm border border-outline-variant focus:border-primary focus:outline-none"
                     autoFocus
                   />
                 </div>
@@ -291,7 +291,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
                     <button
                       key={swimmer.id}
                       onClick={() => handleSelectRoster(swimmer)}
-                      className="w-full py-2 px-3 rounded-lg text-left hover:bg-surface-variant transition-all cursor-pointer"
+                      className="w-full py-2 px-3 rounded-lg text-start hover:bg-surface-variant transition-all cursor-pointer"
                     >
                       <div className="text-sm font-medium text-on-surface">{swimmer.name}</div>
                       {swimmer.group && (
@@ -313,7 +313,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
           <div className="border-t border-outline-variant p-2">
             <button
               onClick={handleCreateNew}
-              className="w-full py-2 px-3 rounded-lg text-left hover:bg-surface-variant transition-all cursor-pointer flex items-center gap-2"
+              className="w-full py-2 px-3 rounded-lg text-start hover:bg-surface-variant transition-all cursor-pointer flex items-center gap-2"
             >
               <Icon name="person_add" color="on-surface-variant" />
               <span className="text-sm text-on-surface">Create new swimmer</span>

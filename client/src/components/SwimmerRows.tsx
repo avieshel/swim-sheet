@@ -98,7 +98,7 @@ function useLongPressMenu() {
             <button
               key={item.label}
               onClick={() => { setMenu(null); item.onClick() }}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-body-md text-on-surface hover:bg-surface-variant transition-colors cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-start text-body-md text-on-surface hover:bg-surface-variant transition-colors cursor-pointer"
             >
               <Icon name={item.icon} size="sm" />
               {item.label}
@@ -220,7 +220,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
         <div className="min-w-0 flex-1 flex flex-col">
           <button
             onClick={handleNameClick}
-            className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-left cursor-pointer hover:text-primary transition-colors"
+            className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-start cursor-pointer hover:text-primary transition-colors"
             title={isVirtual ? 'Save to roster' : 'Edit swimmer'}
           >
             {saved.name}
@@ -259,13 +259,13 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
               </span>
             )}
           </div>
-          <button onClick={() => toggleLapEdit(`saved-${saved.dbId}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none -mr-1 mt-0.5">
+          <button onClick={() => toggleLapEdit(`saved-${saved.dbId}`)} className="text-on-surface-variant hover:text-primary transition-colors leading-none -me-1 mt-0.5">
             <Icon name={isEditing ? 'check' : 'more_horiz'} size="sm" />
           </button>
           {onRemoveFromFocus && (
             <button
               onClick={() => onRemoveFromFocus(saved.dbId)}
-              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1 mt-0.5"
+              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -me-1 mt-0.5"
               title="Remove from timing focus"
             >
               <Icon name="close" size="sm" />
@@ -294,7 +294,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                     <Icon name="close" size="sm" />
                   </button>
                 ) : null}
-                <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-right">#{i + 1}</span>
+                <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-end">#{i + 1}</span>
                 <span className="text-body-lg text-on-surface font-bold shrink-0">{formatTime(entry.time)}</span>
                 {diff !== null && (
                   <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
@@ -309,7 +309,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                     <span className="text-on-surface-variant/60">--</span>
                   )}
                 </span>
-                <div className="ml-auto shrink-0">
+                <div className="ms-auto shrink-0">
                   <StrokeCountStepper
                     value={sc}
                     onChange={count => {
@@ -518,7 +518,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           <div className="min-w-0 flex-1 flex flex-col">
             <button
               onClick={handleNameClick}
-              className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-left cursor-pointer hover:text-primary transition-colors"
+              className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-start cursor-pointer hover:text-primary transition-colors"
               title={isVirtual ? 'Save to roster' : 'Edit swimmer'}
             >
               {swimmer.name}
@@ -557,7 +557,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           {onRemoveFromFocus ? (
             <button
               onClick={() => onRemoveFromFocus(swimmer.id)}
-              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
+              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -me-1"
               title="Remove from timing focus"
             >
               <Icon name="close" size="sm" />
@@ -565,7 +565,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           ) : (
             <button
               onClick={() => setShowRemoveConfirm(true)}
-              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -mr-1"
+              className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -me-1"
               title={isVirtual ? 'Remove swimmer' : 'Remove swimmer from this lane'}
             >
               <Icon name="close" size="sm" />
@@ -584,7 +584,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
             const sc = swimmer.lapStrokeCounts[i + 1]
             return (
               <div key={i} className="flex items-center gap-2 font-mono tabular-nums">
-                <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-right">#{i + 1}</span>
+                <span className="text-label-caps text-on-surface-variant shrink-0 w-5 text-end">#{i + 1}</span>
                 <span className="text-body-lg text-on-surface font-bold shrink-0">{formatTime(split)}</span>
                 {diff !== null && (
                   <span className={`shrink-0 text-xs ${diff > 10 ? 'text-error' : diff < -10 ? 'text-primary' : 'text-on-surface-variant'}`}>
@@ -599,7 +599,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
                     <span className="text-on-surface-variant/60">--</span>
                   )}
                 </span>
-                <div className="ml-auto shrink-0">
+                <div className="ms-auto shrink-0">
                   <StrokeCountStepper
                     value={sc}
                     onChange={count => dispatch({

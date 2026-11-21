@@ -158,12 +158,12 @@ export function LiveSessionHeader({
                   </button>
                 </span>
                 {showPicker && (
-                  <div className="absolute z-[100] left-0 mt-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-xl py-1 min-w-[100px] animate-in fade-in zoom-in duration-100">
+                  <div className="absolute z-[100] start-0 mt-1 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-xl py-1 min-w-[100px] animate-in fade-in zoom-in duration-100">
                     {[25, 50].map(v => (
                       <button
                         key={v}
                         onClick={() => { commit(v); setShowPicker(false) }}
-                        className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                        className={`w-full text-start px-3 py-1.5 text-sm transition-colors ${
                           poolLength === v
                             ? 'bg-primary/10 text-primary font-bold'
                             : 'text-on-surface hover:bg-primary-container/20'

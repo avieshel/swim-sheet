@@ -176,7 +176,7 @@ export const SwimmersList: React.FC = () => {
           <div className="relative flex-1 group">
             <Icon name="search" color="on-surface-variant" className="absolute left-4 top-1/2 -translate-y-1/2" />
             <input
-              className="w-full h-12 pl-12 pr-10 bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 rounded-t-lg transition-all font-body-md text-body-md outline-none"
+              className="w-full h-12 ps-12 pe-10 bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 rounded-t-lg transition-all font-body-md text-body-md outline-none"
               placeholder="Search by name or group..."
               type="text"
               value={search}

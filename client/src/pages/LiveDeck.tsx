@@ -201,7 +201,7 @@ export const LiveDeck: React.FC = () => {
         <button
           onClick={handleQuickStart}
           disabled={startingQuickStart}
-          className="w-full flex items-center justify-between gap-3 p-4 md:p-5 bg-surface-container-lowest rounded-2xl border-2 border-primary/40 hover:border-primary transition-all text-left cursor-pointer shadow-sm disabled:opacity-60"
+          className="w-full flex items-center justify-between gap-3 p-4 md:p-5 bg-surface-container-lowest rounded-2xl border-2 border-primary/40 hover:border-primary transition-all text-start cursor-pointer shadow-sm disabled:opacity-60"
         >
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center flex-shrink-0">
@@ -224,7 +224,7 @@ export const LiveDeck: React.FC = () => {
             key={s.id}
             onClick={() => handleStartSession(s)}
             disabled={startingSessionId !== null}
-            className="w-full flex items-center justify-between gap-3 p-4 md:p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant hover:border-primary/40 transition-all text-left cursor-pointer shadow-sm disabled:opacity-60"
+            className="w-full flex items-center justify-between gap-3 p-4 md:p-5 bg-surface-container-lowest rounded-2xl border border-outline-variant hover:border-primary/40 transition-all text-start cursor-pointer shadow-sm disabled:opacity-60"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center flex-shrink-0">

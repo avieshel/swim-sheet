@@ -78,4 +78,22 @@ describe('Icon', () => {
     expect(el.className).toContain('text-primary')
     expect(el.className).toContain('custom-class')
   })
+
+  it('mirrors known directional icons in rtl', () => {
+    render(<Icon name="arrow_forward" />)
+    const el = screen.getByText('arrow_forward')
+    expect(el.className).toContain('rtl:-scale-x-100')
+  })
+
+  it('does not mirror non-directional icons', () => {
+    render(<Icon name="pool" />)
+    const el = screen.getByText('pool')
+    expect(el.className).not.toContain('rtl:-scale-x-100')
+  })
+
+  it('allows opting out of rtl mirroring', () => {
+    render(<Icon name="arrow_forward" mirrorInRtl={false} />)
+    const el = screen.getByText('arrow_forward')
+    expect(el.className).not.toContain('rtl:-scale-x-100')
+  })
 })

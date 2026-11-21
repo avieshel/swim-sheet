@@ -72,8 +72,12 @@ All icons use the `<Icon>` component from `components/Icon.tsx`. Never use raw
 
 Props: `name`, `size` (`xs`…`4xl`, default `md`), `color` (`primary`/`error`/
 `on-surface-variant`/`on-error`/`current`, default `current`), `fill`, `className`,
-`style`. Size scale: xs=12px (badges), sm=14px (metadata/chevrons), md=16px (default),
-lg=18px (nav), xl=24px (nav cards), 2xl=30px (empty states), 3xl=36px, 4xl=48px (hero).
+`style`, `mirrorInRtl` (`boolean`, optional). Size scale: xs=12px (badges), sm=14px
+(metadata/chevrons), md=16px (default), lg=18px (nav), xl=24px (nav cards), 2xl=30px
+(empty states), 3xl=36px, 4xl=48px (hero). Directional icons (`arrow_back/forward`,
+`chevron_left/right`, `fast_forward/rewind`, `navigate_before/next`,
+`keyboard_arrow_left/right`, `first_page/last_page`, `undo/redo`) auto-mirror in RTL
+via `rtl:-scale-x-100`; pass `mirrorInRtl={false}` to opt out.
 
 ## Themes (no Tailwind `dark:` prefix)
 Named themes written to `document.documentElement.dataset.theme` (`pool` = light,

@@ -119,7 +119,7 @@ export const SwimmerDetail: React.FC = () => {
                   {swimmer.group}
                 </span>
               )}
-              <span className={`inline-block mt-2 ml-2 px-3 py-1 rounded text-label-sm font-bold ${
+              <span className={`inline-block mt-2 ms-2 px-3 py-1 rounded text-label-sm font-bold ${
                 swimmer.status === 'inactive'
                   ? 'bg-surface-variant text-on-surface-variant'
                   : 'bg-green-100 text-green-700'

@@ -138,18 +138,18 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
               autoFocus
             />
             {showDropdown && filteredSwimmers.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-0.5 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto">
+              <div className="absolute start-0 end-0 top-full mt-0.5 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-lg z-10 max-h-48 overflow-y-auto">
                 {filteredSwimmers.map(s => (
                   <button
                     key={s.id}
                     type="button"
                     onClick={() => handleSelectSwimmer(s)}
-                    className="w-full px-3 py-2 text-left text-sm font-medium text-on-surface hover:bg-primary-container/40 flex items-center gap-2 transition-colors cursor-pointer first:rounded-t-xl last:rounded-b-xl"
+                    className="w-full px-3 py-2 text-start text-sm font-medium text-on-surface hover:bg-primary-container/40 flex items-center gap-2 transition-colors cursor-pointer first:rounded-t-xl last:rounded-b-xl"
                   >
                     <Icon name="person" size="sm" color="on-surface-variant" />
                     <span>{s.name}</span>
                     {s.group && (
-                      <span className="ml-auto text-label-sm text-on-surface-variant">{s.group}</span>
+                      <span className="ms-auto text-label-sm text-on-surface-variant">{s.group}</span>
                     )}
                   </button>
                 ))}

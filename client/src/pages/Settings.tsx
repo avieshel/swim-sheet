@@ -369,7 +369,7 @@ export const Settings: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleTeamNameRemove(item)}
-                        className="ml-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
+                        className="ms-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
                       >
                         ×
                       </button>
@@ -479,7 +479,7 @@ export const Settings: React.FC = () => {
                           : 'text-on-surface'
                       }`}
                     />
-                    <span className={`text-sm pr-2 ${
+                    <span className={`text-sm pe-2 ${
                       Number(poolLengthValue) !== 25 && Number(poolLengthValue) !== 50
                         ? 'text-on-primary'
                         : 'text-on-surface-variant'
@@ -499,7 +499,7 @@ export const Settings: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleEquipRemove(item)}
-                        className="ml-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
+                        className="ms-1 text-on-surface-variant hover:text-error transition-colors cursor-pointer bg-transparent border-none p-0 leading-none"
                       >
                         ×
                       </button>
@@ -658,7 +658,7 @@ export const Settings: React.FC = () => {
               {storageInfo && (
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
                   <span className="font-label-sm text-on-surface">Storage Used</span>
-                  <div className="text-right">
+                  <div className="text-end">
                     <span className="font-body-md font-bold text-on-surface">{formatBytes(storageInfo.bytes)}</span>
                     <div className="text-xs text-on-surface-variant">
                       {Object.entries(storageInfo.tables)
@@ -714,7 +714,7 @@ export const Settings: React.FC = () => {
                       <Icon name="info" size="sm" />
                     </button>
                   </span>
-                  <span className="flex items-center gap-3 text-right">
+                  <span className="flex items-center gap-3 text-end">
                     <span className="font-body-md text-on-surface-variant">
                       {persistenceGranted === null ? 'Checking...' : persistenceGranted ? (
                         <span className="flex items-center gap-1.5">

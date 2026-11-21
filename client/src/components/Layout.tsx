@@ -59,7 +59,7 @@ export const Layout: React.FC = () => {
             <h1 className="font-headline-md font-bold text-primary truncate">Swim Sheet</h1>
           </Link>
           <div className="hidden md:flex items-center">
-            <nav className="flex gap-2 lg:gap-4 mr-2">
+            <nav className="flex gap-2 lg:gap-4 me-2">
               {visibleNavItems.map(item => (
                 <Link
                   key={item.path}
@@ -72,7 +72,7 @@ export const Layout: React.FC = () => {
                 >
                   {item.label}
                   {item.path === '/live' && activeRun && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
+                    <span className="absolute top-1 end-1 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
                   )}
                 </Link>
               ))}
@@ -142,7 +142,7 @@ export const Layout: React.FC = () => {
                 fill={isActive(item.path)}
               />
               {item.path === '/live' && activeRun && (
-                <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
+                <span className="absolute -top-1 -end-1.5 w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_0_3px_rgba(34,197,94,0.2)]" />
               )}
             </span>
             <span className="font-label-sm leading-none mt-0.5">{item.label}</span>

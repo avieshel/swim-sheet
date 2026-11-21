@@ -8,7 +8,25 @@ export interface IconProps {
   fill?: boolean
   className?: string
   style?: React.CSSProperties
+  mirrorInRtl?: boolean
 }
+
+const DIRECTIONAL_ICONS = new Set([
+  'arrow_back',
+  'arrow_forward',
+  'chevron_left',
+  'chevron_right',
+  'fast_forward',
+  'fast_rewind',
+  'navigate_before',
+  'navigate_next',
+  'keyboard_arrow_left',
+  'keyboard_arrow_right',
+  'first_page',
+  'last_page',
+  'undo',
+  'redo',
+])
 
 const SIZE_CLASSES: Record<IconSize, string> = {
   xs: 'text-xs',
@@ -29,15 +47,17 @@ const COLOR_CLASSES: Record<IconColor, string> = {
   current: '',
 }
 
-export function Icon({ name, size = 'md', color = 'current', fill = false, className = '', style }: IconProps) {
+export function Icon({ name, size = 'md', color = 'current', fill = false, className = '', style, mirrorInRtl }: IconProps) {
   const sizeClass = SIZE_CLASSES[size]
   const colorClass = COLOR_CLASSES[color]
   const fillStyle = fill ? { fontVariationSettings: "'FILL' 1" } : undefined
   const mergedStyle = { ...fillStyle, ...style }
+  const shouldMirror = mirrorInRtl ?? DIRECTIONAL_ICONS.has(name)
+  const mirrorClass = shouldMirror ? 'rtl:-scale-x-100' : ''
 
   return (
     <span
-      className={`material-symbols-outlined ${sizeClass} ${colorClass} ${className}`}
+      className={`material-symbols-outlined ${sizeClass} ${colorClass} ${mirrorClass} ${className}`.trim()}
       style={mergedStyle}
     >
       {name}

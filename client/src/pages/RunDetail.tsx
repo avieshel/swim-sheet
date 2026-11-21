@@ -182,16 +182,16 @@ export function RunDetail() {
           <p className="text-on-surface-variant font-body-md">No drill results recorded for this run.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left">
+            <table className="w-full min-w-[560px] text-start">
               <thead>
                 <tr className="text-label-caps text-on-surface-variant border-b border-outline-variant/40">
                   <th className="px-3 py-2.5 font-medium">Swimmer</th>
                   {drillColumns.map(col => (
-                    <th key={col.drillId} className="px-3 py-2.5 font-medium text-right truncate max-w-[140px]">
+                    <th key={col.drillId} className="px-3 py-2.5 font-medium text-end truncate max-w-[140px]">
                       {col.label}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 font-medium text-right">Total</th>
+                  <th className="px-3 py-2.5 font-medium text-end">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/40">
@@ -217,12 +217,12 @@ export function RunDetail() {
                       {drillColumns.map(col => {
                         const entry = byDrill.get(col.drillId)
                         return (
-                          <td key={col.drillId} className="px-3 py-2.5 text-right font-mono tabular-nums text-on-surface">
+                          <td key={col.drillId} className="px-3 py-2.5 text-end font-mono tabular-nums text-on-surface">
                             {entry?.totalMs != null ? formatTime(entry.totalMs) : <span className="text-on-surface-variant">—</span>}
                           </td>
                         )
                       })}
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold text-primary">
+                      <td className="px-3 py-2.5 text-end font-mono tabular-nums font-bold text-primary">
                         {swimmer.totalTimeMs != null ? formatTime(swimmer.totalTimeMs) : <span className="text-on-surface-variant">—</span>}
                       </td>
                     </tr>
