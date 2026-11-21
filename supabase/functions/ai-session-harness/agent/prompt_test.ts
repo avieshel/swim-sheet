@@ -319,3 +319,42 @@ Deno.test('the prompt keeps names in English but plan lines and descriptions in 
   assert(prompt.includes('canonical English'))
   assert(prompt.includes('language the coach wrote in'))
 })
+
+Deno.test('the prompt explains library candidate reuse when candidates are provided', () => {
+  const prompt = buildSystemPrompt({
+    ...context,
+    libraryCandidates: [
+      {
+        candidateId: 'cand_1',
+        name: 'Fingertip Drag',
+        stroke: 'freestyle',
+        distance: 100,
+        repeatCount: 1,
+        items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      },
+    ],
+  })
+  assert(prompt.includes('sourceCandidateId'))
+  assert(prompt.includes('cand_1'))
+  assert(prompt.includes('Fingertip Drag'))
+  assert(prompt.includes('never invent a DB ID'))
+})
+
+Deno.test('the prompt tells the model to reuse a matching candidate with variant adjustments', () => {
+  const prompt = buildSystemPrompt({
+    ...context,
+    libraryCandidates: [
+      {
+        candidateId: 'cand_1',
+        name: 'Broken 100m',
+        stroke: 'freestyle',
+        distance: 100,
+        repeatCount: 1,
+        items: [{ distance: 25, stroke: 'freestyle', repeatCount: 4 }],
+      },
+    ],
+  })
+  assert(prompt.toLowerCase().includes('reuse'))
+  assert(prompt.includes('sourceCandidateId'))
+  assert(prompt.toLowerCase().includes('variant') || prompt.toLowerCase().includes('adjust'))
+})
