@@ -7,12 +7,14 @@ import { validateHarnessResult, validateSessionDraftRequest } from '../services/
 import { applySessionDraft as applyDraftService } from '../services/sessionDraft/apply'
 import type {
   ApplyDraftResult,
+  ApplySessionDraftOptions,
 } from '../services/sessionDraft/apply'
 import {
   type ContextInput,
   type EquipmentId,
   type HarnessResult,
   type SessionDraftContext,
+  type SessionDraftLibraryCandidateV1,
   type SessionDraftRequest,
   type SessionDraftSeedV1,
   type SessionDraftV1,
@@ -21,7 +23,7 @@ import { EQUIPMENT_IDS, defaultSessionDraftConfig } from '../../../shared/sessio
 import { settingsService } from '../services/settingsService'
 import { getAllSwimmers } from '../db/dao'
 import { sessionService } from '../services/sessionService'
-import { getSessionDrills } from './drills'
+import { getSessionDrills, listLibraryDrills } from './drills'
 import { getAnalyticsSessionId } from '../services/analyticsService'
 import { v7 as uuidv7 } from 'uuid'
 
@@ -34,6 +36,7 @@ export interface PreparedSessionDraft {
   context: SessionDraftContext
   removedCategories: SessionDraftContext['recentSessions'] extends never ? never : Array<'known_name' | 'email' | 'phone'>
   knownSwimmerNames: string[]
+  libraryDrillMap: Record<string, string>
 }
 
 export type SessionDraftResult =
@@ -85,6 +88,62 @@ async function buildRecentSessions(): Promise<ContextInput['recentSessions']> {
   return built.filter((session): session is NonNullable<typeof session> => session !== null)
 }
 
+function toCandidateItem(item: { distance: number; stroke: string; repeatCount: number; intensity?: string; interval?: string; equipment?: string[]; description?: string }): SessionDraftLibraryCandidateV1['items'][number] | null {
+  if (!isValidRecentDrill(item)) return null
+  const intensity = (defaultSessionDraftConfig.intensityValues as readonly string[]).includes(item.intensity ?? '')
+    ? (item.intensity as SessionDraftLibraryCandidateV1['items'][number]['intensity'])
+    : undefined
+  const equipment = item.equipment?.filter((e): e is EquipmentId => (EQUIPMENT_IDS as readonly string[]).includes(e))
+  return {
+    distance: item.distance,
+    stroke: item.stroke as SessionDraftLibraryCandidateV1['items'][number]['stroke'],
+    repeatCount: item.repeatCount,
+    ...(intensity ? { intensity } : {}),
+    ...(item.interval ? { interval: item.interval } : {}),
+    ...(equipment && equipment.length > 0 ? { equipment } : {}),
+    ...(item.description ? { description: item.description } : {}),
+  }
+}
+
+async function buildLibraryCandidates(): Promise<{ candidates: SessionDraftLibraryCandidateV1[]; libraryDrillMap: Record<string, string> }> {
+  const drills = await listLibraryDrills()
+  const ranked = [...drills].sort((a, b) => {
+    const pop = (b.popularity ?? 0) - (a.popularity ?? 0)
+    if (pop !== 0) return pop
+    const updated = (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '')
+    if (updated !== 0) return updated
+    return a.name.localeCompare(b.name)
+  })
+
+  const candidates: SessionDraftLibraryCandidateV1[] = []
+  const libraryDrillMap: Record<string, string> = {}
+  for (const drill of ranked) {
+    if (candidates.length >= defaultSessionDraftConfig.limits.maxLibraryCandidates) break
+    const rawItems = (drill.items && drill.items.length > 0)
+      ? drill.items
+      : [{ distance: drill.distance, stroke: drill.stroke, repeatCount: drill.repeatCount ?? 1 }]
+    const items = rawItems
+      .map(toCandidateItem)
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .slice(0, defaultSessionDraftConfig.limits.maxStepsPerDrill)
+    if (items.length === 0) continue
+    const candidateId = `cand_${candidates.length + 1}`
+    candidates.push({
+      candidateId,
+      name: drill.name,
+      ...(drill.description ? { description: drill.description } : {}),
+      stroke: drill.stroke,
+      distance: drill.distance,
+      repeatCount: drill.repeatCount ?? 1,
+      items,
+      ...(drill.focus ? { focus: drill.focus } : {}),
+      ...(drill.labels && drill.labels.length > 0 ? { labels: drill.labels.slice(0, defaultSessionDraftConfig.limits.maxCandidateLabels) } : {}),
+    })
+    libraryDrillMap[candidateId] = drill.id
+  }
+  return { candidates, libraryDrillMap }
+}
+
 export async function prepareSessionDraft(prompt: string): Promise<PreparedSessionDraft> {
   const seed = createSessionDraftSeed()
   const settings = await settingsService.getSettings()
@@ -96,6 +155,8 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     .filter((option) => (EQUIPMENT_IDS as readonly string[]).includes(option))
     .map((option) => option as EquipmentId)
 
+  const { candidates: libraryCandidates, libraryDrillMap } = await buildLibraryCandidates()
+
   const contextInput: ContextInput = {
     poolLength: settings.pool_length,
     distanceUnits: settings.distance_units,
@@ -103,6 +164,7 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     knownSwimmerNames,
     equipmentOptions,
     recentSessions: await buildRecentSessions(),
+    libraryCandidates,
   }
 
   const context = buildSessionDraftContext(contextInput)
@@ -114,6 +176,7 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     context,
     removedCategories: sanitized.removedCategories,
     knownSwimmerNames,
+    libraryDrillMap,
   }
 }
 
@@ -361,6 +424,9 @@ export async function requestSessionDraftStream(
 // Persist an actionable draft as a normal session template. The AI step is just a
 // faster way to populate the drills, so the saved session is immediately a kept
 // template — no separate review gate, identical to a manually built session.
-export async function applySessionDraft(draft: SessionDraftV1): Promise<ApplyDraftResult> {
-  return applyDraftService(draft)
+export async function applySessionDraft(
+  draft: SessionDraftV1,
+  options: ApplySessionDraftOptions = {},
+): Promise<ApplyDraftResult> {
+  return applyDraftService(draft, options)
 }

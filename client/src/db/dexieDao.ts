@@ -185,6 +185,13 @@ export async function addDrill(data: SafeDrill): Promise<string> {
   }
   await db.drills.add(drill)
 
+  // When caller already resolved a canonical library drill (AI reuse or high-confidence
+  // convergence), keep that link instead of creating/upserting by name.
+  if (data.libraryDrillId) {
+    await db.drills.update(id, { libraryDrillId: data.libraryDrillId })
+    return id
+  }
+
   // Also save to library
   const libDrill: SafeLibraryDrill = {
     name: drill.name,

@@ -44,8 +44,11 @@ export type { Session, SessionRun } from '../db/schema'
 
 // Direct draft creation bypasses the AI harness entirely. It shares the same
 // validator and writer as the harness path and saves straight to the template list.
-export function createSessionFromDraft(input: unknown): Promise<ApplyDraftResult> {
-  return applySessionDraft(input)
+export function createSessionFromDraft(
+  input: unknown,
+  options: { libraryDrillMap?: Record<string, string> } = {},
+): Promise<ApplyDraftResult> {
+  return applySessionDraft(input, options)
 }
 
 export type { ApplyDraftResult } from '../services/sessionDraft/apply'

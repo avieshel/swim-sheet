@@ -1,5 +1,6 @@
 import type { SafeDrill, SafeSession } from '../../db/schema'
 import { addSessionWithDrills } from '../../db/dao'
+import { bumpDrillPopularity } from '../../db/dexieDao'
 import type { Stroke } from '../../types/swimming'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 import { draftDrillDistance } from '../../../../shared/sessionDraft/distance'
@@ -12,6 +13,10 @@ export { draftDrillDistance, draftTotalDistance } from '../../../../shared/sessi
 export type ApplyDraftResult =
   | { outcome: 'created'; sessionId: string }
   | { outcome: 'invalid'; error: { code: string; message: string } }
+
+export interface ApplySessionDraftOptions {
+  libraryDrillMap?: Record<string, string>
+}
 
 // ── Draft → session/drills mapping ───────────────────────────
 
@@ -36,27 +41,33 @@ function deriveDominantStroke(
 
 export function mapDraftToSessionAndDrills(
   draft: SessionDraftV1,
+  options: ApplySessionDraftOptions = {},
 ): { session: SafeSession; drills: Array<Omit<SafeDrill, 'sessionId'>> } {
-  const drills: Array<Omit<SafeDrill, 'sessionId'>> = draft.drills.map((drill, order) => ({
-    name: drill.name,
-    stroke: deriveDominantStroke(drill.items),
-    distance: draftDrillDistance(drill.items, drill.repeatCount),
-    order,
-    items: drill.items.map((item) => ({
-      id: crypto.randomUUID(),
-      distance: item.distance,
-      stroke: item.stroke,
-      repeatCount: item.repeatCount,
-      intensity: item.intensity,
-      interval: item.interval,
-      equipment: item.equipment,
-      description: item.description,
-    })),
-    repeatCount: drill.repeatCount,
-    focus: 'none',
-    labels: [],
-    description: drill.description ?? '',
-  }))
+  const libraryDrillMap = options.libraryDrillMap ?? {}
+  const drills: Array<Omit<SafeDrill, 'sessionId'>> = draft.drills.map((drill, order) => {
+    const libraryDrillId = drill.sourceCandidateId ? libraryDrillMap[drill.sourceCandidateId] : undefined
+    return {
+      name: drill.name,
+      stroke: deriveDominantStroke(drill.items),
+      distance: draftDrillDistance(drill.items, drill.repeatCount),
+      order,
+      items: drill.items.map((item) => ({
+        id: crypto.randomUUID(),
+        distance: item.distance,
+        stroke: item.stroke,
+        repeatCount: item.repeatCount,
+        intensity: item.intensity,
+        interval: item.interval,
+        equipment: item.equipment,
+        description: item.description,
+      })),
+      repeatCount: drill.repeatCount,
+      focus: 'none',
+      labels: [],
+      description: drill.description ?? '',
+      ...(libraryDrillId ? { libraryDrillId } : {}),
+    }
+  })
 
   const session: SafeSession = {
     name: draft.session.name,
@@ -68,13 +79,16 @@ export function mapDraftToSessionAndDrills(
 
 export async function applySessionDraft(
   input: unknown,
+  options: ApplySessionDraftOptions = {},
 ): Promise<ApplyDraftResult> {
   const validation = validateSessionDraft(input)
   if (!validation.ok) {
     return { outcome: 'invalid', error: validation.error }
   }
   const draft = validation.value
-  const { session, drills } = mapDraftToSessionAndDrills(draft)
+  const { session, drills } = mapDraftToSessionAndDrills(draft, options)
   const id = await addSessionWithDrills(session, drills)
+  const reusedIds = [...new Set(drills.map((d) => d.libraryDrillId).filter((id): id is string => typeof id === 'string'))]
+  await Promise.all(reusedIds.map((libraryDrillId) => bumpDrillPopularity(libraryDrillId)))
   return { outcome: 'created', sessionId: id }
 }
