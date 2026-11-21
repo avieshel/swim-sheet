@@ -15,11 +15,14 @@ export function buildSessionDraftContext(input: ContextInput): SessionDraftConte
 
   const recentSessions = input.recentSessions.slice(0, defaultSessionDraftConfig.limits.maxRecentSessions)
 
+  const libraryCandidates = input.libraryCandidates?.slice(0, defaultSessionDraftConfig.limits.maxLibraryCandidates)
+
   return {
     poolLength: input.poolLength,
     distanceUnits: input.distanceUnits,
     groupNames,
     equipmentOptions: input.equipmentOptions,
     recentSessions,
+    ...(libraryCandidates && libraryCandidates.length > 0 ? { libraryCandidates } : {}),
   }
 }

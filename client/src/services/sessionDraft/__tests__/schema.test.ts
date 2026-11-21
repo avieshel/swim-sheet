@@ -163,6 +163,7 @@ describe('buildDraftJsonSchema', () => {
     expect(schema.properties?.session?.required).toEqual(['name'])
     const drill = schema.properties?.drills?.items
     expect(drill?.required).toEqual(['name', 'repeatCount', 'items'])
+    expect(drill?.properties?.sourceCandidateId?.type).toBe('string')
     expect(drill?.properties?.items?.items?.required).toEqual(['distance', 'stroke', 'repeatCount'])
   })
 
