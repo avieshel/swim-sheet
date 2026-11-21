@@ -2,23 +2,21 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { LiveSessionProvider } from './context/LiveSessionProvider'
+import { LocaleProvider, getCurrentLocale, getLocaleDir } from './i18n'
 import './index.css'
 
-import { getCurrentLocale } from './utils/locale';
-
-// Set document direction based on locale (RTL for Hebrew)
-const setDirection = (lang: string) => {
-  const dir = lang === 'he' ? 'rtl' : 'ltr';
-  if (typeof document !== 'undefined') {
-    document.documentElement.setAttribute('dir', dir);
-  }
-};
-setDirection(getCurrentLocale());
+const initialLocale = getCurrentLocale()
+if (typeof document !== 'undefined') {
+  document.documentElement.setAttribute('lang', initialLocale)
+  document.documentElement.setAttribute('dir', getLocaleDir(initialLocale))
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LiveSessionProvider>
-      <App />
-    </LiveSessionProvider>
+    <LocaleProvider initialLocale={initialLocale}>
+      <LiveSessionProvider>
+        <App />
+      </LiveSessionProvider>
+    </LocaleProvider>
   </StrictMode>,
 )
