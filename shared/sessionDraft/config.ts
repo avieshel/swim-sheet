@@ -52,6 +52,9 @@ export interface SessionDraftLimits {
   maxGroupNames: number
   maxGroupNameLength: number
   maxDistanceUnitsLength: number
+  maxLibraryCandidates: number
+  maxCandidateIdLength: number
+  maxCandidateLabels: number
   // Retry window to tell the client to wait when the harness returns 429 without
   // a Retry-After value. Matches the per-user rate-limit window.
   rateLimitFallbackSeconds: number
@@ -90,6 +93,9 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
     maxGroupNames: 100,
     maxGroupNameLength: 100,
     maxDistanceUnitsLength: 16,
+    maxLibraryCandidates: 12,
+    maxCandidateIdLength: 64,
+    maxCandidateLabels: 8,
     rateLimitFallbackSeconds: 3600,
   },
 }

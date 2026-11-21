@@ -164,6 +164,19 @@ export function findSimilarDrills(
   return results.sort((a, b) => b.score - a.score)
 }
 
+function normalizeDrillName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function findHighConfidenceLibraryMatch<T extends { id: string; name: string; stroke?: Stroke }>(
+  target: { name: string; stroke?: Stroke },
+  libraryDrills: T[],
+): T | null {
+  const targetName = normalizeDrillName(target.name)
+  if (!targetName) return null
+  return libraryDrills.find((drill) => normalizeDrillName(drill.name) === targetName) ?? null
+}
+
 export function detectFocus(drills: { stroke?: Stroke; distance?: number; repeatCount?: number; items?: { stroke?: Stroke; distance: number; repeatCount: number }[] }[]): string[] {
   const focus: string[] = []
   const totalDistance = drills.reduce((sum, d) => sum + getDrillTotalDistance(d), 0)

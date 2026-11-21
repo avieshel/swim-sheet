@@ -165,7 +165,7 @@ export const AiSessionDraft: React.FC = () => {
     try {
       // The AI step just populates the drills; saving creates a normal template
       // and returns to the sessions list, exactly like a manually built session.
-      const applied = await applySessionDraft(draft)
+      const applied = await applySessionDraft(draft, { libraryDrillMap: prepared?.libraryDrillMap ?? {} })
       if (applied.outcome === 'created') {
         navigate('/sessions')
         return

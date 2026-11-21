@@ -88,6 +88,20 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
     'A complete valid draft outcome looks exactly like this:',
     JSON.stringify(buildExampleResult(context), null, 2),
     '',
+    ...(context.libraryCandidates && context.libraryCandidates.length > 0
+      ? [
+          'Coach building blocks (library candidates) are provided in context.libraryCandidates.',
+          'When a candidate matches the coach\'s intent, reuse it: set sourceCandidateId to that',
+          'candidate\'s candidateId and adjust distance, repeatCount, items, interval, or intensity as',
+          'the requested variant. Do not invent a near-duplicate name for the same building block.',
+          'Use only candidate IDs provided in context; never invent a DB ID. If no candidate fits,',
+          'omit sourceCandidateId. Choose granularity from intent: separate drills for separate',
+          'technique units, or one repeated composed drill when the coach describes a repeated block.',
+          'Candidates:',
+          JSON.stringify(context.libraryCandidates, null, 2),
+          '',
+        ]
+      : []),
     'Building the drills matters most. drills is the session in order; each drill',
     'is a named block; each item inside a drill is one step swum a number of times.',
     'An item is never a drill: it never carries a name, and never its own nested items.',

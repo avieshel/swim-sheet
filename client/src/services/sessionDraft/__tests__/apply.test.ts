@@ -101,4 +101,51 @@ describe('applySessionDraft', () => {
     }
     expect(await db.sessions.count()).toBe(2)
   })
+
+  it('links a draft drill to libraryDrillId when sourceCandidateId resolves', async () => {
+    await db.libraryDrills.add({
+      id: 'lib-1',
+      name: 'Fingertip Drag',
+      stroke: 'freestyle',
+      distance: 100,
+      repeatCount: 1,
+      items: [{ id: 'i1', distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      focus: 'technique',
+      labels: [],
+      description: '',
+      popularity: 2,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    const res = await applySessionDraft({
+      ...draft,
+      drills: [{
+        ...draft.drills[0],
+        repeatCount: 1,
+        name: 'Fingertip Drag',
+        sourceCandidateId: 'cand_1',
+        items: [{ distance: 200, stroke: 'freestyle', repeatCount: 1 }],
+      }],
+    }, { libraryDrillMap: { cand_1: 'lib-1' } })
+    expect(res.outcome).toBe('created')
+    if (res.outcome === 'created') {
+      const drills = await db.drills.where('sessionId').equals(res.sessionId).toArray()
+      expect(drills[0].libraryDrillId).toBe('lib-1')
+      expect(drills[0].distance).toBe(200)
+    }
+    const lib = await db.libraryDrills.get('lib-1')
+    expect((lib?.popularity ?? 0)).toBe(3)
+  })
+
+  it('ignores unknown sourceCandidateId and leaves drill unlinked', async () => {
+    const res = await applySessionDraft({
+      ...draft,
+      drills: [{ ...draft.drills[0], sourceCandidateId: 'cand_missing' }],
+    }, { libraryDrillMap: { cand_1: 'lib-1' } })
+    expect(res.outcome).toBe('created')
+    if (res.outcome === 'created') {
+      const drills = await db.drills.where('sessionId').equals(res.sessionId).toArray()
+      expect(drills[0].libraryDrillId).toBeUndefined()
+    }
+  })
 })

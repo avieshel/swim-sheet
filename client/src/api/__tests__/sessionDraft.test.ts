@@ -26,19 +26,20 @@ vi.mock('../../services/sessionService', () => ({
 
 vi.mock('../drills', () => ({
   getSessionDrills: vi.fn(),
+  listLibraryDrills: vi.fn(),
 }))
 
 const mockApply = vi.hoisted(() => ({ applySessionDraft: vi.fn() }))
 
 vi.mock('../../services/sessionDraft/apply', () => ({
-  applySessionDraft: (draft: unknown) => mockApply.applySessionDraft(draft),
+  applySessionDraft: (draft: unknown, options?: unknown) => mockApply.applySessionDraft(draft, options),
 }))
 
 import { supabase } from '../supabase'
 import { getAllSwimmers } from '../../db/dao'
 import { settingsService } from '../../services/settingsService'
 import { sessionService } from '../../services/sessionService'
-import { getSessionDrills } from '../drills'
+import { getSessionDrills, listLibraryDrills } from '../drills'
 import { prepareSessionDraft, requestSessionDraft, requestSessionDraftStream, applySessionDraft, type PreparedSessionDraft } from '../sessionDraft'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
@@ -73,6 +74,7 @@ function prepared(overrides: Partial<PreparedSessionDraft> = {}): PreparedSessio
     context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
     removedCategories: [],
     knownSwimmerNames: [],
+    libraryDrillMap: {},
     ...overrides,
   }
 }
@@ -92,6 +94,7 @@ beforeEach(() => {
   vi.mocked(settingsService.getEquipmentOptions).mockResolvedValue(['fins', 'kickboard'])
   vi.mocked(sessionService.list).mockResolvedValue([])
   vi.mocked(getSessionDrills).mockResolvedValue([])
+  vi.mocked(listLibraryDrills).mockResolvedValue([])
 })
 
 describe('prepareSessionDraft', () => {
@@ -127,7 +130,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: '', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
     })
     expect(result.outcome).toBe('invalid')
     expect(invoke).not.toHaveBeenCalled()
@@ -146,7 +149,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
     })
     expect(result).toEqual({ outcome: 'auth' })
     expect(invoke).not.toHaveBeenCalled()
@@ -200,7 +203,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
     })
     expect(result.outcome).toBe('invalid')
   })
@@ -210,7 +213,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
     })
     expect(result).toEqual({ outcome: 'draft', draft: validDraft() })
   })
@@ -220,7 +223,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'What is the weather', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [],
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
     })
     expect(result).toEqual({ outcome: 'not_actionable', message: 'Not a session.' })
   })
@@ -243,7 +246,7 @@ describe('applySessionDraft (api wrapper)', () => {
   it('delegates to the service with the draft', async () => {
     mockApply.applySessionDraft.mockResolvedValue({ outcome: 'created', sessionId: 's1' })
     const result = await applySessionDraft(validDraft())
-    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(validDraft())
+    expect(mockApply.applySessionDraft).toHaveBeenCalledWith(validDraft(), {})
     expect(result).toEqual({ outcome: 'created', sessionId: 's1' })
   })
 })

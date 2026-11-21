@@ -34,6 +34,10 @@ export interface SessionDraftDrillV1 {
   description?: string
   repeatCount: number
   items: SessionDraftItemV1[]
+  // Opaque candidate ID from request context.libraryCandidates. When present,
+  // the client resolves it to a trusted libraryDrillId; the model must never
+  // emit a DB ID.
+  sourceCandidateId?: string
 }
 
 export interface SessionDraftV1 {
@@ -53,12 +57,25 @@ export interface RecentSessionShape {
   drills: Array<{ distance: number; stroke: Stroke; repeatCount: number }>
 }
 
+export interface SessionDraftLibraryCandidateV1 {
+  candidateId: string
+  name: string
+  description?: string
+  stroke: Stroke
+  distance: number
+  repeatCount: number
+  items: SessionDraftItemV1[]
+  focus?: 'technique' | 'fitness' | 'none'
+  labels?: string[]
+}
+
 export interface SessionDraftContext {
   poolLength: number
   distanceUnits: string
   groupNames: string[]
   equipmentOptions: EquipmentId[]
   recentSessions: RecentSessionShape[]
+  libraryCandidates?: SessionDraftLibraryCandidateV1[]
 }
 
 export interface ContextInput {
@@ -68,6 +85,7 @@ export interface ContextInput {
   knownSwimmerNames: string[]
   equipmentOptions: EquipmentId[]
   recentSessions: RecentSessionShape[]
+  libraryCandidates?: SessionDraftLibraryCandidateV1[]
 }
 
 export interface SessionDraftRequest {

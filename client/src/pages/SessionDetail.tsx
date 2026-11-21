@@ -6,11 +6,11 @@ import { DrillsList, type DrillsListRow } from '../components/session/DrillsList
 import { SessionMetadataModal } from '../components/session/SessionMetadataModal'
 import { Icon } from '../components/Icon'
 import { getSession, updateSession } from '../api/sessions'
-import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteDrill, getSessionDrills } from '../api/drills'
+import { listLibraryDrills, seedLibraryDrills, createDrill, updateDrill, deleteDrill, getSessionDrills, bumpDrillPopularity } from '../api/drills'
 import type { Session } from '../api/sessions'
 import type { Drill, LibraryDrill, SafeDrill } from '../api/drills'
 import { strokeColors } from '../constants/drill'
-import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, emptyDrillForm, drillSubtitle, drillStepLines, drillEquipment, type SimilarDrill } from '../utils/drillHelpers'
+import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrills, findHighConfidenceLibraryMatch, emptyDrillForm, drillSubtitle, drillStepLines, drillEquipment, type SimilarDrill } from '../utils/drillHelpers'
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
 import { Events, analytics } from '../services/analyticsEvents'
@@ -364,18 +364,27 @@ export const SessionDetail: React.FC = () => {
         title={richDrill.id ? 'Edit Drill' : 'New Drill'}
         initialData={showRichEditor ? richDrill as DrillFormData : undefined}
         onSave={async (data) => {
-          const save = async () => {
-            if (!id || !data.name?.trim()) return
+          const excludeId = data.id ?? undefined
+          const highConfidenceLibraryMatch = findHighConfidenceLibraryMatch(
+            { name: data.name ?? '', stroke: data.stroke },
+            libraryDrills.filter(d => d.id !== excludeId),
+          )
+          const dataWithLibraryLink = highConfidenceLibraryMatch
+            ? { ...data, name: highConfidenceLibraryMatch.name, libraryDrillId: highConfidenceLibraryMatch.id }
+            : data
+
+          const save = async (saveData: DrillFormData & { libraryDrillId?: string } = dataWithLibraryLink) => {
+            if (!id || !saveData.name?.trim()) return
             const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
-            const drillData = { ...data, sessionId: id, order: data.id ? (richDrill.order ?? nextOrder) : nextOrder }
+            const drillData = { ...saveData, sessionId: id, order: saveData.id ? (richDrill.order ?? nextOrder) : nextOrder }
             setDrillSaveError(null)
             try {
-              if (data.id) {
-                await updateDrill(data.id, drillData as unknown as Partial<SafeDrill>)
+              if (saveData.id) {
+                await updateDrill(saveData.id, drillData as unknown as Partial<SafeDrill>)
                 analytics.track(Events.DrillUpdated('session'))
               } else {
                 await createDrill(drillData as unknown as SafeDrill)
-                analytics.track(Events.DrillCreated('session', data.stroke ?? '', data.distance ?? 0))
+                analytics.track(Events.DrillCreated('session', saveData.stroke ?? '', saveData.distance ?? 0))
               }
             } catch {
               setDrillSaveError('Could not save the drill. Check your connection and try again.')
@@ -384,7 +393,13 @@ export const SessionDetail: React.FC = () => {
             setShowRichEditor(false)
             void loadData()
           }
-          const excludeId = data.id ?? undefined
+
+          if (highConfidenceLibraryMatch) {
+            await save(dataWithLibraryLink)
+            void bumpDrillPopularity(highConfidenceLibraryMatch.id)
+            return
+          }
+
           const similars = findSimilarDrills(
             { name: data.name, stroke: data.stroke, distance: data.distance, focus: data.focus, labels: data.labels },
             [
@@ -393,9 +408,9 @@ export const SessionDetail: React.FC = () => {
             ].map(d => ({ id: d.id, name: d.name, stroke: d.stroke, distance: d.distance, focus: d.focus, labels: d.labels }))
           )
           if (similars.length > 0) {
-            setSimilarWarning({ similars, data, proceedSave: save })
+            setSimilarWarning({ similars, data, proceedSave: () => save(data) })
           } else {
-            await save()
+            await save(data)
           }
         }}
         onDelete={showRichEditor && richDrill.id ? (() => {

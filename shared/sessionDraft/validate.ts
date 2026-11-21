@@ -11,6 +11,7 @@ import type {
   RecentSessionShape,
   SessionDraftContext,
   SessionDraftItemV1,
+  SessionDraftLibraryCandidateV1,
   SessionDraftRequest,
   SessionDraftSeedV1,
   SessionDraftV1,
@@ -186,7 +187,7 @@ export function validateSessionDraft(
     const drill = drills[d]
     const drillPath = `draft.drills[${d}]`
     if (!isPlainObject(drill)) return fail('invalid_shape', `${drillPath} must be an object`)
-    if (!hasOnlyKeys(drill, ['name', 'description', 'repeatCount', 'items'])) {
+    if (!hasOnlyKeys(drill, ['name', 'description', 'repeatCount', 'items', 'sourceCandidateId'])) {
       return fail('invalid_shape', `${drillPath} has an unsupported field`)
     }
     if (typeof drill.name !== 'string' || drill.name.trim().length === 0) {
@@ -207,6 +208,18 @@ export function validateSessionDraft(
     if (!isPositiveInteger(drill.repeatCount)) {
       return fail('invalid_shape', `${drillPath}.repeatCount must be a positive integer`)
     }
+    if (!isAbsent(drill.sourceCandidateId)) {
+      if (
+        typeof drill.sourceCandidateId !== 'string' ||
+        drill.sourceCandidateId.trim().length === 0 ||
+        drill.sourceCandidateId.length > config.limits.maxCandidateIdLength
+      ) {
+        return fail(
+          'invalid_shape',
+          `${drillPath}.sourceCandidateId must be a non-empty string up to ${config.limits.maxCandidateIdLength} characters`,
+        )
+      }
+    }
     const items = drill.items
     if (!Array.isArray(items) || items.length < 1) {
       return fail('invalid_shape', `${drillPath}.items must contain at least one item`)
@@ -225,6 +238,7 @@ export function validateSessionDraft(
       description: isAbsent(drill.description) ? undefined : (drill.description as string),
       repeatCount: drill.repeatCount,
       items: validatedItems,
+      sourceCandidateId: isAbsent(drill.sourceCandidateId) ? undefined : (drill.sourceCandidateId as string),
     })
   }
 
@@ -364,9 +378,97 @@ function validateRecentSession(config: SessionDraftConfig, value: unknown): Vali
   return { ok: true, value: { totalDistance, drills: validatedDrills } }
 }
 
+function validateLibraryCandidate(
+  config: SessionDraftConfig,
+  value: unknown,
+  path: string,
+): ValidationOutcome<SessionDraftLibraryCandidateV1> {
+  if (!isPlainObject(value)) return fail('invalid_shape', `${path} must be an object`)
+  if (!hasOnlyKeys(value, ['candidateId', 'name', 'description', 'stroke', 'distance', 'repeatCount', 'items', 'focus', 'labels'])) {
+    return fail('invalid_shape', `${path} has an unsupported field`)
+  }
+  if (
+    typeof value.candidateId !== 'string' ||
+    value.candidateId.trim().length === 0 ||
+    value.candidateId.length > config.limits.maxCandidateIdLength
+  ) {
+    return fail('invalid_shape', `${path}.candidateId must be a non-empty string up to ${config.limits.maxCandidateIdLength} characters`)
+  }
+  if (typeof value.name !== 'string' || value.name.trim().length === 0) {
+    return fail('invalid_shape', `${path}.name must be a non-empty string`)
+  }
+  if (value.name.length > config.limits.maxDrillNameLength) {
+    return fail('limit_exceeded', `${path}.name exceeds ${config.limits.maxDrillNameLength} characters`)
+  }
+  if (!isAbsent(value.description)) {
+    if (typeof value.description !== 'string') {
+      return fail('invalid_shape', `${path}.description must be a string`)
+    }
+    if (value.description.length > config.limits.maxDrillDescriptionLength) {
+      return fail('limit_exceeded', `${path}.description exceeds ${config.limits.maxDrillDescriptionLength} characters`)
+    }
+  }
+  if (!isStroke(value.stroke, config)) {
+    return fail('invalid_shape', `${path}.stroke is not a supported stroke`)
+  }
+  if (!isPositiveInteger(value.distance)) {
+    return fail('invalid_shape', `${path}.distance must be a positive integer`)
+  }
+  if (value.distance > config.limits.maxDistance) {
+    return fail('limit_exceeded', `${path}.distance exceeds ${config.limits.maxDistance}`)
+  }
+  if (!isPositiveInteger(value.repeatCount)) {
+    return fail('invalid_shape', `${path}.repeatCount must be a positive integer`)
+  }
+  if (value.repeatCount > config.limits.maxRepeatCount) {
+    return fail('limit_exceeded', `${path}.repeatCount exceeds ${config.limits.maxRepeatCount}`)
+  }
+  const items = value.items
+  if (!Array.isArray(items) || items.length < 1) {
+    return fail('invalid_shape', `${path}.items must contain at least one item`)
+  }
+  if (items.length > config.limits.maxStepsPerDrill) {
+    return fail('limit_exceeded', `${path}.items exceeds ${config.limits.maxStepsPerDrill} steps`)
+  }
+  const validatedItems: SessionDraftItemV1[] = []
+  for (let i = 0; i < items.length; i++) {
+    const result = validateItem(config, items[i], `${path}.items[${i}]`)
+    if (!result.ok) return result
+    validatedItems.push(result.value)
+  }
+  if (!isAbsent(value.focus)) {
+    if (value.focus !== 'technique' && value.focus !== 'fitness' && value.focus !== 'none') {
+      return fail('invalid_shape', `${path}.focus must be technique, fitness, or none`)
+    }
+  }
+  if (!isAbsent(value.labels)) {
+    if (
+      !Array.isArray(value.labels) ||
+      value.labels.length > config.limits.maxCandidateLabels ||
+      !value.labels.every((l) => typeof l === 'string' && l.trim().length > 0 && l.length <= 64)
+    ) {
+      return fail('invalid_shape', `${path}.labels must be an array of short strings within limits`)
+    }
+  }
+  return {
+    ok: true,
+    value: {
+      candidateId: value.candidateId as string,
+      name: value.name as string,
+      description: isAbsent(value.description) ? undefined : (value.description as string),
+      stroke: value.stroke as Stroke,
+      distance: value.distance as number,
+      repeatCount: value.repeatCount as number,
+      items: validatedItems,
+      focus: isAbsent(value.focus) ? undefined : (value.focus as 'technique' | 'fitness' | 'none'),
+      labels: isAbsent(value.labels) ? undefined : (value.labels as string[]),
+    },
+  }
+}
+
 function validateRequestContext(config: SessionDraftConfig, value: unknown): ValidationOutcome<SessionDraftContext> {
   if (!isPlainObject(value)) return fail('invalid_shape', 'request.context must be an object')
-  if (!hasOnlyKeys(value, ['poolLength', 'distanceUnits', 'groupNames', 'equipmentOptions', 'recentSessions'])) {
+  if (!hasOnlyKeys(value, ['poolLength', 'distanceUnits', 'groupNames', 'equipmentOptions', 'recentSessions', 'libraryCandidates'])) {
     return fail('invalid_shape', 'request.context has an unsupported field')
   }
   const poolLength = value.poolLength
@@ -409,6 +511,24 @@ function validateRequestContext(config: SessionDraftConfig, value: unknown): Val
     if (!result.ok) return result
     validatedSessions.push(result.value)
   }
+  let validatedCandidates: SessionDraftLibraryCandidateV1[] | undefined
+  if (!isAbsent(value.libraryCandidates)) {
+    const libraryCandidates = value.libraryCandidates
+    if (!Array.isArray(libraryCandidates) || libraryCandidates.length > config.limits.maxLibraryCandidates) {
+      return fail('limit_exceeded', `request.context.libraryCandidates exceeds ${config.limits.maxLibraryCandidates}`)
+    }
+    const seenIds = new Set<string>()
+    validatedCandidates = []
+    for (let i = 0; i < libraryCandidates.length; i++) {
+      const result = validateLibraryCandidate(config, libraryCandidates[i], `request.context.libraryCandidates[${i}]`)
+      if (!result.ok) return result
+      if (seenIds.has(result.value.candidateId)) {
+        return fail('invalid_shape', `request.context.libraryCandidates[${i}].candidateId must be unique`)
+      }
+      seenIds.add(result.value.candidateId)
+      validatedCandidates.push(result.value)
+    }
+  }
   return {
     ok: true,
     value: {
@@ -417,6 +537,7 @@ function validateRequestContext(config: SessionDraftConfig, value: unknown): Val
       groupNames: groupNames as string[],
       equipmentOptions: equipmentOptions as EquipmentId[],
       recentSessions: validatedSessions,
+      ...(validatedCandidates !== undefined ? { libraryCandidates: validatedCandidates } : {}),
     },
   }
 }

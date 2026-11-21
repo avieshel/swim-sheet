@@ -368,4 +368,121 @@ describe('shared validateSessionDraftRequest (default config)', () => {
     const result = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({ traceId: 'a'.repeat(65) }))
     expect(result.ok).toBe(false)
   })
+
+  it('accepts a request with bounded library candidates', () => {
+    const result = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        libraryCandidates: [
+          {
+            candidateId: 'cand_1',
+            name: 'Fingertip Drag',
+            stroke: 'freestyle',
+            distance: 100,
+            repeatCount: 1,
+            items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+          },
+        ],
+      },
+    }))
+    expect(result.ok).toBe(true)
+  })
+
+  it('rejects too many library candidates', () => {
+    const candidates = Array.from({ length: defaultSessionDraftConfig.limits.maxLibraryCandidates + 1 }, (_, i) => ({
+      candidateId: `cand_${i}`,
+      name: `Drill ${i}`,
+      stroke: 'freestyle',
+      distance: 100,
+      repeatCount: 1,
+      items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+    }))
+    const result = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        libraryCandidates: candidates,
+      },
+    }))
+    expect(result.ok).toBe(false)
+  })
+
+  it('rejects library candidate with unsupported field', () => {
+    const result = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        libraryCandidates: [
+          {
+            candidateId: 'cand_1',
+            name: 'Fingertip Drag',
+            stroke: 'freestyle',
+            distance: 100,
+            repeatCount: 1,
+            items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+            libraryDrillId: 'db-id',
+          },
+        ],
+      },
+    }))
+    expect(result.ok).toBe(false)
+  })
+})
+
+describe('shared library reuse contract (default config)', () => {
+  it('accepts a draft drill with sourceCandidateId', () => {
+    const result = validateSessionDraft(defaultSessionDraftConfig, {
+      schemaVersion: 1,
+      session: { name: 'Technique' },
+      drills: [{
+        name: 'Fingertip Drag',
+        repeatCount: 1,
+        sourceCandidateId: 'cand_1',
+        items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      }],
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.drills[0].sourceCandidateId).toBe('cand_1')
+  })
+
+  it('rejects a draft drill with empty sourceCandidateId', () => {
+    const result = validateSessionDraft(defaultSessionDraftConfig, {
+      schemaVersion: 1,
+      session: { name: 'Technique' },
+      drills: [{
+        name: 'Fingertip Drag',
+        repeatCount: 1,
+        sourceCandidateId: '',
+        items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+      }],
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it('accepts a harness draft outcome with sourceCandidateId', () => {
+    const result = validateHarnessResult(defaultSessionDraftConfig, {
+      outcome: 'draft',
+      draft: {
+        schemaVersion: 1,
+        session: { name: 'Technique' },
+        drills: [{
+          name: 'Fingertip Drag',
+          repeatCount: 1,
+          sourceCandidateId: 'cand_1',
+          items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+        }],
+      },
+    })
+    expect(result.ok).toBe(true)
+  })
 })

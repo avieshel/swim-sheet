@@ -164,6 +164,15 @@ export function buildDraftJsonSchema(
           'a coach what to do. Omit it when the name is self-explanatory.',
         maxLength: limits.maxDrillDescriptionLength,
       },
+      sourceCandidateId: {
+        type: 'string',
+        description:
+          'Optional. When a library candidate in the request context matches this drill\'s intent, ' +
+          'set this to that candidate\'s candidateId and adjust distance/repeat/items as the local ' +
+          'variant. Use only candidate IDs provided in context; never invent a DB ID. Omit when no ' +
+          'candidate fits.',
+        maxLength: limits.maxCandidateIdLength,
+      },
       repeatCount: {
         type: 'integer',
         description:

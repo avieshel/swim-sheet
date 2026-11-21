@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { levenshteinDistance, levenshteinRatio, findSimilarDrills } from '../drillHelpers'
+import { levenshteinDistance, levenshteinRatio, findSimilarDrills, findHighConfidenceLibraryMatch } from '../drillHelpers'
 
 describe('levenshteinDistance', () => {
   it('returns 0 for identical strings', () => {
@@ -87,5 +87,27 @@ describe('findSimilarDrills', () => {
     )
     expect(results[0].matches.length).toBeGreaterThan(0)
     expect(results[0].matches).toContain('similar name')
+  })
+})
+describe('findHighConfidenceLibraryMatch', () => {
+  const library = [
+    { id: 'lib1', name: 'Fingertip Drag', stroke: 'freestyle', distance: 100 },
+    { id: 'lib2', name: 'Broken 100m', stroke: 'freestyle', distance: 100 },
+  ]
+
+  it('matches normalized same name as high confidence distance variant', () => {
+    const match = findHighConfidenceLibraryMatch(
+      { name: '  fingertip   drag  ', stroke: 'freestyle', distance: 200 },
+      library,
+    )
+    expect(match?.id).toBe('lib1')
+  })
+
+  it('does not auto-link different names', () => {
+    const match = findHighConfidenceLibraryMatch(
+      { name: 'Fingertip Glide', stroke: 'freestyle', distance: 100 },
+      library,
+    )
+    expect(match).toBeNull()
   })
 })
