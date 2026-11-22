@@ -57,7 +57,7 @@ export const CoachDashboard: React.FC = () => {
       {/* Hero Section */}
       <section className="mb-stack-lg">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#00677f] to-[#00d1ff] p-6 md:p-8 text-on-primary shadow-lg group">
-          <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
+          <div className="absolute top-0 end-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
             <Icon name="water_drop" className="text-[120px]" />
           </div>
           <div className="relative z-10">
@@ -107,7 +107,7 @@ export const CoachDashboard: React.FC = () => {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-primary font-bold">Go to Swimmers</span>
-            <Icon name="arrow_forward" color="primary" className="group-hover:translate-x-2 transition-transform" />
+            <Icon name="arrow_forward" color="primary" className="ltr:group-hover:translate-x-2 rtl:group-hover:-translate-x-2 transition-transform" />
           </div>
         </Link>
 
@@ -126,7 +126,7 @@ export const CoachDashboard: React.FC = () => {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-primary font-bold">Plan Next Set</span>
-            <Icon name="arrow_forward" color="primary" className="group-hover:translate-x-2 transition-transform" />
+            <Icon name="arrow_forward" color="primary" className="ltr:group-hover:translate-x-2 rtl:group-hover:-translate-x-2 transition-transform" />
           </div>
         </Link>
 
@@ -147,7 +147,7 @@ export const CoachDashboard: React.FC = () => {
             <span className="text-primary-fixed-dim font-bold">Launch Deck</span>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
-              <Icon name="arrow_forward" color="on-surface-variant" className="group-hover:translate-x-2 transition-transform" />
+              <Icon name="arrow_forward" color="on-surface-variant" className="ltr:group-hover:translate-x-2 rtl:group-hover:-translate-x-2 transition-transform" />
             </div>
           </div>
         </Link>

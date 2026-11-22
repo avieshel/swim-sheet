@@ -2,11 +2,11 @@
 
 ## Status
 
-- **State**: In progress on `feat/i18n-hebrew-rtl` (P1 foundation started)
+- **State**: In progress (P1 merged to main via #48; P2 baseline in progress on `feat/i18n-p2-rtl-baseline`)
 - **Date**: 2026-11-21
 - **Scope owner decision needed before Phase 1 merge**: language persistence (local-only vs synced setting)
 - **Primary goal**: Deliver full Hebrew UI support with correct RTL layout, in mergeable phases, without blocking unrelated product/server work.
-- **Progress**: P1 foundation landed on branch (LocaleProvider/useI18n/t fallback, html lang/dir sync, Settings wired to runtime, format skeleton, tests). P2-P5 pending.
+- **Progress**: P1 foundation merged (#48). P2 baseline started: Icon directional mirroring, logical direction class migration across shared components/pages, RTL layout smoke e2e added. P3-P5 pending.
 
 ## Executive summary
 

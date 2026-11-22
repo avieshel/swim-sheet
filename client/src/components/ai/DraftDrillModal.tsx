@@ -57,7 +57,7 @@ export function DraftDrillModal({ index, drill, onChange, onClose }: DraftDrillM
               </button>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-end">
             <span className="block font-label-caps text-on-surface-variant mb-1">Set distance</span>
             <span className="font-headline-md text-primary font-bold">
               {draftDrillDistance(drill.items, drill.repeatCount)}m

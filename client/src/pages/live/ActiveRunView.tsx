@@ -680,7 +680,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
             onChange={(e) => setResetClearSwimmers(e.target.checked)}
             className="mt-0.5 h-5 w-5 rounded border-outline text-primary focus:ring-primary cursor-pointer"
           />
-          <div className="text-left">
+          <div className="text-start">
             <span className="text-sm font-medium text-on-surface block">Clear swimmer lane assignments</span>
             <span className="text-xs text-on-surface-variant">Remove all swimmers from lanes. They'll remain in your roster.</span>
           </div>

@@ -30,12 +30,12 @@ const FOLD_CAP = 'max-h-[6.5rem]'
 //
 // That inward offset is deliberate, not incidental. The parent row sits at
 // p-3/p-4, so its buttons are 12/16px from the card edge; the iteration rows
-// land at 40/44px (box inset + pr-6) — a consistent 28px of depth at both
+// land at 40/44px (box inset + pe-6) — a consistent 28px of depth at both
 // breakpoints. 28px is slightly more than one control column (w-6 + gap-1),
 // so an iteration icon never lands ambiguously between two parent icons; it
 // reads as one clean step in. Shrinking the offset back toward 0 makes the
 // icons straddle the parent's columns and look misaligned.
-const FOLD_BOX = 'ml-8 md:ml-11 mr-4 md:mr-5 mb-2 rounded-xl border border-outline-variant/30 bg-surface-container-low/30 overflow-hidden'
+const FOLD_BOX = 'ms-8 md:ms-11 me-4 md:me-5 mb-2 rounded-xl border border-outline-variant/30 bg-surface-container-low/30 overflow-hidden'
 const PIP_THRESHOLD = 6
 const REP_LABEL = /^\[\d+\/\d+\]$/
 
@@ -109,7 +109,7 @@ function IterationLine({ row, label, done, nested, onEnterTiming, onToggleDone }
   const repLabel = row.instructions && REP_LABEL.test(row.instructions) ? row.instructions : null
   const note = repLabel ? null : row.instructions
   return (
-    <div className={`flex items-center justify-between gap-2 py-1 pr-6 ${nested ? 'pl-6' : 'pl-3'}`}>
+    <div className={`flex items-center justify-between gap-2 py-1 pe-6 ${nested ? 'ps-6' : 'ps-3'}`}>
       <div className="flex items-center gap-2 min-w-0 flex-1">
         <span className={`text-label-sm font-semibold tabular-nums w-5 shrink-0 ${done ? 'text-primary' : 'text-on-surface-variant'}`}>
           {label}
@@ -300,7 +300,7 @@ export function DrillsSection({
                 <div className="flex items-center justify-between gap-3 p-3 md:p-4">
                   <button
                     onClick={toggleExpanded}
-                    className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer group"
+                    className="flex items-center gap-3 min-w-0 flex-1 text-start cursor-pointer group"
                   >
                     <span className="text-label-sm text-on-surface-variant tabular-nums w-5 shrink-0">
                       {idx + 1}

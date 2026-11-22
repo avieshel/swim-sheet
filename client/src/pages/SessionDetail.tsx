@@ -328,7 +328,7 @@ export const SessionDetail: React.FC = () => {
                   {similarWarning.similars.map(s => (
                     <li key={s.drill.id}>
                       <span className="font-semibold">{s.drill.name}</span>
-                      <span className="ml-1 text-on-warning-container/70">
+                      <span className="ms-1 text-on-warning-container/70">
                         ({s.score.toFixed(2)} — {s.matches.join(', ')})
                       </span>
                     </li>

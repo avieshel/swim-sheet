@@ -29,11 +29,11 @@ function AttendeesCell({ run, onViewAll }: { run: RunSummary; onViewAll: () => v
         onViewAll()
       }}
       title="View attendees"
-      className="group inline-flex items-center gap-1 text-left text-label-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none p-0"
+      className="group inline-flex items-center gap-1 text-start text-label-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none p-0"
     >
       <span>{label}</span>
       {hasMatch && (
-        <span className="ml-0.5 text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">
+        <span className="ms-0.5 text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">
           likely match
         </span>
       )}
@@ -88,7 +88,7 @@ function SwimmerDetail({ swimmer }: { swimmer: RunSwimmerSummary }) {
       <div className="flex items-center gap-2 mb-1.5">
         <span className="font-bold text-on-surface">{swimmer.name}</span>
         {swimmer.matchedByName === true && (
-          <span className="text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full ml-1.5">
+          <span className="text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full ms-1.5">
             likely match
           </span>
         )}
@@ -235,7 +235,7 @@ function RunRow({
           <AttendeesCell run={run} onViewAll={onViewAll} />
         </td>
         {showDelete && (
-          <td className="px-4 py-4 text-right">
+          <td className="px-4 py-4 text-end">
             <button
               type="button"
               aria-label={`Delete ${run.templateName}`}
@@ -373,12 +373,12 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
   return (
     <>
       <div className={`overflow-x-auto ${borderless ? '' : 'rounded-2xl border border-outline-variant bg-surface-container-lowest'}`}>
-        <table className="w-full min-w-[560px] text-left">
+        <table className="w-full min-w-[560px] text-start">
           <thead>
             <tr className="text-label-caps text-on-surface-variant border-b border-outline-variant/40">
               <th className="px-4 py-3 font-medium">Session</th>
               <th className="px-4 py-3 font-medium">Attendees</th>
-              {showDelete && <th className="px-4 py-3 font-medium text-right">Actions</th>}
+              {showDelete && <th className="px-4 py-3 font-medium text-end">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/40">

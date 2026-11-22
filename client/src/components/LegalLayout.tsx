@@ -61,7 +61,7 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
                 </p>
               ))}
               {section.bullets && (
-                <ul className="font-body-md text-body-md text-on-surface-variant mb-4 space-y-2 pl-5 list-disc">
+                <ul className="font-body-md text-body-md text-on-surface-variant mb-4 space-y-2 ps-5 list-disc">
                   {section.bullets.map((bullet) => (
                     <li key={bullet}>{renderInline(bullet)}</li>
                   ))}

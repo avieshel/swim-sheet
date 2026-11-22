@@ -38,7 +38,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, options, onCh
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-2 py-1.5 text-sm outline-none rounded-t-md transition-colors text-left"
+        className="w-full flex items-center justify-between bg-surface-container-lowest border-b-2 border-outline focus:border-primary px-2 py-1.5 text-sm outline-none rounded-t-md transition-colors text-start"
       >
         <span className="truncate flex items-center gap-1">{selectedOption ? selectedOption.label : 'Select...'}{selectedOption?.badge}</span>
         <Icon name="expand_more" size="sm" className="transition-transform duration-200" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
@@ -55,7 +55,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, options, onCh
                   onChange(opt.value)
                   setIsOpen(false)
                 }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-container/20 transition-colors flex items-center gap-1 ${
+                className={`w-full text-start px-3 py-2 text-sm hover:bg-primary-container/20 transition-colors flex items-center gap-1 ${
                   value === opt.value ? 'bg-primary/10 text-primary font-bold' : 'text-on-surface'
                 }`}
               >

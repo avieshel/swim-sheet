@@ -113,7 +113,7 @@ function BreakoutAddSwimmer({ groups, focusIds, onAddSwimmer, onAddTempSwimmer, 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-50 mt-2 w-72 max-h-80 overflow-y-auto rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-lg p-2">
+          <div className="absolute end-0 z-50 mt-2 w-72 max-h-80 overflow-y-auto rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-lg p-2">
             <div className="text-label-caps text-on-surface-variant px-2 py-1.5">Add swimmer to timing</div>
             {candidates.length === 0 ? (
               <div className="px-3 py-3 text-label-sm text-on-surface-variant text-center">All swimmers are in focus.</div>
@@ -122,7 +122,7 @@ function BreakoutAddSwimmer({ groups, focusIds, onAddSwimmer, onAddTempSwimmer, 
                 <button
                   key={`${c.lane}:${c.dbId}`}
                   onClick={() => { onAddSwimmer(c.dbId); setOpen(false) }}
-                  className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
+                  className="w-full text-start px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
                 >
                   <span className="text-label-sm font-bold text-on-surface-variant">L{c.lane}</span>
                   <span className="text-on-surface truncate">{c.name}</span>
@@ -132,14 +132,14 @@ function BreakoutAddSwimmer({ groups, focusIds, onAddSwimmer, onAddTempSwimmer, 
             <div className="border-t border-outline-variant my-1" />
             <button
               onClick={() => { onAddTempSwimmer(); setOpen(false) }}
-              className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
+              className="w-full text-start px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
             >
               <Icon name="casino" size="sm" className="text-primary" />
               <span className="text-on-surface text-label-sm">Add temp swimmer</span>
             </button>
             <button
               onClick={() => { setShowCreate(true); setOpen(false) }}
-              className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
+              className="w-full text-start px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
             >
               <Icon name="person_add" size="sm" className="text-primary" />
               <span className="text-on-surface text-label-sm">Create new swimmer</span>
@@ -247,7 +247,7 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
             className="h-9 w-9 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer relative"
           >
             <Icon name="timer" size="sm" />
-            <span className="absolute -top-1 -right-1 flex items-center justify-center w-3 h-3 rounded-full bg-surface text-error text-[10px] font-bold">
+            <span className="absolute -top-1 -end-1 flex items-center justify-center w-3 h-3 rounded-full bg-surface text-error text-[10px] font-bold">
               &times;
             </span>
           </button>

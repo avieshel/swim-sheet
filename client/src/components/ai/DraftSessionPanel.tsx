@@ -117,7 +117,7 @@ export function DraftSessionPanel({ draft, onChange, onSave, onDiscard, saving =
           </div>
         }
         actions={
-          <div className="rounded-xl bg-primary/5 px-3 py-2 text-right">
+          <div className="rounded-xl bg-primary/5 px-3 py-2 text-end">
             <span className="block font-label-caps text-on-surface-variant mb-0.5">Total distance</span>
             <span className="font-headline-md text-primary font-bold tabular-nums">{draftTotalDistance(draft)}m</span>
           </div>

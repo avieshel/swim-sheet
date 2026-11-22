@@ -102,7 +102,7 @@ export function LaneEditorModal({
           <div className="bg-surface-container-low rounded-xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <span className="bg-surface-variant text-on-surface-variant text-xs font-bold px-2 py-0.5 rounded-md">Unassigned</span>
-              <span className="text-xs text-on-surface-variant ml-auto">{unassignedPool.length} swimmer{unassignedPool.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-on-surface-variant ms-auto">{unassignedPool.length} swimmer{unassignedPool.length !== 1 ? 's' : ''}</span>
             </div>
             <input
               type="text"
@@ -208,7 +208,7 @@ export function LaneEditorModal({
                 )}
                 {group.swimmers.length === 0 && (
                   <button onClick={() => setRemovingGroupId(group.id)}
-                    className="ml-auto text-xs text-error font-semibold hover:underline cursor-pointer">Remove</button>
+                    className="ms-auto text-xs text-error font-semibold hover:underline cursor-pointer">Remove</button>
                 )}
               </div>
               {group.swimmers.length === 0 ? (

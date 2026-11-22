@@ -137,12 +137,12 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
                         className="w-full px-3 py-2 rounded-lg bg-surface text-on-surface text-sm border border-outline-variant focus:border-primary focus:outline-none"
                       />
                       {searchResults[swimmer.dbId]?.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-lg z-10 max-h-40 overflow-y-auto">
+                        <div className="absolute top-full start-0 end-0 mt-1 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-lg z-10 max-h-40 overflow-y-auto">
                           {searchResults[swimmer.dbId].map(result => (
                             <button
                               key={result.id}
                               onClick={() => handleSelectRoster(swimmer.dbId, result.id, result.name)}
-                              className="w-full px-3 py-2 text-left hover:bg-surface-variant transition-all cursor-pointer"
+                              className="w-full px-3 py-2 text-start hover:bg-surface-variant transition-all cursor-pointer"
                             >
                               <div className="text-sm font-medium text-on-surface">{result.name}</div>
                             </button>
