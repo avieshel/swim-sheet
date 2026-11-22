@@ -44,7 +44,7 @@ function suggestTeamNames(name: string): string[] {
 
 export const Settings: React.FC = () => {
   const navigate = useNavigate()
-  const { locale, setLocale } = useI18n()
+  const { locale, setLocale, t } = useI18n()
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<SettingsForm>({
     team_name: '',
@@ -324,7 +324,7 @@ export const Settings: React.FC = () => {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading settings...</p>
+      <p className="text-on-surface-variant">{t('settings.loading')}</p>
     </div>
   )
 
@@ -332,15 +332,15 @@ export const Settings: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-4 md:mb-8">
-        <h1 className="font-headline-lg font-bold text-primary mb-2 md:mb-4">Settings</h1>
-        <p className="text-on-surface-variant font-body-md md:font-body-lg">Customize your SwimSheet experience</p>
+        <h1 className="font-headline-lg font-bold text-primary mb-2 md:mb-4">{t('settings.title')}</h1>
+        <p className="text-on-surface-variant font-body-md md:font-body-lg">{t('settings.subtitle')}</p>
       </div>
 
       <div className="space-y-6 md:space-y-8">
         <AccountSection />
         {/* Profile Settings */}
         <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Coach Profile</h2>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">{t('settings.profile')}</h2>
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
@@ -360,7 +360,7 @@ export const Settings: React.FC = () => {
 
               <div>
                 <label className="font-label-sm text-on-surface block mb-2">
-                  Teams
+                  {t('settings.teams')}
                 </label>
                 <div className="flex flex-wrap gap-2 mb-3 min-h-[2rem]">
                   {form.team_names.map(item => (
@@ -382,7 +382,7 @@ export const Settings: React.FC = () => {
                     value={newTeamName}
                     onChange={e => setNewTeamName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleTeamNameAdd() } }}
-                    placeholder="Add a team..."
+                    placeholder={t('settings.addTeam')}
                     className="flex-1 bg-surface text-on-surface px-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
                   />
                   <button
@@ -391,12 +391,12 @@ export const Settings: React.FC = () => {
                     disabled={!newTeamName.trim()}
                     className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none text-sm"
                   >
-                    Add
+                    {t('settings.add')}
                   </button>
                 </div>
                 {suggestions.length > 0 && (
                   <div className="mt-2">
-                    <p className="text-xs text-on-surface-variant mb-1.5">Suggestions based on coach name:</p>
+                    <p className="text-xs text-on-surface-variant mb-1.5">{t('settings.suggestions')}</p>
                     <div className="flex flex-wrap gap-1.5">
                       {suggestions.map(s => (
                         <button
@@ -423,12 +423,12 @@ export const Settings: React.FC = () => {
 
         {/* General App Settings */}
         <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">General App Settings</h2>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">{t('settings.general')}</h2>
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
                 <label className="font-label-sm text-on-surface block mb-2">
-                  Default Pool Length
+                  {t('settings.pool_length')}
                 </label>
                 <div className="flex items-center flex-wrap gap-2">
                   {[25, 50].map(v => (
@@ -529,7 +529,7 @@ export const Settings: React.FC = () => {
                   onClick={handleEquipReset}
                   className="text-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none underline"
                 >
-                  Reset to defaults
+                  {t('equipment.reset')}
                 </button>
               </div>
             </div>
@@ -543,7 +543,7 @@ export const Settings: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label className="font-label-sm text-on-surface block mb-2">
-                  Font Size
+                  {t('settings.font_size')}
                 </label>
                 <div className="flex items-center gap-2">
                   {(['small', 'medium', 'large'] as const).map(size => (
@@ -590,7 +590,7 @@ export const Settings: React.FC = () => {
 
               <div>
                 <label className="font-label-sm text-on-surface block mb-2">
-                  Language
+                  {t('settings.language')}
                 </label>
                 <CustomSelect
                   value={locale}
@@ -606,7 +606,7 @@ export const Settings: React.FC = () => {
 
               <div className="border-t border-outline-variant/30 pt-4">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-label-sm text-on-surface">Reset Settings</span>
+                  <span className="font-label-sm text-on-surface">{t('settings.resetSettings')}</span>
                   <button
                     type="button"
                     onClick={() => setShowResetConfirm(true)}
@@ -622,7 +622,7 @@ export const Settings: React.FC = () => {
 
         {/* Data Management */}
         <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Data Management</h2>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">{t('data.management.title')}</h2>
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
@@ -643,7 +643,7 @@ export const Settings: React.FC = () => {
 
               <div className="flex items-center justify-between">
                 <label className="font-label-sm text-on-surface">
-                  Enable Notifications
+                  {t('settings.enable_notifications')}
                 </label>
                 <input
                   type="checkbox"
@@ -657,7 +657,7 @@ export const Settings: React.FC = () => {
 
               {storageInfo && (
                 <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
-                  <span className="font-label-sm text-on-surface">Storage Used</span>
+                  <span className="font-label-sm text-on-surface">{t('settings.storage_used')}</span>
                   <div className="text-end">
                     <span className="font-body-md font-bold text-on-surface">{formatBytes(storageInfo.bytes)}</span>
                     <div className="text-xs text-on-surface-variant">
@@ -693,7 +693,7 @@ export const Settings: React.FC = () => {
                     disabled={cleaningUp}
                     className="bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
                   >
-                    {cleaningUp ? '...' : 'Clean'}
+                    {cleaningUp ? t('settings.cleaning') : t('settings.clean')}
                   </button>
                 </div>
                 {cleanupMsg && (
@@ -704,7 +704,7 @@ export const Settings: React.FC = () => {
               <div className="border-t border-outline-variant/30 pt-4">
                 <div className="flex items-center justify-between gap-3 pb-2">
                   <span className="flex items-center gap-1.5 font-label-sm text-on-surface">
-                    Storage Protection
+                    {t('settings.storageProtection')}
                     <button
                       type="button"
                       onClick={() => setShowStorageInfo(true)}
@@ -729,15 +729,15 @@ export const Settings: React.FC = () => {
                         onClick={handleRequestPersistence}
                         className="bg-primary text-on-primary font-bold px-4 py-2 rounded-xl hover:brightness-110 transition-all active:scale-95 cursor-pointer border-none text-sm whitespace-nowrap"
                       >
-                        Request protection
+                        {t('settings.requestProtection')}
                       </button>
                     )}
                   </span>
                 </div>
                 <div className="flex items-center justify-between pb-2">
-                  <span className="font-label-sm text-on-surface">Last Automatic Backup</span>
+                  <span className="font-label-sm text-on-surface">{t('settings.lastBackup')}</span>
                   <span className="font-body-md text-on-surface-variant">
-                    {backupInfo ? new Date(backupInfo.savedAt).toLocaleString() : 'Never'}
+                    {backupInfo ? new Date(backupInfo.savedAt).toLocaleString() : t('settings.never')}
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant pb-3">
@@ -750,10 +750,10 @@ export const Settings: React.FC = () => {
                     disabled={exporting}
                     className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
                   >
-                    {exporting ? 'Exporting...' : 'Back up to file'}
+                    {exporting ? 'Exporting...' : t('settings.backupToFile')}
                   </button>
                   <label className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none text-center">
-                    Restore from file
+                    {t('settings.restoreFromFile')}
                     <input type="file" accept="application/json,.json" onChange={handleImportFile} className="hidden" />
                   </label>
                 </div>
@@ -768,7 +768,7 @@ export const Settings: React.FC = () => {
                   onClick={() => setShowResetDataDialog(true)}
                   className="flex-1 bg-error-container text-on-error-container font-bold px-6 py-4 rounded-xl hover:bg-error transition-all active:scale-95 cursor-pointer border-none"
                 >
-                  Reset Data
+                  {t('settings.resetData')}
                 </button>
               </div>
             </div>
@@ -777,10 +777,10 @@ export const Settings: React.FC = () => {
 
         <ConfirmDialog
           open={showResetConfirm}
-          title="Reset Settings?"
-          message="This will restore all settings to their default values. This action cannot be undone."
-          confirmLabel="Reset"
-          cancelLabel="Cancel"
+          title={t('settings.reset_confirm')}
+          message={t('settings.reset_confirm_msg')}
+          confirmLabel={t('settings.reset')}
+          cancelLabel={t('settings.cancel')}
           destructive={false}
           onConfirm={handleReset}
           onCancel={() => setShowResetConfirm(false)}
