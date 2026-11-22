@@ -6,7 +6,10 @@ import { Icon } from './Icon'
 import { syncService } from '../sync/syncService'
 import { createBackupPayload } from '../api/backup'
 import { config } from '../config'
+import { useI18n } from '../i18n'
 import type { SyncState, SyncConflict, SyncError } from '../sync/types'
+
+type TFn = ReturnType<typeof useI18n>['t']
 
 function initials(name: string | undefined, email: string | undefined): string {
   const source = name?.trim() || email?.trim() || '?'
@@ -38,29 +41,29 @@ function formatLastSync(iso: string): string {
   return d.toLocaleString()
 }
 
-function describeSyncError(error: SyncError): string {
+function describeSyncError(error: SyncError, t: TFn): string {
   switch (error.kind) {
     case 'auth':
-      return 'Your sign-in may have expired. Sign out and sign in again to sync.'
+      return t('account.syncErrorAuth')
     case 'offline':
-      return "You're offline — we'll sync when you reconnect."
+      return t('account.syncErrorOffline')
     case 'conflict':
-      return 'Some items need your review above.'
+      return t('account.syncErrorConflict')
     case 'validation':
-      return 'Some of your data could not be synced. Try again.'
+      return t('account.syncErrorValidation')
     default:
-      return "Sync couldn't finish. Please try again."
+      return t('account.syncErrorUnexpected')
   }
 }
 
-function describeSyncStatus(state: SyncState, online: boolean): string {
-  if (!online) return "You're offline. Sync will resume when you reconnect."
-  if (state.inFlight || state.phase === 'pushing' || state.phase === 'pulling') return 'Syncing your data…'
-  if (state.phase === 'initializing') return 'Connecting to cloud sync…'
-  if (state.phase === 'needs_first_merge') return 'Review your local and cloud data to start syncing.'
-  if (state.phase === 'error') return 'Sync needs attention. See the error below.'
-  if (state.phase === 'ready') return 'Cloud sync is ready.'
-  return 'Cloud sync is ready to check.'
+function describeSyncStatus(state: SyncState, online: boolean, t: TFn): string {
+  if (!online) return t('account.syncOffline')
+  if (state.inFlight || state.phase === 'pushing' || state.phase === 'pulling') return t('account.syncInProgress')
+  if (state.phase === 'initializing') return t('account.syncInitializing')
+  if (state.phase === 'needs_first_merge') return t('account.syncNeedsFirstMerge')
+  if (state.phase === 'error') return t('account.syncError')
+  if (state.phase === 'ready') return t('account.syncReady')
+  return t('account.syncIdle')
 }
 
 async function downloadBackup(): Promise<void> {
@@ -78,6 +81,7 @@ async function downloadBackup(): Promise<void> {
 
 export function AccountSection() {
   const { user, status, persist, setPersist, signInWithGoogle, signInAsTestUser, signOut } = useAuth()
+  const { t } = useI18n()
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,10 +144,10 @@ export function AccountSection() {
 
   return (
     <section>
-      <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Account</h2>
+      <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">{t('account.title')}</h2>
       <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
         {status === 'loading' ? (
-          <p className="text-on-surface-variant">Checking account...</p>
+          <p className="text-on-surface-variant">{t('account.checking')}</p>
         ) : user ? (
           <>
           <div className="flex items-center gap-3">
@@ -157,34 +161,34 @@ export function AccountSection() {
             <div className="min-w-0 flex-1">
               {fullName && <p className="font-body-md font-bold text-on-surface truncate">{fullName}</p>}
               <p className="font-body-sm text-on-surface-variant truncate">{email}</p>
-              <p className="text-sm text-on-surface-variant mt-1">Signed in on this device. Your local data is unchanged.</p>
+              <p className="text-sm text-on-surface-variant mt-1">{t('account.signedInDevice')}</p>
             </div>
             <button
               type="button"
               onClick={() =>
-                void runAuthAction(signOut, "Couldn't sign out. Please try again.", () =>
+                void runAuthAction(signOut, t('account.signOutError'), () =>
                   analytics.track(Events.AppSettings('sign_out'))
                 )
               }
               disabled={busy}
               className="shrink-0 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-xl hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none"
             >
-              Sign out
+              {t('account.signOut')}
             </button>
           </div>
           {!syncConfigured && (
             <p role="status" className="text-sm text-on-surface-variant mt-3">
-              Cloud sync isn't configured for this app. Your data remains on this device.
+              {t('account.syncNotConfigured')}
             </p>
           )}
           {syncConfigured && (
             <p role="status" aria-live="polite" className="text-sm text-on-surface-variant mt-3">
-              {describeSyncStatus(syncState, online)}
+              {describeSyncStatus(syncState, online, t)}
             </p>
           )}
           {syncState.conflicts.length > 0 && (
             <div className="mt-4 border border-error/40 rounded-xl p-3">
-              <p className="font-bold text-error mb-2">Sync conflicts ({syncState.conflicts.length})</p>
+              <p className="font-bold text-error mb-2">{t('account.syncConflicts', { count: syncState.conflicts.length })}</p>
               <ul className="space-y-3">
                 {syncState.conflicts.map((c) => (
                   <li key={c.id}>
@@ -195,14 +199,14 @@ export function AccountSection() {
                         onClick={() => void syncService.resolveConflict(c.id, 'remote')}
                         className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
                       >
-                        Use cloud
+                        {t('account.useCloud')}
                       </button>
                       <button
                         type="button"
                         onClick={() => void syncService.resolveConflict(c.id, 'local')}
                         className="bg-primary-container text-on-primary-container font-bold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all cursor-pointer border-none text-sm"
                       >
-                        Keep mine
+                        {t('account.keepMine')}
                       </button>
                     </div>
                   </li>
@@ -213,11 +217,13 @@ export function AccountSection() {
 
           {showFirstMerge && (
             <div className="mt-4 border border-primary/40 rounded-xl p-3">
-              <p className="font-bold text-on-surface mb-1">Review &amp; merge your data</p>
+              <p className="font-bold text-on-surface mb-1">{t('account.reviewMergeTitle')}</p>
               <p className="text-sm text-on-surface-variant mb-2">
-                {summary.localCount} local item(s), {summary.cloudCount} cloud item(s)
-                {summary.catalogMatches > 0 ? `, ${summary.catalogMatches} match(es) by catalog` : ''}. We'll
-                merge your existing local data with the cloud rather than overwriting it.
+                {t('account.reviewMergeBody', {
+                  local: summary.localCount,
+                  cloud: summary.cloudCount,
+                  catalog: summary.catalogMatches > 0 ? t('account.reviewMergeCatalog', { count: summary.catalogMatches }) : '',
+                })}
               </p>
               <div className="flex gap-2">
                 <button
@@ -225,14 +231,14 @@ export function AccountSection() {
                   onClick={() => void syncService.confirmFirstMerge()}
                   className="bg-primary text-on-primary font-bold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all cursor-pointer border-none text-sm"
                 >
-                  Merge &amp; Sync
+                  {t('account.mergeSync')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDismissedFirstMerge(true)}
                   className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
                 >
-                  Not now
+                  {t('account.notNow')}
                 </button>
               </div>
             </div>
@@ -245,7 +251,7 @@ export function AccountSection() {
                 onClick={() => setDismissedFirstMerge(false)}
                 className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
               >
-                Review &amp; merge
+                {t('account.reviewMerge')}
               </button>
             </div>
           )}
@@ -253,8 +259,8 @@ export function AccountSection() {
           {!!user && phase !== 'needs_first_merge' && (
             <div className="mt-4 flex items-center gap-3 flex-wrap">
               <span className="text-sm text-on-surface-variant">
-                Last synced: {syncState.lastSyncAt ? formatLastSync(syncState.lastSyncAt) : 'never'}
-                {syncState.pendingCount > 0 ? ` • ${syncState.pendingCount} pending` : ''}
+                {t('account.lastSynced', { value: syncState.lastSyncAt ? formatLastSync(syncState.lastSyncAt) : t('account.never') })}
+                {syncState.pendingCount > 0 ? ` • ${t('account.pending', { count: syncState.pendingCount })}` : ''}
               </span>
               {syncConfigured && (
                 <button
@@ -263,7 +269,7 @@ export function AccountSection() {
                   disabled={syncState.inFlight || phase === 'initializing' || !online}
                   className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
                 >
-                  {syncState.inFlight ? 'Syncing…' : 'Sync now'}
+                  {syncState.inFlight ? t('account.syncing') : t('account.syncNow')}
                 </button>
               )}
               <button
@@ -271,7 +277,7 @@ export function AccountSection() {
                 onClick={() => void downloadBackup()}
                 className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
               >
-                Export backup
+                {t('account.exportBackup')}
               </button>
               {syncConfigured && !confirmingReset && (
                 <button
@@ -280,7 +286,7 @@ export function AccountSection() {
                   disabled={!online || syncState.inFlight || phase === 'initializing'}
                   className="bg-surface-variant text-on-surface-variant font-bold px-3 py-1.5 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
                 >
-                  Reset from cloud
+                  {t('account.resetFromCloud')}
                 </button>
               )}
             </div>
@@ -288,10 +294,9 @@ export function AccountSection() {
 
           {!!user && confirmingReset && (
             <div role="alert" className="mt-4 border border-error/40 rounded-xl p-3">
-              <p className="font-bold text-error mb-1">Reset from cloud?</p>
+              <p className="font-bold text-error mb-1">{t('account.resetFromCloudTitle')}</p>
               <p className="text-sm text-on-surface-variant mb-3">
-                This wipes all local data on this device (including unsynced changes) and re-downloads
-                your cloud data. Use it only if sync is stuck. Your cloud data is not affected.
+                {t('account.resetFromCloudBody')}
               </p>
               <div className="flex gap-2 flex-wrap">
                 <button
@@ -300,7 +305,7 @@ export function AccountSection() {
                   disabled={resetting}
                   className="min-h-11 bg-error text-on-error font-bold px-3 py-2 rounded-lg hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
                 >
-                  {resetting ? 'Resetting…' : 'Reset from cloud'}
+                  {resetting ? t('account.resetting') : t('account.resetFromCloud')}
                 </button>
                 <button
                   type="button"
@@ -308,7 +313,7 @@ export function AccountSection() {
                   disabled={resetting}
                   className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
                 >
-                  Cancel
+                  {t('account.cancel')}
                 </button>
               </div>
             </div>
@@ -316,7 +321,7 @@ export function AccountSection() {
 
           {!!user && syncState.error && (
             <div role="alert" className="mt-4 border border-error/40 rounded-xl p-3">
-              <p className="text-sm text-error mb-2">{describeSyncError(syncState.error)}</p>
+              <p className="text-sm text-error mb-2">{describeSyncError(syncState.error, t)}</p>
               {syncState.error.message && (
                 <p className="text-xs text-on-surface-variant mb-3">{syncState.error.message}</p>
               )}
@@ -327,14 +332,14 @@ export function AccountSection() {
                   disabled={!syncConfigured || !online || syncState.inFlight || phase === 'initializing'}
                   className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
                 >
-                  Retry
+                  {t('account.retry')}
                 </button>
                 <button
                   type="button"
                   onClick={() => syncService.dismissError()}
                   className="min-h-11 bg-surface-variant text-on-surface-variant font-bold px-3 py-2 rounded-lg hover:bg-surface transition-all cursor-pointer border-none text-sm"
                 >
-                  Dismiss sync error
+                  {t('account.dismissSyncError')}
                 </button>
                 <button
                   type="button"
@@ -342,7 +347,7 @@ export function AccountSection() {
                   disabled={!online || syncState.inFlight || phase === 'initializing'}
                   className="min-h-11 bg-error text-on-error font-bold px-3 py-2 rounded-lg hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none text-sm"
                 >
-                  Reset from cloud
+                  {t('account.resetFromCloud')}
                 </button>
               </div>
             </div>
@@ -352,31 +357,31 @@ export function AccountSection() {
           <div className="space-y-4">
             <p role="status" className="text-on-surface-variant">
               {syncConfigured
-                ? 'Sign in to enable cloud sync across your devices. Your data stays on this device until you sign in.'
-                : "Cloud sync isn't configured for this app. Your data stays on this device."}
+                ? t('account.signInPrompt')
+                : t('account.syncNotConfiguredSignedOut')}
             </p>
             <label className="flex items-center gap-2 text-sm text-on-surface cursor-pointer">
               <input
                 type="checkbox"
                 checked={persist}
                 onChange={event => setPersist(event.target.checked)}
-                aria-label="Keep me signed in on this device"
+                aria-label={t('account.keepSignedIn')}
                 className="w-4 h-4 accent-primary"
               />
-              Keep me signed in on this device
+              {t('account.keepSignedIn')}
             </label>
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={() =>
-                  void runAuthAction(signInWithGoogle, "Couldn't sign in. Please try again.", () =>
+                  void runAuthAction(signInWithGoogle, t('account.signInError'), () =>
                     analytics.track(Events.AppSettings('sign_in', { method: 'google' }))
                   )
                 }
                 disabled={busy || !online || !syncConfigured}
                 className="flex-1 h-11 bg-primary text-on-primary font-bold px-4 rounded-xl hover:brightness-110 transition-all disabled:opacity-50 cursor-pointer border-none"
               >
-                <span className="inline-flex items-center justify-center gap-2"><Icon name="login" size="sm" />Continue with Google</span>
+                <span className="inline-flex items-center justify-center gap-2"><Icon name="login" size="sm" />{t('account.continueGoogle')}</span>
               </button>
               {canUseTestLogin() && (
                 <button
@@ -389,11 +394,11 @@ export function AccountSection() {
                   disabled={busy || !online || !syncConfigured}
                   className="h-11 bg-surface-variant text-on-surface-variant font-bold px-4 rounded-xl hover:bg-surface transition-all disabled:opacity-50 cursor-pointer border-none"
                 >
-                  Sign in as test user
+                  {t('account.signInTestUser')}
                 </button>
               )}
             </div>
-            {!online && <p className="text-sm text-on-surface-variant">Connect to sign in.</p>}
+            {!online && <p className="text-sm text-on-surface-variant">{t('account.connectToSignIn')}</p>}
           </div>
         )}
         {error && <p role="alert" className="text-sm text-error mt-3">{error}</p>}

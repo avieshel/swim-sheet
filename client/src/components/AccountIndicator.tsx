@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useI18n } from '../i18n'
 
 function getString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
@@ -7,6 +8,7 @@ function getString(value: unknown): string | undefined {
 
 export function AccountIndicator() {
   const { status, user } = useAuth()
+  const { t } = useI18n()
 
   if (status !== 'signed_in' || !user) return null
 
@@ -18,11 +20,11 @@ export function AccountIndicator() {
   return (
     <Link
       to="/settings"
-      aria-label="Account settings"
+      aria-label={t('common.accountSettings')}
       className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container-high transition-colors"
     >
       {avatarUrl ? (
-        <img src={avatarUrl} alt="Account avatar" className="w-8 h-8 rounded-full object-cover" />
+        <img src={avatarUrl} alt={t('common.accountAvatar')} className="w-8 h-8 rounded-full object-cover" />
       ) : (
         <span className="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold">
           {initials}
