@@ -2,11 +2,11 @@
 
 ## Status
 
-- **State**: In progress (P1 merged #48; P2 merged #49; P3 shell+Settings slice in progress on `feat/i18n-p3-shell-settings`)
+- **State**: In progress (P1 merged #48; P2 merged #49; P3 in progress)
 - **Date**: 2026-11-22
 - **Scope owner decision needed before Phase 1 merge**: language persistence (local-only vs synced setting)
 - **Primary goal**: Deliver full Hebrew UI support with correct RTL layout, in mergeable phases, without blocking unrelated product/server work.
-- **Progress**: P1 foundation merged (#48). P2 RTL baseline merged (#49). P3 in progress: shell+Settings localized (#50, #51), shared/common UI localized (UpdatePrompt, InfoDialog, AccountIndicator, AuthCallback, ResetDataDialog, AccountSection). Remaining P3 surfaces (Swimmers/Sessions/Drills/Live/Runs) and P4-P5 pending.
+- **Progress**: P1 foundation merged (#48). P2 RTL baseline merged (#49). P3 in progress: shell+Settings localized (#50, #51), shared/common UI + account/auth localized (#52), Swimmers flow localized on `feat/i18n-p3-swimmers` (SwimmersList, SwimmerDetail, SwimmerFormModal). Remaining P3 surfaces (Sessions, Drills, Live, Runs) and P4-P5 pending.
 
 ## Executive summary
 

@@ -8,6 +8,7 @@ import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
 import { useCoachAssist } from '../context/coachAssistShared'
+import { useI18n } from '../i18n'
 
 interface SwimmerStats {
   lastRun: { runId: string; date: string; templateName: string } | null
@@ -32,6 +33,7 @@ function computeSwimmerStats(runs: RunSummary[], swimmer: Swimmer): SwimmerStats
 
 export const SwimmersList: React.FC = () => {
   const { coach } = useCoachAssist()
+  const { t } = useI18n()
   const [swimmers, setSwimmers] = useState<Swimmer[]>([])
   const [historyRuns, setHistoryRuns] = useState<RunSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -165,10 +167,10 @@ export const SwimmersList: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-              Team Management
+              {t('swimmers.title')}
             </h2>
             <p className="font-body-md text-on-surface-variant mt-1">
-              Manage {swimmers.length} active swimmers and their performance profiles.
+              {t('swimmers.subtitle', { count: swimmers.length })}
             </p>
           </div>
         </div>
@@ -177,7 +179,7 @@ export const SwimmersList: React.FC = () => {
             <Icon name="search" color="on-surface-variant" className="absolute left-4 top-1/2 -translate-y-1/2" />
             <input
               className="w-full h-12 ps-12 pe-10 bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 rounded-t-lg transition-all font-body-md text-body-md outline-none"
-              placeholder="Search by name or group..."
+              placeholder={t('swimmers.searchPlaceholder')}
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -185,6 +187,7 @@ export const SwimmersList: React.FC = () => {
             {search && (
               <button
                 onClick={() => setSearch('')}
+                aria-label={t('swimmers.clearSearch')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors cursor-pointer bg-transparent border-none"
               >
                 <Icon name="close" />
@@ -202,15 +205,15 @@ export const SwimmersList: React.FC = () => {
               <div className="w-16 h-16 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center mb-4">
                 <Icon name="search_off" size="2xl" />
               </div>
-              <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No results found</h3>
+              <h3 className="font-headline-md text-headline-md text-on-surface mb-2">{t('swimmers.noResults')}</h3>
               <p className="font-body-md text-body-md text-on-surface-variant mb-6">
-                No swimmers match "{search}". Try a different name or group.
+                {t('swimmers.noResultsMatch', { search })}
               </p>
               <button
                 onClick={() => setSearch('')}
                 className="h-12 px-6 border-2 border-outline text-on-surface rounded-xl font-label-sm text-label-sm hover:bg-surface-container transition-colors cursor-pointer"
               >
-                Clear Search
+                {t('swimmers.clearSearch')}
               </button>
             </>
           ) : (
@@ -218,16 +221,16 @@ export const SwimmersList: React.FC = () => {
               <div className="w-16 h-16 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-4">
                 <Icon name="person_add" size="2xl" />
               </div>
-              <h3 className="font-headline-md text-headline-md text-on-surface mb-2">No swimmers yet</h3>
+              <h3 className="font-headline-md text-headline-md text-on-surface mb-2">{t('swimmers.noSwimmers')}</h3>
               <p className="font-body-md text-body-md text-on-surface-variant mb-6">
-                Add your first swimmer to get started tracking performance.
+                {t('swimmers.noSwimmersDescList')}
               </p>
               <button
                 onClick={openAddModal}
                 className="bg-primary text-on-primary px-8 py-3 rounded-xl font-label-sm text-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
                 <Icon name="add" />
-                Add Swimmer
+                {t('swimmers.addFirst')}
               </button>
             </>
           )}
@@ -258,7 +261,7 @@ export const SwimmersList: React.FC = () => {
                         ? 'bg-surface-variant text-on-surface-variant'
                         : 'bg-green-100 text-green-700'
                     }`}>
-                      {s.status === 'inactive' ? 'Inactive' : 'Active'}
+                      {s.status === 'inactive' ? t('swimmers.inactive') : t('swimmers.active')}
                     </span>
                     {s.notes && (
                       <span className="text-on-surface-variant font-label-sm text-label-sm truncate max-w-[200px]">{s.notes}</span>
@@ -271,7 +274,7 @@ export const SwimmersList: React.FC = () => {
                 return (
                   <div className="flex flex-col gap-3 mb-6">
                     <div className="bg-surface-container-low p-3 rounded-lg min-w-0">
-                      <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">LAST SESSION</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">{t('swimmers.lastSession').toUpperCase()}</span>
                       {stats.lastRun ? (
                         <Link
                           to={`/runs/${stats.lastRun.runId}`}
@@ -281,11 +284,11 @@ export const SwimmersList: React.FC = () => {
                           <span className="block font-label-sm text-label-sm text-on-surface-variant font-normal">{stats.lastRun.date}</span>
                         </Link>
                       ) : (
-                        <span className="font-body-md text-on-surface-variant">No sessions yet</span>
+                        <span className="font-body-md text-on-surface-variant">{t('swimmers.noSessionsYet')}</span>
                       )}
                     </div>
                     <div className="bg-surface-container-low p-3 rounded-lg">
-                      <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">SESSIONS · 30D</span>
+                      <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">{t('swimmers.sessions30d').toUpperCase()}</span>
                       <span className="font-display-timer text-headline-lg text-primary">{stats.sessions30d}</span>
                     </div>
                   </div>
@@ -297,18 +300,18 @@ export const SwimmersList: React.FC = () => {
                   className="flex-1 h-touch-target-min bg-primary text-on-primary rounded-lg font-label-sm text-label-sm flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all no-underline"
                 >
                   <Icon name="analytics" size="xl" />
-                  Stats
+                  {t('swimmers.stats')}
                 </Link>
                 <button
                   onClick={() => openEditModal(s)}
-                  aria-label={`Edit ${s.name}`}
+                  aria-label={t('swimmers.editAria', { name: s.name })}
                   className="h-9 w-9 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
                   <Icon name="edit" />
                 </button>
                 <button
                   onClick={() => { setDeleteTarget(s); }}
-                  aria-label={`Delete ${s.name}`}
+                  aria-label={t('swimmers.deleteAria', { name: s.name })}
                   className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                 >
                   <Icon name="delete" />
@@ -324,9 +327,9 @@ export const SwimmersList: React.FC = () => {
             <div className="w-12 h-12 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
               <Icon name="person_add" />
             </div>
-            <h4 className="font-headline-md text-headline-md text-on-surface">Add New Swimmer</h4>
+            <h4 className="font-headline-md text-headline-md text-on-surface">{t('swimmers.addNew')}</h4>
             <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-              Register a new athlete to the team roster.
+              {t('swimmers.addNewDesc')}
             </p>
           </div>
         </section>
@@ -354,10 +357,10 @@ export const SwimmersList: React.FC = () => {
 
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="Delete Swimmer"
-        message={`Are you sure you want to delete ${deleteTarget?.name || 'this swimmer'}? This will also remove all their sessions and lap data.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
+        title={t('swimmers.deleteTitle')}
+        message={t('swimmers.deleteMessage', { name: deleteTarget?.name || '' })}
+        confirmLabel={t('deleteSwimmer')}
+        cancelLabel={t('settings.cancel')}
         destructive
         onConfirm={() => handleDelete(deleteTarget!.id)}
         onCancel={() => setDeleteTarget(null)}

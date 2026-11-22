@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 
 export interface SwimmerFormData {
   name: string
@@ -36,6 +37,7 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
   const [showDropdown, setShowDropdown] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const { t } = useI18n()
   const displayError = externalError ?? error
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
       s => s.id !== editingId && s.name.trim().toLowerCase() === trimmed.toLowerCase()
     )
     if (!selectedDbId && duplicate) {
-      setError(`A swimmer named "${duplicate.name}" already exists. Select them from the list, or use a different name.`)
+      setError(t('swimmers.form.duplicateName', { name: duplicate.name }))
       setShowDropdown(true)
       return
     }
@@ -116,10 +118,11 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
       <div className="bg-surface-container-lowest w-full max-w-sm md:max-w-md rounded-2xl p-4 md:p-6 shadow-2xl">
         <div className="flex justify-between items-center mb-4 md:mb-6">
           <h3 className="font-headline-md text-on-surface">
-            {editingId ? 'Edit Athlete' : 'New Athlete'}
+            {editingId ? t('swimmers.form.editAthlete') : t('swimmers.form.newAthlete')}
           </h3>
           <button
             onClick={onClose}
+            aria-label={t('common.close')}
             className="h-11 w-11 flex items-center justify-center text-outline hover:bg-surface-variant rounded-lg transition-colors cursor-pointer bg-transparent border-none"
           >
             <Icon name="close" color="on-surface-variant" />
@@ -127,14 +130,14 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
         </div>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="relative" ref={wrapperRef}>
-            <label className="block font-label-caps text-on-surface-variant mb-1">Full Name</label>
+            <label className="block font-label-caps text-on-surface-variant mb-1">{t('swimmers.form.fullName')}</label>
             <input
               className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none"
               type="text"
               value={name}
               onChange={handleNameChange}
               onFocus={() => { if (name.trim()) setShowDropdown(true) }}
-              placeholder="e.g. Alex Rivera"
+              placeholder={t('swimmers.form.namePlaceholder')}
               autoFocus
             />
             {showDropdown && filteredSwimmers.length > 0 && (
@@ -164,28 +167,28 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
           </p>
           <div className="r-grid" style={{ '--grid-min': '160px', '--grid-gap': '1rem' } as React.CSSProperties}>
             <div>
-              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Group</label>
+              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">{t('swimmers.form.group')}</label>
               <input
                 className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none"
                 type="text"
                 value={group}
                 onChange={e => setGroup(e.target.value)}
-                placeholder="e.g. U17"
+                placeholder={t('swimmers.form.groupPlaceholder')}
               />
             </div>
             <div>
-              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Notes</label>
+              <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1">{t('swimmers.form.notes')}</label>
               <input
                 className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none"
                 type="text"
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. Primary: Freestyle"
+                placeholder={t('swimmers.form.notesPlaceholder')}
               />
             </div>
           </div>
           <div>
-            <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">Status</label>
+            <label className="block font-label-caps text-label-caps text-on-surface-variant mb-2">{t('swimmers.form.status')}</label>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -196,7 +199,7 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
                     : 'bg-transparent text-on-surface-variant border-outline-variant hover:bg-surface-container'
                 }`}
               >
-                Active
+                {t('swimmers.form.active')}
               </button>
               <button
                 type="button"
@@ -207,7 +210,7 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
                     : 'bg-transparent text-on-surface-variant border-outline-variant hover:bg-surface-container'
                 }`}
               >
-                Inactive
+                {t('swimmers.form.inactive')}
               </button>
             </div>
           </div>
@@ -217,13 +220,13 @@ export const SwimmerFormModal: React.FC<SwimmerFormModalProps> = ({
               onClick={onClose}
               className="flex-1 h-12 min-w-[44px] border-2 border-outline text-on-surface rounded-lg font-label-sm hover:bg-surface-container transition-colors cursor-pointer"
             >
-              Cancel
+              {t('swimmers.form.cancel')}
             </button>
             <button
               type="submit"
               className="flex-1 h-12 min-w-[44px] bg-primary text-on-primary rounded-lg font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
             >
-              {editingId ? 'Save Changes' : 'Add Swimmer'}
+              {editingId ? t('swimmers.form.saveChanges') : t('addSwimmer')}
             </button>
           </div>
         </form>

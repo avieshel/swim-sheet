@@ -7,10 +7,12 @@ import { RunHistoryTable } from '../components/Table'
 import { downloadBlob } from '../utils/downloadBlob'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useI18n } from '../i18n'
 
 export const SwimmerDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [swimmer, setSwimmer] = useState<Swimmer | null>(null)
   const [loading, setLoading] = useState(true)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -86,12 +88,12 @@ export const SwimmerDetail: React.FC = () => {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading...</p>
+      <p className="text-on-surface-variant">{t('swimmers.detail.loading')}</p>
     </div>
   )
   if (!swimmer) return (
     <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Swimmer not found.</p>
+      <p className="text-on-surface-variant">{t('swimmers.detail.notFound')}</p>
     </div>
   )
 
@@ -102,7 +104,7 @@ export const SwimmerDetail: React.FC = () => {
         className="h-11 px-3 mb-4 inline-flex items-center gap-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer border-none"
       >
         <Icon name="arrow_back" size="sm" />
-        <span className="text-label-sm font-medium">Back to Swimmers</span>
+        <span className="text-label-sm font-medium">{t('swimmers.detail.back')}</span>
       </button>
 
       {/* Profile Header */}
@@ -124,7 +126,7 @@ export const SwimmerDetail: React.FC = () => {
                   ? 'bg-surface-variant text-on-surface-variant'
                   : 'bg-green-100 text-green-700'
               }`}>
-                {swimmer.status === 'inactive' ? 'Inactive' : 'Active'}
+                {swimmer.status === 'inactive' ? t('swimmers.inactive') : t('swimmers.active')}
               </span>
               {swimmer.notes && (
                 <p className="font-body-md text-body-md text-on-surface-variant mt-2">{swimmer.notes}</p>
@@ -137,10 +139,11 @@ export const SwimmerDetail: React.FC = () => {
               className="h-touch-target-min px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-colors cursor-pointer"
             >
               <Icon name="edit" size="lg" />
-              Edit
+              {t('swimmers.detail.edit')}
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
+              aria-label={t('swimmers.deleteAria', { name: swimmer.name })}
               className="h-touch-target-min px-4 border-2 border-error/30 text-error rounded-lg font-label-sm flex items-center gap-2 hover:bg-error-container transition-colors cursor-pointer"
             >
               <Icon name="delete" size="lg" />
@@ -154,7 +157,7 @@ export const SwimmerDetail: React.FC = () => {
         <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant mb-6">
           <h3 className="font-headline-md text-headline-md text-on-surface mb-3 flex items-center gap-2">
             <Icon name="info" color="primary" />
-            General Information
+            {t('swimmers.detail.generalInfo')}
           </h3>
           <p className="font-body-md text-body-md text-on-surface-variant whitespace-pre-wrap">{swimmer.notes}</p>
         </div>
@@ -164,7 +167,7 @@ export const SwimmerDetail: React.FC = () => {
       <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant">
         <h3 className="font-headline-md text-headline-md text-on-surface mb-4 flex items-center gap-2">
           <Icon name="event_note" color="primary" />
-          Session History
+          {t('swimmers.detail.sessionHistory')}
         </h3>
         <RunHistoryTable swimmerId={id} borderless focusName={swimmer.name} lastAttended />
       </div>
@@ -188,9 +191,9 @@ export const SwimmerDetail: React.FC = () => {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-surface-container-lowest rounded-3xl p-8 max-w-md w-full border border-outline-variant shadow-2xl">
-            <h3 className="font-headline-md text-headline-md font-bold text-primary mb-4">Delete {swimmer.name}?</h3>
+            <h3 className="font-headline-md text-headline-md font-bold text-primary mb-4">{t('swimmers.detail.deleteName', { name: swimmer.name })}</h3>
             <p className="text-on-surface-variant font-body-md mb-6">
-              Choose what to do with this swimmer's data:
+              {t('swimmers.detail.chooseDelete')}
             </p>
             <div className="flex flex-col gap-3">
               <button
@@ -198,28 +201,28 @@ export const SwimmerDetail: React.FC = () => {
                 disabled={deleting}
                 className="w-full bg-primary text-on-primary font-bold px-6 py-3.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
               >
-                {deleting ? 'Deleting...' : 'Export data & delete'}
+                {deleting ? t('swimmers.detail.deleting') : t('swimmers.detail.exportAndDelete')}
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
                 className="w-full bg-error text-on-error font-bold px-6 py-3.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
               >
-                Delete all data permanently
+                {t('swimmers.detail.deletePermanently')}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={deleting}
                 className="w-full bg-surface-variant text-on-surface-variant font-bold px-6 py-3.5 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none"
               >
-                Cancel
+                {t('swimmers.form.cancel')}
               </button>
               <div className="mt-2 pt-3 border-t border-outline-variant/30">
                 <button
                   onClick={handleExportOnly}
                   className="w-full text-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none underline"
                 >
-                  Export data without deleting
+                  {t('swimmers.detail.exportOnly')}
                 </button>
               </div>
             </div>
