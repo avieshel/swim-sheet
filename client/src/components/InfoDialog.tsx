@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 
 interface InfoDialogProps {
   open: boolean
@@ -9,6 +10,7 @@ interface InfoDialogProps {
 }
 
 export function InfoDialog({ open, title, children, onClose }: InfoDialogProps) {
+  const { t } = useI18n()
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden'
@@ -37,7 +39,7 @@ export function InfoDialog({ open, title, children, onClose }: InfoDialogProps) 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="w-10 h-10 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer bg-transparent border-none"
           >
             <Icon name="close" size="md" />
@@ -52,7 +54,7 @@ export function InfoDialog({ open, title, children, onClose }: InfoDialogProps) 
             onClick={onClose}
             className="h-12 min-w-[44px] px-6 rounded-xl font-label-sm bg-primary text-on-primary hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
           >
-            Got it
+            {t('common.gotIt')}
           </button>
         </div>
       </div>

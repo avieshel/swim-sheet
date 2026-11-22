@@ -6,7 +6,7 @@
 - **Date**: 2026-11-22
 - **Scope owner decision needed before Phase 1 merge**: language persistence (local-only vs synced setting)
 - **Primary goal**: Deliver full Hebrew UI support with correct RTL layout, in mergeable phases, without blocking unrelated product/server work.
-- **Progress**: P1 foundation merged (#48). P2 RTL baseline merged (#49). P3 started: Layout nav/banner localized, Settings key wiring + Hebrew translations expanded (partial slice). Remaining P3 surfaces and P4-P5 pending.
+- **Progress**: P1 foundation merged (#48). P2 RTL baseline merged (#49). P3 in progress: shell+Settings localized (#50, #51), shared/common UI localized (UpdatePrompt, InfoDialog, AccountIndicator, AuthCallback, ResetDataDialog, AccountSection). Remaining P3 surfaces (Swimmers/Sessions/Drills/Live/Runs) and P4-P5 pending.
 
 ## Executive summary
 
