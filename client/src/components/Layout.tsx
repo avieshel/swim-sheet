@@ -5,20 +5,21 @@ import { settingsService } from '../services/settingsService';
 import { Icon } from './Icon';
 import { AccountIndicator } from './AccountIndicator';
 import { useCoachAssist } from '../context/coachAssistShared';
-
-const navItems = [
-  { path: '/swimmers', label: 'Swimmers', icon: 'groups' },
-  { path: '/sessions', label: 'Sessions', icon: 'event_note' },
-  { path: '/drills', label: 'Drills', icon: 'library_books' },
-  { path: '/live', label: 'Live', icon: 'timer' },
-  { path: '/settings', label: 'Settings', icon: 'settings' },
-];
+import { useI18n } from '../i18n';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { isOwner, coach, exit } = useCoachAssist();
   const activeRun = useActiveRun(!coach);
+  const { t } = useI18n();
+  const navItems = [
+    { path: '/swimmers', label: t('nav.swimmers'), icon: 'groups' },
+    { path: '/sessions', label: t('nav.sessions'), icon: 'event_note' },
+    { path: '/drills', label: t('nav.drills'), icon: 'library_books' },
+    { path: '/live', label: t('nav.live'), icon: 'timer' },
+    { path: '/settings', label: t('nav.settings'), icon: 'settings' },
+  ];
 
   // In coach mode the Live tab is suppressed: starting a live session would
   // write run/lap rows to the owner's local Dexie, not the coach's tenant.
@@ -56,7 +57,7 @@ export const Layout: React.FC = () => {
         <div className="r-container flex items-center justify-between py-3 md:py-4">
           <Link to="/" className="flex items-center gap-2 md:gap-3 min-w-0 no-underline">
             <Icon name="pool" size="xl" color="primary" className="shrink-0" />
-            <h1 className="font-headline-md font-bold text-primary truncate">Swim Sheet</h1>
+            <h1 className="font-headline-md font-bold text-primary truncate">{t('layout.appName')}</h1>
           </Link>
           <div className="hidden md:flex items-center">
             <nav className="flex gap-2 lg:gap-4 me-2">
@@ -85,7 +86,7 @@ export const Layout: React.FC = () => {
                       : 'text-on-surface-variant hover:bg-surface-container-high'
                   }`}
                 >
-                  Coach Assist
+                  {t('nav.coachAssist')}
                 </Link>
               )}
             </nav>
@@ -98,7 +99,7 @@ export const Layout: React.FC = () => {
         <div className="bg-secondary-container text-on-secondary-container text-label-sm px-4 py-2 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 min-w-0">
             <Icon name="supervisor_account" size="sm" />
-            <span className="truncate">Coach Assist — editing {coach.name}'s data</span>
+            <span className="truncate">{t('layout.coachAssistEditing', { name: coach.name })}</span>
           </span>
           <button
             type="button"
@@ -108,7 +109,7 @@ export const Layout: React.FC = () => {
             }}
             className="shrink-0 font-label-sm underline underline-offset-2 cursor-pointer"
           >
-            Exit
+            {t('layout.exit')}
           </button>
         </div>
       )}
@@ -158,7 +159,7 @@ export const Layout: React.FC = () => {
             }`}
           >
             <Icon name="supervisor_account" fill={isActive('/admin/coach-assist')} />
-            <span className="font-label-sm leading-none mt-0.5">Assist</span>
+            <span className="font-label-sm leading-none mt-0.5">{t('nav.assistShort')}</span>
           </Link>
         )}
       </nav>
