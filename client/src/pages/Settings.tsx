@@ -490,7 +490,7 @@ export const Settings: React.FC = () => {
 
               <div>
                 <label className="font-label-sm text-on-surface block mb-2">
-                  Default Equipment
+                  {t('settings.defaultEquipment')}
                 </label>
                 <div className="flex flex-wrap gap-2 min-h-[2rem] mb-2">
                   {equipmentItems.map(item => (
@@ -512,7 +512,7 @@ export const Settings: React.FC = () => {
                     value={newEquipName}
                     onChange={e => setNewEquipName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleEquipAdd() } }}
-                    placeholder="Add equipment item..."
+                    placeholder={t('settings.addEquipmentItem')}
                     className="flex-1 bg-surface text-on-surface px-4 py-2.5 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
                   />
                   <button
@@ -521,7 +521,7 @@ export const Settings: React.FC = () => {
                     disabled={!newEquipName.trim()}
                     className="bg-primary text-on-primary font-bold px-4 py-2.5 rounded-xl hover:brightness-110 transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none text-sm"
                   >
-                    Add
+                    {t('equipment.add')}
                   </button>
                 </div>
                 <button
@@ -538,7 +538,7 @@ export const Settings: React.FC = () => {
 
         {/* Application Preferences */}
         <section>
-          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">Application Preferences</h2>
+          <h2 className="font-label-caps text-primary mb-3 md:mb-4 px-3">{t('settings.appPreferences')}</h2>
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-6 border border-outline-variant">
             <div className="space-y-4">
               <div>
@@ -557,7 +557,7 @@ export const Settings: React.FC = () => {
                           : 'bg-surface text-on-surface-variant/50 border-outline-variant hover:border-primary/50'
                       }`}
                     >
-                      {size}
+                      {{ small: t('settings.fontSize.small'), medium: t('settings.fontSize.medium'), large: t('settings.fontSize.large') }[size]}
                     </button>
                   ))}
                 </div>
@@ -565,14 +565,14 @@ export const Settings: React.FC = () => {
 
               <div>
                 <label htmlFor="theme" className="font-label-sm text-on-surface block mb-2">
-                  Theme
+                  {t('settings.theme')}
                 </label>
                 <CustomSelect
                   value={form.theme}
                   options={[
-                    { value: 'pool', label: 'Pool (Light)' },
-                    { value: 'open-water', label: 'Open Water (Dark)' },
-                    { value: 'auto', label: 'Automatic' },
+                    { value: 'pool', label: t('settings.theme.pool') },
+                    { value: 'open-water', label: t('settings.theme.openWater') },
+                    { value: 'auto', label: t('settings.theme.auto') },
                   ]}
                   onChange={(val) => {
                     const newEvent = { target: { name: 'theme', value: val } } as React.ChangeEvent<HTMLSelectElement>
@@ -612,7 +612,7 @@ export const Settings: React.FC = () => {
                     onClick={() => setShowResetConfirm(true)}
                     className="h-9 px-3 bg-surface-variant text-on-surface-variant text-label-sm font-bold rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none"
                   >
-                    Reset
+                    {t('settings.reset')}
                   </button>
                 </div>
               </div>
@@ -627,7 +627,7 @@ export const Settings: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="sync_interval" className="font-label-sm text-on-surface block mb-2">
-                  Auto-sync Interval (seconds)
+                  {t('settings.sync_interval')}
                 </label>
                 <input
                   type="number"
@@ -674,7 +674,7 @@ export const Settings: React.FC = () => {
 
               <div>
                 <label htmlFor="data_retention_days" className="font-label-sm text-on-surface block mb-2">
-                  Auto-cleanup older than (days)
+                  {t('settings.autoCleanupLabel')}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -708,7 +708,7 @@ export const Settings: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setShowStorageInfo(true)}
-                      aria-label="What does storage protection mean?"
+                      aria-label={t('settings.storageProtectionInfo')}
                       className="w-6 h-6 flex items-center justify-center rounded-full text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors cursor-pointer bg-transparent border-none"
                     >
                       <Icon name="info" size="sm" />
@@ -716,12 +716,12 @@ export const Settings: React.FC = () => {
                   </span>
                   <span className="flex items-center gap-3 text-end">
                     <span className="font-body-md text-on-surface-variant">
-                      {persistenceGranted === null ? 'Checking...' : persistenceGranted ? (
+                      {persistenceGranted === null ? t('settings.checking') : persistenceGranted ? (
                         <span className="flex items-center gap-1.5">
                           <Icon name="check_circle" size="sm" color="primary" fill />
-                          <span>Protected from automatic eviction</span>
+                          <span>{t('settings.protectedEviction')}</span>
                         </span>
-                      ) : 'Not protected — browser may evict data'}
+                      ) : t('settings.notProtected')}
                     </span>
                     {!persistenceGranted && (
                       <button
@@ -741,7 +741,7 @@ export const Settings: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant pb-3">
-                  SwimSheet keeps an automatic backup on this device. Back up to a file to keep a copy outside this browser (for example, before switching devices).
+                  {t('settings.backupHint')}
                 </p>
                 <div className="flex gap-3">
                   <button
@@ -750,7 +750,7 @@ export const Settings: React.FC = () => {
                     disabled={exporting}
                     className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 disabled:opacity-50 cursor-pointer border-none"
                   >
-                    {exporting ? 'Exporting...' : t('settings.backupToFile')}
+                    {exporting ? t('settings.exporting') : t('settings.backupToFile')}
                   </button>
                   <label className="flex-1 bg-surface-variant text-on-surface-variant font-bold px-4 py-3 rounded-xl hover:bg-surface transition-all active:scale-95 cursor-pointer border-none text-center">
                     {t('settings.restoreFromFile')}
@@ -800,10 +800,10 @@ export const Settings: React.FC = () => {
 
         <ConfirmDialog
           open={showImportConfirm}
-          title="Restore from backup?"
-          message="This will replace ALL current data (swimmers, session templates, completed sessions, results) with the contents of the backup file. This cannot be undone."
-          confirmLabel="Restore"
-          cancelLabel="Cancel"
+          title={t('settings.restoreBackupTitle')}
+          message={t('settings.restoreBackupMessage')}
+          confirmLabel={t('settings.restore')}
+          cancelLabel={t('settings.cancel')}
           destructive
           confirmDisabled={importing}
           onConfirm={handleImportConfirm}
@@ -812,7 +812,7 @@ export const Settings: React.FC = () => {
 
         <InfoDialog
           open={showStorageInfo}
-          title="Storage Protection"
+          title={t('settings.storageProtection')}
           onClose={() => setShowStorageInfo(false)}
         >
           <p>
@@ -836,28 +836,28 @@ export const Settings: React.FC = () => {
 
       {/* App Info */}
       <section className="mt-8">
-        <h2 className="font-label-caps text-primary mb-4 px-3">App Info</h2>
+        <h2 className="font-label-caps text-primary mb-4 px-3">{t('settings.appInfo')}</h2>
         <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant space-y-2">
           <div className="flex items-center justify-between">
-            <span className="font-label-sm text-on-surface">Version</span>
+            <span className="font-label-sm text-on-surface">{t('app.version')}</span>
             <span className="font-body-md text-on-surface-variant">{getAppVersion().version}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-label-sm text-on-surface">Commit</span>
+            <span className="font-label-sm text-on-surface">{t('app.commit')}</span>
             <span className="font-body-md text-on-surface-variant">{getAppVersion().commit}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-label-sm text-on-surface">Built</span>
+            <span className="font-label-sm text-on-surface">{t('app.built')}</span>
             <span className="font-body-md text-on-surface-variant">{getAppVersion().built.replace('T', ' ').replace(/\.\d+Z/, '')} UTC</span>
           </div>
           <div className="flex items-center justify-between gap-4">
-            <span className="font-label-sm text-on-surface">Legal</span>
+            <span className="font-label-sm text-on-surface">{t('settings.legal')}</span>
             <span className="font-body-md text-on-surface-variant flex flex-wrap justify-end gap-x-4 gap-y-1">
               <Link to="/terms" className="text-primary no-underline hover:underline">
-                Terms of Service
+                {t('settings.terms')}
               </Link>
               <Link to="/privacy" className="text-primary no-underline hover:underline">
-                Privacy Policy
+                {t('settings.privacy')}
               </Link>
             </span>
           </div>

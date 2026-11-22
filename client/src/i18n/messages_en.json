@@ -86,5 +86,20 @@
   "settings.protectedEviction": "Protected from automatic eviction",
   "settings.notProtected": "Not protected — browser may evict data",
   "settings.backupHint": "SwimSheet keeps an automatic backup on this device. Back up to a file to keep a copy outside this browser (for example, before switching devices).",
-  "settings.storageProtectionInfo": "What does storage protection mean?"
+  "settings.storageProtectionInfo": "What does storage protection mean?",
+  "settings.appPreferences": "Application Preferences",
+  "settings.appInfo": "App Info",
+  "settings.legal": "Legal",
+  "settings.terms": "Terms of Service",
+  "settings.privacy": "Privacy Policy",
+  "settings.restoreBackupTitle": "Restore from backup?",
+  "settings.restoreBackupMessage": "This will replace ALL current data (swimmers, session templates, completed sessions, results) with the contents of the backup file. This cannot be undone.",
+  "settings.restore": "Restore",
+  "settings.exporting": "Exporting...",
+  "settings.autoCleanupLabel": "Auto-cleanup older than (days)",
+  "settings.defaultEquipment": "Default Equipment",
+  "settings.addEquipmentItem": "Add equipment item...",
+  "settings.theme.pool": "Pool (Light)",
+  "settings.theme.openWater": "Open Water (Dark)",
+  "settings.theme.auto": "Automatic"
 }

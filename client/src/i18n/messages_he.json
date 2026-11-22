@@ -86,5 +86,20 @@
   "settings.protectedEviction": "מוגן מפינוי אוטומטי",
   "settings.notProtected": "לא מוגן — הדפדפן עלול לפנות נתונים",
   "settings.backupHint": "SwimSheet שומרת גיבוי אוטומטי במכשיר זה. גבה לקובץ כדי לשמור עותק מחוץ לדפדפן (למשל לפני מעבר למכשיר אחר).",
-  "settings.storageProtectionInfo": "מה המשמעות של הגנת אחסון?"
+  "settings.storageProtectionInfo": "מה המשמעות של הגנת אחסון?",
+  "settings.appPreferences": "העדפות אפליקציה",
+  "settings.appInfo": "מידע על האפליקציה",
+  "settings.legal": "משפטי",
+  "settings.terms": "תנאי שימוש",
+  "settings.privacy": "מדיניות פרטיות",
+  "settings.restoreBackupTitle": "לשחזר מגיבוי?",
+  "settings.restoreBackupMessage": "פעולה זו תחליף את כל הנתונים הנוכחיים (שחיינים, תבניות אימון, אימונים שהושלמו, תוצאות) בתוכן קובץ הגיבוי. לא ניתן לבטל פעולה זו.",
+  "settings.restore": "שחזר",
+  "settings.exporting": "מייצא...",
+  "settings.autoCleanupLabel": "ניקוי אוטומטי ישן מ- (ימים)",
+  "settings.defaultEquipment": "ציוד ברירת מחדל",
+  "settings.addEquipmentItem": "הוסף פריט ציוד...",
+  "settings.theme.pool": "בריכה (בהיר)",
+  "settings.theme.openWater": "ים פתוח (כהה)",
+  "settings.theme.auto": "אוטומטי"
 }
