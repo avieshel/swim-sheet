@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CatalogSessionIndex } from '../api/catalog'
 import { fetchSessionFile, importSession } from '../api/catalog'
+import { useI18n } from '../i18n'
 import { Icon } from './Icon'
 import { Events, analytics } from '../services/analyticsEvents'
 
@@ -11,6 +12,7 @@ interface SessionCatalogCardProps {
 }
 
 export function SessionCatalogCard({ session, isImported, onImported }: SessionCatalogCardProps) {
+  const { t } = useI18n()
   const [importing, setImporting] = useState(false)
 
   const handleImport = async () => {
@@ -37,7 +39,7 @@ export function SessionCatalogCard({ session, isImported, onImported }: SessionC
           <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
             <span className="flex items-center gap-1">
               <Icon name="fitness_center" size="sm" />
-              {session.drillCount} drills
+              {session.drillCount} {session.drillCount === 1 ? t('sessions.drill') : t('sessions.drills')}
             </span>
             <span className="text-outline">·</span>
             <span className="flex items-center gap-1">
@@ -62,7 +64,7 @@ export function SessionCatalogCard({ session, isImported, onImported }: SessionC
         {isImported ? (
           <span className="text-label-sm text-on-surface-variant font-bold flex items-center gap-1">
             <Icon name="check_circle" size="sm" color="primary" />
-            Imported
+            {t('sessions.catalog.imported')}
           </span>
         ) : (
           <button
@@ -73,11 +75,11 @@ export function SessionCatalogCard({ session, isImported, onImported }: SessionC
             {importing ? (
               <>
                 <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                Importing...
+                {t('sessions.catalog.importing')}
               </>
             ) : (
               <>
-                Import
+                {t('sessions.catalog.import')}
                 <Icon name="download" size="sm" />
               </>
             )}

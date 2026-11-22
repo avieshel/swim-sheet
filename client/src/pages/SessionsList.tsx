@@ -15,6 +15,7 @@ import { SessionCard } from '../components/SessionCard'
 import { SessionPackageImportModal } from '../components/SessionPackageImportModal'
 import { Events, analytics } from '../services/analyticsEvents'
 import { useCoachAssist } from '../context/coachAssistShared'
+import { useI18n } from '../i18n'
 import type { Stroke } from '../types/swimming'
 import { exportSessionPackage } from '../api/sessionPackages'
 import { downloadSessionPackageFile } from '../utils/sessionPackageFile'
@@ -28,6 +29,7 @@ interface SessionWithTotals extends Session {
 
 export const SessionsList: React.FC = () => {
   const navigate = useNavigate()
+  const { t } = useI18n()
   const { coach } = useCoachAssist()
   const activeRun = useActiveRun(!coach)
   const { startLiveSession } = useStartLiveSession()
@@ -119,7 +121,7 @@ export const SessionsList: React.FC = () => {
         notes: '',
       })
     } catch {
-      setCreateError('Could not create the session. Check your connection and try again.')
+      setCreateError(t('sessions.templates.createError'))
       return
     }
     analytics.track(Events.SessionCreated(sessions.length + 1))
@@ -134,7 +136,7 @@ export const SessionsList: React.FC = () => {
       const sessionPackage = await exportSessionPackage(id)
       downloadSessionPackageFile(sessionPackage, name)
     } catch {
-      setExportError('Could not export the session. Review the template and try again.')
+      setExportError(t('sessions.templates.exportError'))
     }
   }
 
@@ -143,9 +145,9 @@ export const SessionsList: React.FC = () => {
     if (!result.ok) {
       setConfirmState({
         open: true,
-        title: 'Delete live session and template?',
-        message: `"${name}" is being delivered right now. Deleting it will end the live session (its recorded results are kept as history) and remove the template. This cannot be undone.`,
-        confirmLabel: 'Delete both',
+        title: t('sessions.templates.deleteLiveTitle'),
+        message: t('sessions.templates.deleteLiveMessage', { name }),
+        confirmLabel: t('sessions.templates.deleteBoth'),
         onConfirm: () => { void performDelete(id, name, true) },
       })
       return
@@ -158,18 +160,19 @@ export const SessionsList: React.FC = () => {
   const handleDelete = (id: string, name: string) => {
     setConfirmState({
       open: true,
-      title: 'Delete Template',
-      message: `Are you sure you want to permanently delete the template "${name}"?`,
+      title: t('sessions.templates.deleteTitle'),
+      message: t('sessions.templates.deleteMessage', { name }),
       onConfirm: async () => {
         const completedCount = await countCompletedRunsForSession(id)
         if (completedCount === 0) {
           await performDelete(id, name)
           return
         }
+        const unit = completedCount === 1 ? t('sessions.templates.deleteSessionUnit') : t('sessions.templates.deleteSessionsUnit')
         setConfirmState({
           open: true,
-          title: 'Delete Template',
-          message: `"${name}" was used in ${completedCount} recorded ${completedCount === 1 ? 'session' : 'sessions'}. Deleting it keeps that history — each run keeps its own snapshot of what was done.`,
+          title: t('sessions.templates.deleteTitle'),
+          message: t('sessions.templates.deleteWithHistoryMessage', { name, count: completedCount, unit }),
           onConfirm: () => { void performDelete(id, name) },
         })
       },
@@ -274,15 +277,15 @@ export const SessionsList: React.FC = () => {
       <section aria-labelledby="session-templates-heading" className="mb-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6">
           <div>
-            <h2 id="session-templates-heading" className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">Session Templates</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant mt-1">Create and manage reusable training blueprints. Start a session from the Live View.</p>
+            <h2 id="session-templates-heading" className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">{t('sessions.templates.title')}</h2>
+            <p className="font-body-md text-body-md text-on-surface-variant mt-1">{t('sessions.templates.description')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setShowImportModal(true)}
-              aria-label="Import session"
-              title="Import session"
+              aria-label={t('sessions.templates.importAria')}
+              title={t('sessions.templates.importTitle')}
               className="h-11 w-11 inline-flex items-center justify-center rounded-xl border border-outline text-on-surface hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <Icon name="file_download" />
@@ -292,7 +295,7 @@ export const SessionsList: React.FC = () => {
               className="h-11 inline-flex items-center gap-2 px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-all no-underline"
             >
               <Icon name="storefront" />
-              Browse Catalog
+              {t('sessions.templates.browseCatalog')}
             </Link>
             <button
               onClick={() => {
@@ -302,14 +305,14 @@ export const SessionsList: React.FC = () => {
               className="h-11 inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold shadow-sm hover:brightness-110 active:scale-[0.98] transition-all"
             >
               <Icon name="add" />
-              New Template
+              {t('sessions.templates.newTemplate')}
             </button>
             <Link
               to="/sessions/ai"
               className="h-11 inline-flex items-center gap-2 px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-all no-underline"
             >
               <Icon name="auto_awesome" />
-              Create with AI
+              {t('sessions.templates.createWithAi')}
             </Link>
           </div>
         </div>
@@ -321,16 +324,16 @@ export const SessionsList: React.FC = () => {
 
         {showNewForm && (
           <div className="bg-surface-container-lowest rounded-2xl p-4 md:p-5 mb-6 border border-outline-variant shadow-sm">
-            <h3 className="font-headline-md text-on-surface mb-3 md:mb-4">Create New Template</h3>
+            <h3 className="font-headline-md text-on-surface mb-3 md:mb-4">{t('sessions.templates.createNew')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
               <div>
-                <label htmlFor="new-template-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">Template Name</label>
+                <label htmlFor="new-template-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">{t('sessions.templates.templateName')}</label>
                 <input
                   id="new-template-name"
                   type="text"
                   value={formName}
                   onChange={e => setFormName(e.target.value)}
-                  placeholder="e.g. Tuesday Endurance"
+                  placeholder={t('sessions.templates.namePlaceholder')}
                   className="w-full bg-surface-container-low border-b-2 border-outline focus:border-primary focus:ring-0 p-2 font-body-md outline-none rounded-t-lg"
                 />
               </div>
@@ -345,7 +348,7 @@ export const SessionsList: React.FC = () => {
                 onClick={handleCreate}
                 className="h-11 bg-primary text-on-primary px-5 rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-[0.98] transition-all"
               >
-                Create Template
+                {t('sessions.templates.createAction')}
               </button>
           <button
             onClick={() => {
@@ -354,7 +357,7 @@ export const SessionsList: React.FC = () => {
             }}
                 className="h-11 border border-outline text-on-surface px-5 rounded-xl font-label-sm hover:bg-surface-container-low transition-colors"
               >
-                Cancel
+                {t('sessions.cancel')}
               </button>
             </div>
           </div>
@@ -368,11 +371,11 @@ export const SessionsList: React.FC = () => {
               type="text"
               value={templateSearch}
               onChange={e => setTemplateSearch(e.target.value)}
-              placeholder="Search templates by name..."
+              placeholder={t('sessions.templates.searchPlaceholder')}
               className="flex-1 bg-transparent border-none outline-none font-body-md text-on-surface"
             />
             {templateSearch && (
-              <button onClick={() => setTemplateSearch('')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
+              <button onClick={() => setTemplateSearch('')} aria-label={t('common.close')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
                 <Icon name="close" size="lg" />
               </button>
             )}
@@ -383,19 +386,19 @@ export const SessionsList: React.FC = () => {
         {sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
             <Icon name="event_note" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
-            <p className="text-on-surface-variant font-body-md mb-2">No session templates yet.</p>
-            <p className="text-label-sm text-on-surface-variant mb-6">Create a template to start building your drill library.</p>
+            <p className="text-on-surface-variant font-body-md mb-2">{t('sessions.templates.emptyTitle')}</p>
+            <p className="text-label-sm text-on-surface-variant mb-6">{t('sessions.templates.emptyDesc')}</p>
             <button
               onClick={() => setShowNewForm(true)}
               className="bg-primary text-on-primary px-6 py-3 h-11 rounded-xl font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
             >
-              Create First Template
+              {t('sessions.templates.createFirst')}
             </button>
           </div>
         ) : filteredTemplates.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
             <Icon name="search_off" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
-            <p className="text-on-surface-variant font-body-md">No templates match "{templateSearch}".</p>
+            <p className="text-on-surface-variant font-body-md">{t('sessions.templates.noMatch', { search: templateSearch })}</p>
           </div>
         ) : (
           <>
@@ -423,7 +426,7 @@ export const SessionsList: React.FC = () => {
                         {isLive && (
                           <span className="shrink-0 flex items-center gap-1 text-label-caps text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
                             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                            Live
+                            {t('sessions.templates.liveBadge')}
                           </span>
                         )}
                       </div>
@@ -431,8 +434,8 @@ export const SessionsList: React.FC = () => {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); void handleExport(s.id, s.name) }}
-                          aria-label={`Export ${s.name}`}
-                          title="Export session"
+                          aria-label={t('sessions.templates.exportAria', { name: s.name })}
+                          title={t('sessions.templates.exportTitle')}
                           className="h-11 w-11 inline-flex items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         >
                           <Icon name="file_upload" />
@@ -440,7 +443,7 @@ export const SessionsList: React.FC = () => {
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name) }}
-                          aria-label={`Delete ${s.name}`}
+                          aria-label={t('sessions.templates.deleteAria', { name: s.name })}
                           className="h-11 w-11 inline-flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 rounded-xl transition-colors cursor-pointer bg-transparent border-none flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         >
                           <Icon name="delete" />
@@ -450,7 +453,7 @@ export const SessionsList: React.FC = () => {
                     <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
                       <span className="flex items-center gap-1">
                         <Icon name="fitness_center" size="sm" />
-                        {s.drillCount} drills
+                        {s.drillCount} {s.drillCount === 1 ? t('sessions.drill') : t('sessions.drills')}
                       </span>
                       <span className="text-outline">·</span>
                       <span className="flex items-center gap-1">
@@ -493,11 +496,11 @@ export const SessionsList: React.FC = () => {
                       className="flex items-center gap-1.5 h-11 min-w-[44px] px-3 rounded-lg bg-primary text-on-primary font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
                     >
                       <Icon name={isLive ? 'visibility' : 'play_arrow'} size="sm" />
-                      {isLive ? 'View Live' : startingSessionId === s.id ? 'Starting...' : 'Start Live'}
+                      {isLive ? t('sessions.templates.viewLive') : startingSessionId === s.id ? t('sessions.templates.starting') : t('sessions.templates.startLive')}
                     </button>
                     )}
                     <span className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all">
-                      Open Template
+                      {t('sessions.templates.openTemplate')}
                       <Icon name="arrow_forward" size="sm" />
                     </span>
                   </div>
@@ -513,7 +516,7 @@ export const SessionsList: React.FC = () => {
               className="flex items-center gap-2 mx-auto mt-6 text-label-sm text-primary font-bold hover:gap-3 transition-all bg-transparent border-none cursor-pointer p-0"
               aria-expanded={showAllTemplates}
             >
-              {showAllTemplates ? 'Show fewer' : `Show all (${filteredTemplates.length})`}
+              {showAllTemplates ? t('sessions.templates.showFewer') : t('sessions.templates.showAll', { count: filteredTemplates.length })}
               <Icon name={showAllTemplates ? 'expand_less' : 'expand_more'} size="lg" />
             </button>
           )}
@@ -526,7 +529,7 @@ export const SessionsList: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-headline-md text-on-surface flex items-center gap-2">
             <Icon name="history" color="primary" />
-            Recently Completed
+            {t('sessions.recent.title')}
           </h3>
           {sortedRecent.length > 6 && !recentSearch.trim() && (
             <button
@@ -534,7 +537,7 @@ export const SessionsList: React.FC = () => {
               className="flex items-center gap-2 text-label-sm text-primary font-bold hover:gap-3 transition-all bg-transparent border-none cursor-pointer p-0"
               aria-expanded={showAllRecent}
             >
-              {showAllRecent ? 'Show fewer' : `Show all (${sortedRecent.length})`}
+              {showAllRecent ? t('sessions.templates.showFewer') : t('sessions.templates.showAll', { count: sortedRecent.length })}
               <Icon name={showAllRecent ? 'expand_less' : 'expand_more'} size="lg" />
             </button>
           )}
@@ -546,11 +549,11 @@ export const SessionsList: React.FC = () => {
               type="text"
               value={recentSearch}
               onChange={e => setRecentSearch(e.target.value)}
-              placeholder="Search completed sessions..."
+              placeholder={t('sessions.recent.searchPlaceholder')}
               className="flex-1 bg-transparent border-none outline-none font-body-md text-on-surface"
             />
             {recentSearch && (
-              <button onClick={() => setRecentSearch('')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
+              <button onClick={() => setRecentSearch('')} aria-label={t('common.close')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
                 <Icon name="close" size="lg" />
               </button>
             )}
@@ -559,7 +562,7 @@ export const SessionsList: React.FC = () => {
         <div>
           {visibleRecent.length === 0 ? (
             <p className="text-body-md text-on-surface-variant text-center py-8">
-              {sortedRecent.length === 0 ? 'No recently completed sessions yet.' : `No completed sessions match "${recentSearch}".`}
+              {sortedRecent.length === 0 ? t('sessions.recent.empty') : t('sessions.recent.noMatch', { search: recentSearch })}
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -597,8 +600,8 @@ export const SessionsList: React.FC = () => {
       />
       <ConfirmDialog
         open={runDeleteTarget != null}
-        title={runDeleteTarget ? `Delete "${runDeleteTarget.templateName}"?` : 'Delete session?'}
-        message="This will permanently delete this session and all of its drill times, lap records, and results. This cannot be undone."
+        title={runDeleteTarget ? t('sessions.recent.deleteTitle', { name: runDeleteTarget.templateName }) : t('sessions.templates.deleteTitle')}
+        message={t('sessions.recent.deleteMessage')}
         onConfirm={confirmDeleteRun}
         onCancel={() => setRunDeleteTarget(null)}
       />

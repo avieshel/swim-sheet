@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useI18n } from '../../i18n'
 import { Icon } from '../Icon'
 import { EquipmentIcons, type EquipmentType } from '../EquipmentIcons'
 
@@ -53,10 +54,13 @@ function hasFoldContent(row: DrillsListRow): boolean {
   return row.steps.length > 1 || Boolean(row.description?.trim()) || row.badges.length > 0
 }
 
+type TFn = ReturnType<typeof useI18n>['t']
+
 type RowState = DrillsListRow & {
   toggleExpanded: () => void
   expanded: boolean
   canFold: boolean
+  t: TFn
 }
 
 function RowControls({ row }: { row: RowState }) {
@@ -67,7 +71,7 @@ function RowControls({ row }: { row: RowState }) {
           <button
             onClick={() => row.onMove!(-1)}
             disabled={row.canMoveUp === false}
-            aria-label={`Move ${row.name} up`}
+            aria-label={row.t('drillsList.moveUp', { name: row.name })}
             className="w-6 h-6 flex items-center justify-center rounded-full text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Icon name="keyboard_arrow_up" size="sm" />
@@ -75,7 +79,7 @@ function RowControls({ row }: { row: RowState }) {
           <button
             onClick={() => row.onMove!(1)}
             disabled={row.canMoveDown === false}
-            aria-label={`Move ${row.name} down`}
+            aria-label={row.t('drillsList.moveDown', { name: row.name })}
             className="w-6 h-6 flex items-center justify-center rounded-full text-outline hover:text-primary disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Icon name="keyboard_arrow_down" size="sm" />
@@ -85,7 +89,7 @@ function RowControls({ row }: { row: RowState }) {
       {row.onEdit && (
         <button
           onClick={row.onEdit}
-          aria-label={`Edit drill: ${row.name}`}
+          aria-label={row.t('drillsList.edit', { name: row.name })}
           className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
           <Icon name="edit" size="sm" />
@@ -95,7 +99,7 @@ function RowControls({ row }: { row: RowState }) {
         <button
           onClick={row.onDelete}
           disabled={row.canDelete === false}
-          aria-label={`Remove drill: ${row.name}`}
+          aria-label={row.t('drillsList.remove', { name: row.name })}
           className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-error disabled:opacity-30 transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error rounded-full"
         >
           <Icon name="delete" size="sm" />
@@ -104,7 +108,7 @@ function RowControls({ row }: { row: RowState }) {
       {row.canFold && (
         <button
           onClick={row.toggleExpanded}
-          aria-label={row.expanded ? `Hide details for ${row.name}` : `Show details for ${row.name}`}
+          aria-label={row.expanded ? row.t('drillsList.hideDetails', { name: row.name }) : row.t('drillsList.showDetails', { name: row.name })}
           className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
           <Icon name={row.expanded ? 'expand_more' : 'chevron_right'} size="sm" />
@@ -114,7 +118,7 @@ function RowControls({ row }: { row: RowState }) {
   )
 }
 
-function RowDetail({ row }: { row: DrillsListRow }) {
+function RowDetail({ row }: { row: RowState }) {
   return (
     <div className={FOLD_BOX}>
       {row.steps.length > 1 && (
@@ -139,7 +143,7 @@ function RowDetail({ row }: { row: DrillsListRow }) {
         >
           {row.description?.trim() && (
             <p className="text-on-surface/90">
-              <span className="font-semibold text-on-surface block mb-0.5">Description</span>
+              <span className="font-semibold text-on-surface block mb-0.5">{row.t('drillsList.description')}</span>
               {row.description}
             </p>
           )}
@@ -161,11 +165,11 @@ function RowDetail({ row }: { row: DrillsListRow }) {
   )
 }
 
-function Row({ row, index }: { row: DrillsListRow; index: number }) {
+function Row({ row, index, t }: { row: DrillsListRow; index: number; t: TFn }) {
   const [expanded, setExpanded] = useState(false)
   const toggleExpanded = () => setExpanded(value => !value)
   const canFold = hasFoldContent(row)
-  const expandedRow: RowState = { ...row, toggleExpanded, expanded, canFold }
+  const expandedRow: RowState = { ...row, toggleExpanded, expanded, canFold, t }
   const hasEquipment = row.equipment.length > 0
 
   return (
@@ -185,12 +189,13 @@ function Row({ row, index }: { row: DrillsListRow; index: number }) {
         </div>
         <RowControls row={expandedRow} />
       </div>
-      {expanded && <RowDetail row={row} />}
+      {expanded && <RowDetail row={expandedRow} />}
     </div>
   )
 }
 
 export function DrillsList({ title, summary, actions, headerExtra, footer, rows, emptyMessage, className = '' }: DrillsListProps) {
+  const { t } = useI18n()
   const totalMeters = rows.reduce((sum, row) => sum + row.distance, 0)
   return (
     <div
@@ -202,7 +207,7 @@ export function DrillsList({ title, summary, actions, headerExtra, footer, rows,
         <span className="flex items-center gap-2 min-w-0">
           <span className="font-headline-sm text-on-surface">{title}</span>
           <span className="text-label-sm text-on-surface-variant font-medium tabular-nums">
-            {rows.length > 0 ? `${rows.length} drills · ${totalMeters}m` : 'No drills'}
+            {rows.length > 0 ? t('drillsList.summary', { count: rows.length, distance: totalMeters }) : t('drillsList.noDrills')}
           </span>
           {summary}
         </span>
@@ -212,12 +217,12 @@ export function DrillsList({ title, summary, actions, headerExtra, footer, rows,
       {rows.length > 0 ? (
         <div className="divide-y divide-outline-variant/10 border-t border-outline-variant/20">
           {rows.map((row, index) => (
-            <Row key={row.id} row={row} index={index} />
+            <Row key={row.id} row={row} index={index} t={t} />
           ))}
         </div>
       ) : (
         <div className="border-t border-outline-variant/20 px-4 py-10 text-center">
-          {emptyMessage ?? <p className="text-label-sm text-on-surface-variant">No drills yet.</p>}
+          {emptyMessage ?? <p className="text-label-sm text-on-surface-variant">{t('drillsList.empty')}</p>}
         </div>
       )}
       {footer && <div className="border-t border-outline-variant/20 px-3.5 md:p-4 pb-3.5 md:pb-4">{footer}</div>}

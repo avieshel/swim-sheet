@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
+import { useI18n } from '../../i18n'
 import { SessionModalShell } from './SessionModalShell'
 
 export interface SessionMetadata {
@@ -14,6 +15,7 @@ interface SessionMetadataModalProps {
 }
 
 export function SessionMetadataModal({ initialData, onSave, onClose, error }: SessionMetadataModalProps) {
+  const { t } = useI18n()
   const [name, setName] = useState(initialData.name)
   const [notes, setNotes] = useState(initialData.notes)
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -25,7 +27,7 @@ export function SessionMetadataModal({ initialData, onSave, onClose, error }: Se
 
   return (
     <SessionModalShell
-      title="Edit Session"
+      title={t('sessions.metadata.title')}
       onClose={onClose}
       initialFocusRef={nameInputRef}
       size="compact"
@@ -35,7 +37,7 @@ export function SessionMetadataModal({ initialData, onSave, onClose, error }: Se
       <form onSubmit={handleSubmit} className="space-y-4 p-4 md:p-6 pt-4">
         <div>
           <label htmlFor="session-metadata-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-            Template Name
+            {t('sessions.metadata.templateName')}
           </label>
           <input
             ref={nameInputRef}
@@ -49,13 +51,13 @@ export function SessionMetadataModal({ initialData, onSave, onClose, error }: Se
 
         <div>
           <label htmlFor="session-metadata-notes" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-            Focus / Notes
+            {t('sessions.metadata.focusNotes')}
           </label>
           <textarea
             id="session-metadata-notes"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
-            placeholder="e.g. Endurance focus, pre-meet taper, technique work..."
+            placeholder={t('sessions.metadata.focusNotesPlaceholder')}
             rows={3}
             className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
           />
@@ -73,13 +75,13 @@ export function SessionMetadataModal({ initialData, onSave, onClose, error }: Se
             onClick={onClose}
             className="h-12 min-w-[44px] rounded-xl border border-outline px-5 font-label-sm text-on-surface hover:bg-surface-container transition-colors cursor-pointer bg-transparent"
           >
-            Cancel
+            {t('sessions.cancel')}
           </button>
           <button
             type="submit"
             className="h-12 min-w-[44px] rounded-xl bg-primary px-5 font-label-sm font-bold text-on-primary hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer border-none"
           >
-            Save
+            {t('sessions.save')}
           </button>
         </div>
       </form>

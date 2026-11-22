@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useI18n } from '../i18n'
 import { Icon } from './Icon'
 
 interface SessionCardProps {
@@ -15,6 +16,7 @@ interface SessionCardProps {
 }
 
 export function SessionCard({ id, name, date, poolName, drillCount = 0, totalDistance = 0, swimmerCount, notes, to, onDelete }: SessionCardProps) {
+  const { t } = useI18n()
   return (
     <div className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant shadow-sm hover:shadow-md transition-all group">
       <div className="flex items-start gap-3 mb-3">
@@ -27,7 +29,7 @@ export function SessionCard({ id, name, date, poolName, drillCount = 0, totalDis
             {onDelete && (
               <button
                 onClick={onDelete}
-                aria-label={`Delete ${name}`}
+                aria-label={t('sessions.deleteAria', { name })}
                 className="p-1.5 text-error hover:text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none flex-shrink-0"
               >
                 <Icon name="delete" size="lg" />
@@ -52,7 +54,7 @@ export function SessionCard({ id, name, date, poolName, drillCount = 0, totalDis
       <div className="flex items-center gap-2 text-label-sm text-on-surface-variant mt-0.5">
         <span className="flex items-center gap-1">
           <Icon name="fitness_center" size="sm" />
-          {drillCount} drills
+          {drillCount} {drillCount === 1 ? t('sessions.drill') : t('sessions.drills')}
         </span>
         <span className="text-outline">·</span>
         <span className="flex items-center gap-1">
@@ -64,7 +66,7 @@ export function SessionCard({ id, name, date, poolName, drillCount = 0, totalDis
             <span className="text-outline">·</span>
             <span className="flex items-center gap-1">
               <Icon name="groups" size="sm" />
-              {swimmerCount} swimmers
+              {swimmerCount} {swimmerCount === 1 ? t('sessions.swimmer') : t('sessions.swimmers')}
             </span>
           </>
         )}
@@ -79,7 +81,7 @@ export function SessionCard({ id, name, date, poolName, drillCount = 0, totalDis
           to={to ?? `/sessions/${id}`}
           className="text-label-sm text-primary font-bold flex items-center gap-1 group-hover:gap-2 transition-all"
         >
-          Open Session
+          {t('sessions.openSession')}
           <Icon name="arrow_forward" size="sm" />
         </Link>
       </div>
