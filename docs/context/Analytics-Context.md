@@ -12,16 +12,30 @@ cannot drift from the registry (`analyticsEventsRegistry.ts` was a conflicting d
 has been deleted).
 
 ## Delivery pipeline
-Events queue in localStorage (`swimsheet_analytics_queue`, capped at 500 — oldest dropped)
-and flush in batches of 50 to Supabase `analytics_events`. Delivery is at-least-once: every
-event carries a client-generated `event_id` (uuidv7, unique index via migration
-`20261004000002`) so a retried batch that already landed fails with `23505` and is
-treated as delivered. Systemic failures keep the queue and retry with exponential backoff
-(5s → 5min); row-level failures (SQLSTATE class 22/23) recursively split the batch to
-isolate the poison event, which moves to a dead-letter list (last 20,
-`swimsheet_analytics_dead_letter`) instead of blocking the other 49. Flushes run on every
-`track`, on `online`, and on `pagehide`/`visibilitychange` via `fetch keepalive` so
-closing the tab doesn't lose the queue.
+Events queue in localStorage (`swimsheet_analytics_queue`, capped at 500 — oldest dropped;
+overflow is counted in persisted health stats) and flush in batches of 50 to Supabase
+`analytics_events`. Delivery is at-least-once: every event carries a client-generated
+`event_id` (uuidv7, unique index via migration `20261004000002`) so a retried batch that
+already landed fails with `23505` and is treated as delivered.
+
+Systemic failures keep the queue and retry with exponential backoff (30s base, 120s cap,
+4 attempts). HTTP 429 is treated as retryable throttling; when a `Retry-After` header is
+readable it is honored (clamped to the 120s cap), otherwise backoff applies. After max
+attempts the remaining queue is dropped to the dead-letter with an explicit reason
+(`MAX_RETRIES_EXCEEDED`, or `MAX_RETRIES_EXCEEDED:429` for persistent throttling).
+
+Row-level failures (SQLSTATE class 22/23) recursively split the batch to isolate the
+poison event, which moves to the dead-letter list (`swimsheet_analytics_dead_letter`, last
+20 entries). Bulk drops (4xx batch rejection, max-retries queue drop) are stored as compact
+summary entries with `count` and a representative event, avoiding repeated full payload
+storage. Flushes run on every `track`, on `online`, and on `pagehide`/`visibilitychange`
+via `fetch keepalive` so closing the tab doesn't lose the queue.
+
+Persisted delivery health lives in `swimsheet_analytics_health` (best-effort, separate from
+the queue): `queueOverflowDrops`, `deadLetterDrops`, `lastDropAt`, `lastDropReason`,
+`lastFlushSuccessAt`, `lastFlushErrorCode`. `window.analytics.getStats()` exposes these
+fields plus `queued`, `deadLetterCount`, in-memory `eventsProduced`/`eventsDelivered`/
+`eventsDeadLettered`, and `flushInProgress`.
 
 `device_id` is a uuidv7 in `localStorage` under `swimsheet_device_id`; when `localStorage`
 throws (blocked storage, some private modes) it degrades to `sessionStorage` so the id
@@ -36,6 +50,14 @@ chars of the build's git commit, `dev` fallback), plus device context: `device_c
 7 days, `null` on non-Cloudflare hosts), `device_language` (navigator.language),
 `device_os`, `device_type` (`mobile`|`tablet`|`desktop`), `device_screen` (`WxH`),
 `device_connection` (Network Information `effectiveType`, `null` if unsupported).
+
+## Diagnostics / operator checks
+- Inspect runtime delivery: `window.analytics.getStats()` in the browser console.
+- Inspect persisted queue: `localStorage.getItem('swimsheet_analytics_queue')`.
+- Inspect dead-letter: `localStorage.getItem('swimsheet_analytics_dead_letter')` (entries may be summaries with `count`).
+- Inspect health counters: `localStorage.getItem('swimsheet_analytics_health')`.
+- Supabase check: query `analytics_events` by `device_id`/`user_id` for received events; Supabase cannot show client-side drops, so use health/dead-letter for loss diagnosis.
+- `HTTP_4XX:*` dead-letter reasons indicate non-retryable payload/schema rejection; `MAX_RETRIES_EXCEEDED` / `MAX_RETRIES_EXCEEDED:429` indicate persistent systemic/throttling failure after bounded retries.
 
 ## Payload policy
 Counts, enums, and action types only — no swimmer names, lap times, or free-text notes.
