@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react'
 import { LiveSessionContext } from '../../context/LiveSessionContext'
 import { Icon } from '../Icon'
+import { useI18n } from '../../i18n'
 
 interface LaneSwimmersSectionProps {
   onManageSwimmers: (lane?: number) => void
@@ -8,6 +9,7 @@ interface LaneSwimmersSectionProps {
 }
 
 export function LaneSwimmersSection({ onManageSwimmers, onEnterTimingSwimmers }: LaneSwimmersSectionProps) {
+  const { t } = useI18n()
   const { groups } = useContext(LiveSessionContext)
   const [isExpanded, setIsExpanded] = useState(false)
   const swimmerCount = groups.reduce((sum, g) => sum + g.swimmers.length, 0)
@@ -29,7 +31,7 @@ export function LaneSwimmersSection({ onManageSwimmers, onEnterTimingSwimmers }:
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <span className="font-headline-sm text-on-surface">Lane Swimmers</span>
+          <span className="font-headline-sm text-on-surface">{t('live.lanes.title')}</span>
           <span className="font-bold text-on-surface tabular-nums">{swimmerCount}</span>
         </div>
 
@@ -50,14 +52,14 @@ export function LaneSwimmersSection({ onManageSwimmers, onEnterTimingSwimmers }:
             <div className="py-6 px-2 text-center">
               <Icon name="groups" size="2xl" color="on-surface-variant" className="mb-2" />
               <p className="text-label-sm text-on-surface-variant mb-3">
-                No swimmers assigned to lanes yet.
+                {t('live.lanes.empty')}
               </p>
               <button
                 onClick={() => onManageSwimmers()}
                 className="h-11 px-4 rounded-lg bg-primary text-on-primary hover:brightness-110 font-bold flex items-center gap-1.5 transition-all cursor-pointer text-label-sm mx-auto"
               >
                 <Icon name="group_add" size="sm" />
-                Assign swimmers to lanes
+                {t('live.lanes.assign')}
               </button>
             </div>
           ) : (
@@ -65,15 +67,15 @@ export function LaneSwimmersSection({ onManageSwimmers, onEnterTimingSwimmers }:
               <div className="space-y-3 pt-2">
                 {activeGroups.map(group => (
                   <div key={group.id} className="py-1 border-b border-outline-variant/10 last:border-0">
-                    <div className="text-label-sm font-bold text-on-surface mb-1.5">Lane {group.lane}</div>
+                    <div className="text-label-sm font-bold text-on-surface mb-1.5">{t('live.lanes.lane', { lane: group.lane })}</div>
                     <div className="flex flex-wrap gap-2">
                       {group.swimmers.length === 0 ? (
-                        <span className="text-label-sm italic text-on-surface-variant opacity-60">No swimmers assigned</span>
+                        <span className="text-label-sm italic text-on-surface-variant opacity-60">{t('live.lanes.noSwimmersAssigned')}</span>
                       ) : group.swimmers.map(s => (
                         <button
                           key={s.id}
                           onClick={() => s.dbId && onEnterTimingSwimmers([s.dbId])}
-                          title={`Time ${s.name}`}
+                          title={t('live.lanes.timeSwimmer', { name: s.name })}
                           className="flex items-center gap-1.5 h-10 px-3 rounded-full bg-surface-container border border-outline-variant/30 text-on-surface text-label-sm font-medium hover:bg-primary-container/30 transition-all cursor-pointer"
                         >
                           <Icon name="timer" size="xs" className="text-primary" />
@@ -91,7 +93,7 @@ export function LaneSwimmersSection({ onManageSwimmers, onEnterTimingSwimmers }:
                   className="h-9 px-4 rounded-lg bg-surface-variant/60 hover:bg-surface-variant text-on-surface font-medium flex items-center gap-1.5 transition-all cursor-pointer text-label-sm"
                 >
                   <Icon name="group_add" size="sm" />
-                  Manage Lane Swimmers
+                  {t('live.lanes.manage')}
                 </button>
               </div>
             </>
