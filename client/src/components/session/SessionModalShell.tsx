@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useI18n } from '../../i18n'
 import { Icon } from '../Icon'
 
 interface SessionModalShellProps {
@@ -22,6 +23,7 @@ export function SessionModalShell({
   layer = 'base',
   dismissOnBackdrop = false,
 }: SessionModalShellProps) {
+  const { t } = useI18n()
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
 
@@ -84,7 +86,7 @@ export function SessionModalShell({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="h-11 w-11 inline-flex shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Icon name="close" />

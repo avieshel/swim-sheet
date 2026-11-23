@@ -15,10 +15,12 @@ import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
 import { Events, analytics } from '../services/analyticsEvents'
 import { useCoachAssist } from '../context/coachAssistShared'
+import { useI18n } from '../i18n'
 
 export const SessionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const { coach } = useCoachAssist()
   const { startLiveSession, starting: startingStart } = useStartLiveSession()
   const activeRun = useActiveRun(!coach)
@@ -120,7 +122,7 @@ export const SessionDetail: React.FC = () => {
     try {
       await updateSession(id, { name: data.name.trim(), notes: data.notes })
     } catch {
-      setMetadataSaveError('Could not save the session. Check your connection and try again.')
+      setMetadataSaveError(t('sessions.detail.saveSessionError'))
       return
     }
     analytics.track(Events.SessionUpdated())
@@ -151,9 +153,9 @@ export const SessionDetail: React.FC = () => {
   const handleDeleteDrill = (drillId: string) => {
     setConfirmState({
       open: true,
-      title: 'Remove Drill',
-      message: 'Are you sure you want to remove this drill from the session?',
-      confirmLabel: 'Remove',
+      title: t('sessions.detail.removeDrillTitle'),
+      message: t('sessions.detail.removeDrillMessage'),
+      confirmLabel: t('sessions.detail.removeDrillConfirm'),
       onConfirm: async () => {
         await deleteDrill(drillId)
         analytics.track(Events.DrillDeleted('session'))
@@ -243,7 +245,7 @@ export const SessionDetail: React.FC = () => {
   )
   if (!session) return (
     <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Template not found.</p>
+      <p className="text-on-surface-variant">{t('sessions.detail.notFound')}</p>
     </div>
   )
 
@@ -254,7 +256,7 @@ export const SessionDetail: React.FC = () => {
         className="h-11 px-3 mb-4 inline-flex items-center gap-1.5 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer border-none"
       >
         <Icon name="arrow_back" size="sm" />
-        <span className="text-label-sm font-medium">Back to Templates</span>
+        <span className="text-label-sm font-medium">{t('sessions.detail.backToTemplates')}</span>
       </button>
 
       {/* Template Metadata */}
@@ -280,10 +282,10 @@ export const SessionDetail: React.FC = () => {
               onClick={() => { void handleStartLive() }}
               disabled={drills.length === 0 || startingStart}
               className="flex items-center gap-1.5 h-11 min-w-[44px] px-4 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer disabled:opacity-60 border-none"
-              title={drills.length === 0 ? 'Add at least one drill before starting this session' : undefined}
+              title={drills.length === 0 ? t('sessions.detail.startLiveDisabledTitle') : undefined}
             >
               <Icon name={activeRun?.sessionId === session.id ? 'visibility' : 'play_arrow'} size="sm" />
-              {activeRun?.sessionId === session.id ? 'View Live' : startingStart ? 'Starting...' : 'Start Live'}
+              {activeRun?.sessionId === session.id ? t('sessions.detail.viewLive') : startingStart ? t('sessions.detail.starting') : t('sessions.detail.startLive')}
             </button>
             )}
             <button
@@ -292,7 +294,7 @@ export const SessionDetail: React.FC = () => {
                 setMetadataSaveError(null)
                 setEditingMeta(true)
               }}
-              aria-label="Edit template name and notes"
+              aria-label={t('sessions.detail.editAria')}
               className="h-11 w-11 inline-flex items-center justify-center text-primary hover:bg-primary-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
             >
               <Icon name="edit" color="primary" />
@@ -323,7 +325,7 @@ export const SessionDetail: React.FC = () => {
             <div className="flex items-start gap-3">
               <Icon name="warning" color="on-surface-variant" />
               <div className="flex-1">
-                <p className="font-bold text-sm mb-2">Similar drills found:</p>
+                <p className="font-bold text-sm mb-2">{t('sessions.detail.similarDrillsFound')}</p>
                 <ul className="list-disc list-inside text-sm space-y-1 mb-3">
                   {similarWarning.similars.map(s => (
                     <li key={s.drill.id}>
@@ -342,13 +344,13 @@ export const SessionDetail: React.FC = () => {
                     }}
                     className="flex-1 py-2.5 bg-warning text-on-warning rounded-xl font-bold text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                   >
-                    Create Anyway
+                    {t('sessions.detail.createAnyway')}
                   </button>
                   <button
                     onClick={() => setSimilarWarning(null)}
                     className="flex-1 py-2.5 border-2 border-outline text-on-surface rounded-xl font-bold text-xs cursor-pointer bg-transparent"
                   >
-                    Cancel
+                    {t('sessions.cancel')}
                   </button>
                 </div>
               </div>
@@ -361,7 +363,7 @@ export const SessionDetail: React.FC = () => {
       <DrillEditorModal
         key={showRichEditor ? richDrill.id ?? 'new' : 'closed'}
         open={showRichEditor}
-        title={richDrill.id ? 'Edit Drill' : 'New Drill'}
+        title={richDrill.id ? t('sessions.detail.editDrill') : t('sessions.detail.newDrill')}
         initialData={showRichEditor ? richDrill as DrillFormData : undefined}
         onSave={async (data) => {
           const excludeId = data.id ?? undefined
@@ -387,7 +389,7 @@ export const SessionDetail: React.FC = () => {
                 analytics.track(Events.DrillCreated('session', saveData.stroke ?? '', saveData.distance ?? 0))
               }
             } catch {
-              setDrillSaveError('Could not save the drill. Check your connection and try again.')
+              setDrillSaveError(t('sessions.detail.saveDrillError'))
               return
             }
             setShowRichEditor(false)
@@ -416,8 +418,8 @@ export const SessionDetail: React.FC = () => {
         onDelete={showRichEditor && richDrill.id ? (() => {
           setConfirmState({
             open: true,
-            title: 'Delete Session Drill',
-            message: 'Are you sure you want to permanently delete this drill?',
+            title: t('sessions.detail.deleteDrillTitle'),
+            message: t('sessions.detail.deleteDrillMessage'),
             onConfirm: async () => {
               await deleteDrill(richDrill.id!)
               analytics.track(Events.DrillDeleted('session'))
@@ -434,28 +436,28 @@ export const SessionDetail: React.FC = () => {
       {/* Totals View — intrinsic grid */}
       <div className="r-grid" style={{ '--grid-min': '160px', '--grid-gap': 'clamp(0.5rem, 1.5vw, 1rem)' } as React.CSSProperties}>
         <div className="bg-surface-container-lowest rounded-xl p-3 md:p-4 border border-outline-variant">
-          <span className="font-label-caps text-on-surface-variant">Total Distance</span>
+          <span className="font-label-caps text-on-surface-variant">{t('sessions.detail.totalDistance')}</span>
           <div className="font-headline-lg text-primary font-bold mt-1">{totalDistance}m</div>
         </div>
         <div className="bg-surface-container-lowest rounded-xl p-3 md:p-4 border border-outline-variant">
-          <span className="font-label-caps text-on-surface-variant">Drills</span>
+          <span className="font-label-caps text-on-surface-variant">{t('sessions.detail.drills')}</span>
           <div className="font-headline-lg text-primary font-bold mt-1">{drills.length}</div>
         </div>
         <div className="bg-surface-container-lowest rounded-xl p-3 md:p-4 border border-outline-variant" style={{ gridColumn: 'span 2' }}>
-          <span className="font-label-caps text-on-surface-variant">Stroke Breakdown</span>
+          <span className="font-label-caps text-on-surface-variant">{t('sessions.detail.strokeBreakdown')}</span>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {strokeBreakdown.length > 0 ? strokeBreakdown.map(b => (
               <span key={b.stroke} className={`${strokeColors[b.stroke] || 'bg-surface-variant text-on-surface-variant'} text-label-sm font-bold px-2 py-0.5 rounded-full`}>
                 {b.stroke} {b.meters}m
               </span>
-            )) : <span className="text-label-sm text-on-surface-variant">No drills</span>}
+            )) : <span className="text-label-sm text-on-surface-variant">{t('sessions.detail.noDrills')}</span>}
           </div>
         </div>
       </div>
 
       {/* Drills list — shared presentation with the live overview */}
       <DrillsList
-        title="Drills"
+        title={t('sessions.detail.drills')}
         className="mt-6"
         rows={drills.map((d, i): DrillsListRow => ({
           id: d.id,
@@ -482,14 +484,14 @@ export const SessionDetail: React.FC = () => {
               event.currentTarget.focus()
               openRichEditor()
             }}
-            aria-label="Add Drill"
+            aria-label={t('sessions.detail.addDrillAria')}
             className="h-10 md:h-12 px-3 md:px-4 bg-primary text-on-primary rounded-lg font-label-sm flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
           >
             <Icon name="add" size="lg" />
-            <span className="hidden sm:inline">Add Drill</span>
+            <span className="hidden sm:inline">{t('sessions.detail.addDrill')}</span>
           </button>
         }
-        emptyMessage={<p className="font-body-md text-body-md text-on-surface-variant">No drills yet. Add your first drill from the editor.</p>}
+        emptyMessage={<p className="font-body-md text-body-md text-on-surface-variant">{t('sessions.detail.noDrillsYet')}</p>}
       />
 
       {/* Confirmation Dialog */}

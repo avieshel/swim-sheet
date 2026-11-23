@@ -3,6 +3,7 @@ import { importSessionPackage, inspectSessionPackage } from '../api/sessionPacka
 import { SessionModalShell } from './session/SessionModalShell'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 import { readSessionPackageFile } from '../utils/sessionPackageFile'
+import { useI18n } from '../i18n'
 import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
 
 interface SessionPackageImportModalProps {
@@ -16,6 +17,7 @@ export function SessionPackageImportModal({
   onImported,
   onViewSession,
 }: SessionPackageImportModalProps) {
+  const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [sessionPackage, setSessionPackage] = useState<SessionPackageV1 | null>(null)
   const [hasNameConflict, setHasNameConflict] = useState(false)
@@ -42,7 +44,7 @@ export function SessionPackageImportModal({
       setHasNameConflict(inspection.nameConflict)
       setSuggestedName(inspection.suggestedName)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The selected file could not be read.')
+      setError(cause instanceof Error ? cause.message : t('sessions.import.readError'))
       setSessionPackage(null)
     } finally {
       input.value = ''
@@ -71,7 +73,7 @@ export function SessionPackageImportModal({
       setCreatedSessionId(result.sessionId)
       onImported(result.sessionId)
     } catch {
-      setError('Could not import this session. Your existing sessions were not changed.')
+      setError(t('sessions.import.importError'))
     } finally {
       setBusy(false)
     }
@@ -84,7 +86,7 @@ export function SessionPackageImportModal({
 
   return (
     <SessionModalShell
-      title="Import session"
+      title={t('sessions.import.title')}
       onClose={onClose}
       initialFocusRef={fileInputRef}
       size="compact"
@@ -92,25 +94,25 @@ export function SessionPackageImportModal({
       <div className="px-4 pb-4 md:px-6 md:pb-6">
         {createdSessionId ? (
           <div className="pt-4">
-            <h3 className="font-headline-md text-on-surface">Import Complete</h3>
+            <h3 className="font-headline-md text-on-surface">{t('sessions.import.completeTitle')}</h3>
             <p className="text-body-md text-on-surface-variant">
-              “{sessionPackage?.session.name}” was added to your sessions.
+              {t('sessions.import.addedToSessions', { name: sessionPackage?.session.name ?? '' })}
             </p>
             <button
               type="button"
               onClick={() => onViewSession(createdSessionId)}
               className="h-11 min-w-[44px] rounded-xl bg-primary px-5 font-label-sm font-bold text-on-primary hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              View session
+              {t('sessions.import.viewSession')}
             </button>
           </div>
         ) : (
           <>
             <p className="font-body-md text-on-surface-variant mt-4">
-              Choose a .swimsheet file to preview and add a copy to your sessions.
+              {t('sessions.import.chooseFile')}
             </p>
             <label htmlFor="session-package-file" className="mb-1 block font-label-sm text-on-surface">
-              Session file
+              {t('sessions.import.sessionFileLabel')}
             </label>
             <input
               ref={fileInputRef}
@@ -122,7 +124,7 @@ export function SessionPackageImportModal({
               className="block min-h-11 w-full rounded-xl border border-outline-variant bg-surface-container-lowest p-2 text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
             />
             {busy && (
-              <p role="status" className="mt-3 text-label-sm text-on-surface-variant">Reading session file…</p>
+              <p role="status" className="mt-3 text-label-sm text-on-surface-variant">{t('sessions.import.readingFile')}</p>
             )}
             {error && (
               <p role="alert" className="mt-3 rounded-lg bg-error-container/40 p-3 text-label-sm text-error">
@@ -130,20 +132,24 @@ export function SessionPackageImportModal({
               </p>
             )}
             {sessionPackage && (
-              <section aria-label="Session preview" className="mt-4 rounded-xl border border-outline-variant bg-surface-container-low p-4">
+              <section aria-label={t('sessions.import.previewAria')} className="mt-4 rounded-xl border border-outline-variant bg-surface-container-low p-4">
                 <h3 className="font-headline-md text-on-surface">{sessionPackage.session.name}</h3>
                 <p className="text-label-sm text-on-surface-variant">
-                  {sessionPackage.drills.length} {sessionPackage.drills.length === 1 ? 'drill' : 'drills'} · {totalDistance}m
+                  {t('sessions.import.drillCount', {
+                    count: sessionPackage.drills.length,
+                    unit: sessionPackage.drills.length === 1 ? t('sessions.drill') : t('sessions.drills'),
+                    distance: totalDistance,
+                  })}
                 </p>
                 {sessionPackage.creator?.label && (
-                  <p className="text-label-sm text-on-surface-variant">Shared by {sessionPackage.creator.label}</p>
+                  <p className="text-label-sm text-on-surface-variant">{t('sessions.import.sharedBy', { label: sessionPackage.creator.label })}</p>
                 )}
                 {sessionPackage.session.notes && (
                   <p className="mt-2 text-label-sm text-on-surface-variant">{sessionPackage.session.notes}</p>
                 )}
                 {hasNameConflict && (
                   <p role="status" className="mt-3 text-label-sm text-on-surface-variant">
-                    A session with this name already exists. This will be imported as “{suggestedName}”.
+                    {t('sessions.import.nameConflict', { name: suggestedName ?? '' })}
                   </p>
                 )}
               </section>
@@ -154,7 +160,7 @@ export function SessionPackageImportModal({
                 onClick={onClose}
                 className="h-11 min-w-[44px] rounded-xl border border-outline px-4 font-label-sm text-on-surface hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                Cancel
+                {t('sessions.cancel')}
               </button>
               {sessionPackage && (
                 <button
@@ -163,7 +169,7 @@ export function SessionPackageImportModal({
                   disabled={busy}
                   className="h-11 min-w-[44px] rounded-xl bg-primary px-5 font-label-sm font-bold text-on-primary hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
                 >
-                  {hasNameConflict ? `Import as ${suggestedName}` : 'Import session'}
+                  {hasNameConflict ? t('sessions.import.importAs', { name: suggestedName ?? '' }) : t('sessions.import.importAction')}
                 </button>
               )}
             </div>
