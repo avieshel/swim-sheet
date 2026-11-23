@@ -38,6 +38,10 @@ vi.mock('../../services/analyticsEvents', () => ({
     ViewSessions: vi.fn(),
     SessionCreated: vi.fn(),
     SessionDeleted: vi.fn(),
+    SessionPackageShared: vi.fn(),
+    ShareFailed: vi.fn(),
+    SearchPerformed: vi.fn(),
+    ViewExited: vi.fn(),
   },
   analytics: { track: mocks.analytics.track },
 }))

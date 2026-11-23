@@ -33,6 +33,7 @@ const mockApply = vi.hoisted(() => ({ applySessionDraft: vi.fn() }))
 
 vi.mock('../../services/sessionDraft/apply', () => ({
   applySessionDraft: (draft: unknown, options?: unknown) => mockApply.applySessionDraft(draft, options),
+  draftTotalDistance: () => 100,
 }))
 
 import { supabase } from '../supabase'

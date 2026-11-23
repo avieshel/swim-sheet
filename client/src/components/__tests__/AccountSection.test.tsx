@@ -25,6 +25,11 @@ const mockAnalytics = vi.hoisted(() => ({
       name: 'app_settings',
       properties: { action, ...(extra ?? {}) },
     })),
+    SignedIn: vi.fn((method: string) => ({
+      name: 'signed_in',
+      properties: { method },
+    })),
+    SignedOut: vi.fn(() => ({ name: 'signed_out' })),
   },
 }))
 
@@ -259,27 +264,27 @@ describe('AccountSection', () => {
     expect(screen.getByRole('button', { name: /Continue with Google/i })).toHaveProperty('disabled', false)
   })
 
-  it('tracks app_settings sign_in with method google when Google sign-in succeeds', async () => {
+  it('tracks signed_in with method google when Google sign-in succeeds', async () => {
     renderAccount()
     fireEvent.click(await screen.findByRole('button', { name: /Continue with Google/i }))
     await waitFor(() => expect(mockAuth.signInWithGoogle).toHaveBeenCalled())
     expect(mockAnalytics.analytics.track).toHaveBeenCalledWith({
-      name: 'app_settings',
-      properties: { action: 'sign_in', method: 'google' },
+      name: 'signed_in',
+      properties: { method: 'google' },
     })
   })
 
-  it('tracks app_settings sign_in with method test when test sign-in succeeds', async () => {
+  it('tracks signed_in with method test when test sign-in succeeds', async () => {
     renderAccount()
     fireEvent.click(await screen.findByRole('button', { name: 'Sign in as test user' }))
     await waitFor(() => expect(mockAuth.signInAsTestUser).toHaveBeenCalled())
     expect(mockAnalytics.analytics.track).toHaveBeenCalledWith({
-      name: 'app_settings',
-      properties: { action: 'sign_in', method: 'test' },
+      name: 'signed_in',
+      properties: { method: 'test' },
     })
   })
 
-  it('tracks app_settings sign_out when sign-out succeeds', async () => {
+  it('tracks signed_out when sign-out succeeds', async () => {
     mockAuth.restoreSession.mockResolvedValue({
       id: 'u1',
       email: 'coach@gmail.com',
@@ -289,8 +294,7 @@ describe('AccountSection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Sign out' }))
     await waitFor(() => expect(mockAuth.signOut).toHaveBeenCalled())
     expect(mockAnalytics.analytics.track).toHaveBeenCalledWith({
-      name: 'app_settings',
-      properties: { action: 'sign_out' },
+      name: 'signed_out',
     })
   })
 

@@ -30,7 +30,12 @@ vi.mock('../../hooks/useStartLiveSession', () => ({
   useStartLiveSession: () => ({ startLiveSession: vi.fn(), starting: false }),
 }))
 vi.mock('../../services/analyticsEvents', () => ({
-  Events: { ViewSessionTemplate: vi.fn(), SessionUpdated: vi.fn(), DrillDeleted: vi.fn() },
+  Events: {
+    ViewSessionTemplate: vi.fn(),
+    SessionUpdated: vi.fn(),
+    DrillDeleted: vi.fn(),
+    ViewExited: vi.fn(),
+  },
   analytics: { track: vi.fn() },
 }))
 
