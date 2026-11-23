@@ -88,6 +88,13 @@ cd supabase/functions/ai-session-harness && deno task check  # Type-check the Ed
     provider adapter, output validation) and transport/auth/rate-limit code in `harness/`
     (an injectable `createHandler(deps)`, wired by `index.ts`). Both sides must be testable
     with fakes — a module may not perform a side effect it did not receive via injection.
+ 9. **i18n: no hardcoded user-facing strings** — every user-visible string in UI (labels,
+    headings, buttons, placeholders, aria-labels, titles, tooltips, empty/loading/error
+    states, confirmation dialogs, toasts) must go through `useI18n()` / `t(key)`. When adding
+    or changing UI, add the key to both `client/src/i18n/messages_en.json` and
+    `client/src/i18n/messages_he.json` (keep key parity). English is the default/fallback.
+    User-generated content (names, notes, imported text) is not translated but should be
+    rendered bidi-safe (`dir="auto"` where appropriate).
 
 ## Hard Gate Override Policy
 
@@ -165,5 +172,6 @@ client/src/
 
 - [ ] `npm run check` passes (lint + typecheck + unit tests)
 - [ ] Relevant E2E tests pass (`npx playwright test --grep <related-test>`)
+- [ ] New/changed user-visible UI strings use `t(key)` with keys added to both `client/src/i18n/messages_en.json` and `messages_he.json`
 - [ ] Context files are updated if needed
 - [ ] No dead code, no commented-out code
