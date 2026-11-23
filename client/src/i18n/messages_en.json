@@ -713,5 +713,17 @@
   "aiDraft.emptyMessage": "Generate a draft from your description and it will appear here, ready to fine-tune before anything is saved.",
   "aiDraft.regenerateTitle": "Regenerate draft?",
   "aiDraft.regenerateMessage": "Generating again replaces the proposal currently on screen with a fresh one.",
-  "aiDraft.regenerate": "Regenerate"
+  "aiDraft.regenerate": "Regenerate",
+  "usage.title": "Usage",
+  "usage.description": "Aggregated analytics events for your account.",
+  "usage.window7": "7 days",
+  "usage.window30": "30 days",
+  "usage.loading": "Loading usage…",
+  "usage.error": "Could not load usage data.",
+  "usage.signInRequired": "Sign in to view usage analytics.",
+  "usage.empty": "No analytics events in this window.",
+  "usage.totalEvents": "Total events: {count}",
+  "usage.colEvent": "Event",
+  "usage.colDay": "Day",
+  "usage.colCount": "Count"
 }

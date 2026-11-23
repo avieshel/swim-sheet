@@ -122,8 +122,10 @@ Notes:
 - `Events.SessionOpenedViaShare` exists in the registry but is not wired because there is no share-link deep-link entry point yet.
 - `Events.AccountCreated` and `Events.TimingModeSelected` were not added: the app has no distinct sign-up flow or manual/automatic timing-mode selection control.
 
+Owner usage view: `/usage` (signed-in) reads `analytics_event_rollup(window_days)` RPC (SECURITY INVOKER, RLS-scoped to `auth.uid()`), showing event/day/count for 7/30 days.
+
 Future upgrade candidates (not yet implemented): swimmers-with-session counts over
-7/30/60-day windows, timing-mode breakdowns, per-swimmer activity, owner usage rollup view.
+7/30/60-day windows, timing-mode breakdowns, per-swimmer activity.
 
 ## Related
 - Design system: `docs/context/UI-Design-System-Context.md`

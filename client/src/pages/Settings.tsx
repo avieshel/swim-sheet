@@ -863,6 +863,12 @@ export const Settings: React.FC = () => {
               </Link>
             </span>
           </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="font-label-sm text-on-surface">{t('usage.title')}</span>
+            <Link to="/usage" className="font-body-md text-primary no-underline hover:underline">
+              {t('usage.title')}
+            </Link>
+          </div>
         </div>
       </section>
     </div>
