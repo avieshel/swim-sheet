@@ -398,6 +398,13 @@ describe('analyticsService', () => {
     expect(dl[0].error_code).toBe('HTTP_4XX:PGRST102')
     expect(dl[0].count).toBe(50)
     expect(dl[0].event.event_name).toBe('bad-0')
+
+    const stats = analytics.getStats()
+    expect(stats.deadLetterDrops).toBe(50)
+    expect(stats.deadLetterCount).toBe(50)
+    expect(stats.lastDropReason).toBe('HTTP_4XX:PGRST102')
+    expect(stats.lastFlushErrorCode).toBeNull()
+    expect(stats.lastFlushSuccessAt).toEqual(expect.any(Number))
   })
 
   it('keeps retrying on network errors', async () => {
@@ -512,6 +519,32 @@ describe('analyticsService', () => {
       ok: false,
       status: 429,
       headers: new Headers({ 'Retry-After': '5' }),
+      json: async () => ({ code: 'PGRST429', message: 'rate limited' }),
+    })
+    fetchMock.mockResolvedValueOnce(okResponse())
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(queued()).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(0)
+  })
+
+  it('honors Retry-After HTTP-date header on 429', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-23T10:00:00Z'))
+    const retryAfter = new Date(Date.now() + 5000).toUTCString()
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': retryAfter }),
       json: async () => ({ code: 'PGRST429', message: 'rate limited' }),
     })
     fetchMock.mockResolvedValueOnce(okResponse())

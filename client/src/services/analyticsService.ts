@@ -141,6 +141,7 @@ interface BatchOutcome {
   retryable: boolean
   code?: string
   retryAfterMs?: number
+  throttled?: boolean
 }
 
 function getTimezone(): string {
@@ -313,6 +314,7 @@ interface InsertResult {
   code: string
   retryable: boolean
   retryAfterMs?: number
+  throttled?: boolean
 }
 
 async function insertRows(
@@ -357,11 +359,18 @@ async function insertRows(
     if (res.status === 429) {
       const rawRetryAfter = res.headers?.get?.('Retry-After')
       const retryAfterSeconds = rawRetryAfter ? Number(rawRetryAfter) : NaN
-      const retryAfterMs =
+      let retryAfterMs =
         Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
           ? Math.min(retryAfterSeconds * 1000, RETRY_MAX_MS)
           : undefined
-      return { kind: 'systemic', code: code || '429', retryable: true, retryAfterMs }
+      if (retryAfterMs === undefined && rawRetryAfter) {
+        const retryAfterDate = Date.parse(rawRetryAfter)
+        if (Number.isFinite(retryAfterDate)) {
+          const deltaMs = retryAfterDate - Date.now()
+          if (deltaMs > 0) retryAfterMs = Math.min(deltaMs, RETRY_MAX_MS)
+        }
+      }
+      return { kind: 'systemic', code: code || '429', retryable: true, retryAfterMs, throttled: true }
     }
     // 5xx and no-response network errors are transient — worth retrying.
     // 4xx means the server rejected this payload shape; retrying with the
@@ -391,6 +400,7 @@ async function sendBatch(
       retryable: result.retryable,
       code: result.code,
       retryAfterMs: result.retryAfterMs,
+      throttled: result.throttled,
     }
   }
 
@@ -414,6 +424,7 @@ async function sendBatch(
     retryable: second.retryable,
     code: second.code,
     retryAfterMs: second.retryAfterMs,
+    throttled: second.throttled,
   }
 }
 
@@ -455,6 +466,8 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
     let retryable = true
     let systemicCode: string | undefined
     let systemicRetryAfterMs: number | undefined
+    let systemicThrottled = false
+    let flushErrorCode: string | undefined
     let iterations = 0
     for (;;) {
       const queue = getQueue()
@@ -470,15 +483,18 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
       }
       if (outcome.systemic) {
         if (!outcome.retryable) {
-          dropBatchToDeadLetter(batch, `HTTP_4XX:${outcome.code ?? 'UNKNOWN'}`)
+          const code = `HTTP_4XX:${outcome.code ?? 'UNKNOWN'}`
+          dropBatchToDeadLetter(batch, code)
           saveQueue(getQueue().filter(e => !batch.some(b => b.event_id === e.event_id)))
           eventsDeadLettered += batch.length
+          flushErrorCode = code
           continue
         }
         systemic = true
         retryable = outcome.retryable
         systemicCode = outcome.code
         systemicRetryAfterMs = outcome.retryAfterMs
+        systemicThrottled = outcome.throttled === true
         break
       }
       if (opts?.keepalive) break
@@ -488,7 +504,7 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
       if (retryAttempts >= RETRY_MAX_ATTEMPTS) {
         const remaining = getQueue().length
         const reason =
-          systemicCode === '429' || systemicCode === 'PGRST429'
+          systemicThrottled || systemicCode === '429' || systemicCode === 'PGRST429'
             ? 'MAX_RETRIES_EXCEEDED:429'
             : 'MAX_RETRIES_EXCEEDED'
         dropQueueToDeadLetter(reason)
@@ -498,6 +514,10 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
       } else {
         scheduleRetry(retryable, systemicRetryAfterMs)
       }
+    } else if (flushErrorCode) {
+      recordFlushError(flushErrorCode)
+      cancelRetry()
+      retryAttempts = 0
     } else {
       recordFlushSuccess()
       cancelRetry()
