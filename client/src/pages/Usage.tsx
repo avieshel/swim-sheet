@@ -8,15 +8,17 @@ const WINDOWS = [7, 30] as const
 export function Usage() {
   const { t } = useI18n()
   const { user } = useAuth()
+  const signedIn = !!user && !user.is_anonymous
   const [windowDays, setWindowDays] = useState<(typeof WINDOWS)[number]>(7)
   const [rows, setRows] = useState<AnalyticsRollupRow[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (!user || user.is_anonymous) return
+    if (!signedIn) return
     let cancelled = false
-    void (async () => {
+    void Promise.resolve().then(async () => {
+      if (cancelled) return
       setLoading(true)
       setError(false)
       try {
@@ -30,13 +32,13 @@ export function Usage() {
       } finally {
         if (!cancelled) setLoading(false)
       }
-    })()
+    })
     return () => {
       cancelled = true
     }
-  }, [user, windowDays])
+  }, [signedIn, windowDays])
 
-  if (!user || user.is_anonymous) {
+  if (!signedIn) {
     return (
       <div>
         <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">
@@ -47,7 +49,7 @@ export function Usage() {
     )
   }
 
-  const total = rows.reduce((sum, row) => sum + Number(row.event_count), 0)
+  const total = rows.reduce((sum, row) => sum + row.event_count, 0)
 
   return (
     <div>

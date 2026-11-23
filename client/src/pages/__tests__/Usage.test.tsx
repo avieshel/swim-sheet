@@ -75,4 +75,21 @@ describe('Usage', () => {
     fireEvent.click(screen.getByRole('button', { name: '30 days' }))
     await waitFor(() => expect(mockGetAnalyticsRollup).toHaveBeenCalledWith(30))
   })
+
+  it('shows error alert when rollup request fails', async () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'u1', is_anonymous: false } })
+    mockGetAnalyticsRollup.mockRejectedValue(new Error('boom'))
+
+    render(<Usage />)
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.getByText('Could not load usage data.')).toBeTruthy()
+  })
+
+  it('shows sign-in prompt for anonymous user', () => {
+    mockUseAuth.mockReturnValue({ user: { id: 'u1', is_anonymous: true } })
+    render(<Usage />)
+    expect(screen.getByText('Sign in to view usage analytics.')).toBeTruthy()
+    expect(mockGetAnalyticsRollup).not.toHaveBeenCalled()
+  })
 })
