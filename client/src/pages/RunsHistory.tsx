@@ -6,6 +6,7 @@ import type { RunSummary } from '../api/runs'
 import { listSwimmers } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
 import { Icon } from '../components/Icon'
+import { useI18n } from '../i18n'
 import { Events, analytics } from '../services/analyticsEvents'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
@@ -17,6 +18,7 @@ interface LoadState {
 }
 
 export const RunsHistory: React.FC = () => {
+  const { t } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const [initialSwimmer] = useState(() => searchParams.get('swimmer') ?? '')
   const [roster, setRoster] = useState<Swimmer[]>([])
@@ -98,10 +100,10 @@ export const RunsHistory: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-            Past Sessions
+            {t('runs.title')}
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-            Browse completed runs, filtered by swimmer and date range.
+            {t('runs.subtitle')}
           </p>
         </div>
       </div>
@@ -109,7 +111,7 @@ export const RunsHistory: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 mb-6">
         <div>
           <label htmlFor="swimmer-filter" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-            Swimmer
+            {t('runs.filter.swimmer')}
           </label>
           <select
             id="swimmer-filter"
@@ -118,7 +120,7 @@ export const RunsHistory: React.FC = () => {
             disabled={!rosterLoaded}
             className={fieldClass}
           >
-            <option value="">All swimmers</option>
+            <option value="">{t('runs.filter.allSwimmers')}</option>
             {roster.map(s => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
@@ -126,7 +128,7 @@ export const RunsHistory: React.FC = () => {
         </div>
         <div>
           <label htmlFor="from-date" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-            From
+            {t('runs.filter.from')}
           </label>
           <input
             id="from-date"
@@ -138,7 +140,7 @@ export const RunsHistory: React.FC = () => {
         </div>
         <div>
           <label htmlFor="to-date" className="block font-label-caps text-label-caps text-on-surface-variant mb-1">
-            To
+            {t('runs.filter.to')}
           </label>
           <input
             id="to-date"
@@ -153,12 +155,12 @@ export const RunsHistory: React.FC = () => {
       {loading ? (
         <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
           <Icon name="progress_activity" className="animate-spin" />
-          <span className="font-body-md">Loading past sessions...</span>
+          <span className="font-body-md">{t('runs.loading')}</span>
         </div>
       ) : error ? (
         <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
           <Icon name="error_outline" color="error" />
-          <span className="font-body-md">Couldn't load past sessions. Please try again.</span>
+          <span className="font-body-md">{t('runs.loadError')}</span>
         </div>
       ) : (
         <RunHistoryTable runs={filteredRuns ?? []} swimmerId={selected || undefined} focusName={focusName} showDelete />
