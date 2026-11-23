@@ -7,6 +7,7 @@ import { EQUIPMENT_OPTIONS, TECHNIQUE_LABELS, FITNESS_LABELS, PHASE_LABELS, stro
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 import { emptyDrillForm } from '../utils/drillHelpers'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 import type { Stroke } from '../types/swimming'
 
 interface DrillItem {
@@ -67,6 +68,7 @@ const defaultForm = (initialData?: Partial<DrillFormData>): DrillFormData => {
 }
 
 export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title, initialData, onSave, onDelete, onClose, restoreFocusRef, error }) => {
+  const { t } = useI18n()
   const [form, setForm] = useState<DrillFormData>(() => defaultForm(initialData))
   const [showStrokeConfirm, setShowStrokeConfirm] = useState(false)
   const [pendingSave, setPendingSave] = useState<DrillFormData | null>(null)
@@ -123,29 +125,29 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
           <div className="space-y-5">
             {/* Basic Info */}
             <div>
-              <label htmlFor="drill-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Drill Name</label>
+              <label htmlFor="drill-name" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">{t('drills.editor.drillName')}</label>
               <input
                 ref={nameInputRef}
                 id="drill-name"
                 type="text"
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Pyramid Set or 8x100m Progression"
+                placeholder={t('drills.editor.drillNamePlaceholder')}
                 className="w-full min-h-12 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <div>
-                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Total Set Repeats</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">{t('drills.editor.totalSetRepeats')}</label>
                 <div className="flex items-center gap-3">
-                  <button type="button" aria-label="Decrease total set repeats" onClick={() => setForm({ ...form, repeatCount: Math.max(1, (form.repeatCount || 1) - 1) })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">-</button>
+                  <button type="button" aria-label={t('drills.editor.decreaseRepeats')} onClick={() => setForm({ ...form, repeatCount: Math.max(1, (form.repeatCount || 1) - 1) })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">-</button>
                   <span className="font-bold text-lg w-8 text-center">{form.repeatCount}x</span>
-                  <button type="button" aria-label="Increase total set repeats" onClick={() => setForm({ ...form, repeatCount: (form.repeatCount || 1) + 1 })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">+</button>
+                  <button type="button" aria-label={t('drills.editor.increaseRepeats')} onClick={() => setForm({ ...form, repeatCount: (form.repeatCount || 1) + 1 })} className="h-11 w-11 rounded-full border border-outline flex items-center justify-center cursor-pointer hover:bg-surface-variant transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">+</button>
                 </div>
               </div>
               <div className="flex flex-col justify-center items-center sm:items-end">
-                <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">Set Distance</span>
+                <span className="font-label-caps text-label-caps text-on-surface-variant mb-1">{t('drills.editor.setDistance')}</span>
                 <span className="font-headline-md text-primary font-bold">{getDrillTotalDistance(form)}m</span>
               </div>
             </div>
@@ -153,7 +155,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             {/* Steps — each step is one compact row */}
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="block font-label-caps text-label-caps text-on-surface-variant">Steps</label>
+                <label className="block font-label-caps text-label-caps text-on-surface-variant">{t('drills.editor.steps')}</label>
                 <button
                   type="button"
                   onClick={() => setForm({
@@ -163,7 +165,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                   className="h-9 text-label-sm text-primary font-bold flex items-center gap-1 hover:underline cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 >
                   <Icon name="add_circle" size="sm" />
-                  Add Step
+                  {t('drills.editor.addStep')}
                 </button>
               </div>
               <div className="divide-y divide-outline-variant/15">
@@ -174,7 +176,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                       <input
                         type="number"
                         min="1"
-                        aria-label="Reps"
+                        aria-label={t('drills.editor.reps')}
                         value={item.repeatCount}
                         onChange={e => {
                           const newItems = [...(form.items || [])]
@@ -185,18 +187,18 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                       />
                       <span className="text-on-surface-variant">×</span>
                     </div>
-                    <div className="w-24 shrink-0" title="Distance">
+                    <div className="w-24 shrink-0" title={t('drills.editor.distance')}>
                       <CustomSelect
                         label=""
                         value={item.distance > 600 ? 'custom' : item.distance}
                         options={[
                           ...[25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 350, 400, 450, 500, 550, 600].map(v => ({ value: v, label: `${v}m` })),
-                          { value: 'custom', label: item.distance > 600 ? `${item.distance}m` : 'Custom…' }
+                          { value: 'custom', label: item.distance > 600 ? `${item.distance}m` : t('drills.editor.custom') }
                         ]}
                         onChange={(val) => {
                           const newItems = [...(form.items || [])]
                           if (val === 'custom') {
-                            const custom = prompt('Enter custom distance (m):', String(item.distance))
+                            const custom = prompt(t('drills.editor.customDistancePrompt'), String(item.distance))
                             newItems[idx] = { ...item, distance: parseInt(custom || '0') || 0 }
                           } else {
                             newItems[idx] = { ...item, distance: val as number }
@@ -205,7 +207,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         }}
                       />
                     </div>
-                    <div className="w-28 shrink-0" title="Stroke">
+                    <div className="w-28 shrink-0" title={t('drills.editor.stroke')}>
                       <CustomSelect
                         label=""
                         value={item.stroke}
@@ -217,7 +219,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         }}
                       />
                     </div>
-                    <div className="w-16 shrink-0" title="Intensity">
+                    <div className="w-16 shrink-0" title={t('drills.editor.intensity')}>
                       <CustomSelect
                         label=""
                         value={item.intensity || ''}
@@ -237,26 +239,26 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                     </div>
                     <input
                       type="text"
-                      aria-label="Interval"
+                      aria-label={t('drills.editor.interval')}
                       value={item.interval || ''}
                       onChange={e => {
                         const newItems = [...(form.items || [])]
                         newItems[idx] = { ...item, interval: e.target.value }
                         setForm({ ...form, items: newItems })
                       }}
-                      placeholder="int"
+                      placeholder={t('drills.editor.intervalPlaceholder')}
                       className="w-16 min-h-9 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 text-center"
                     />
                     <input
                       type="text"
-                      aria-label="Technique"
+                      aria-label={t('drills.editor.technique')}
                       value={item.description || ''}
                       onChange={e => {
                         const newItems = [...(form.items || [])]
                         newItems[idx] = { ...item, description: e.target.value === '' ? undefined : e.target.value }
                         setForm({ ...form, items: newItems })
                       }}
-                      placeholder="technique"
+                      placeholder={t('drills.editor.techniquePlaceholder')}
                       className="w-28 min-h-9 rounded-lg border border-outline-variant bg-surface-container-lowest px-2 py-1.5 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 text-center"
                     />
                     <div className="flex gap-0.5 shrink-0">
@@ -292,7 +294,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                         setForm({ ...form, items: newItems })
                       }}
                       disabled={(form.items || []).length === 1}
-                      aria-label="Remove step"
+                      aria-label={t('drills.editor.removeStep')}
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-outline hover:text-error hover:bg-error-container/20 disabled:opacity-40 transition-all cursor-pointer bg-transparent border-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error shrink-0"
                     >
                       <Icon name="delete" size="sm" />
@@ -310,7 +312,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                 className="w-full flex items-center justify-between gap-3 p-3 md:p-4 cursor-pointer hover:bg-surface-container-low/50 transition-colors bg-surface-container-lowest"
               >
                 <span className="flex items-center gap-2 min-w-0">
-                  <span className="font-headline-sm text-on-surface">Description &amp; Tags</span>
+                  <span className="font-headline-sm text-on-surface">{t('drills.editor.descriptionTags')}</span>
                   {!detailsExpanded && detailsSummary && (
                     <span className="text-label-sm text-on-surface-variant truncate">{detailsSummary}</span>
                   )}
@@ -319,17 +321,17 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
               </button>
               {detailsExpanded && (
                 <div className="p-3 md:p-4 border-t border-outline-variant/20 space-y-3">
-              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Description / Instructions</label>
+              <label htmlFor="drill-description" className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">{t('drills.editor.descriptionInstructions')}</label>
               <textarea
                 id="drill-description"
                 value={form.description || ''}
                 onChange={e => setForm({ ...form, description: e.target.value })}
-                placeholder="e.g. 6-1-6 breathing: 6 kicks on side, 1 stroke, 6 kicks on other side..."
+                placeholder={t('drills.editor.descriptionPlaceholder')}
                 rows={2}
                 className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30 resize-y"
               />
               <div>
-                <span className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">Tags</span>
+                <span className="block font-label-caps text-label-caps text-on-surface-variant mb-1.5">{t('drills.editor.tags')}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {PHASE_LABELS.map(label => {
                     const active = form.labels?.includes(label)
@@ -353,15 +355,19 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                   })}
                 </div>
                 <div className="flex gap-2 mt-2">
-                  {['none', 'technique', 'fitness'].map(f => (
+                  {([
+                    { id: 'none', label: t('drills.editor.focusNone') },
+                    { id: 'technique', label: t('drills.editor.focusTechnique') },
+                    { id: 'fitness', label: t('drills.editor.focusFitness') },
+                  ] as const).map(({ id: f, label }) => (
                     <button
                       key={f}
                       type="button"
                       aria-pressed={form.focus === f}
                       onClick={() => setForm({ ...form, focus: f, labels: (form.labels || []).filter(l => !TECHNIQUE_LABELS.includes(l) && !FITNESS_LABELS.includes(l)) })}
-                      className={`flex-1 min-h-9 rounded-full border text-label-sm font-bold capitalize transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
+                      className={`flex-1 min-h-9 rounded-full border text-label-sm font-bold transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${form.focus === f ? 'bg-primary-container text-on-primary-container border-primary' : 'border-outline text-on-surface-variant'}`}
                     >
-                      {f}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -406,7 +412,7 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                     onClick={onDelete}
                     className="flex-1 h-12 min-w-[44px] rounded-xl font-label-sm bg-error text-on-error hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                   >
-                    Delete
+                    {t('drills.editor.delete')}
                   </button>
                 ) : (
                   <span className="w-0" />
@@ -415,13 +421,13 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
                   onClick={handleSave}
                   className="flex-1 h-12 min-w-[44px] rounded-xl font-label-sm bg-primary text-on-primary hover:brightness-110 active:scale-95 transition-all cursor-pointer"
                 >
-                  {form.id ? 'Save Changes' : 'Create Drill'}
+                  {form.id ? t('drills.editor.saveChanges') : t('drills.editor.createDrill')}
                 </button>
                 <button
                   onClick={onClose}
                   className="flex-1 h-12 min-w-[44px] border-2 border-outline text-on-surface rounded-xl font-label-sm hover:bg-surface-container transition-colors cursor-pointer"
                 >
-                  Cancel
+                  {t('drills.editor.cancel')}
                 </button>
               </div>
             </div>
@@ -429,12 +435,12 @@ export const DrillEditorModal: React.FC<DrillEditorModalProps> = ({ open, title,
             {/* Stroke-Change Confirmation */}
 <ConfirmDialog
                  open={showStrokeConfirm}
-                 title="Stroke Changed"
-                 message="This drill has a different stroke than the original. Save as a new variant to bump its popularity ranking, or discard to undo your changes?"
+                 title={t('drills.editor.strokeChangedTitle')}
+                 message={t('drills.editor.strokeChangedMessage')}
                  onConfirm={handleStrokeConfirm}
                  onCancel={handleStrokeSkip}
-                 confirmLabel="Save as New Variant"
-                 cancelLabel="Discard"
+                 confirmLabel={t('drills.editor.saveAsVariant')}
+                 cancelLabel={t('drills.editor.discard')}
                  destructive={false}
                />
           </div>
