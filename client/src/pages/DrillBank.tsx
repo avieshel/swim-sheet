@@ -10,9 +10,11 @@ import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useI18n } from '../i18n'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [drills, setDrills] = useState<LibraryDrill[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -22,7 +24,13 @@ export const DrillBank: React.FC = () => {
   const libraryDrillEditRefs = useRef(new Map<string, HTMLButtonElement>())
   const newLibraryDrillRef = useRef<HTMLButtonElement>(null)
 
-  const quickLabels = ['Technique', 'Kick', 'Speed', 'Endurance', 'Rotation']
+  const quickLabels = [
+    { id: 'Technique', label: t('drills.bank.filterTechnique') },
+    { id: 'Kick', label: t('drills.bank.filterKick') },
+    { id: 'Speed', label: t('drills.bank.filterSpeed') },
+    { id: 'Endurance', label: t('drills.bank.filterEndurance') },
+    { id: 'Rotation', label: t('drills.bank.filterRotation') },
+  ]
 
   // Editor Modal
   const [showEditor, setShowEditor] = useState(false)
@@ -125,20 +133,20 @@ export const DrillBank: React.FC = () => {
       if (inUse.length === 0) {
         setConfirmState({
           open: true,
-          title: 'Delete Bank Drill',
-          message: 'Are you sure you want to permanently remove this drill from the bank?',
+          title: t('drills.bank.deleteTitle'),
+          message: t('drills.bank.deleteMessage'),
           onConfirm: () => { void performDelete(id, false) },
         })
         return
       }
       const lines = inUse
-        .map(s => `• ${s.sessionName} (${s.drillCount} ${s.drillCount === 1 ? 'drill' : 'drills'})`)
+        .map(s => `• ${s.sessionName} (${s.drillCount === 1 ? t('drills.bank.drillInSession', { count: s.drillCount }) : t('drills.bank.drillsInSession', { count: s.drillCount })})`)
         .join('\n')
       setConfirmState({
         open: true,
-        title: 'Still Used In Sessions',
-        message: `This drill was copied into:\n\n${lines}\n\nDeleting it removes it from the bank AND from those sessions. Recorded history is not affected.`,
-        confirmLabel: 'Delete everywhere',
+        title: t('drills.bank.stillUsedTitle'),
+        message: t('drills.bank.stillUsedMessage', { lines }),
+        confirmLabel: t('drills.bank.deleteEverywhere'),
         onConfirm: () => { void performDelete(id, true) },
       })
     })()
@@ -217,8 +225,8 @@ export const DrillBank: React.FC = () => {
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-6 mb-4 md:mb-6">
         <div>
-          <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">Drills</h1>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">Review and manage your shared library of swim sets.</p>
+          <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">{t('drills.bank.title')}</h1>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-1">{t('drills.bank.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -227,11 +235,11 @@ export const DrillBank: React.FC = () => {
               event.currentTarget.focus()
               openEditor(undefined, event.currentTarget)
             }}
-            aria-label="New Library Drill"
+            aria-label={t('drills.bank.newDrill')}
             className="h-10 md:h-12 px-4 md:px-6 bg-primary text-on-primary rounded-xl font-bold flex items-center gap-2 hover:brightness-110 active:scale-95 transition-all cursor-pointer shadow-lg shadow-primary/20 text-xs md:text-sm"
           >
             <Icon name="add" className="md:text-lg" />
-            <span className="hidden sm:inline">New Library Drill</span>
+            <span className="hidden sm:inline">{t('drills.bank.newDrill')}</span>
           </button>
         </div>
       </div>
@@ -242,11 +250,11 @@ export const DrillBank: React.FC = () => {
           type="text"
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          placeholder="Search by name, description, or tags..."
+          placeholder={t('drills.bank.searchPlaceholder')}
           className="flex-1 bg-transparent border-none outline-none font-body-md text-on-surface"
         />
         {filter && (
-          <button onClick={() => setFilter('')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
+          <button onClick={() => setFilter('')} aria-label={t('common.close')} className="p-1 text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none">
             <Icon name="close" size="lg" />
           </button>
         )}
@@ -261,20 +269,20 @@ export const DrillBank: React.FC = () => {
                : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
            }`}
          >
-           All ({drills.length})
+           {t('drills.bank.all', { count: drills.length })}
          </button>
-         {quickLabels.map(label => {
+         {quickLabels.map(({ id, label }) => {
            const count = drills.filter(d => {
              const drillLabels = (d.labels || []).map(l => l.toLowerCase())
              const drillFocus = (d.focus || '').toLowerCase()
-             return drillLabels.includes(label.toLowerCase()) || drillFocus === label.toLowerCase()
+             return drillLabels.includes(id.toLowerCase()) || drillFocus === id.toLowerCase()
            }).length
            return (
              <button
-               key={label}
-               onClick={() => setActiveLabel(activeLabel === label ? null : label)}
+               key={id}
+               onClick={() => setActiveLabel(activeLabel === id ? null : id)}
                className={`h-9 md:h-10 px-3 rounded-full text-label-sm font-bold uppercase tracking-wider transition-all cursor-pointer border-none ${
-                 activeLabel === label
+                 activeLabel === id
                    ? 'bg-primary text-on-primary'
                    : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-high'
                }`}
@@ -292,7 +300,7 @@ export const DrillBank: React.FC = () => {
            }`}
          >
            <Icon name="trending_up" size="sm" />
-           Popular
+           {t('drills.bank.popular')}
          </button>
        </div>
 
@@ -345,7 +353,7 @@ export const DrillBank: React.FC = () => {
                    className="flex-1 h-9 px-3 inline-flex items-center justify-center gap-1.5 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                  >
                    <Icon name="playlist_add" size="sm" />
-                   Add to Session
+                   {t('drills.bank.addToSession')}
                  </button>
                   <button
                     onClick={(event) => {
@@ -356,14 +364,14 @@ export const DrillBank: React.FC = () => {
                       if (d.id && element) libraryDrillEditRefs.current.set(d.id, element)
                       else if (d.id) libraryDrillEditRefs.current.delete(d.id)
                     }}
-                   aria-label={`Edit ${d.name}`}
+                   aria-label={t('drills.bank.editAria', { name: d.name })}
                    className="h-9 w-9 inline-flex items-center justify-center text-on-surface-variant hover:bg-surface-container rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                  >
                    <Icon name="edit" />
                  </button>
                  <button
                    onClick={() => handleDelete(d.id!)}
-                   aria-label={`Delete ${d.name}`}
+                   aria-label={t('drills.bank.deleteAria', { name: d.name })}
                    className="h-9 w-9 inline-flex items-center justify-center text-error hover:bg-error-container/20 rounded-lg transition-colors cursor-pointer bg-transparent border-none"
                  >
                    <Icon name="delete" />
@@ -377,7 +385,7 @@ export const DrillBank: React.FC = () => {
       {filteredDrills.length === 0 && (
         <div className="text-center py-20 bg-surface-container-low rounded-2xl border border-dashed border-outline">
           <Icon name="search_off" size="4xl" color="on-surface-variant" className="mb-3" />
-          <p className="text-on-surface-variant font-body-lg">No drills found matching your search.</p>
+          <p className="text-on-surface-variant font-body-lg">{t('drills.bank.noResults')}</p>
         </div>
       )}
 
@@ -387,7 +395,7 @@ export const DrillBank: React.FC = () => {
           <div className="flex items-start gap-3">
             <Icon name="warning" color="on-surface-variant" />
             <div className="flex-1">
-              <p className="font-bold text-sm mb-2">Similar drills found:</p>
+              <p className="font-bold text-sm mb-2">{t('drills.bank.similarFound')}</p>
               <ul className="list-disc list-inside text-sm space-y-1 mb-3">
                 {similarWarning.similars.map(s => (
                   <li key={s.drill.id}>
@@ -406,13 +414,13 @@ export const DrillBank: React.FC = () => {
                   }}
                   className="px-4 py-2 bg-warning text-on-warning rounded-lg font-bold text-xs hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                 >
-                  Create Anyway
+                  {t('drills.bank.createAnyway')}
                 </button>
                 <button
                   onClick={() => setSimilarWarning(null)}
                   className="px-4 py-2 border-2 border-outline text-on-surface rounded-lg font-bold text-xs cursor-pointer bg-transparent"
                 >
-                  Cancel
+                  {t('sessions.cancel')}
                 </button>
               </div>
             </div>
@@ -424,7 +432,7 @@ export const DrillBank: React.FC = () => {
       <DrillEditorModal
         key={showEditor ? editingDrill.id ?? 'new' : 'closed'}
         open={showEditor}
-        title={editingDrill.id ? 'Edit Bank Drill' : 'New Bank Drill'}
+        title={editingDrill.id ? t('drills.bank.editBankDrill') : t('drills.bank.newBankDrill')}
         initialData={showEditor ? editingDrill as DrillFormData : undefined}
         restoreFocusRef={modalReturnFocusRef}
          onSave={async (data, asVariant) => {
@@ -453,8 +461,8 @@ export const DrillBank: React.FC = () => {
         onDelete={editingDrill.id ? (() => {
           setConfirmState({
             open: true,
-            title: 'Delete Bank Drill',
-            message: 'Are you sure you want to permanently remove this drill from the bank?',
+            title: t('drills.bank.deleteTitle'),
+            message: t('drills.bank.deleteMessage'),
             onConfirm: () => { void performDelete(editingDrill.id!, false) },
           })
         }) : undefined}
@@ -477,7 +485,7 @@ export const DrillBank: React.FC = () => {
           <div className="bg-surface-container-lowest rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl border border-outline-variant" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-outline-variant/30">
               <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1">{detailDrill.name}</h2>
-              <button onClick={() => setDetailDrill(null)} className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer bg-transparent border-none">
+              <button onClick={() => setDetailDrill(null)} aria-label={t('common.close')} className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer bg-transparent border-none">
                 <Icon name="close" />
               </button>
             </div>
@@ -494,14 +502,14 @@ export const DrillBank: React.FC = () => {
                   )) : (
                     <span className={`${strokeColors[detailDrill.stroke] || 'bg-surface-variant text-on-surface-variant'} text-xs font-bold px-2 py-0.5 rounded-full`}>{detailDrill.stroke} {detailDrill.distance}m</span>
                   )}
-                  <span className="text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{getDrillTotalDistance(detailDrill)}m total</span>
+                  <span className="text-label-sm bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">{t('drills.bank.total', { distance: getDrillTotalDistance(detailDrill) })}</span>
                 </div>
               </div>
 
               {/* Description */}
               {detailDrill.description && (
                 <div>
-                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">Description</span>
+                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">{t('drills.bank.description')}</span>
                   <p className="text-sm text-on-surface-variant italic">{detailDrill.description}</p>
                 </div>
               )}
@@ -509,7 +517,7 @@ export const DrillBank: React.FC = () => {
               {/* Focus & Labels */}
               {(detailDrill.focus && detailDrill.focus !== 'none' || (detailDrill.labels || []).length > 0) && (
                 <div>
-                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1.5">Tags</span>
+                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1.5">{t('drills.bank.tags')}</span>
                   <div className="flex flex-wrap gap-1">
                     {detailDrill.focus && detailDrill.focus !== 'none' && (
                       <span className="text-caption-caps bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded uppercase">{detailDrill.focus}</span>
@@ -533,28 +541,28 @@ export const DrillBank: React.FC = () => {
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 bg-primary text-on-primary rounded-xl font-bold hover:brightness-110 active:scale-95 transition-all cursor-pointer border-none"
                 >
                   <Icon name="edit" />
-                  Edit Drill
+                  {t('drills.bank.editDrill')}
                 </button>
                 <button
                   onClick={handleAddToSession}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 border-2 border-primary text-primary rounded-xl font-bold hover:bg-primary/5 active:scale-95 transition-all cursor-pointer bg-transparent"
                 >
                   <Icon name="playlist_add" />
-                  Add to Session
+                  {t('drills.bank.addToSession')}
                 </button>
                 <button
                   onClick={() => { const id = detailDrill.id; setDetailDrill(null); handleDelete(id) }}
                   className="w-full h-touch-target-min flex items-center justify-center gap-2 border-2 border-error/30 text-error rounded-xl font-bold hover:bg-error-container/20 active:scale-95 transition-all cursor-pointer bg-transparent"
                 >
                   <Icon name="delete" />
-                  Delete Drill
+                  {t('drills.bank.deleteDrill')}
                 </button>
               </div>
 
               {/* Session Picker */}
               {showSessionPicker && (
                 <div className="pt-2">
-                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-2">Select a session:</span>
+                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-2">{t('drills.bank.selectSession')}</span>
                   <div className="space-y-1 max-h-48 overflow-y-auto">
                     {sessions.map(s => (
                       <button
@@ -567,7 +575,7 @@ export const DrillBank: React.FC = () => {
                       </button>
                     ))}
                     {sessions.length === 0 && (
-                      <p className="text-sm text-on-surface-variant italic">No sessions yet. Create one first.</p>
+                      <p className="text-sm text-on-surface-variant italic">{t('drills.bank.noSessions')}</p>
                     )}
                   </div>
                 </div>
