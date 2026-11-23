@@ -585,5 +585,19 @@
   "runs.table.viewFullSession": "View full session",
   "runs.table.likelyMatch": "likely match",
   "runs.table.guest": "guest",
-  "runs.status.active": "active"
+  "runs.status.active": "active",
+  "live.swimmer.editSwimmer": "Edit swimmer",
+  "live.swimmer.saveToRoster": "Save to roster",
+  "live.swimmer.wannaBe": "wanna be",
+  "live.swimmer.saving": "Saving...",
+  "live.swimmer.save": "Save",
+  "live.swimmer.saved": "Saved",
+  "live.swimmer.done": "Done",
+  "live.swimmer.skipped": "Skipped",
+  "live.swimmer.clearGoOffset": "Clear go offset",
+  "live.swimmer.removeLap": "Remove lap {lap}",
+  "live.swimmer.clearSwimmer": "Clear swimmer",
+  "live.swimmer.clearMessage": "Clear {name}'s offsets, laps, and timing data for this drill?",
+  "live.groupCard.showSwimmers": "Show swimmers",
+  "live.groupCard.hideSwimmers": "Hide swimmers"
 }

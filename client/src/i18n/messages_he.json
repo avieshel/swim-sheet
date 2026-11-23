@@ -585,5 +585,19 @@
   "runs.table.viewFullSession": "צפה באימון המלא",
   "runs.table.likelyMatch": "התאמה משוערת",
   "runs.table.guest": "אורח",
-  "runs.status.active": "פעיל"
+  "runs.status.active": "פעיל",
+  "live.swimmer.editSwimmer": "ערוך שחיין",
+  "live.swimmer.saveToRoster": "שמור לסגל",
+  "live.swimmer.wannaBe": "אורח",
+  "live.swimmer.saving": "שומר...",
+  "live.swimmer.save": "שמור",
+  "live.swimmer.saved": "נשמר",
+  "live.swimmer.done": "הושלם",
+  "live.swimmer.skipped": "דולג",
+  "live.swimmer.clearGoOffset": "נקה היסט יציאה",
+  "live.swimmer.removeLap": "הסר הקפה {lap}",
+  "live.swimmer.clearSwimmer": "נקה שחיין",
+  "live.swimmer.clearMessage": "לנקות את ההיסטים, הקפות ונתוני התזמון של {name} לתרגיל זה?",
+  "live.groupCard.showSwimmers": "הצג שחיינים",
+  "live.groupCard.hideSwimmers": "הסתר שחיינים"
 }
