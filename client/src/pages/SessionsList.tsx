@@ -135,7 +135,9 @@ export const SessionsList: React.FC = () => {
     try {
       const sessionPackage = await exportSessionPackage(id)
       downloadSessionPackageFile(sessionPackage, name)
+      analytics.track(Events.SessionPackageShared(sessionPackage.drills.length, 'template'))
     } catch {
+      analytics.track(Events.ShareFailed('export_error'))
       setExportError(t('sessions.templates.exportError'))
     }
   }

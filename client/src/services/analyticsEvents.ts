@@ -85,6 +85,43 @@ export const Events = {
     name: 'search_performed',
     properties: { scope, result_count: resultCount },
   }),
+  SessionPackageShared: (
+    drillCount: number,
+    source: 'template' | 'run'
+  ): TrackedEvent => ({
+    name: 'session_package_shared',
+    properties: { drill_count: drillCount, source },
+  }),
+  SessionPackageImported: (
+    drillCount: number,
+    source: 'share_link' | 'file',
+    sharedBy?: string
+  ): TrackedEvent => ({
+    name: 'session_package_imported',
+    properties: {
+      drill_count: drillCount,
+      source,
+      ...(sharedBy ? { shared_by: sharedBy } : {}),
+    },
+  }),
+  SessionOpenedViaShare: (): TrackedEvent => ({
+    name: 'session_opened_via_share',
+  }),
+  ShareFailed: (errorKind: string): TrackedEvent => ({
+    name: 'share_failed',
+    properties: { error_kind: errorKind },
+  }),
+  PackageImportFailed: (
+    errorKind: string,
+    source: 'share_link' | 'file'
+  ): TrackedEvent => ({
+    name: 'package_import_failed',
+    properties: { error_kind: errorKind, source },
+  }),
+  BackupFailed: (errorKind: string): TrackedEvent => ({
+    name: 'backup_failed',
+    properties: { error_kind: errorKind },
+  }),
   SwimmerCreated: (source: SwimmerSource, swimmerCount: number): TrackedEvent => ({
     name: 'swimmer_created',
     properties: { source, swimmer_count: swimmerCount },

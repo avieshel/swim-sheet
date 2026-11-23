@@ -46,3 +46,44 @@ describe('search event', () => {
     })
   })
 })
+
+describe('sharing and failure events', () => {
+  it('SessionPackageShared carries drill_count and source', () => {
+    expect(Events.SessionPackageShared(8, 'template')).toEqual({
+      name: 'session_package_shared',
+      properties: { drill_count: 8, source: 'template' },
+    })
+  })
+
+  it('SessionPackageImported carries drill_count, source, shared_by', () => {
+    expect(Events.SessionPackageImported(8, 'share_link', 'Coach A')).toEqual({
+      name: 'session_package_imported',
+      properties: { drill_count: 8, source: 'share_link', shared_by: 'Coach A' },
+    })
+  })
+
+  it('ShareFailed carries error_kind', () => {
+    expect(Events.ShareFailed('network')).toEqual({
+      name: 'share_failed',
+      properties: { error_kind: 'network' },
+    })
+  })
+
+  it('PackageImportFailed carries error_kind and source', () => {
+    expect(Events.PackageImportFailed('network', 'file')).toEqual({
+      name: 'package_import_failed',
+      properties: { error_kind: 'network', source: 'file' },
+    })
+  })
+
+  it('BackupFailed carries error_kind', () => {
+    expect(Events.BackupFailed('quota')).toEqual({
+      name: 'backup_failed',
+      properties: { error_kind: 'quota' },
+    })
+  })
+
+  it('SessionOpenedViaShare has no properties', () => {
+    expect(Events.SessionOpenedViaShare()).toEqual({ name: 'session_opened_via_share' })
+  })
+})
