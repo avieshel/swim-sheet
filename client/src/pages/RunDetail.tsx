@@ -6,6 +6,7 @@ import { formatTime } from '../utils/formatTime'
 import { downloadBlob } from '../utils/downloadBlob'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { Icon } from '../components/Icon'
+import { useI18n } from '../i18n'
 
 function isQuickStartNotes(notes: string | null | undefined): boolean {
   if (!notes) return false
@@ -21,6 +22,7 @@ function isQuickStartNotes(notes: string | null | undefined): boolean {
 export function RunDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [run, setRun] = useState<RunSummary | null>(null)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(() => id == null)
@@ -84,20 +86,20 @@ export function RunDetail() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading...</p>
+      <p className="text-on-surface-variant">{t('live.loading')}</p>
     </div>
   )
 
   if (!run) return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <Icon name="run_circle" size="3xl" color="on-surface-variant" className="mb-3" />
-      <p className="text-on-surface-variant font-body-md mb-4">Run not found.</p>
+      <p className="text-on-surface-variant font-body-md mb-4">{t('runs.notFound')}</p>
       <button
         onClick={() => navigate('/runs')}
         className="flex items-center gap-2 text-primary hover:underline cursor-pointer bg-transparent border-none font-body-md"
       >
         <Icon name="arrow_back" size="lg" />
-        Back to Past Sessions
+        {t('runs.back')}
       </button>
     </div>
   )
@@ -110,7 +112,7 @@ export function RunDetail() {
           className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-body-md cursor-pointer bg-transparent border-none"
         >
           <Icon name="arrow_back" size="lg" />
-          Back to Past Sessions
+          {t('runs.back')}
         </button>
         <div className="flex gap-2">
           <button
@@ -118,14 +120,14 @@ export function RunDetail() {
             className="h-touch-target-min px-4 border-2 border-outline text-on-surface rounded-lg font-label-sm flex items-center gap-2 hover:bg-surface-container transition-colors cursor-pointer"
           >
             <Icon name="download" size="lg" />
-            Export
+            {t('runs.export')}
           </button>
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="h-touch-target-min px-4 border-2 border-error/30 text-error rounded-lg font-label-sm flex items-center gap-2 hover:bg-error-container transition-colors cursor-pointer"
           >
             <Icon name="delete" size="lg" />
-            Delete session
+            {t('runs.deleteSession')}
           </button>
         </div>
       </div>
@@ -158,7 +160,7 @@ export function RunDetail() {
               <span className="text-outline">·</span>
               <span className="flex items-center gap-1">
                 <Icon name="groups" size="sm" />
-                {run.totalSwimmers} swimmer{run.totalSwimmers === 1 ? '' : 's'}
+                {run.totalSwimmers === 1 ? t('runs.swimmersCount', { count: run.totalSwimmers }) : t('runs.swimmersCountPlural', { count: run.totalSwimmers })}
               </span>
             </div>
             {notes && (
@@ -168,7 +170,7 @@ export function RunDetail() {
           <span className={`shrink-0 text-label-caps font-bold px-2 py-0.5 rounded-full ${
             run.status === 'completed' ? 'text-primary bg-primary-container/40' : 'text-warning bg-warning-container/40'
           }`}>
-            {run.status}
+            {run.status === 'completed' ? t('runs.status.completed') : t('runs.status.active')}
           </span>
         </div>
       </div>
@@ -176,22 +178,22 @@ export function RunDetail() {
       <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant">
         <h3 className="font-headline-md text-headline-md text-on-surface mb-4 flex items-center gap-2">
           <Icon name="timer" color="primary" />
-          Results
+          {t('runs.results')}
         </h3>
         {drillColumns.length === 0 || swimmers.length === 0 ? (
-          <p className="text-on-surface-variant font-body-md">No drill results recorded for this run.</p>
+          <p className="text-on-surface-variant font-body-md">{t('runs.noResults')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-start">
               <thead>
                 <tr className="text-label-caps text-on-surface-variant border-b border-outline-variant/40">
-                  <th className="px-3 py-2.5 font-medium">Swimmer</th>
+                  <th className="px-3 py-2.5 font-medium">{t('runs.swimmer')}</th>
                   {drillColumns.map(col => (
                     <th key={col.drillId} className="px-3 py-2.5 font-medium text-end truncate max-w-[140px]">
                       {col.label}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 font-medium text-end">Total</th>
+                  <th className="px-3 py-2.5 font-medium text-end">{t('runs.total')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/40">
@@ -204,12 +206,12 @@ export function RunDetail() {
                           {swimmer.name}
                           {swimmer.matchedByName === true && (
                             <span className="text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">
-                              likely match
+                              {t('runs.table.likelyMatch')}
                             </span>
                           )}
                           {swimmer.isVirtual && (
                             <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
-                              guest
+                              {t('runs.table.guest')}
                             </span>
                           )}
                         </span>
@@ -236,9 +238,9 @@ export function RunDetail() {
 
       <ConfirmDialog
         open={showDeleteConfirm}
-        title={`Delete "${run.templateName}"?`}
-        message="This will permanently delete this session and all of its drill times, lap records, and results. This cannot be undone."
-        confirmLabel={deleting ? 'Deleting...' : 'Delete session'}
+        title={t('runs.deleteSessionTitle', { name: run.templateName })}
+        message={t('runs.deleteSessionMessage')}
+        confirmLabel={deleting ? t('runs.deleting') : t('runs.deleteSession')}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />

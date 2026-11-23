@@ -5,6 +5,7 @@ import type { RunHistoryData, RunSummary, RunSwimmerSummary } from '../api/runs'
 import { formatTime, formatWallTime } from '../utils/formatTime'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 
 interface TableProps {
   swimmerId?: string
@@ -16,10 +17,13 @@ interface TableProps {
 }
 
 function AttendeesCell({ run, onViewAll }: { run: RunSummary; onViewAll: () => void }) {
+  const { t } = useI18n()
   const shown = run.swimmers.slice(0, 3)
   const extra = run.totalSwimmers - shown.length
   const label =
-    extra > 0 ? `${shown.map(s => s.name).join(', ')} and ${extra} more` : shown.map(s => s.name).join(', ')
+    extra > 0
+      ? t('runs.table.andMore', { names: shown.map(s => s.name).join(', '), count: extra })
+      : shown.map(s => s.name).join(', ')
   const hasMatch = shown.some(s => s.matchedByName === true)
   return (
     <button
@@ -28,13 +32,13 @@ function AttendeesCell({ run, onViewAll }: { run: RunSummary; onViewAll: () => v
         e.stopPropagation()
         onViewAll()
       }}
-      title="View attendees"
+      title={t('runs.table.viewAttendees')}
       className="group inline-flex items-center gap-1 text-start text-label-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer bg-transparent border-none p-0"
     >
       <span>{label}</span>
       {hasMatch && (
         <span className="ms-0.5 text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">
-          likely match
+          {t('runs.table.likelyMatch')}
         </span>
       )}
       <Icon name="open_in_full" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -43,6 +47,7 @@ function AttendeesCell({ run, onViewAll }: { run: RunSummary; onViewAll: () => v
 }
 
 function SessionCell({ run, lastAttended }: { run: RunSummary; lastAttended?: boolean }) {
+  const { t } = useI18n()
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex flex-col min-w-0">
@@ -50,7 +55,7 @@ function SessionCell({ run, lastAttended }: { run: RunSummary; lastAttended?: bo
           <span className="font-bold text-on-surface truncate">{run.templateName}</span>
           {lastAttended && (
             <span className="shrink-0 text-label-caps text-on-primary bg-primary px-1.5 py-0.5 rounded-full">
-              Last attended
+              {t('runs.table.lastAttended')}
             </span>
           )}
         </span>
@@ -83,23 +88,24 @@ function SessionCell({ run, lastAttended }: { run: RunSummary; lastAttended?: bo
 }
 
 function SwimmerDetail({ swimmer }: { swimmer: RunSwimmerSummary }) {
+  const { t } = useI18n()
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2 mb-1.5">
         <span className="font-bold text-on-surface">{swimmer.name}</span>
         {swimmer.matchedByName === true && (
           <span className="text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full ms-1.5">
-            likely match
+            {t('runs.table.likelyMatch')}
           </span>
         )}
         {swimmer.isVirtual && (
           <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
-            guest
+            {t('runs.table.guest')}
           </span>
         )}
       </div>
       {swimmer.timeEntries.length === 0 ? (
-        <p className="text-label-sm text-on-surface-variant">No recorded times.</p>
+        <p className="text-label-sm text-on-surface-variant">{t('runs.table.noRecordedTimes')}</p>
       ) : (
         <ul className="space-y-1">
           {swimmer.timeEntries.map(entry => (
@@ -110,7 +116,7 @@ function SwimmerDetail({ swimmer }: { swimmer: RunSwimmerSummary }) {
                   <>
                     <span className="font-bold text-on-surface">{formatTime(entry.totalMs)}</span>
                     {entry.unitMs > 0 && (
-                      <span className="text-label-sm text-on-surface-variant">· {formatTime(entry.unitMs)} avg</span>
+                      <span className="text-label-sm text-on-surface-variant">· {formatTime(entry.unitMs)} {t('runs.table.avg')}</span>
                     )}
                   </>
                 ) : (
@@ -126,6 +132,7 @@ function SwimmerDetail({ swimmer }: { swimmer: RunSwimmerSummary }) {
 }
 
 function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => void }) {
+  const { t } = useI18n()
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -141,11 +148,11 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-headline-md text-on-surface">Attendees</h3>
+          <h3 className="font-headline-md text-on-surface">{t('runs.table.attendees')}</h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="inline-flex items-center justify-center w-9 h-9 rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
           >
             <Icon name="close" size="lg" />
@@ -153,7 +160,7 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
         </div>
         <p className="font-body-md text-on-surface-variant mb-4 truncate">{run.templateName} · {run.date}</p>
         {run.swimmers.length === 0 ? (
-          <p className="text-on-surface-variant font-body-md">No attendees recorded.</p>
+          <p className="text-on-surface-variant font-body-md">{t('runs.table.noAttendees')}</p>
         ) : (
           <ul className="divide-y divide-outline-variant/40">
             {run.swimmers.map(s => (
@@ -162,12 +169,12 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
                   <span className="font-body-md text-on-surface truncate">{s.name}</span>
                   {s.matchedByName === true && (
                     <span className="shrink-0 text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">
-                      likely match
+                      {t('runs.table.likelyMatch')}
                     </span>
                   )}
                   {s.isVirtual && (
                     <span className="shrink-0 text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
-                      guest
+                      {t('runs.table.guest')}
                     </span>
                   )}
                 </span>
@@ -177,11 +184,11 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
                     onClick={onClose}
                     className="inline-flex items-center gap-1 text-primary text-label-sm font-bold hover:underline cursor-pointer shrink-0"
                   >
-                    Stats
+                    {t('runs.table.stats')}
                     <Icon name="arrow_forward" size="sm" />
                   </Link>
                 ) : (
-                  <span className="text-label-sm text-on-surface-variant shrink-0">No profile</span>
+                  <span className="text-label-sm text-on-surface-variant shrink-0">{t('runs.table.noProfile')}</span>
                 )}
               </li>
             ))}
@@ -213,6 +220,7 @@ function RunRow({
   lastAttended?: boolean
   onViewAll: () => void
 }) {
+  const { t } = useI18n()
   const focused =
     swimmerId != null
       ? run.swimmers.find(s => s.swimmerId === swimmerId) ??
@@ -238,7 +246,7 @@ function RunRow({
           <td className="px-4 py-4 text-end">
             <button
               type="button"
-              aria-label={`Delete ${run.templateName}`}
+              aria-label={t('runs.table.deleteAria', { name: run.templateName })}
               onClick={e => {
                 e.stopPropagation()
                 onDelete?.(run)
@@ -261,7 +269,7 @@ function RunRow({
                     to={`/runs/${run.runId}`}
                     className="inline-flex items-center gap-1 mt-3 text-primary text-label-sm font-bold hover:underline cursor-pointer"
                   >
-                    View full session
+                    {t('runs.table.viewFullSession')}
                     <Icon name="arrow_forward" size="sm" />
                   </Link>
                 </div>
@@ -279,6 +287,7 @@ function RunRow({
 }
 
 export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDelete = false, focusName, lastAttended = false }: TableProps) {
+  const { t } = useI18n()
   const [fetched, setFetched] = useState<RunHistoryData | null>(null)
   const [loading, setLoading] = useState(runsProp == null)
   const [error, setError] = useState(false)
@@ -347,7 +356,7 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
         <Icon name="progress_activity" className="animate-spin" />
-        <span className="font-body-md">Loading past sessions...</span>
+        <span className="font-body-md">{t('runs.loading')}</span>
       </div>
     )
   }
@@ -356,7 +365,7 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
     return (
       <div className="flex items-center justify-center gap-2 py-12 text-on-surface-variant">
         <Icon name="error_outline" color="error" />
-        <span className="font-body-md">Couldn't load past sessions. Please try again.</span>
+        <span className="font-body-md">{t('runs.loadError')}</span>
       </div>
     )
   }
@@ -365,7 +374,7 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
     return (
       <div className={`flex flex-col items-center justify-center py-12 text-center ${borderless ? '' : 'bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant'}`}>
         <Icon name="history" size="3xl" color="on-surface-variant" className="mb-3" />
-        <p className="font-body-md text-on-surface-variant">No past sessions yet.</p>
+        <p className="font-body-md text-on-surface-variant">{t('runs.empty')}</p>
       </div>
     )
   }
@@ -376,9 +385,9 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
         <table className="w-full min-w-[560px] text-start">
           <thead>
             <tr className="text-label-caps text-on-surface-variant border-b border-outline-variant/40">
-              <th className="px-4 py-3 font-medium">Session</th>
-              <th className="px-4 py-3 font-medium">Attendees</th>
-              {showDelete && <th className="px-4 py-3 font-medium text-end">Actions</th>}
+              <th className="px-4 py-3 font-medium">{t('runs.table.session')}</th>
+              <th className="px-4 py-3 font-medium">{t('runs.table.attendees')}</th>
+              {showDelete && <th className="px-4 py-3 font-medium text-end">{t('runs.table.actions')}</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/40">
@@ -401,9 +410,9 @@ export function RunHistoryTable({ swimmerId, runs: runsProp, borderless, showDel
       </div>
       <ConfirmDialog
         open={deleteTarget != null}
-        title={deleteTarget ? `Delete "${deleteTarget.templateName}"?` : 'Delete session?'}
-        message="This will permanently delete this session and all of its drill times, lap records, and results. This cannot be undone."
-        confirmLabel={deleting ? 'Deleting...' : 'Delete'}
+        title={deleteTarget ? t('runs.deleteSessionTitle', { name: deleteTarget.templateName }) : t('runs.deleteSession')}
+        message={t('runs.deleteSessionMessage')}
+        confirmLabel={deleting ? t('runs.deleting') : t('runs.delete')}
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
