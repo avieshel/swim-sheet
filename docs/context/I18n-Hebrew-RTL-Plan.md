@@ -2,11 +2,11 @@
 
 ## Status
 
-- **State**: In progress (P1 merged #48; P2 merged #49; P3 in progress)
+- **State**: In progress (P1-P3 merged #48-#58; P4-P5 pending)
 - **Date**: 2026-11-22
 - **Scope owner decision needed before Phase 1 merge**: language persistence (local-only vs synced setting)
 - **Primary goal**: Deliver full Hebrew UI support with correct RTL layout, in mergeable phases, without blocking unrelated product/server work.
-- **Progress**: P1 foundation merged (#48). P2 RTL baseline merged (#49). P3 in progress: shell+Settings localized (#50, #51), shared/common UI + account/auth localized (#52), Swimmers flow localized (#53), Sessions flow localized (#54), DrillBank + DrillEditor localized (#56), Live flow localized (#57). Runs slice in progress on `feat/i18n-p3-runs` (RunsHistory, RunDetail, RunHistoryTable). P4-P5 pending.
+- **Progress**: P1-P2 foundation/RTL merged (#48, #49). P3 core flows complete: shell+Settings (#50, #51), shared/common UI + account/auth (#52), swimmers (#53), sessions (#54), drills (#56), live (#57), runs (#58). P4 (remaining surfaces/content/polish) and P5 (hardening/guardrails) pending.
 
 ## Executive summary
 
