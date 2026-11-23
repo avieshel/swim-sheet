@@ -309,7 +309,6 @@ export interface LiveSessionContextValue {
   sessionElapsed: number
   sessionRunning: boolean
   groups: TimedGroup[]
-  tick: (delta: number) => void
 }
 
 export const LiveSessionContext = createContext<LiveSessionContextValue>({
@@ -319,5 +318,4 @@ export const LiveSessionContext = createContext<LiveSessionContextValue>({
   sessionElapsed: 0,
   sessionRunning: false,
   groups: [],
-  tick: () => {},
 })
