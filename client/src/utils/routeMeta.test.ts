@@ -6,27 +6,29 @@ describe('resolveRouteMeta', () => {
     const meta = resolveRouteMeta('/about')
     expect(meta.index).toBe(true)
     expect(meta.canonicalPath).toBe('/about')
-    expect(meta.title).toBe('Swim Sheet — Swim Coaching Session Management')
-    expect(meta.description).toContain('swim coaching app')
+    expect(meta.titleKey).toBe('meta.landing.title')
+    expect(meta.descriptionKey).toBe('meta.landing.description')
+    expect(meta.appendSuffix).toBe(false)
   })
 
   it('returns non-indexable Live Deck meta for the app root', () => {
     const meta = resolveRouteMeta('/')
     expect(meta.index).toBe(false)
     expect(meta.canonicalPath).toBe('/')
-    expect(meta.title).toContain('Live Deck')
+    expect(meta.titleKey).toBe('meta.live.title')
+    expect(meta.appendSuffix).toBe(true)
   })
 
   it('marks /auth/callback as an app route', () => {
     const meta = resolveRouteMeta('/auth/callback')
     expect(meta.index).toBe(false)
-    expect(meta.title).toContain('Signing In')
+    expect(meta.titleKey).toBe('meta.authCallback.title')
   })
 
   it('strips trailing slashes before matching', () => {
     expect(resolveRouteMeta('/live/')).toEqual(resolveRouteMeta('/live'))
     expect(resolveRouteMeta('/about/')).toEqual(resolveRouteMeta('/about'))
-    expect(resolveRouteMeta('/dashboard/').title).toContain('Coach Dashboard')
+    expect(resolveRouteMeta('/dashboard/').titleKey).toBe('meta.dashboard.title')
   })
 
   it('returns non-indexable meta for each static app route', () => {
@@ -44,20 +46,19 @@ describe('resolveRouteMeta', () => {
     for (const route of routes) {
       const meta = resolveRouteMeta(route)
       expect(meta.index, route).toBe(false)
-      expect(meta.title, route).toContain('Swim Sheet')
-      expect(meta.title, route).not.toBe('')
-      expect(meta.description, route).not.toBe('')
+      expect(meta.titleKey, route).not.toBe('')
+      expect(meta.descriptionKey, route).not.toBe('')
     }
   })
 
   it('matches /sessions/catalog before the /sessions/ pattern', () => {
-    expect(resolveRouteMeta('/sessions/catalog').title).toContain('Session Catalog')
+    expect(resolveRouteMeta('/sessions/catalog').titleKey).toBe('meta.catalog.title')
   })
 
   it('returns pattern meta for dynamic detail routes', () => {
-    expect(resolveRouteMeta('/swimmers/abc-123').title).toContain('Swimmer Details')
-    expect(resolveRouteMeta('/sessions/xyz').title).toContain('Session Details')
-    expect(resolveRouteMeta('/runs/42').title).toContain('Run Details')
+    expect(resolveRouteMeta('/swimmers/abc-123').titleKey).toBe('meta.swimmerDetail.title')
+    expect(resolveRouteMeta('/sessions/xyz').titleKey).toBe('meta.sessionDetail.title')
+    expect(resolveRouteMeta('/runs/42').titleKey).toBe('meta.runDetail.title')
     for (const meta of [
       resolveRouteMeta('/swimmers/abc-123'),
       resolveRouteMeta('/sessions/xyz'),
@@ -68,13 +69,14 @@ describe('resolveRouteMeta', () => {
   })
 
   it('does not match a bare prefix with no id', () => {
-    expect(resolveRouteMeta('/swimmers/').title).toContain('Swimmers')
+    expect(resolveRouteMeta('/swimmers/').titleKey).toBe('meta.swimmers.title')
   })
 
   it('falls back to non-indexable generic meta for unknown paths', () => {
     const meta = resolveRouteMeta('/no/such/route')
     expect(meta.index).toBe(false)
-    expect(meta.title).toContain('Swim Sheet')
+    expect(meta.titleKey).toBe('meta.default.title')
+    expect(meta.appendSuffix).toBe(false)
   })
 
   it('builds absolute canonical URLs with SITE_URL', () => {

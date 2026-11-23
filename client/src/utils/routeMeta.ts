@@ -1,59 +1,62 @@
 export const SITE_URL = 'https://swim-sheet.pages.dev'
 
-export interface RouteMeta {
-  title: string
-  description: string
+export interface RouteMetaDef {
+  titleKey: string
+  descriptionKey: string
   canonicalPath: string
   index: boolean
+  appendSuffix: boolean
 }
 
-const APP_SUFFIX = ' | Swim Sheet'
-
-const appMeta = (title: string, description: string): RouteMeta => ({
-  title: title + APP_SUFFIX,
-  description,
+const appMeta = (titleKey: string, descriptionKey: string): RouteMetaDef => ({
+  titleKey,
+  descriptionKey,
   canonicalPath: '',
   index: false,
+  appendSuffix: true,
 })
 
-const landingMeta: RouteMeta = {
-  title: 'Swim Sheet — Swim Coaching Session Management',
-  description:
-    'Swim Sheet is an offline-first swim coaching app for building practice plans, running live timing on deck, and tracking swimmers — works on any device.',
-  canonicalPath: '/about',
-  index: true,
+const staticRoutes: Record<string, RouteMetaDef> = {
+  '/': appMeta('meta.live.title', 'meta.live.description'),
+  '/live': appMeta('meta.live.title', 'meta.live.description'),
+  '/about': {
+    titleKey: 'meta.landing.title',
+    descriptionKey: 'meta.landing.description',
+    canonicalPath: '/about',
+    index: true,
+    appendSuffix: false,
+  },
+  '/privacy': {
+    titleKey: 'meta.privacy.title',
+    descriptionKey: 'meta.privacy.description',
+    canonicalPath: '',
+    index: true,
+    appendSuffix: true,
+  },
+  '/terms': {
+    titleKey: 'meta.terms.title',
+    descriptionKey: 'meta.terms.description',
+    canonicalPath: '',
+    index: true,
+    appendSuffix: true,
+  },
+  '/auth/callback': appMeta('meta.authCallback.title', 'meta.authCallback.description'),
+  '/dashboard': appMeta('meta.dashboard.title', 'meta.dashboard.description'),
+  '/swimmers': appMeta('meta.swimmers.title', 'meta.swimmers.description'),
+  '/sessions': appMeta('meta.sessions.title', 'meta.sessions.description'),
+  '/sessions/catalog': appMeta('meta.catalog.title', 'meta.catalog.description'),
+  '/drills': appMeta('meta.drills.title', 'meta.drills.description'),
+  '/settings': appMeta('meta.settings.title', 'meta.settings.description'),
+  '/runs': appMeta('meta.runs.title', 'meta.runs.description'),
 }
 
-const legalMeta = (title: string, description: string): RouteMeta => ({
-  title: title + ' | Swim Sheet',
-  description,
-  canonicalPath: '',
-  index: true,
-})
-
-const staticRoutes: Record<string, RouteMeta> = {
-  '/': appMeta('Live Deck', 'Live timing deck for running swim practices on deck, lap by lap.'),
-  '/live': appMeta('Live Deck', 'Live timing deck for running swim practices on deck, lap by lap.'),
-  '/about': landingMeta,
-  '/privacy': legalMeta('Privacy Policy', 'How Swim Sheet collects, uses, stores, and deletes your information.'),
-  '/terms': legalMeta('Terms of Service', 'The terms that govern your use of the Swim Sheet app.'),
-  '/auth/callback': appMeta('Signing In', 'Completing sign-in.'),
-  '/dashboard': appMeta('Coach Dashboard', 'Overview of recent sessions, runs, and roster activity.'),
-  '/swimmers': appMeta('Swimmers', 'Manage your swimmer roster, groups, and notes.'),
-  '/sessions': appMeta('Sessions', 'Build and organize swim practice session templates.'),
-  '/sessions/catalog': appMeta('Session Catalog', 'Browse the catalog of ready-made session templates.'),
-  '/drills': appMeta('Drill Bank', 'Library of swim drills by stroke, focus, and phase.'),
-  '/settings': appMeta('Settings', 'Configure Swim Sheet preferences and appearance.'),
-  '/runs': appMeta('Run History', 'History of completed practice runs with results.'),
-}
-
-const patternRoutes: { prefix: string; meta: RouteMeta }[] = [
-  { prefix: '/swimmers/', meta: appMeta('Swimmer Details', 'Swimmer profile with groups, notes, and history.') },
-  { prefix: '/sessions/', meta: appMeta('Session Details', 'Session plan with drills, sets, and structure.') },
-  { prefix: '/runs/', meta: appMeta('Run Details', 'Detailed results from a completed practice run.') },
+const patternRoutes: { prefix: string; meta: RouteMetaDef }[] = [
+  { prefix: '/swimmers/', meta: appMeta('meta.swimmerDetail.title', 'meta.swimmerDetail.description') },
+  { prefix: '/sessions/', meta: appMeta('meta.sessionDetail.title', 'meta.sessionDetail.description') },
+  { prefix: '/runs/', meta: appMeta('meta.runDetail.title', 'meta.runDetail.description') },
 ]
 
-export function resolveRouteMeta(pathname: string): RouteMeta {
+export function resolveRouteMeta(pathname: string): RouteMetaDef {
   const path = pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname
 
   const staticMatch = staticRoutes[path]
@@ -65,5 +68,5 @@ export function resolveRouteMeta(pathname: string): RouteMeta {
     }
   }
 
-  return { ...appMeta('Swim Sheet', 'Swim coaching session management and timing.'), canonicalPath: path }
+  return { ...appMeta('meta.default.title', 'meta.default.description'), canonicalPath: path, appendSuffix: false }
 }
