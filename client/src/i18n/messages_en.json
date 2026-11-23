@@ -652,5 +652,15 @@
   "dashboard.teamStatus": "Team Status",
   "dashboard.registeredSwimmers": "Registered Swimmers",
   "dashboard.completedSessions": "Completed Sessions",
-  "dashboard.trainingRunsCompleted": "Training Runs Completed"
+  "dashboard.trainingRunsCompleted": "Training Runs Completed",
+  "coachAssist.loading": "Loading…",
+  "coachAssist.notAuthorizedTitle": "Not authorized",
+  "coachAssist.notAuthorizedMessage": "You do not have owner access to this tool.",
+  "coachAssist.title": "Coach Assist",
+  "coachAssist.description": "Select a coach to manage their swimmers, sessions, and drills through the app's normal tabs. Edits are written to the coach's account only.",
+  "coachAssist.assisting": "Assisting {name}",
+  "coachAssist.openTabs": "Open tabs",
+  "coachAssist.exit": "Exit",
+  "coachAssist.selectCoach": "Select coach",
+  "coachAssist.noCoaches": "No coaches available."
 }

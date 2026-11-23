@@ -652,5 +652,15 @@
   "dashboard.teamStatus": "סטטוס קבוצה",
   "dashboard.registeredSwimmers": "שחיינים רשומים",
   "dashboard.completedSessions": "אימונים שהושלמו",
-  "dashboard.trainingRunsCompleted": "ריצות אימון שהושלמו"
+  "dashboard.trainingRunsCompleted": "ריצות אימון שהושלמו",
+  "coachAssist.loading": "טוען…",
+  "coachAssist.notAuthorizedTitle": "אין הרשאה",
+  "coachAssist.notAuthorizedMessage": "אין לך הרשאת בעלים לכלי זה.",
+  "coachAssist.title": "סיוע למאמן",
+  "coachAssist.description": "בחר מאמן כדי לנהל את השחיינים, האימונים והתרגילים שלו דרך הלשוניות הרגילות של האפליקציה. העריכות נכתבות לחשבון המאמן בלבד.",
+  "coachAssist.assisting": "מסייע ל{name}",
+  "coachAssist.openTabs": "פתח לשוניות",
+  "coachAssist.exit": "יציאה",
+  "coachAssist.selectCoach": "בחר מאמן",
+  "coachAssist.noCoaches": "אין מאמנים זמינים."
 }
