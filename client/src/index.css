@@ -51,14 +51,14 @@
   --color-disabled: #b0b8bc;
   --color-on-disabled: #5a6368;
 
-  --font-headline-lg: Montserrat, sans-serif;
-  --font-body-lg: Inter, sans-serif;
-  --font-display-timer: Montserrat, sans-serif;
-  --font-headline-md: Montserrat, sans-serif;
-  --font-body-md: Inter, sans-serif;
-  --font-label-caps: Inter, sans-serif;
-  --font-label-sm: Inter, sans-serif;
-  --font-headline-lg-mobile: Montserrat, sans-serif;
+  --font-headline-lg: Montserrat, Heebo, sans-serif;
+  --font-body-lg: Inter, Heebo, sans-serif;
+  --font-display-timer: Montserrat, Heebo, sans-serif;
+  --font-headline-md: Montserrat, Heebo, sans-serif;
+  --font-body-md: Inter, Heebo, sans-serif;
+  --font-label-caps: Inter, Heebo, sans-serif;
+  --font-label-sm: Inter, Heebo, sans-serif;
+  --font-headline-lg-mobile: Montserrat, Heebo, sans-serif;
 
   --text-headline-lg: clamp(24px, 4vw, 32px);
   --text-headline-lg--line-height: 1.2;
