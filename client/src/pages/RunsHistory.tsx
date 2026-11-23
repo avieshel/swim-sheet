@@ -85,10 +85,17 @@ export const RunsHistory: React.FC = () => {
     })
   }, [runs, fromDate, toDate])
 
+  const lastTrackedRunFilterRef = useRef('')
   useEffect(() => {
-    if (selected === '' && fromDate === '' && toDate === '') return
+    const signature = `${selected}|${fromDate}|${toDate}`
+    if (selected === '' && fromDate === '' && toDate === '') {
+      lastTrackedRunFilterRef.current = ''
+      return
+    }
     if (filteredRuns == null) return
+    if (signature === lastTrackedRunFilterRef.current) return
     const timer = setTimeout(() => {
+      lastTrackedRunFilterRef.current = signature
       analytics.track(Events.SearchPerformed('runs', filteredRuns.length))
     }, ANALYTICS_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)

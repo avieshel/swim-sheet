@@ -72,11 +72,7 @@ export function SessionPackageImportModal({
         return
       }
       analytics.track(
-        Events.SessionPackageImported(
-          sessionPackage.drills.length,
-          'file',
-          sessionPackage.creator?.label,
-        )
+        Events.SessionPackageImported(sessionPackage.drills.length, 'file')
       )
       setCreatedSessionId(result.sessionId)
       onImported(result.sessionId)

@@ -36,6 +36,21 @@ vi.mock('../../services/sessionDraft/apply', () => ({
   draftTotalDistance: () => 100,
 }))
 
+const mockAnalytics = vi.hoisted(() => ({ track: vi.fn() }))
+vi.mock('../../services/analyticsEvents', () => ({
+  Events: {
+    AiDraftRequested: (source: string) => ({ name: 'ai_draft_requested', properties: { source } }),
+    AiDraftGenerated: (drillCount: number, totalDistance: number, source: string) => ({
+      name: 'ai_draft_generated',
+      properties: { drill_count: drillCount, total_distance: totalDistance, source },
+    }),
+    AiDraftAccepted: (drillCount: number) => ({ name: 'ai_draft_accepted', properties: { drill_count: drillCount } }),
+    AiDraftRejected: () => ({ name: 'ai_draft_rejected' }),
+    AiDraftFailed: (errorKind: string) => ({ name: 'ai_draft_failed', properties: { error_kind: errorKind } }),
+  },
+  analytics: { track: mockAnalytics.track },
+}))
+
 import { supabase } from '../supabase'
 import { getAllSwimmers } from '../../db/dao'
 import { settingsService } from '../../services/settingsService'
@@ -275,6 +290,7 @@ describe('requestSessionDraftStream', () => {
     fetchMock.mockReset()
     getSession.mockReset()
     getSession.mockResolvedValue({ data: { session: { access_token: 'jwt' } } })
+    mockAnalytics.track.mockReset()
   })
 
   afterEach(() => {
@@ -373,5 +389,35 @@ describe('requestSessionDraftStream', () => {
     await requestSessionDraftStream(prepared(), {}, ac.signal)
     const opts = fetchMock.mock.calls[0][1] as { signal?: AbortSignal }
     expect(opts.signal).toBe(ac.signal)
+  })
+
+  it('does not emit AI draft failure on abort', async () => {
+    const abortError = new DOMException('aborted', 'AbortError')
+    fetchMock.mockRejectedValueOnce(abortError)
+    const onError = vi.fn()
+    const ac = new AbortController()
+    ac.abort()
+
+    await requestSessionDraftStream(prepared(), { onError }, ac.signal)
+
+    expect(onError).not.toHaveBeenCalled()
+    expect(mockAnalytics.track).not.toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'ai_draft_failed' }),
+    )
+  })
+
+  it('emits network failure when stream ends without terminal frame', async () => {
+    fetchMock.mockResolvedValueOnce(sseResponse([{ type: 'delta', text: '{"outcome":"draft"' }]))
+    const onError = vi.fn()
+    const onDone = vi.fn()
+
+    await requestSessionDraftStream(prepared(), { onError, onDone })
+
+    expect(onDone).not.toHaveBeenCalled()
+    expect(onError).toHaveBeenCalledWith({ outcome: 'network' })
+    expect(mockAnalytics.track).toHaveBeenCalledWith({
+      name: 'ai_draft_failed',
+      properties: { error_kind: 'network' },
+    })
   })
 })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listSwimmers, createSwimmerIfNotExists, updateSwimmer, deleteSwimmer } from '../api/swimmers'
 import { getRunHistory } from '../api/runs'
@@ -57,10 +57,16 @@ export const SwimmersList: React.FC = () => {
     )
   }, [swimmers, search])
 
+  const lastTrackedSearchRef = useRef('')
   useEffect(() => {
     const query = search.trim()
-    if (!query) return
+    if (!query) {
+      lastTrackedSearchRef.current = ''
+      return
+    }
+    if (query === lastTrackedSearchRef.current) return
     const timer = setTimeout(() => {
+      lastTrackedSearchRef.current = query
       analytics.track(Events.SearchPerformed('swimmers', filteredSwimmers.length))
     }, ANALYTICS_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)

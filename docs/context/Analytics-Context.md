@@ -103,7 +103,7 @@ Counts, enums, and action types only — no swimmer names, lap times, or free-te
 | `app_foregrounded` | `last_background_ms \| null` | `App.tsx` document `visibilitychange` → visible |
 | `search_performed` | `scope` (`swimmers`\|`sessions`\|`drills`\|`runs`), `result_count` | SwimmersList, SessionsList (templates/recent), DrillBank, RunsHistory; debounced, non-empty filters only |
 | `session_package_shared` | `drill_count`, `source` (`template`\|`run`) | SessionsList template export |
-| `session_package_imported` | `drill_count`, `source` (`share_link`\|`file`), `shared_by?` | SessionPackageImportModal successful import |
+| `session_package_imported` | `drill_count`, `source` (`share_link`\|`file`) | SessionPackageImportModal successful import |
 | `share_failed` | `error_kind` | SessionsList template export failure |
 | `package_import_failed` | `error_kind`, `source` (`share_link`\|`file`) | SessionPackageImportModal import failure |
 | `backup_failed` | `error_kind` (`export`\|`import`) | Settings backup export/import failure |

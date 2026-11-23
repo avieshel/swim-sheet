@@ -180,10 +180,16 @@ export const DrillBank: React.FC = () => {
     return a.name.localeCompare(b.name)
   })
 
+  const lastTrackedFilterRef = useRef('')
   useEffect(() => {
     const query = filter.trim()
-    if (!query) return
+    if (!query) {
+      lastTrackedFilterRef.current = ''
+      return
+    }
+    if (query === lastTrackedFilterRef.current) return
     const timer = setTimeout(() => {
+      lastTrackedFilterRef.current = query
       analytics.track(Events.SearchPerformed('drills', filteredDrills.length))
     }, ANALYTICS_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)

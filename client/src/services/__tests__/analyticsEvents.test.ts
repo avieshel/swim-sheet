@@ -55,10 +55,10 @@ describe('sharing and failure events', () => {
     })
   })
 
-  it('SessionPackageImported carries drill_count, source, shared_by', () => {
-    expect(Events.SessionPackageImported(8, 'share_link', 'Coach A')).toEqual({
+  it('SessionPackageImported carries drill_count and source', () => {
+    expect(Events.SessionPackageImported(8, 'share_link')).toEqual({
       name: 'session_package_imported',
-      properties: { drill_count: 8, source: 'share_link', shared_by: 'Coach A' },
+      properties: { drill_count: 8, source: 'share_link' },
     })
   })
 

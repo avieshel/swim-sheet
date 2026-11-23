@@ -351,11 +351,16 @@ export async function requestSessionDraftStream(
     analyticsSessionId: getAnalyticsSessionId(),
     traceId: uuidv7(),
   }
+  let terminalHandled = false
   const fail = (result: SessionDraftResult) => {
+    if (terminalHandled) return
+    terminalHandled = true
     analytics.track(Events.AiDraftFailed(result.outcome))
     handlers.onError?.(result)
   }
   const done = (result: SessionDraftResult) => {
+    if (terminalHandled) return
+    terminalHandled = true
     if (result.outcome === 'draft') {
       analytics.track(Events.AiDraftGenerated(result.draft.drills.length, draftTotalDistance(result.draft), 'harness'))
     } else {
@@ -363,6 +368,8 @@ export async function requestSessionDraftStream(
     }
     handlers.onDone?.(result)
   }
+  const isAbort = (err: unknown) =>
+    signal?.aborted === true || (err instanceof DOMException && err.name === 'AbortError')
 
   const requestCheck = validateSessionDraftRequest(body)
   if (!requestCheck.ok) {
@@ -398,7 +405,8 @@ export async function requestSessionDraftStream(
       body: JSON.stringify(body),
       signal,
     })
-  } catch {
+  } catch (err) {
+    if (isAbort(err)) return
     fail({ outcome: 'network' })
     return
   }
@@ -444,7 +452,12 @@ export async function requestSessionDraftStream(
         }
       }
     }
-  } catch {
+  } catch (err) {
+    if (isAbort(err)) return
+    fail({ outcome: 'network' })
+    return
+  }
+  if (!terminalHandled && !signal?.aborted) {
     fail({ outcome: 'network' })
   }
 }

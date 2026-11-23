@@ -106,15 +106,10 @@ export const Events = {
   }),
   SessionPackageImported: (
     drillCount: number,
-    source: 'share_link' | 'file',
-    sharedBy?: string
+    source: 'share_link' | 'file'
   ): TrackedEvent => ({
     name: 'session_package_imported',
-    properties: {
-      drill_count: drillCount,
-      source,
-      ...(sharedBy ? { shared_by: sharedBy } : {}),
-    },
+    properties: { drill_count: drillCount, source },
   }),
   SessionOpenedViaShare: (): TrackedEvent => ({
     name: 'session_opened_via_share',

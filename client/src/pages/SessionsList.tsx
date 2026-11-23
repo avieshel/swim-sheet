@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { listSessions, createSession, deleteSession, countCompletedRunsForSession } from '../api/sessions'
@@ -235,19 +235,31 @@ export const SessionsList: React.FC = () => {
     return filteredRecent.slice(0, 6)
   }, [filteredRecent, showAllRecent, recentSearch])
 
+  const lastTrackedTemplateSearchRef = useRef('')
   useEffect(() => {
     const query = templateSearch.trim()
-    if (!query) return
+    if (!query) {
+      lastTrackedTemplateSearchRef.current = ''
+      return
+    }
+    if (query === lastTrackedTemplateSearchRef.current) return
     const timer = setTimeout(() => {
+      lastTrackedTemplateSearchRef.current = query
       analytics.track(Events.SearchPerformed('sessions', filteredTemplates.length))
     }, ANALYTICS_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [templateSearch, filteredTemplates.length])
 
+  const lastTrackedRecentSearchRef = useRef('')
   useEffect(() => {
     const query = recentSearch.trim()
-    if (!query) return
+    if (!query) {
+      lastTrackedRecentSearchRef.current = ''
+      return
+    }
+    if (query === lastTrackedRecentSearchRef.current) return
     const timer = setTimeout(() => {
+      lastTrackedRecentSearchRef.current = query
       analytics.track(Events.SearchPerformed('runs', filteredRecent.length))
     }, ANALYTICS_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
