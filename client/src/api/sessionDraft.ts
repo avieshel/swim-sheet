@@ -4,7 +4,7 @@ import { createSessionDraftSeed } from '../../../shared/sessionDraft/seed'
 import { sanitizePrompt } from '../../../shared/sessionDraft/sanitize'
 import { buildSessionDraftContext } from '../services/sessionDraft/context'
 import { validateHarnessResult, validateSessionDraftRequest } from '../services/sessionDraft/validate'
-import { applySessionDraft as applyDraftService } from '../services/sessionDraft/apply'
+import { applySessionDraft as applyDraftService, draftTotalDistance } from '../services/sessionDraft/apply'
 import type {
   ApplyDraftResult,
   ApplySessionDraftOptions,
@@ -25,6 +25,7 @@ import { getAllSwimmers } from '../db/dao'
 import { sessionService } from '../services/sessionService'
 import { getSessionDrills, listLibraryDrills } from './drills'
 import { getAnalyticsSessionId } from '../services/analyticsService'
+import { Events, analytics } from '../services/analyticsEvents'
 import { v7 as uuidv7 } from 'uuid'
 
 // The only client network boundary for the AI draft. Pages never call the Edge
@@ -268,18 +269,31 @@ export async function requestSessionDraft(prepared: PreparedSessionDraft): Promi
   // Validate the request we are about to send; the harness validates it again.
   const requestCheck = validateSessionDraftRequest(body)
   if (!requestCheck.ok) {
+    analytics.track(Events.AiDraftFailed('invalid'))
     return { outcome: 'invalid', message: requestCheck.message }
   }
 
   const user = getCurrentUser()
   if (!user || user.is_anonymous) {
+    analytics.track(Events.AiDraftFailed('auth'))
     return { outcome: 'auth' }
   }
 
+  analytics.track(Events.AiDraftRequested('harness'))
   const { data, error } = await supabase.functions.invoke('ai-session-harness', { body })
-  if (error) return await mapInvokeError(error)
+  if (error) {
+    const mapped = await mapInvokeError(error)
+    analytics.track(Events.AiDraftFailed(mapped.outcome))
+    return mapped
+  }
 
-  return shapeResult(data, prepared.knownSwimmerNames)
+  const result = shapeResult(data, prepared.knownSwimmerNames)
+  if (result.outcome === 'draft') {
+    analytics.track(Events.AiDraftGenerated(result.draft.drills.length, draftTotalDistance(result.draft), 'harness'))
+  } else {
+    analytics.track(Events.AiDraftFailed(result.outcome))
+  }
+  return result
 }
 
 // Streaming counterpart. Negotiates `text/event-stream` so the harness returns
@@ -337,14 +351,27 @@ export async function requestSessionDraftStream(
     analyticsSessionId: getAnalyticsSessionId(),
     traceId: uuidv7(),
   }
+  const fail = (result: SessionDraftResult) => {
+    analytics.track(Events.AiDraftFailed(result.outcome))
+    handlers.onError?.(result)
+  }
+  const done = (result: SessionDraftResult) => {
+    if (result.outcome === 'draft') {
+      analytics.track(Events.AiDraftGenerated(result.draft.drills.length, draftTotalDistance(result.draft), 'harness'))
+    } else {
+      analytics.track(Events.AiDraftFailed(result.outcome))
+    }
+    handlers.onDone?.(result)
+  }
+
   const requestCheck = validateSessionDraftRequest(body)
   if (!requestCheck.ok) {
-    handlers.onError?.({ outcome: 'invalid', message: requestCheck.message })
+    fail({ outcome: 'invalid', message: requestCheck.message })
     return
   }
   const user = getCurrentUser()
   if (!user || user.is_anonymous) {
-    handlers.onError?.({ outcome: 'auth' })
+    fail({ outcome: 'auth' })
     return
   }
 
@@ -353,10 +380,11 @@ export async function requestSessionDraftStream(
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
   if (!token) {
-    handlers.onError?.({ outcome: 'auth' })
+    fail({ outcome: 'auth' })
     return
   }
 
+  analytics.track(Events.AiDraftRequested('harness'))
   let response: Response
   try {
     response = await fetch(url, {
@@ -371,18 +399,18 @@ export async function requestSessionDraftStream(
       signal,
     })
   } catch {
-    handlers.onError?.({ outcome: 'network' })
+    fail({ outcome: 'network' })
     return
   }
 
   if (!response.ok) {
-    handlers.onError?.(await mapInvokeError({ status: response.status, context: response }))
+    fail(await mapInvokeError({ status: response.status, context: response }))
     return
   }
 
   const resBody = response.body
   if (!resBody) {
-    handlers.onError?.({ outcome: 'network' })
+    fail({ outcome: 'network' })
     return
   }
 
@@ -391,8 +419,8 @@ export async function requestSessionDraftStream(
   let buffer = ''
   try {
     for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
+      const { done: streamDone, value } = await reader.read()
+      if (streamDone) break
       buffer += decoder.decode(value, { stream: true })
       let sep: number
       while ((sep = buffer.indexOf('\n\n')) >= 0) {
@@ -410,14 +438,14 @@ export async function requestSessionDraftStream(
         if (frame.type === 'delta' && typeof frame.text === 'string') {
           handlers.onDelta?.(frame.text)
         } else if (frame.type === 'done' && frame.result !== undefined) {
-          handlers.onDone?.(shapeResult(frame.result, prepared.knownSwimmerNames))
+          done(shapeResult(frame.result, prepared.knownSwimmerNames))
         } else if (frame.type === 'error') {
-          handlers.onError?.(streamErrorToResult(frame))
+          fail(streamErrorToResult(frame))
         }
       }
     }
   } catch {
-    handlers.onError?.({ outcome: 'network' })
+    fail({ outcome: 'network' })
   }
 }
 

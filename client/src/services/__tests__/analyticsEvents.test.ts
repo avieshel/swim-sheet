@@ -87,3 +87,37 @@ describe('sharing and failure events', () => {
     expect(Events.SessionOpenedViaShare()).toEqual({ name: 'session_opened_via_share' })
   })
 })
+
+describe('ai draft events', () => {
+  it('AiDraftGenerated carries drill_count, total_distance, source', () => {
+    expect(Events.AiDraftGenerated(10, 1500, 'harness')).toEqual({
+      name: 'ai_draft_generated',
+      properties: { drill_count: 10, total_distance: 1500, source: 'harness' },
+    })
+  })
+
+  it('AiDraftFailed carries error_kind', () => {
+    expect(Events.AiDraftFailed('rate_limited')).toEqual({
+      name: 'ai_draft_failed',
+      properties: { error_kind: 'rate_limited' },
+    })
+  })
+
+  it('AiDraftRequested carries source', () => {
+    expect(Events.AiDraftRequested('harness')).toEqual({
+      name: 'ai_draft_requested',
+      properties: { source: 'harness' },
+    })
+  })
+
+  it('AiDraftAccepted carries drill_count', () => {
+    expect(Events.AiDraftAccepted(3)).toEqual({
+      name: 'ai_draft_accepted',
+      properties: { drill_count: 3 },
+    })
+  })
+
+  it('AiDraftRejected has no properties', () => {
+    expect(Events.AiDraftRejected()).toEqual({ name: 'ai_draft_rejected' })
+  })
+})

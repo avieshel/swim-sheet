@@ -122,6 +122,29 @@ export const Events = {
     name: 'backup_failed',
     properties: { error_kind: errorKind },
   }),
+  AiDraftRequested: (source: 'harness' | 'direct'): TrackedEvent => ({
+    name: 'ai_draft_requested',
+    properties: { source },
+  }),
+  AiDraftGenerated: (
+    drillCount: number,
+    totalDistance: number,
+    source: 'harness' | 'direct'
+  ): TrackedEvent => ({
+    name: 'ai_draft_generated',
+    properties: { drill_count: drillCount, total_distance: totalDistance, source },
+  }),
+  AiDraftAccepted: (drillCount: number): TrackedEvent => ({
+    name: 'ai_draft_accepted',
+    properties: { drill_count: drillCount },
+  }),
+  AiDraftRejected: (): TrackedEvent => ({
+    name: 'ai_draft_rejected',
+  }),
+  AiDraftFailed: (errorKind: string): TrackedEvent => ({
+    name: 'ai_draft_failed',
+    properties: { error_kind: errorKind },
+  }),
   SwimmerCreated: (source: SwimmerSource, swimmerCount: number): TrackedEvent => ({
     name: 'swimmer_created',
     properties: { source, swimmer_count: swimmerCount },
