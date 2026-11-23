@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { listSwimmers } from '../api/swimmers'
@@ -17,6 +17,14 @@ export const CoachDashboard: React.FC = () => {
     totalDistance: 0,
   })
   const [loading, setLoading] = useState(true)
+
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('dashboard', Date.now() - mountedAtRef.current))
+    }
+  }, [])
 
   useEffect(() => {
     const load = async () => {

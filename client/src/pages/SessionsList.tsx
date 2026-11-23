@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { listSessions, createSession, deleteSession, countCompletedRunsForSession } from '../api/sessions'
@@ -98,6 +98,14 @@ export const SessionsList: React.FC = () => {
     applySessions(templates)
     setRecentRuns(history)
   }, [loadRecentRuns, loadSessionData])
+
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('sessions', Date.now() - mountedAtRef.current))
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false

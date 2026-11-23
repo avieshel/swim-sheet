@@ -70,6 +70,14 @@ export const DrillBank: React.FC = () => {
 
   const loadDrills = async () => applyDrills(await loadDrillsData())
 
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('drill_bank', Date.now() - mountedAtRef.current))
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     loadDrillsData()

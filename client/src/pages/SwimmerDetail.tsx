@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSwimmer, updateSwimmer, deleteSwimmer, deleteSwimmerWithData, exportSwimmerData } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
@@ -29,6 +29,14 @@ export const SwimmerDetail: React.FC = () => {
     }
     return () => { document.body.style.overflow = '' }
   }, [showDeleteConfirm, showEditModal])
+
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('swimmer_profile', Date.now() - mountedAtRef.current))
+    }
+  }, [])
 
   useEffect(() => {
     const load = async () => {

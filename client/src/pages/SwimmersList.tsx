@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listSwimmers, createSwimmerIfNotExists, updateSwimmer, deleteSwimmer } from '../api/swimmers'
 import { getRunHistory } from '../api/runs'
@@ -64,6 +64,14 @@ export const SwimmersList: React.FC = () => {
     }, ANALYTICS_SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [search, filteredSwimmers.length])
+
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('swimmers', Date.now() - mountedAtRef.current))
+    }
+  }, [])
 
   const loadSwimmerData = async (): Promise<Swimmer[]> => {
     return listSwimmers()

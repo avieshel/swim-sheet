@@ -10,6 +10,14 @@ export type SwimmerManageSource = 'roster' | 'profile'
 export type DrillSource = 'library' | 'session'
 export type DrillAddedSource = 'drill_bank' | 'session_detail'
 export type RunFilter = 'all' | 'swimmer'
+export type ScreenName =
+  | 'swimmers'
+  | 'swimmer_profile'
+  | 'sessions'
+  | 'session_template'
+  | 'drill_bank'
+  | 'dashboard'
+  | 'runs_history'
 
 interface SessionCompletionStats {
   swimmerCount: number
@@ -84,6 +92,10 @@ export const Events = {
   ): TrackedEvent => ({
     name: 'search_performed',
     properties: { scope, result_count: resultCount },
+  }),
+  ViewExited: (screen: ScreenName, dwellMs: number): TrackedEvent => ({
+    name: 'view_exited',
+    properties: { screen, dwell_ms: Math.max(0, Math.round(dwellMs)) },
   }),
   SessionPackageShared: (
     drillCount: number,
@@ -214,6 +226,12 @@ export const Events = {
   SessionReset: (clearSwimmers: boolean): TrackedEvent => ({
     name: 'session_reset',
     properties: { clear_swimmers: clearSwimmers },
+  }),
+  SessionPaused: (): TrackedEvent => ({
+    name: 'session_paused',
+  }),
+  SessionResumed: (): TrackedEvent => ({
+    name: 'session_resumed',
   }),
   DrillCreated: (source: DrillSource, stroke: Stroke | '', distance: number): TrackedEvent => ({
     name: 'drill_created',

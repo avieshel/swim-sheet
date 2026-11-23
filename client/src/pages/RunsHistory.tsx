@@ -51,6 +51,14 @@ export const RunsHistory: React.FC = () => {
     return () => { cancelled = true }
   }, [initialSwimmer])
 
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('runs_history', Date.now() - mountedAtRef.current))
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     getRunHistory(selected || undefined)

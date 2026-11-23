@@ -121,3 +121,26 @@ describe('ai draft events', () => {
     expect(Events.AiDraftRejected()).toEqual({ name: 'ai_draft_rejected' })
   })
 })
+
+describe('live session events', () => {
+  it('SessionPaused has no properties', () => {
+    expect(Events.SessionPaused()).toEqual({ name: 'session_paused' })
+  })
+
+  it('SessionResumed has no properties', () => {
+    expect(Events.SessionResumed()).toEqual({ name: 'session_resumed' })
+  })
+})
+
+describe('screen dwell events', () => {
+  it('ViewExited carries screen enum and non-negative dwell_ms', () => {
+    expect(Events.ViewExited('dashboard', 4200)).toEqual({
+      name: 'view_exited',
+      properties: { screen: 'dashboard', dwell_ms: 4200 },
+    })
+    expect(Events.ViewExited('sessions', -5)).toEqual({
+      name: 'view_exited',
+      properties: { screen: 'sessions', dwell_ms: 0 },
+    })
+  })
+})

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
@@ -91,6 +91,14 @@ export const SessionDetail: React.FC = () => {
     if (isCancelled?.()) return
     setLibraryDrills(lib)
   }
+
+  const mountedAtRef = useRef(0)
+  useEffect(() => {
+    mountedAtRef.current = Date.now()
+    return () => {
+      analytics.track(Events.ViewExited('session_template', Date.now() - mountedAtRef.current))
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false

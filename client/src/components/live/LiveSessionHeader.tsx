@@ -3,6 +3,7 @@ import { LiveSessionContext } from '../../context/LiveSessionContext'
 import type { SessionRun } from '../../api/runs'
 import { formatSessionTime, formatWallTime } from '../../utils/formatTime'
 import { Icon } from '../Icon'
+import { Events, analytics } from '../../services/analyticsEvents'
 import { useI18n } from '../../i18n'
 
 interface LiveSessionHeaderProps {
@@ -56,6 +57,11 @@ export function LiveSessionHeader({
     if (!sessionRunning && activeGroups.length === 0) {
       onOpenLaneEditor()
       return
+    }
+    if (sessionRunning) {
+      analytics.track(Events.SessionPaused())
+    } else if (sessionElapsed > 0) {
+      analytics.track(Events.SessionResumed())
     }
     onToggleSession()
   }
