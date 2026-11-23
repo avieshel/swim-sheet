@@ -167,7 +167,7 @@ export function AccountSection() {
               type="button"
               onClick={() =>
                 void runAuthAction(signOut, t('account.signOutError'), () =>
-                  analytics.track(Events.AppSettings('sign_out'))
+                  analytics.track(Events.SignedOut())
                 )
               }
               disabled={busy}
@@ -375,7 +375,7 @@ export function AccountSection() {
                 type="button"
                 onClick={() =>
                   void runAuthAction(signInWithGoogle, t('account.signInError'), () =>
-                    analytics.track(Events.AppSettings('sign_in', { method: 'google' }))
+                    analytics.track(Events.SignedIn('google'))
                   )
                 }
                 disabled={busy || !online || !syncConfigured}
@@ -388,7 +388,7 @@ export function AccountSection() {
                   type="button"
                   onClick={() =>
                     void runAuthAction(signInAsTestUser, "Couldn't sign in. Please try again.", () =>
-                      analytics.track(Events.AppSettings('sign_in', { method: 'test' }))
+                      analytics.track(Events.SignedIn('test'))
                     )
                   }
                   disabled={busy || !online || !syncConfigured}

@@ -227,10 +227,15 @@ export const Events = {
     name: 'plan_updated_by_other',
     properties: { table: stats.table, row_id: stats.id, editor_id: stats.editorId },
   }),
+  SignedIn: (method: 'google' | 'email' | 'test' | 'apple'): TrackedEvent => ({
+    name: 'signed_in',
+    properties: { method },
+  }),
+  SignedOut: (): TrackedEvent => ({
+    name: 'signed_out',
+  }),
   AppSettings: (
     action:
-      | 'sign_in'
-      | 'sign_out'
       | 'sync'
       | 'clear_data'
       | 'set_equipment'
