@@ -57,7 +57,7 @@ function EmptyState({ icon, title, actionLabel, actionIcon, compact, onAction }:
 
 export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () => void }) {
   const navigate = useNavigate()
-  const { dispatch, store, sessionElapsed, sessionRunning, groups, tick } = useContext(LiveSessionContext)
+  const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const [runDrills, setRunDrills] = useState<RunDrill[]>([])
   const [laneDrillResults, setLaneDrillResults] = useState<LaneDrillResult[]>([])
   const [templateName, setTemplateName] = useState('')
@@ -321,18 +321,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     listSwimmers().then(setRosterSwimmers)
   }
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useEffect(() => {
-    if (sessionRunning) {
-      intervalRef.current = setInterval(() => {
-        tick(10)
-      }, 10)
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [sessionRunning, tick])
 
 
 
