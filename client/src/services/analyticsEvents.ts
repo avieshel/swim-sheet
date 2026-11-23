@@ -234,6 +234,17 @@ export const Events = {
   SignedOut: (): TrackedEvent => ({
     name: 'signed_out',
   }),
+  AppBackgrounded: (foregroundMs: number): TrackedEvent => ({
+    name: 'app_backgrounded',
+    properties: { foreground_ms: Math.max(0, Math.round(foregroundMs)) },
+  }),
+  AppForegrounded: (lastBackgroundMs: number | null): TrackedEvent => ({
+    name: 'app_foregrounded',
+    properties: {
+      last_background_ms:
+        lastBackgroundMs === null ? null : Math.max(0, Math.round(lastBackgroundMs)),
+    },
+  }),
   AppSettings: (
     action:
       | 'sync'

@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Layout } from './components/Layout'
 import { RouteMeta } from './components/RouteMeta'
 import { UpdatePrompt } from './components/UpdatePrompt'
@@ -27,11 +27,36 @@ import { AuthCallback } from './pages/AuthCallback'
 import { CoachAssistEntry } from './pages/CoachAssistEntry'
 
 function App() {
+  const foregroundSinceRef = useRef(0)
+  const backgroundedAtRef = useRef<number | null>(null)
+
   useEffect(() => {
     if (isNewSession()) {
       analytics.track(Events.AppOpened())
     }
     void testSupabaseConnection()
+  }, [])
+
+  useEffect(() => {
+    foregroundSinceRef.current = Date.now()
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        backgroundedAtRef.current = Date.now()
+        analytics.track(Events.AppBackgrounded(Date.now() - foregroundSinceRef.current))
+        return
+      }
+      if (document.visibilityState === 'visible') {
+        const lastBackgroundMs = backgroundedAtRef.current
+          ? Date.now() - backgroundedAtRef.current
+          : null
+        backgroundedAtRef.current = null
+        foregroundSinceRef.current = Date.now()
+        analytics.track(Events.AppForegrounded(lastBackgroundMs))
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
   }, [])
   return (
     <AuthProvider>
