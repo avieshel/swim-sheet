@@ -12,35 +12,36 @@ import {
   type PreparedSessionDraft,
   type SessionDraftResult,
 } from '../api/sessionDraft'
+import { useI18n } from '../i18n'
 import type { SessionDraftV1 } from '../../../shared/sessionDraft/types'
 
 type Phase = 'compose' | 'review'
 
-function formatRetryWait(seconds: number): string {
+function formatRetryWait(seconds: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (seconds < 60) {
     const s = Math.max(1, Math.ceil(seconds))
-    return `${s} second${s === 1 ? '' : 's'}`
+    return t(s === 1 ? 'aiDraft.retry.seconds' : 'aiDraft.retry.secondsPlural', { count: s })
   }
   const minutes = Math.ceil(seconds / 60)
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`
+  if (minutes < 60) return t(minutes === 1 ? 'aiDraft.retry.minutes' : 'aiDraft.retry.minutesPlural', { count: minutes })
   const hours = Math.ceil(minutes / 60)
-  return `${hours} hour${hours === 1 ? '' : 's'}`
+  return t(hours === 1 ? 'aiDraft.retry.hours' : 'aiDraft.retry.hoursPlural', { count: hours })
 }
 
 // Recoverable, non-draft outcomes that need their own message. The provider
 // being offline must be visible, not silent.
-function problemMessage(result: SessionDraftResult): string | null {
+function problemMessage(result: SessionDraftResult, t: (key: string) => string): string | null {
   switch (result.outcome) {
     case 'provider':
-      return 'The AI service is unavailable right now. Please try again later.'
+      return t('aiDraft.problem.provider')
     case 'timeout':
-      return 'The AI service took too long to respond. Please try again.'
+      return t('aiDraft.problem.timeout')
     case 'network':
-      return "Couldn't reach the AI service. Check your connection and try again."
+      return t('aiDraft.problem.network')
     case 'auth':
-      return 'Your session has expired. Please sign in again, then retry.'
+      return t('aiDraft.problem.auth')
     case 'invalid':
-      return result.message ?? "That request couldn't be processed. Please rephrase and try again."
+      return result.message ?? t('aiDraft.problem.invalid')
     default:
       return null
   }
@@ -49,6 +50,7 @@ function problemMessage(result: SessionDraftResult): string | null {
 export const AiSessionDraft: React.FC = () => {
   const { user, status } = useAuth()
   const navigate = useNavigate()
+  const { t } = useI18n()
 
   const [phase, setPhase] = useState<Phase>('compose')
   const [raw, setRaw] = useState('')
@@ -82,17 +84,16 @@ export const AiSessionDraft: React.FC = () => {
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant">
-          <h2 className="font-headline-md text-on-surface mb-2">Sign in to use AI drafting</h2>
+          <h2 className="font-headline-md text-on-surface mb-2">{t('aiDraft.signInTitle')}</h2>
           <p className="text-on-surface-variant mb-6">
-            AI session drafting is the only sign-in-gated feature. Sign in from Settings, then return here.
-            Your prompt and structural context are sent to the selected provider only after you sign in.
+            {t('aiDraft.signInMessage')}
           </p>
           <Link
             to="/settings"
             className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-on-primary rounded-xl font-bold"
           >
             <Icon name="settings" />
-            Go to Settings
+            {t('aiDraft.goToSettings')}
           </Link>
         </div>
       </div>
@@ -109,7 +110,7 @@ export const AiSessionDraft: React.FC = () => {
       setEditedPrompt(next.prompt)
       setPhase('review')
     } catch {
-      setError('Could not prepare your request. Please try again.')
+      setError(t('aiDraft.prepareError'))
     } finally {
       setLoading(false)
     }
@@ -170,9 +171,9 @@ export const AiSessionDraft: React.FC = () => {
         navigate('/sessions')
         return
       }
-      setError('That draft could not be saved. Please try again.')
+      setError(t('aiDraft.saveError'))
     } catch {
-      setError('Something went wrong saving the draft. Check your connection and try again.')
+      setError(t('aiDraft.saveGenericError'))
     } finally {
       setLoading(false)
     }
@@ -181,10 +182,9 @@ export const AiSessionDraft: React.FC = () => {
   return (
     <section aria-labelledby="ai-session-heading">
       <div className="mb-6">
-        <h2 id="ai-session-heading" className="font-headline-lg text-on-surface m-0">Create with AI</h2>
+        <h2 id="ai-session-heading" className="font-headline-lg text-on-surface m-0">{t('aiDraft.heading')}</h2>
         <p className="text-on-surface-variant mt-1">
-          Describe a session in plain language. We redact swimmer names and send only a sanitized
-          description plus structural context (pool length, units, equipment, recent session shapes).
+          {t('aiDraft.subtitle')}
         </p>
       </div>
 
@@ -193,7 +193,7 @@ export const AiSessionDraft: React.FC = () => {
         style={{ '--grid-min': 'min(100%, 440px)' } as React.CSSProperties}
       >
         <SessionEditorSection
-          title={phase === 'compose' ? 'Describe your session' : 'Review your prompt'}
+          title={phase === 'compose' ? t('aiDraft.composeTitle') : t('aiDraft.reviewTitle')}
           className="p-4 md:p-5"
         >
           {phase === 'compose' && (
@@ -202,18 +202,18 @@ export const AiSessionDraft: React.FC = () => {
                 htmlFor="ai-session-description"
                 className="block font-label-caps text-label-caps text-on-surface-variant mb-1"
               >
-                Session description
+                {t('aiDraft.descriptionLabel')}
               </label>
               <textarea
                 id="ai-session-description"
                 value={raw}
                 onChange={(e) => setRaw(e.target.value)}
                 rows={6}
-                placeholder="e.g. A 2000m aerobic set: 200 free warmup, then 10x100 on 1:30 at v2, finish with 4x50 kick"
+                placeholder={t('aiDraft.descriptionPlaceholder')}
                 className="w-full min-h-36 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none resize-y transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
               <p className="text-caption text-on-surface-variant mt-2">
-                Do not include swimmer names, health details, or anything personal. Anything we detect is removed before sending.
+                {t('aiDraft.privacyNote')}
               </p>
               <div className="flex gap-3 mt-5">
                 <button
@@ -222,7 +222,7 @@ export const AiSessionDraft: React.FC = () => {
                   className="h-12 min-w-[44px] inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
                 >
                   <Icon name="arrow_forward" />
-                  Review
+                  {t('aiDraft.review')}
                 </button>
               </div>
             </>
@@ -233,14 +233,14 @@ export const AiSessionDraft: React.FC = () => {
               {prepared.removedCategories.length > 0 && (
                 <div className="flex items-center gap-2 mb-3 text-label-sm text-tertiary-container bg-tertiary-container/10 px-3 py-2 rounded-lg">
                   <Icon name="shield" size="sm" />
-                  Removed {prepared.removedCategories.join(', ')} — the model never sees the original values.
+                  {t('aiDraft.removedCategories', { categories: prepared.removedCategories.join(', ') })}
                 </div>
               )}
               <label
                 htmlFor="ai-sanitized-prompt"
                 className="block font-label-caps text-label-caps text-on-surface-variant mb-1"
               >
-                Sanitized prompt
+                {t('aiDraft.sanitizedLabel')}
               </label>
               <textarea
                 id="ai-sanitized-prompt"
@@ -250,7 +250,7 @@ export const AiSessionDraft: React.FC = () => {
                 className="w-full min-h-36 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 font-body-md text-on-surface outline-none resize-y transition-colors focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
               <p className="text-caption text-on-surface-variant mt-2">
-                Review the text above. If it is empty, nothing will be sent.
+                {t('aiDraft.sanitizedNote')}
               </p>
               <div className="flex flex-wrap gap-3 mt-5">
                 <button
@@ -259,7 +259,7 @@ export const AiSessionDraft: React.FC = () => {
                   className="h-12 min-w-[44px] inline-flex items-center gap-2 px-5 bg-primary text-on-primary rounded-xl font-label-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
                 >
                   {loading ? <Icon name="hourglass_empty" /> : <Icon name="auto_awesome" />}
-                  Generate draft
+                  {t('aiDraft.generate')}
                 </button>
                 <button
                   onClick={() => {
@@ -272,7 +272,7 @@ export const AiSessionDraft: React.FC = () => {
                   disabled={loading}
                   className="h-12 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors"
                 >
-                  Back
+                  {t('aiDraft.back')}
                 </button>
               </div>
             </>
@@ -289,35 +289,35 @@ export const AiSessionDraft: React.FC = () => {
             <div className="mt-4 bg-surface-container-low rounded-lg p-3 text-on-surface">
               <div className="flex items-center gap-2 font-bold mb-1">
                 <Icon name="info" size="sm" />
-                No session draft
+                {t('aiDraft.noDraftTitle')}
               </div>
               <p className="text-label-sm text-on-surface-variant">{result.message}</p>
               <p className="text-caption text-on-surface-variant mt-2">
-                Try describing a concrete workout (distances, strokes, repeats).
+                {t('aiDraft.noDraftHint')}
               </p>
             </div>
           )}
 
           {result && (result.outcome === 'rate_limited') && (
             <div className="mt-4 text-label-sm text-on-surface-variant">
-              You have reached the AI request limit. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
+              {t('aiDraft.rateLimited', { wait: formatRetryWait(result.retryAfterSeconds, t) })}
             </div>
           )}
 
           {result && (result.outcome === 'provider_rate_limited') && (
             <div className="mt-4 text-label-sm text-on-surface-variant">
-              The AI service is busy right now. Please try again in about {formatRetryWait(result.retryAfterSeconds)}.
+              {t('aiDraft.providerRateLimited', { wait: formatRetryWait(result.retryAfterSeconds, t) })}
             </div>
           )}
 
           {result && result.outcome === 'privacy' && (
             <div className="mt-4 text-label-sm text-error">
-              The response contained a swimmer name. It was blocked and nothing was saved.
+              {t('aiDraft.privacyBlocked')}
             </div>
           )}
 
-          {result && problemMessage(result) && (
-            <div className="mt-4 text-label-sm text-on-surface-variant">{problemMessage(result)}</div>
+          {result && problemMessage(result, t) && (
+            <div className="mt-4 text-label-sm text-on-surface-variant">{problemMessage(result, t)}</div>
           )}
         </SessionEditorSection>
 
@@ -335,13 +335,13 @@ export const AiSessionDraft: React.FC = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 font-label-caps text-label-caps text-on-surface-variant">
                   <Icon name="auto_awesome" size="sm" />
-                  Drafting…
+                  {t('aiDraft.drafting')}
                 </div>
                 <button
                   onClick={handleCancel}
                   className="h-11 min-w-[44px] px-4 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors"
                 >
-                  Cancel
+                  {t('aiDraft.cancel')}
                 </button>
               </div>
               <pre className="whitespace-pre-wrap break-words font-mono text-label-sm text-on-surface bg-surface-container-low rounded-lg p-3 max-h-96 overflow-auto">
@@ -351,7 +351,7 @@ export const AiSessionDraft: React.FC = () => {
           ) : loading ? (
             <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant text-center">
               <Icon name="hourglass_empty" size="xl" className="text-on-surface-variant animate-pulse" />
-              <p className="font-headline-md text-on-surface mt-3">Generating your draft…</p>
+              <p className="font-headline-md text-on-surface mt-3">{t('aiDraft.generating')}</p>
               <button
                 onClick={handleCancel}
                 className="mt-4 h-11 min-w-[44px] px-5 border border-outline text-on-surface rounded-xl font-label-sm font-bold hover:bg-surface-container-low transition-colors"
@@ -362,10 +362,9 @@ export const AiSessionDraft: React.FC = () => {
           ) : (
             <div className="bg-surface-container-lowest rounded-2xl p-6 md:p-8 border border-outline-variant text-center">
               <Icon name="auto_awesome" size="xl" className="text-on-surface-variant" />
-              <p className="font-headline-md text-on-surface mt-3">Nothing proposed yet</p>
+              <p className="font-headline-md text-on-surface mt-3">{t('aiDraft.emptyTitle')}</p>
               <p className="text-label-sm text-on-surface-variant mt-1">
-                Generate a draft from your description and it will appear here, ready to fine-tune
-                before anything is saved.
+                {t('aiDraft.emptyMessage')}
               </p>
             </div>
           )}
@@ -373,9 +372,9 @@ export const AiSessionDraft: React.FC = () => {
       </div>
       <ConfirmDialog
         open={confirmRegenerate}
-        title="Regenerate draft?"
-        message="Generating again replaces the proposal currently on screen with a fresh one."
-        confirmLabel="Regenerate"
+        title={t('aiDraft.regenerateTitle')}
+        message={t('aiDraft.regenerateMessage')}
+        confirmLabel={t('aiDraft.regenerate')}
         destructive={false}
         onConfirm={() => {
           setConfirmRegenerate(false)
