@@ -5,6 +5,7 @@ import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { ActiveSwimmerRow, SavedSwimmerRow } from './SwimmerRows'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 
 interface SwimmerBreakoutCardProps {
   swimmer: TimedGroup['swimmers'][number]
@@ -34,6 +35,7 @@ export function SwimmerBreakoutCard({
   onSwimmerStart, onSwimmerLap, onSwimmerComplete, onSwimmerSkip, onSwimmerMarkDone,
   onSkipSavedSwimmer, onMarkDoneSavedSwimmer, onMoveSwimmer, onRemoveFromFocus,
 }: SwimmerBreakoutCardProps) {
+  const { t } = useI18n()
   const { dispatch } = useContext(LiveSessionContext)
   const [confirmClearSwimmer, setConfirmClearSwimmer] = useState<{ swimmerId: number; dbId?: string } | null>(null)
   const [lapEditMode, setLapEditMode] = useState<Record<string, boolean>>({})
@@ -68,7 +70,7 @@ export function SwimmerBreakoutCard({
         <button
           onClick={() => swimmer.dbId && onRemoveFromFocus(swimmer.dbId)}
           className="h-8 w-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer shrink-0"
-          title="Remove from timing focus"
+          title={t('live.breakoutCard.removeFromFocus')}
         >
           <Icon name="close" size="sm" />
         </button>
@@ -119,10 +121,10 @@ export function SwimmerBreakoutCard({
 
       <ConfirmDialog
         open={confirmClearSwimmer !== null}
-        title="Clear swimmer?"
-        message="Clear this swimmer's offsets, laps, and timing data for the current drill?"
-        confirmLabel="Clear"
-        cancelLabel="Cancel"
+        title={t('live.breakoutCard.clearTitle')}
+        message={t('live.breakoutCard.clearMessage')}
+        confirmLabel={t('live.breakoutCard.clear')}
+        cancelLabel={t('sessions.cancel')}
         destructive={true}
         onConfirm={() => {
           if (confirmClearSwimmer) {

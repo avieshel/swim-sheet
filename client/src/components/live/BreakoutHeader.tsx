@@ -3,6 +3,7 @@ import type { TimedGroup } from '../../context/LiveSessionContext'
 import type { RunDrill, LaneDrillResult } from '../../api/runs'
 import { Icon } from '../Icon'
 import { SwimmerFormModal } from '../SwimmerFormModal'
+import { useI18n } from '../../i18n'
 
 export interface TimingBreakout {
   drillId: string
@@ -19,6 +20,7 @@ function DrillNameScroller({ runDrills, drillId, onSwitchDrill }: {
   drillId: string
   onSwitchDrill: (drillId: string) => void
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   const drillIndex = runDrills.findIndex(d => d.id === drillId)
   const prev = drillIndex > 0 ? runDrills[drillIndex - 1] : null
@@ -48,7 +50,7 @@ function DrillNameScroller({ runDrills, drillId, onSwitchDrill }: {
         <button
           onClick={() => prev && onSwitchDrill(prev.id)}
           disabled={!prev}
-          title="Previous drill"
+          title={t('live.breakout.prevDrill')}
           className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
         >
           <Icon name="keyboard_arrow_up" size="md" />
@@ -56,7 +58,7 @@ function DrillNameScroller({ runDrills, drillId, onSwitchDrill }: {
         <button
           onClick={() => next && onSwitchDrill(next.id)}
           disabled={!next}
-          title="Next drill"
+          title={t('live.breakout.nextDrill')}
           className="h-9 w-9 rounded bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
         >
           <Icon name="keyboard_arrow_down" size="md" />
@@ -92,6 +94,7 @@ function BreakoutAddSwimmer({ groups, focusIds, onAddSwimmer, onAddTempSwimmer, 
   onAddTempSwimmer: () => void
   onCreateSwimmer: (data: { name: string; group: string; notes: string; status: string }) => void
 }) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const candidates = groups.flatMap(g =>
@@ -105,18 +108,18 @@ function BreakoutAddSwimmer({ groups, focusIds, onAddSwimmer, onAddTempSwimmer, 
       <button
         onClick={() => setOpen(o => !o)}
         className="h-9 px-3 rounded-full bg-primary-container text-on-primary-container flex items-center gap-1 hover:brightness-95 transition-all cursor-pointer text-label-sm font-bold shrink-0"
-        title="Add swimmer to focus"
+        title={t('live.breakout.addToFocus')}
       >
         <Icon name="person_add" size="sm" />
-        <span className="hidden md:inline">Add</span>
+        <span className="hidden md:inline">{t('live.breakout.add')}</span>
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute end-0 z-50 mt-2 w-72 max-h-80 overflow-y-auto rounded-2xl bg-surface-container-lowest border border-outline-variant shadow-lg p-2">
-            <div className="text-label-caps text-on-surface-variant px-2 py-1.5">Add swimmer to timing</div>
+            <div className="text-label-caps text-on-surface-variant px-2 py-1.5">{t('live.breakout.addSwimmerToTiming')}</div>
             {candidates.length === 0 ? (
-              <div className="px-3 py-3 text-label-sm text-on-surface-variant text-center">All swimmers are in focus.</div>
+              <div className="px-3 py-3 text-label-sm text-on-surface-variant text-center">{t('live.breakout.allInFocus')}</div>
             ) : (
               candidates.map(c => (
                 <button
@@ -135,14 +138,14 @@ function BreakoutAddSwimmer({ groups, focusIds, onAddSwimmer, onAddTempSwimmer, 
               className="w-full text-start px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
             >
               <Icon name="casino" size="sm" className="text-primary" />
-              <span className="text-on-surface text-label-sm">Add temp swimmer</span>
+              <span className="text-on-surface text-label-sm">{t('live.breakout.addTemp')}</span>
             </button>
             <button
               onClick={() => { setShowCreate(true); setOpen(false) }}
               className="w-full text-start px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-surface-variant transition-colors cursor-pointer"
             >
               <Icon name="person_add" size="sm" className="text-primary" />
-              <span className="text-on-surface text-label-sm">Create new swimmer</span>
+              <span className="text-on-surface text-label-sm">{t('live.breakout.createNew')}</span>
             </button>
           </div>
         </>
@@ -172,6 +175,7 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
   onCreateSwimmer: (data: { name: string; group: string; notes: string; status: string }) => void
   onMarkAllDone: () => void
 }) {
+  const { t } = useI18n()
   const isFocus = timingBreakout.swimmerIds !== null
   const focusIds = new Set(timingBreakout.swimmerIds ?? [])
   const relevantGroups = isFocus
@@ -191,12 +195,12 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
           </span>
           <div className="min-w-0 flex-1">
             <div className="font-medium text-on-surface truncate flex items-center gap-2">
-              {isFocus ? 'Timing focus' : 'Timing all lanes'}
+              {isFocus ? t('live.breakout.timingFocus') : t('live.breakout.timingAllLanes')}
               {drill && <span className="text-on-surface-variant font-normal">· {drill.name}</span>}
             </div>
             {isFocus && (
               <div className="text-label-sm text-on-surface-variant">
-                {timingBreakout.swimmerIds!.length} swimmer{timingBreakout.swimmerIds!.length === 1 ? '' : 's'} selected
+                {timingBreakout.swimmerIds!.length === 1 ? t('live.breakout.swimmersSelected', { count: timingBreakout.swimmerIds!.length }) : t('live.breakout.swimmersSelectedPlural', { count: timingBreakout.swimmerIds!.length })}
               </div>
             )}
           </div>
@@ -207,7 +211,7 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
             <>
               <button
                 onClick={onMarkAllDone}
-                title={isDrillDone ? 'Mark incomplete' : 'Mark all done'}
+                title={isDrillDone ? t('live.drills.markIncomplete') : t('live.breakout.markAllDone')}
                 className={`h-9 px-3 rounded-full flex items-center gap-1 transition-all cursor-pointer text-label-sm font-bold ${
                   isDrillDone
                     ? 'bg-primary text-on-primary'
@@ -215,7 +219,7 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
                 }`}
               >
                 <Icon name="check" size="sm" />
-                <span className="hidden md:inline">{isDrillDone ? 'Done' : 'Mark all'}</span>
+                <span className="hidden md:inline">{isDrillDone ? t('live.breakout.done') : t('live.breakout.markAllDone')}</span>
               </button>
               <div className="relative">
                 <BreakoutAddSwimmer
@@ -231,7 +235,7 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
 
           <button
             onClick={onToggleBreakoutDone}
-            title={isDrillDone ? 'Mark incomplete' : 'Mark drill complete'}
+            title={isDrillDone ? t('live.drills.markIncomplete') : t('live.breakout.markDrillComplete')}
             className={`h-9 w-9 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
               isDrillDone
                 ? 'bg-primary border-primary text-on-primary'
@@ -243,7 +247,7 @@ export function BreakoutHeader({ runDrills, timingBreakout, laneDrillResults, gr
 
           <button
             onClick={onExit}
-            title="Exit timing / Overview"
+            title={t('live.breakout.exitTiming')}
             className="h-9 w-9 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer relative"
           >
             <Icon name="timer" size="sm" />

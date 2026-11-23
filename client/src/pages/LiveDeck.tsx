@@ -7,12 +7,12 @@ import type { Session } from '../api/sessions'
 import type { SessionRun } from '../api/runs'
 import { ActiveRunView } from './live/ActiveRunView'
 import { Icon } from '../components/Icon'
+import { useI18n } from '../i18n'
 import { useStartLiveSession, DEFAULT_QUICK_SESSION_NAME } from '../hooks/useStartLiveSession'
 import { Events, analytics } from '../services/analyticsEvents'
 
-const QUICK_TIME_LABEL = '100m freestyle quick time'
-
 export const LiveDeck: React.FC = () => {
+  const { t } = useI18n()
   const { dispatch } = useContext(LiveSessionContext)
   const { startLiveSession } = useStartLiveSession()
   const [activeRun, setActiveRun] = useState<SessionRun | null>(null)
@@ -72,7 +72,7 @@ export const LiveDeck: React.FC = () => {
               g = {
                 id: crypto.randomUUID(),
                 lane: vs.lane,
-                name: `Lane ${vs.lane}`,
+                name: t('live.lane', { lane: vs.lane }),
                 swimmers: [],
                 currentRunDrillId: defaultDrillId,
               }
@@ -93,7 +93,7 @@ export const LiveDeck: React.FC = () => {
               g = {
                 id: crypto.randomUUID(),
                 lane: link.lane,
-                name: `Lane ${link.lane}`,
+                name: t('live.lane', { lane: link.lane }),
                 swimmers: [],
                 currentRunDrillId: defaultDrillId,
               }
@@ -105,7 +105,7 @@ export const LiveDeck: React.FC = () => {
               g.swimmers.push({
                 id: Date.now() + Math.random(),
                 dbId: link.swimmerId,
-                name: sw?.name || 'Unknown',
+                name: sw?.name || t('live.unknownSwimmer'),
                 completed: false,
                 lapStrokeCounts: {},
               })
@@ -124,13 +124,13 @@ export const LiveDeck: React.FC = () => {
             return {
               id: crypto.randomUUID(),
               lane: laneNum,
-              name: `Lane ${laneNum}`,
+              name: t('live.lane', { lane: laneNum }),
               swimmers: laneLinks.map((link, idx) => {
                 const sw = swimmerMap.get(link.swimmerId)
                 return {
                   id: Date.now() + idx + Math.random(),
                   dbId: link.swimmerId,
-                  name: sw?.name || 'Unknown',
+                  name: sw?.name || t('live.unknownSwimmer'),
                   completed: false,
                   lapStrokeCounts: {},
                 }
@@ -145,7 +145,7 @@ export const LiveDeck: React.FC = () => {
     }
     void init()
     return () => { cancelled = true }
-  }, [dispatch])
+  }, [dispatch, t])
 
   useEffect(() => {
     let cancelled = false
@@ -161,7 +161,7 @@ export const LiveDeck: React.FC = () => {
     return () => { cancelled = true }
   }, [])
 
-  if (checking) return <div className="flex items-center justify-center py-20"><p className="text-on-surface-variant">Loading...</p></div>
+  if (checking) return <div className="flex items-center justify-center py-20"><p className="text-on-surface-variant">{t('live.loading')}</p></div>
 
   if (activeRun) {
     return (
@@ -173,16 +173,16 @@ export const LiveDeck: React.FC = () => {
               <div className="w-12 h-12 md:w-14 md:h-14 rounded-full mx-auto mb-4 flex items-center justify-center bg-primary-container">
                 <Icon name="info" size="xl" color="primary" className="md:text-3xl" />
               </div>
-              <h3 className="font-headline-md text-on-surface mb-2">Temp swimmers added</h3>
+              <h3 className="font-headline-md text-on-surface mb-2">{t('live.tempSwimmers.title')}</h3>
               <p className="font-body-md text-on-surface-variant mb-4">
-                To let you clock a quick time right away, I've added temp swimmers to the lanes. You can remove them now, or keep them and save your real swimmers later for future sessions.
+                {t('live.tempSwimmers.message')}
               </p>
               <button
                 type="button"
                 onClick={() => setShowTempSwimmersNotice(false)}
                 className="w-full h-12 min-w-[44px] bg-primary text-on-primary rounded-xl font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
               >
-                Got it
+                {t('live.tempSwimmers.gotIt')}
               </button>
             </div>
           </div>
@@ -194,8 +194,8 @@ export const LiveDeck: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto py-8 md:py-12">
       <div className="text-center mb-8">
-        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">Start a Session</h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-2">Choose an option to begin a live timing session.</p>
+        <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0">{t('live.start.title')}</h1>
+        <p className="font-body-md text-body-md text-on-surface-variant mt-2">{t('live.start.subtitle')}</p>
       </div>
       <div className="space-y-3">
         <button
@@ -208,8 +208,8 @@ export const LiveDeck: React.FC = () => {
               <Icon name="timer" color="primary" />
             </div>
             <div className="min-w-0">
-              <span className="block font-bold text-on-surface truncate">{QUICK_TIME_LABEL}</span>
-              <span className="block text-label-sm text-on-surface-variant">Instant 100m freestyle timer — two lanes ready to go.</span>
+              <span className="block font-bold text-on-surface truncate">{t('live.start.quickTimeLabel')}</span>
+              <span className="block text-label-sm text-on-surface-variant">{t('live.start.quickTimeDesc')}</span>
             </div>
           </div>
           <Icon name="arrow_forward" size="md" color="primary" />
@@ -235,7 +235,7 @@ export const LiveDeck: React.FC = () => {
               </div>
             </div>
             {startingSessionId === s.id ? (
-              <span className="text-label-sm text-on-surface-variant shrink-0">Starting…</span>
+              <span className="text-label-sm text-on-surface-variant shrink-0">{t('live.start.starting')}</span>
             ) : (
               <Icon name="arrow_forward" size="md" color="primary" />
             )}
@@ -243,7 +243,7 @@ export const LiveDeck: React.FC = () => {
         ))}
 
         {sessionChoices !== null && sessionChoices.length === 0 && (
-          <p className="text-center text-label-sm text-on-surface-variant pt-2">No templates yet — the quick time option above is all you need to get started.</p>
+          <p className="text-center text-label-sm text-on-surface-variant pt-2">{t('live.start.noTemplates')}</p>
         )}
       </div>
     </div>

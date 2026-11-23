@@ -3,6 +3,7 @@ import { LiveSessionContext } from '../../context/LiveSessionContext'
 import type { SessionRun } from '../../api/runs'
 import { formatSessionTime, formatWallTime } from '../../utils/formatTime'
 import { Icon } from '../Icon'
+import { useI18n } from '../../i18n'
 
 interface LiveSessionHeaderProps {
   templateName: string
@@ -26,6 +27,7 @@ export function LiveSessionHeader({
   onToggleSession, onRequestComplete, onReset, onOpenLaneEditor, onEditSession,
   onCommitPoolLength
 }: LiveSessionHeaderProps) {
+  const { t } = useI18n()
   const { groups } = useContext(LiveSessionContext)
   const [poolLength, setPoolLength] = useState(run.poolLength)
   const [showPicker, setShowPicker] = useState(false)
@@ -65,11 +67,11 @@ export function LiveSessionHeader({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <h2 className="font-headline-md font-bold text-on-surface truncate">{templateName}</h2>
           {sessionRunning ? (
-            <span className="w-3 h-3 rounded-full bg-primary animate-pulse shrink-0" title="Live" />
+            <span className="w-3 h-3 rounded-full bg-primary animate-pulse shrink-0" title={t('live.header.live')} />
           ) : sessionElapsed > 0 ? (
-            <span className="w-3 h-3 rounded-full bg-on-surface-variant/50 shrink-0" title="Paused" />
+            <span className="w-3 h-3 rounded-full bg-on-surface-variant/50 shrink-0" title={t('live.header.paused')} />
           ) : (
-            <span className="w-3 h-3 rounded-full bg-outline shrink-0" title="Not started" />
+            <span className="w-3 h-3 rounded-full bg-outline shrink-0" title={t('live.header.notStarted')} />
           )}
         </div>
 
@@ -81,7 +83,7 @@ export function LiveSessionHeader({
                 ? 'bg-primary border-primary text-on-primary'
                 : 'border-outline-variant hover:border-primary text-on-surface-variant hover:text-primary'
             }`}
-            title={sessionRunning || sessionElapsed > 0 ? 'Complete session' : 'Start session'}
+            title={sessionRunning || sessionElapsed > 0 ? t('live.header.completeSession') : t('live.header.startSession')}
           >
             <Icon name={sessionRunning || sessionElapsed > 0 ? 'stop' : 'play_arrow'} size="xs" />
           </button>
@@ -91,7 +93,7 @@ export function LiveSessionHeader({
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-            title={isExpanded ? 'Collapse details' : 'Expand details'}
+            title={isExpanded ? t('live.header.collapseDetails') : t('live.header.expandDetails')}
           >
             <Icon name={isExpanded ? 'expand_more' : 'chevron_right'} color="on-surface-variant" size="md" />
           </button>
@@ -111,30 +113,30 @@ export function LiveSessionHeader({
               }`}
             >
               <Icon name={sessionRunning ? 'pause' : 'play_arrow'} size="xs" />
-              {sessionRunning ? 'Pause' : sessionElapsed > 0 ? 'Resume' : 'Start'}
+              {sessionRunning ? t('live.header.pause') : sessionElapsed > 0 ? t('live.header.resume') : t('live.header.start')}
             </button>
             <button
               onClick={onRequestComplete}
               className="flex items-center justify-center gap-1.5 h-10 px-4 text-label-sm rounded-full font-bold transition-all cursor-pointer active:scale-95 bg-surface-variant text-on-surface hover:brightness-95"
             >
               <Icon name="check" size="xs" />
-              Complete
+              {t('live.header.complete')}
             </button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-label-sm pt-2 border-t border-outline-variant/10">
             <div>
-              <span className="block text-on-surface-variant/60 mb-0.5">Status</span>
+              <span className="block text-on-surface-variant/60 mb-0.5">{t('live.header.status')}</span>
               <span className="font-medium text-on-surface capitalize">
-                {sessionRunning ? 'live' : sessionElapsed > 0 ? 'paused' : 'not started'}
+                {sessionRunning ? t('live.header.statusLive') : sessionElapsed > 0 ? t('live.header.statusPaused') : t('live.header.statusNotStarted')}
               </span>
             </div>
             <div>
-              <span className="block text-on-surface-variant/60 mb-0.5">Start Time</span>
+              <span className="block text-on-surface-variant/60 mb-0.5">{t('live.header.startTime')}</span>
               <span className="font-medium text-on-surface">{formatWallTime(sessionStartedAt)}</span>
             </div>
             <div>
-              <span className="block text-on-surface-variant/60 mb-0.5">Pool Size</span>
+              <span className="block text-on-surface-variant/60 mb-0.5">{t('live.header.poolSize')}</span>
               <div className="relative inline-block" ref={pickerRef}>
                 <span className="inline-flex items-center">
                   <input
@@ -177,11 +179,11 @@ export function LiveSessionHeader({
               </div>
             </div>
             <div>
-              <span className="block text-on-surface-variant/60 mb-0.5">Total Drills</span>
-              <span className="font-medium text-on-surface">{drillCount} drills</span>
+              <span className="block text-on-surface-variant/60 mb-0.5">{t('live.header.totalDrills')}</span>
+              <span className="font-medium text-on-surface">{t('live.header.totalDrillsValue', { count: drillCount })}</span>
             </div>
             <div>
-              <span className="block text-on-surface-variant/60 mb-0.5">Total Distance</span>
+              <span className="block text-on-surface-variant/60 mb-0.5">{t('live.header.totalDistance')}</span>
               <span className="font-medium text-on-surface">{completedDistance} / {totalDistance}m</span>
             </div>
           </div>
@@ -192,14 +194,14 @@ export function LiveSessionHeader({
               className="h-8 px-3 rounded-lg bg-surface-variant/50 hover:bg-surface-variant text-on-surface font-medium flex items-center gap-1.5 transition-all cursor-pointer text-label-sm"
             >
               <Icon name="edit_square" size="sm" />
-              Edit Session
+              {t('live.header.editSession')}
             </button>
             <button
               onClick={onReset}
               className="h-8 px-3 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-error-container hover:text-error hover:border-error transition-all cursor-pointer text-label-sm font-medium flex items-center gap-1"
             >
               <Icon name="restart_alt" size="xs" />
-              Reset Session
+              {t('live.header.resetSession')}
             </button>
           </div>
         </div>

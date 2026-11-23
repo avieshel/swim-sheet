@@ -5,6 +5,7 @@ import { addSwimmerToRun } from '../api/runs'
 import type { RunDrill, LaneDrillResult, SwimmerDrillStatus } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 import { formatTime } from '../utils/formatTime'
 import { ActiveSwimmerRow, SavedSwimmerRow } from './SwimmerRows'
 import { SwimmerFormModal } from './SwimmerFormModal'
@@ -59,6 +60,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
   onLapReset: () => void
   onSelectDrill: (runDrillId: string) => void
 }) {
+  const { t } = useI18n()
   return (
     <div className={`mb-3 rounded-xl border overflow-hidden ${showCompleted ? 'border-primary/40 bg-primary-container/15' : 'border-outline-variant/20 bg-surface-container-low'}`}>
       {loading ? (
@@ -135,7 +137,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
                 }`}
               >
                 <Icon name={isDrillRunning ? 'stop' : 'play_arrow'} size="lg" />
-                {isDrillRunning ? 'Finish Drill' : 'Start Drill'}
+                {isDrillRunning ? t('live.groupCard.finishDrill') : t('live.groupCard.startDrill')}
               </button>
             )}
 
@@ -166,7 +168,7 @@ function DrillCard({ loading, currentDrillIndex, runDrills, baseDrill, showCompl
         </div>
       ) : (
         <div className="p-4 text-center">
-          <p className="text-sm text-on-surface-variant">No drills in this session.</p>
+          <p className="text-sm text-on-surface-variant">{t('live.drills.noDrills')}</p>
         </div>
       )}
     </div>
@@ -178,6 +180,7 @@ function DrillNav({ currentDrillIndex, runDrills, onSelectDrill }: {
   runDrills: RunDrill[]
   onSelectDrill: (runDrillId: string) => void
 }) {
+  const { t } = useI18n()
   return (
     <div className="flex items-center justify-center gap-3 mb-3">
       <button onClick={() => { const prev = runDrills[currentDrillIndex - 1]; if (prev) onSelectDrill(prev.id) }}
@@ -186,7 +189,7 @@ function DrillNav({ currentDrillIndex, runDrills, onSelectDrill }: {
         <Icon name="chevron_left" size="lg" />
       </button>
       <span className="text-label-sm text-on-surface-variant tabular-nums">
-        Drill {currentDrillIndex + 1} / {runDrills.length}
+        {t('live.groupCard.drillNav', { current: currentDrillIndex + 1, total: runDrills.length })}
       </span>
       <button onClick={() => { const nxt = runDrills[currentDrillIndex + 1]; if (nxt) onSelectDrill(nxt.id) }}
         disabled={currentDrillIndex < 0 || currentDrillIndex >= runDrills.length - 1}
@@ -203,6 +206,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
   rosterSwimmers?: Array<{ id: string; name: string; group: string; notes: string; status: string }>;
   onSelectRoster: (swimmer: { id: string; name: string }) => void;
 }) {
+  const { t } = useI18n()
   const [showPopup, setShowPopup] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const popupRef = useRef<HTMLDivElement>(null)
@@ -251,7 +255,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
         className="w-full py-2.5 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant font-medium text-sm flex items-center justify-center gap-1.5 hover:bg-surface-variant hover:border-primary hover:text-primary transition-all cursor-pointer"
       >
         <Icon name="add" />
-        Add Swimmer
+        {t('swimmers.addFirst')}
       </button>
 
       {showPopup && (
@@ -276,7 +280,7 @@ function AddSwimmerRow({ onAdd, onAddTemp, rosterSwimmers, onSelectRoster }: {
                   <Icon name="search" color="on-surface-variant" className="absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search roster..."
+                    placeholder={t('live.groupCard.searchRoster')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full py-2 ps-9 pe-3 rounded-lg bg-surface-container text-on-surface text-sm border border-outline-variant focus:border-primary focus:outline-none"
@@ -349,6 +353,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
   onMarkDoneSavedSwimmer: (groupId: string, runDrillId: string, swimmerDbId: string) => void;
   hideDrillNav?: boolean;
 }) {
+  const { t } = useI18n()
   const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const liveGroup = groups.find(g => g.id === group.id) ?? group
 
@@ -666,10 +671,10 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
 
       <ConfirmDialog
         open={confirmClearSwimmer !== null}
-        title="Clear swimmer?"
-        message="Clear this swimmer's offsets, laps, and timing data for the current drill?"
-        confirmLabel="Clear"
-        cancelLabel="Cancel"
+        title={t('live.breakoutCard.clearTitle')}
+        message={t('live.breakoutCard.clearMessage')}
+        confirmLabel={t('live.breakoutCard.clear')}
+        cancelLabel={t('sessions.cancel')}
         destructive={true}
         onConfirm={() => {
           if (confirmClearSwimmer) {
@@ -690,10 +695,10 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
 
       <ConfirmDialog
         open={showResetDrillConfirm}
-        title="Reset drill?"
+        title={t('live.groupCard.resetDrillTitle')}
         message={`Reset all timing data for this drill? Swimmers will return to the not-started state.`}
-        confirmLabel="Reset"
-        cancelLabel="Cancel"
+        confirmLabel={t('live.active.reset')}
+        cancelLabel={t('sessions.cancel')}
         destructive={true}
         onConfirm={handleResetDrillConfirm}
         onCancel={() => setShowResetDrillConfirm(false)}

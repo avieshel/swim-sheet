@@ -31,6 +31,7 @@ import { pickRandomTempSwimmerName } from '../../api/constants'
 import { LiveSessionHeader } from '../../components/live/LiveSessionHeader'
 import { DrillsSection } from '../../components/live/DrillsSection'
 import { LaneSwimmersSection } from '../../components/live/LaneSwimmersSection'
+import { useI18n } from '../../i18n'
 
 // ── Presentational sub-components (logic lives in ActiveRunView) ─────────────
 
@@ -57,6 +58,7 @@ function EmptyState({ icon, title, actionLabel, actionIcon, compact, onAction }:
 
 export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () => void }) {
   const navigate = useNavigate()
+  const { t } = useI18n()
   const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const [runDrills, setRunDrills] = useState<RunDrill[]>([])
   const [laneDrillResults, setLaneDrillResults] = useState<LaneDrillResult[]>([])
@@ -313,9 +315,9 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       setDrillsLoaded(true)
     })
     getLaneResults(run.id).then(results => setLaneDrillResults(results))
-    getSession(run.sessionId).then(s => setTemplateName(s?.name || 'Unknown'))
+    getSession(run.sessionId).then(s => setTemplateName(s?.name || t('live.unknownSwimmer')))
     listSwimmers().then(setRosterSwimmers)
-  }, [run.id, run.sessionId, dispatch, run, activeGroups.length])
+  }, [run.id, run.sessionId, dispatch, run, activeGroups.length, t])
 
   const refreshRoster = () => {
     listSwimmers().then(setRosterSwimmers)
@@ -511,7 +513,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
             onMarkAllDone={markBreakoutDone}
           />
           {activeGroups.length === 0 ? (
-            <EmptyState icon="groups" title="No swimmers in any lane yet." actionLabel="Add Swimmers" actionIcon="casino" compact onAction={() => openLaneEditor()} />
+            <EmptyState icon="groups" title={t('live.active.emptyNoSwimmers')} actionLabel={t('live.active.addSwimmers')} actionIcon="casino" compact onAction={() => openLaneEditor()} />
           ) : timingBreakout.swimmerIds === null ? (
             <section className="mb-8">
               <div className="r-grid" style={{ '--grid-min': 'min(100%, 360px)' } as React.CSSProperties}>
@@ -613,14 +615,14 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
       <ConfirmDialog
         open={showEmptyWarning}
-        title="Empty Session"
+        title={t('live.active.emptySessionTitle')}
         message={
           sessionTemps.length > 0
-            ? "This session seems to be empty and will be discarded. You have guest swimmers with times — promote them to keep their results, or discard."
-            : "This session seems to be empty and will be discarded."
+            ? t('live.active.emptySessionWithTemps')
+            : t('live.active.emptySession')
         }
-        confirmLabel="Discard"
-        cancelLabel={sessionTemps.length > 0 ? "Promote temp swimmers" : "Keep editing"}
+        confirmLabel={t('live.active.discard')}
+        cancelLabel={sessionTemps.length > 0 ? t('live.active.promoteTemp') : t('live.active.keepEditing')}
         destructive={true}
         onConfirm={handleWarningDiscard}
         onCancel={sessionTemps.length > 0 ? handleWarningPromote : () => setShowEmptyWarning(false)}
@@ -629,10 +631,10 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
       <ConfirmDialog
         open={confirmMove !== null}
-        title="Move swimmer?"
-        message={`${confirmMove?.swimmer.name ?? ''} is already assigned. Move them to the new group?`}
-        confirmLabel="Move"
-        cancelLabel="Cancel"
+        title={t('live.active.moveSwimmerTitle')}
+        message={t('live.active.moveSwimmerMessage', { name: confirmMove?.swimmer.name ?? '' })}
+        confirmLabel={t('live.active.move')}
+        cancelLabel={t('sessions.cancel')}
         destructive={false}
         onConfirm={async () => {
           if (!confirmMove) return
@@ -654,10 +656,10 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
 
       <ConfirmDialog
         open={showResetSessionConfirm}
-        title="Reset Session?"
-        message="Reset all timing data and return all groups to the first drill. This cannot be undone."
-        confirmLabel="Reset"
-        cancelLabel="Cancel"
+        title={t('live.active.resetSessionTitle')}
+        message={t('live.active.resetSessionMessage')}
+        confirmLabel={t('live.active.reset')}
+        cancelLabel={t('sessions.cancel')}
         destructive={true}
         onConfirm={handleResetSession}
         onCancel={() => { setShowResetSessionConfirm(false); setResetClearSwimmers(false) }}
@@ -670,18 +672,18 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
             className="mt-0.5 h-5 w-5 rounded border-outline text-primary focus:ring-primary cursor-pointer"
           />
           <div className="text-start">
-            <span className="text-sm font-medium text-on-surface block">Clear swimmer lane assignments</span>
-            <span className="text-xs text-on-surface-variant">Remove all swimmers from lanes. They'll remain in your roster.</span>
+            <span className="text-sm font-medium text-on-surface block">{t('live.active.clearSwimmerAssignments')}</span>
+            <span className="text-xs text-on-surface-variant">{t('live.active.clearSwimmerAssignmentsDesc')}</span>
           </div>
         </label>
       </ConfirmDialog>
 
       <ConfirmDialog
         open={showCompleteConfirm}
-        title="Complete Session?"
-        message="This saves all recorded timing data and ends the live session. You'll be returned to the session picker."
-        confirmLabel="Complete"
-        cancelLabel="Cancel"
+        title={t('live.active.completeSessionTitle')}
+        message={t('live.active.completeSessionMessage')}
+        confirmLabel={t('live.active.complete')}
+        cancelLabel={t('sessions.cancel')}
         destructive={false}
         onConfirm={() => {
           setShowCompleteConfirm(false)

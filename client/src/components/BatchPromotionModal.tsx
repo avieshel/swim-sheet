@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { searchSwimmers } from '../api/swimmers'
 import { promoteAndLinkSwimmer, discardTempSwimmer } from '../api/runs'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useI18n } from '../i18n'
 
 interface SwimmerToPromote {
   name: string
@@ -24,6 +25,7 @@ interface BatchPromotionModalProps {
 }
 
 export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel }: BatchPromotionModalProps) {
+  const { t } = useI18n()
   const [userChoices, setUserChoices] = useState<Record<string, Partial<PromotionChoice>>>({})
   const [searchQueries, setSearchQueries] = useState<Record<string, string>>({})
   const [searchResults, setSearchResults] = useState<Record<string, Array<{ id: string; name: string }>>>({})
@@ -97,9 +99,9 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-surface-container-lowest rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
         <div className="p-4 border-b border-outline-variant">
-          <h2 className="font-headline-md text-on-surface">Promote Swimmers to Roster</h2>
+          <h2 className="font-headline-md text-on-surface">{t('live.promotion.title')}</h2>
           <p className="text-sm text-on-surface-variant mt-1">
-            Choose which swimmers to save to your permanent roster.
+            {t('live.promotion.subtitle')}
           </p>
         </div>
 
@@ -122,7 +124,7 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
                     <span className="font-medium text-on-surface truncate">{swimmer.name}</span>
                   </div>
                   {!choice.promote && (
-                    <span className="text-label-sm text-on-surface-variant">Will not be saved</span>
+                    <span className="text-label-sm text-on-surface-variant">{t('live.promotion.willNotSave')}</span>
                   )}
                 </div>
 
@@ -131,7 +133,7 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
                     <div className="relative">
                       <input
                         type="text"
-                        placeholder="Search existing swimmer or type new name..."
+                        placeholder="{t('live.promotion.searchPlaceholder')}"
                         value={searchQueries[swimmer.dbId] || ''}
                         onChange={(e) => handleSearch(swimmer.dbId, e.target.value)}
                         className="w-full px-3 py-2 rounded-lg bg-surface text-on-surface text-sm border border-outline-variant focus:border-primary focus:outline-none"
@@ -151,10 +153,10 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
                       )}
                     </div>
                     {choice.selectedRosterId && (
-                      <p className="text-xs text-primary">Linking to existing swimmer in roster</p>
+                      <p className="text-xs text-primary">{t('live.promotion.linkingExisting')}</p>
                     )}
                     {!choice.selectedRosterId && searchQueries[swimmer.dbId] && (
-                      <p className="text-xs text-on-surface-variant">Will create new swimmer with this name</p>
+                      <p className="text-xs text-on-surface-variant">{t('live.promotion.willCreateNew')}</p>
                     )}
                   </div>
                 )}
@@ -169,14 +171,14 @@ export function BatchPromotionModal({ open, swimmers, runId, onConfirm, onCancel
             disabled={saving}
             className="px-4 py-2 rounded-xl text-on-surface-variant font-medium hover:bg-surface-variant transition-all cursor-pointer disabled:opacity-50"
           >
-            Skip All
+            {t('live.promotion.skipAll')}
           </button>
           <button
             onClick={handleConfirm}
             disabled={saving || swimmers.filter(s => getChoice(s.dbId).promote).length === 0}
             className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold hover:brightness-110 transition-all cursor-pointer disabled:opacity-50"
           >
-            {saving ? 'Saving...' : `Promote ${swimmers.filter(s => getChoice(s.dbId).promote).length} Swimmer${swimmers.filter(s => getChoice(s.dbId).promote).length === 1 ? '' : 's'}`}
+            {saving ? t('live.promotion.saving') : (swimmers.filter(s => getChoice(s.dbId).promote).length === 1 ? t('live.promotion.promoteOne', { count: swimmers.filter(s => getChoice(s.dbId).promote).length }) : t('live.promotion.promoteMany', { count: swimmers.filter(s => getChoice(s.dbId).promote).length }))}
           </button>
         </div>
       </div>

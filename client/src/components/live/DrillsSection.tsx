@@ -13,6 +13,7 @@ import {
 } from '../../utils/sessionProgress'
 import { Icon } from '../Icon'
 import { EquipmentIcons, type EquipmentType } from '../EquipmentIcons'
+import { useI18n } from '../../i18n'
 
 // A drill unrolling into at least this many rows folds behind its chevron.
 // Below it the iterations stay inline, because a coach scanning the overview
@@ -60,10 +61,10 @@ function groupTitle(group: DrillGroup): string {
     : `${group.setCount} × ${stripRepPrefix(group.rows[0].name)}`
 }
 
-function groupSubtitle(group: DrillGroup): string {
+function groupSubtitle(group: DrillGroup, t: (k: string, p?: Record<string, string | number>) => string): string {
   const meters = group.rows.reduce((sum, row) => sum + row.distance, 0)
   if (group.stepCount <= 1) return `${meters}m ${group.rows[0].stroke}`
-  return `${meters}m · ${group.setCount} rounds × ${group.stepCount} steps`
+  return t('live.drills.groupSubtitle', { meters, sets: group.setCount, steps: group.stepCount })
 }
 
 // Tap target for reaching the granular view: jumps straight into timing the
@@ -72,15 +73,16 @@ function GroupProgress({ progress, onJump }: {
   progress: DrillRowProgress
   onJump: () => void
 }) {
+  const { t } = useI18n()
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0
   return (
     <button
       onClick={onJump}
-      title="Jump to the next unfinished iteration"
+      title={t('live.drills.jumpToNext')}
       className="flex items-center gap-1.5 shrink-0 cursor-pointer"
     >
       {progress.total <= PIP_THRESHOLD ? (
-        <span className="flex items-center gap-1" aria-label={`${progress.done} of ${progress.total} iterations done`}>
+        <span className="flex items-center gap-1" aria-label={t('live.drills.iterationsDone', { done: progress.done, total: progress.total })}>
           {Array.from({ length: progress.total }, (_, i) => (
             <span
               key={i}
@@ -106,6 +108,7 @@ function IterationLine({ row, label, done, nested, onEnterTiming, onToggleDone }
   onEnterTiming: (drillId: string) => void
   onToggleDone: (row: RunDrill) => void
 }) {
+  const { t } = useI18n()
   const repLabel = row.instructions && REP_LABEL.test(row.instructions) ? row.instructions : null
   const note = repLabel ? null : row.instructions
   return (
@@ -122,14 +125,14 @@ function IterationLine({ row, label, done, nested, onEnterTiming, onToggleDone }
       <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={() => onEnterTiming(row.id)}
-          title={`Time drill: ${stripRepPrefix(row.name)}`}
+          title={t('live.drills.timeDrill', { name: stripRepPrefix(row.name) })}
           className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
         >
           <Icon name="timer" size="xs" />
         </button>
         <button
           onClick={() => onToggleDone(row)}
-          title={done ? 'Mark incomplete' : 'Mark complete'}
+          title={done ? t('live.drills.markIncomplete') : t('live.drills.markComplete')}
           className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
             done ? 'bg-primary border-primary text-on-primary' : 'border-outline-variant hover:border-primary text-transparent'
           }`}
@@ -148,6 +151,7 @@ function DrillSetRows({ group, laneDrillResults, activeGroups, onEnterTiming, on
   onEnterTiming: (drillId: string) => void
   onToggleDone: (row: RunDrill) => void
 }) {
+  const { t } = useI18n()
   return (
     <>
       {group.sets.map((set, setIdx) => {
@@ -156,7 +160,7 @@ function DrillSetRows({ group, laneDrillResults, activeGroups, onEnterTiming, on
           <Fragment key={setIdx}>
             {nested && (
               <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-0.5">
-                <span className="text-label-sm font-semibold text-on-surface">Round {set.label ?? setIdx + 1}</span>
+                <span className="text-label-sm font-semibold text-on-surface">{t('live.drills.round', { round: set.label ?? setIdx + 1 })}</span>
                 <span className="text-label-sm text-on-surface-variant tabular-nums">
                   {set.rows.filter(r => isDrillRowComplete(r, laneDrillResults, activeGroups)).length}/{set.rows.length}
                 </span>
@@ -193,6 +197,7 @@ function DrillFold({ children }: { children: ReactNode }) {
 }
 
 function GroupDetails({ group, divider }: { group: DrillGroup; divider: boolean }) {
+  const { t } = useI18n()
   const row = group.rows[0]
   const hasEquipment = Boolean(row.equipment && row.equipment.length > 0)
   const hasDescription = Boolean(row.notes && row.notes.trim())
@@ -200,13 +205,13 @@ function GroupDetails({ group, divider }: { group: DrillGroup; divider: boolean 
     <div className={`px-3 pb-3 pt-2 text-label-sm text-on-surface-variant space-y-2 ${divider ? 'border-t border-outline-variant/20' : ''}`}>
       {hasDescription && (
         <div>
-          <span className="font-semibold text-on-surface block mb-0.5">Description</span>
+          <span className="font-semibold text-on-surface block mb-0.5">{t('live.drills.description')}</span>
           <p className="text-on-surface/90">{row.notes}</p>
         </div>
       )}
       {hasEquipment && (
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-on-surface">Equipment:</span>
+          <span className="font-semibold text-on-surface">{t('live.drills.equipment')}</span>
           <span className="inline-flex items-center gap-1 text-primary font-medium capitalize">
             <EquipmentIcons type={row.equipment![0] as EquipmentType} className="w-4 h-4" />
             {row.equipment!.join(', ')}
@@ -216,7 +221,7 @@ function GroupDetails({ group, divider }: { group: DrillGroup; divider: boolean 
       {/* Only an explicitly opened, otherwise-empty panel explains itself. Inside
           an already-populated box the placeholder is trailing noise. */}
       {!hasDescription && !hasEquipment && group.rows.length === 1 && (
-        <p className="italic text-on-surface-variant/60">No additional details for this drill.</p>
+        <p className="italic text-on-surface-variant/60">{t('live.drills.noDetails')}</p>
       )}
     </div>
   )
@@ -226,6 +231,7 @@ export function DrillsSection({
   runDrills, laneDrillResults, groups,
   onEnterTiming, onToggleDrillDone
 }: DrillsSectionProps) {
+  const { t } = useI18n()
   const [expandedByDrill, setExpandedByDrill] = useState<Record<string, boolean>>({})
   const [uncappedFolds, setUncappedFolds] = useState<Set<string>>(() => new Set())
   const [collapsed, setCollapsed] = useState(false)
@@ -272,9 +278,9 @@ export function DrillsSection({
         aria-expanded={!collapsed}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="font-headline-sm text-on-surface">Drills</span>
+          <span className="font-headline-sm text-on-surface">{t('live.drills.title')}</span>
           <span className="text-label-sm text-on-surface-variant font-medium tabular-nums">
-            {hasDrills ? `${drillGroups.length} drills · ${totalMeters}m` : 'No drills'}
+            {hasDrills ? t('live.drills.summary', { count: drillGroups.length, distance: totalMeters }) : t('live.drills.noDrills')}
           </span>
         </span>
         <Icon name={collapsed ? 'chevron_right' : 'expand_more'} color="on-surface-variant" />
@@ -314,7 +320,7 @@ export function DrillsSection({
                           </span>
                         )}
                       </div>
-                      <div className="text-label-sm text-on-surface-variant">{groupSubtitle(group)}</div>
+                      <div className="text-label-sm text-on-surface-variant">{groupSubtitle(group, t)}</div>
                     </div>
                   </button>
 
@@ -327,14 +333,14 @@ export function DrillsSection({
                     )}
                     <button
                       onClick={() => jumpRow && onEnterTiming(jumpRow.id)}
-                      title={`Time drill: ${stripRepPrefix(group.rows[0].name)}`}
+                      title={t('live.drills.timeDrill', { name: stripRepPrefix(group.rows[0].name) })}
                       className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
                     >
                       <Icon name="timer" size="sm" />
                     </button>
                     <button
                       onClick={() => toggleGroupDone(group)}
-                      title={progress.complete ? 'Mark incomplete' : 'Mark complete'}
+                      title={progress.complete ? t('live.drills.markIncomplete') : t('live.drills.markComplete')}
                       className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
                         progress.complete
                           ? 'bg-primary border-primary text-on-primary'
@@ -347,8 +353,8 @@ export function DrillsSection({
                       onClick={toggleExpanded}
                       className="w-6 h-6 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
                       title={group.rows.length > 1
-                        ? (showIterations ? 'Hide iterations' : 'Show iterations')
-                        : (showDetails ? 'Hide details' : 'Show details')}
+                        ? (showIterations ? t('live.drills.hideIterations') : t('live.drills.showIterations'))
+                        : (showDetails ? t('live.drills.hideDetails') : t('live.drills.showDetails'))}
                     >
                       <Icon name={expanded ? 'expand_more' : 'chevron_right'} size="sm" />
                     </button>
@@ -374,7 +380,7 @@ export function DrillsSection({
                       onClick={() => setUncappedFolds(prev => toggleIn(prev, key))}
                       className="w-full flex items-center justify-center gap-1 py-1.5 border-t border-outline-variant/20 text-label-sm text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
                     >
-                      {progress.done}/{progress.total} done
+                      {t('live.drills.doneCount', { done: progress.done, total: progress.total })}
                       <Icon name="unfold_more" size="xs" />
                     </button>
                   )}
