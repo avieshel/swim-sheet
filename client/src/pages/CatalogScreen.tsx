@@ -4,8 +4,10 @@ import { fetchCatalog, getImportedSessionNames } from '../api/catalog'
 import type { CatalogSessionIndex } from '../api/catalog'
 import { SessionCatalogCard } from '../components/SessionCatalogCard'
 import { Icon } from '../components/Icon'
+import { useI18n } from '../i18n'
 
 export const CatalogScreen: React.FC = () => {
+  const { t } = useI18n()
   const [sessions, setSessions] = useState<CatalogSessionIndex[]>([])
   const [importedNames, setImportedNames] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -31,12 +33,12 @@ export const CatalogScreen: React.FC = () => {
       })
       .catch(e => {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load catalog')
+          setError(e instanceof Error ? e.message : t('catalog.loadErrorFallback'))
           setLoading(false)
         }
       })
     return () => { cancelled = true }
-  }, [])
+  }, [t])
 
   const handleImported = async () => {
     const names = await getImportedSessionNames()
@@ -78,18 +80,18 @@ export const CatalogScreen: React.FC = () => {
   if (error) return (
     <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
       <Icon name="cloud_off" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
-      <p className="text-on-surface-variant font-body-md mb-2">Could not load catalog</p>
+      <p className="text-on-surface-variant font-body-md mb-2">{t('catalog.loadError')}</p>
       <p className="text-label-sm text-on-surface-variant mb-6">{error}</p>
       <button
         onClick={() => {
           setError(null)
           loadData()
             .then(d => { setSessions(d.sessions); setImportedNames(d.names); setLoading(false) })
-            .catch(e => { setError(e instanceof Error ? e.message : 'Failed to load catalog'); setLoading(false) })
+            .catch(e => { setError(e instanceof Error ? e.message : t('catalog.loadErrorFallback')); setLoading(false) })
         }}
         className="bg-primary text-on-primary px-6 py-3 h-11 rounded-xl font-label-sm hover:brightness-110 active:scale-95 transition-all cursor-pointer"
       >
-        Try Again
+        {t('catalog.tryAgain')}
       </button>
     </div>
   )
@@ -99,20 +101,20 @@ export const CatalogScreen: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link to="/sessions" className="text-on-surface-variant hover:text-primary transition-colors">
+            <Link to="/sessions" className="text-on-surface-variant hover:text-primary transition-colors" aria-label={t('catalog.backToSessions')}>
               <Icon name="arrow_back" />
             </Link>
-            <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Session Catalog</h2>
+            <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">{t('catalog.title')}</h2>
           </div>
-          <p className="font-body-md text-body-md text-on-surface-variant mt-1">Browse and import curated session templates.</p>
+          <p className="font-body-md text-body-md text-on-surface-variant mt-1">{t('catalog.subtitle')}</p>
         </div>
       </div>
 
       {sessions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 md:py-20 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant">
           <Icon name="inventory_2" size="3xl" color="on-surface-variant" className="mb-4 md:text-5xl" />
-          <p className="text-on-surface-variant font-body-md mb-2">No sessions available</p>
-          <p className="text-label-sm text-on-surface-variant">Check back later for new templates.</p>
+          <p className="text-on-surface-variant font-body-md mb-2">{t('catalog.emptyTitle')}</p>
+          <p className="text-label-sm text-on-surface-variant">{t('catalog.emptySubtitle')}</p>
         </div>
       ) : (
         <div className="r-grid r-grid--fill" style={{ '--grid-min': '280px' } as React.CSSProperties}>

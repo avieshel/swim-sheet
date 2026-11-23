@@ -662,5 +662,13 @@
   "coachAssist.openTabs": "Open tabs",
   "coachAssist.exit": "Exit",
   "coachAssist.selectCoach": "Select coach",
-  "coachAssist.noCoaches": "No coaches available."
+  "coachAssist.noCoaches": "No coaches available.",
+  "catalog.title": "Session Catalog",
+  "catalog.subtitle": "Browse and import curated session templates.",
+  "catalog.loadError": "Could not load catalog",
+  "catalog.loadErrorFallback": "Failed to load catalog",
+  "catalog.tryAgain": "Try Again",
+  "catalog.emptyTitle": "No sessions available",
+  "catalog.emptySubtitle": "Check back later for new templates.",
+  "catalog.backToSessions": "Back to sessions"
 }
