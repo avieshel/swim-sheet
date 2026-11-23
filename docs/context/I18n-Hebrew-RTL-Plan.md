@@ -2,11 +2,11 @@
 
 ## Status
 
-- **State**: In progress (P1 merged #48; P2 merged #49; P3 in progress)
+- **State**: In progress (P1-P3 merged #48-#58; P4/P5 in progress on `feat/i18n-p4-remaining`, PR pending)
 - **Date**: 2026-11-22
 - **Scope owner decision needed before Phase 1 merge**: language persistence (local-only vs synced setting)
 - **Primary goal**: Deliver full Hebrew UI support with correct RTL layout, in mergeable phases, without blocking unrelated product/server work.
-- **Progress**: P1 foundation merged (#48). P2 RTL baseline merged (#49). P3 in progress: shell+Settings localized (#50, #51), shared/common UI + account/auth localized (#52), Swimmers flow localized (#53), Sessions flow localized (#54), DrillBank + DrillEditor localized (#56), Live flow localized (#57). Runs slice in progress on `feat/i18n-p3-runs` (RunsHistory, RunDetail, RunHistoryTable). P4-P5 pending.
+- **Progress**: P1-P2 foundation/RTL merged (#48, #49). P3 core flows complete (#48-#58). P4 in progress on `feat/i18n-p4-remaining`: missed live/shared strings, RouteMeta, CoachDashboard, CoachAssist, Catalog, AI draft localized; Heebo Hebrew font fallback added; `dir="auto"` added to key user-generated content. Deferred by product decision: Landing/Privacy/Terms body content stays English for now; seeded drills/sessions/catalog Hebrew content keywords out of scope for this story. P5 guardrails/docs being folded into same PR: i18n/RTL conventions documented in UI design system context; key parity covered by existing i18n coverage tests; `npm run check` green.
 
 ## Executive summary
 

@@ -22,6 +22,7 @@ function GroupHeader({ name, lane, onEdit, collapsed, onToggleCollapsed }: {
   collapsed: boolean
   onToggleCollapsed: () => void
 }) {
+  const { t } = useI18n()
   const fastLaneBadge = lane === 1 ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant text-on-surface-variant'
   return (
     <div className="flex justify-between items-center mb-4">
@@ -37,7 +38,7 @@ function GroupHeader({ name, lane, onEdit, collapsed, onToggleCollapsed }: {
       </div>
       <button onClick={onToggleCollapsed}
         className="h-11 w-11 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-primary-container/60 transition-all cursor-pointer"
-        title={collapsed ? 'Show swimmers' : 'Hide swimmers'}>
+        title={collapsed ? t('live.groupCard.showSwimmers') : t('live.groupCard.hideSwimmers')}>
         <Icon name={collapsed ? 'chevron_right' : 'expand_more'} size="sm" />
       </button>
     </div>

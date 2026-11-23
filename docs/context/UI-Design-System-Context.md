@@ -105,6 +105,15 @@ desktop header shows a compact signed-in account indicator linking to Settings
 (avatar or single-initial fallback), omitted while auth is loading, when signed out,
 and from the mobile bottom navigation.
 
+## i18n & RTL
+- **Locales**: `en` (default/fallback) and `he` (Hebrew, RTL). Runtime in `client/src/i18n/` (`LocaleProvider`, `useI18n()`, `t(key, params?)`).
+- **Messages**: `client/src/i18n/messages_en.json` and `messages_he.json` must keep key parity (covered by i18n coverage tests). Add keys to both files; English is the fallback.
+- **HTML lang/dir**: set reactively by the i18n runtime on locale change.
+- **Fonts**: Heebo is included as the Hebrew fallback in font stacks (`Montserrat, Heebo, sans-serif` for headlines; `Inter, Heebo, sans-serif` for body/labels) and loaded via Google Fonts in `index.html`.
+- **RTL layout**: prefer logical Tailwind utilities (`ms/me`, `ps/pe`, `text-start/end`, `start/end`). Use `rtl:` only for exceptions. Directional icons auto-mirror via `<Icon>` `mirrorInRtl`.
+- **Bidi user content**: render user-generated/mixed content (names, notes, template titles, descriptions) with `dir="auto"` where appropriate.
+- **Deferred by product decision**: Landing/Privacy/Terms body content remains English for now; seeded drills/sessions/catalog Hebrew content keywords are out of scope for this story.
+
 ## Related
 - Layout + screen specs: `docs/context/UI-Context.md`
 - Live deck UI: `docs/context/UI-Live-Deck-Context.md`

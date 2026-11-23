@@ -320,8 +320,8 @@ export function LaneEditorModal({
           <ConfirmDialog
             open={true}
             title={t('live.laneEditor.removeLaneTitle')}
-            message={`{t('live.laneEditor.removeLaneMessage')}`}
-            confirmLabel="Remove"
+            message={t('live.laneEditor.removeLaneMessage')}
+            confirmLabel={t('live.laneEditor.remove')}
             cancelLabel={t('sessions.cancel')}
             destructive={true}
             onConfirm={() => { onRemoveGroup(removingGroupId); setRemovingGroupId(null) }}
@@ -331,9 +331,9 @@ export function LaneEditorModal({
         {resettingGroupId && (
           <ConfirmDialog
             open={true}
-            title="{t('live.laneEditor.resetLane')}?"
-            message={`{t('live.laneEditor.resetLaneMessage')}`}
-            confirmLabel="Reset"
+            title={t('live.laneEditor.resetLaneTitle')}
+            message={t('live.laneEditor.resetLaneMessage')}
+            confirmLabel={t('live.active.reset')}
             cancelLabel={t('sessions.cancel')}
             destructive={true}
             onConfirm={() => { onResetGroup(resettingGroupId); setResettingGroupId(null) }}

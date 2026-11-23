@@ -8,6 +8,7 @@ import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { removeSwimmerFromRun, type SwimmerDrillStatus } from '../api/runs'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 
 // A single tap completes the swimmer; a long press (≈450ms) opens a small
 // anchorless menu at the touch point. Buttons/inputs inside the row are excluded
@@ -163,6 +164,7 @@ interface SavedSwimmerRowProps {
 }
 
 export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, sessionElapsed, lapEditMode, toggleLapEdit, onEditSavedSwimmer, onClearSavedSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation, onRemoveFromFocus, onSkipSavedSwimmer, onMarkDoneSavedSwimmer }: SavedSwimmerRowProps) {
+  const { t } = useI18n()
   const { dispatch } = useContext(LiveSessionContext)
   const lapEntries = saved.laps ?? []
   const [confirmClear, setConfirmClear] = useState(false)
@@ -221,17 +223,18 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
           <button
             onClick={handleNameClick}
             className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-start cursor-pointer hover:text-primary transition-colors"
-            title={isVirtual ? 'Save to roster' : 'Edit swimmer'}
+            title={isVirtual ? t('live.swimmer.saveToRoster') : t('live.swimmer.editSwimmer')}
+            dir="auto"
           >
             {saved.name}
           </button>
           <div className="flex flex-wrap gap-1.5 mt-0.5">
             {isVirtual && (
-              <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">wanna be</span>
+              <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">{t('live.swimmer.wannaBe')}</span>
             )}
-            <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Saved</span>
+            <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">{t('live.swimmer.saved')}</span>
             {saved.status === 'skipped' && (
-              <span className="text-label-caps text-on-surface-variant bg-surface-variant px-1.5 py-0.5 rounded-full">Skipped</span>
+              <span className="text-label-caps text-on-surface-variant bg-surface-variant px-1.5 py-0.5 rounded-full">{t('live.swimmer.skipped')}</span>
             )}
           </div>
         </div>
@@ -251,7 +254,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                         onEditSavedSwimmer(group.id, runDrillId!, entry.dbId, { laps: adjustedLaps, startedAt: undefined })
                       }
                     }}
-                    aria-label="Clear go offset"
+                    aria-label={t('live.swimmer.clearGoOffset')}
                     className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-error/10 text-error hover:bg-error hover:text-on-error transition-colors shrink-0">
                     <Icon name="close" size="sm" />
                   </button>
@@ -266,7 +269,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
             <button
               onClick={() => onRemoveFromFocus(saved.dbId)}
               className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -me-1 mt-0.5"
-              title="Remove from timing focus"
+              title={t('live.breakoutCard.removeFromFocus')}
             >
               <Icon name="close" size="sm" />
             </button>
@@ -289,7 +292,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
                       const newLaps = removeLapEntry(lapEntries, i)
                       onEditSavedSwimmer(group.id, runDrillId!, saved.dbId, { laps: newLaps })
                     }}
-                    aria-label={`Remove lap ${i + 1}`}
+                    aria-label={t('live.swimmer.removeLap', { lap: i + 1 })}
                     className="h-8 w-8 inline-flex items-center justify-center rounded-full bg-error/10 text-error hover:bg-error hover:text-on-error transition-colors shrink-0">
                     <Icon name="close" size="sm" />
                   </button>
@@ -338,10 +341,10 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
 
       <ConfirmDialog
         open={confirmClear}
-        title="Clear swimmer?"
-        message={`Clear ${saved.name}'s offsets, laps, and timing data for this drill?`}
-        confirmLabel="Clear"
-        cancelLabel="Cancel"
+        title={t('live.breakoutCard.clearTitle')}
+        message={t('live.swimmer.clearMessage', { name: saved.name })}
+        confirmLabel={t('live.breakoutCard.clear')}
+        cancelLabel={t('sessions.cancel')}
         destructive
         onConfirm={() => {
           setConfirmClear(false)
@@ -385,6 +388,7 @@ interface ActiveSwimmerRowProps {
 }
 
 export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, onClear, onSkip, onMarkDone, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation, onRemoveFromFocus, savedStatus }: ActiveSwimmerRowProps) {
+  const { t } = useI18n()
   const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
   const storeVersion = store.version
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
@@ -519,7 +523,8 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
             <button
               onClick={handleNameClick}
               className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-start cursor-pointer hover:text-primary transition-colors"
-              title={isVirtual ? 'Save to roster' : 'Edit swimmer'}
+              title={isVirtual ? t('live.swimmer.saveToRoster') : t('live.swimmer.editSwimmer')}
+              dir="auto"
             >
               {swimmer.name}
             </button>
@@ -527,22 +532,22 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
               {isVirtual && (
                 <span className="inline-flex items-center gap-1">
                   <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">
-                    {saving ? 'Saving...' : 'wanna be'}
+                    {saving ? t('live.swimmer.saving') : t('live.swimmer.wannaBe')}
                   </span>
                   <button
                     onClick={handleNameClick}
                     className="h-6 px-2 rounded-full bg-primary text-on-primary text-label-sm font-bold hover:brightness-110 transition-all cursor-pointer"
-                    title="Save to roster"
+                    title={t('live.swimmer.saveToRoster')}
                   >
                     Save
                   </button>
                 </span>
               )}
               {swimmer.completed && savedStatus !== 'skipped' && (
-                <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">Done</span>
+                <span className="text-label-caps text-primary bg-primary-container/40 px-1.5 py-0.5 rounded-full">{t('live.swimmer.done')}</span>
               )}
               {savedStatus === 'skipped' && (
-                <span className="text-label-caps text-on-surface-variant bg-surface-variant px-1.5 py-0.5 rounded-full">Skipped</span>
+                <span className="text-label-caps text-on-surface-variant bg-surface-variant px-1.5 py-0.5 rounded-full">{t('live.swimmer.skipped')}</span>
               )}
             </div>
           </div>
@@ -558,7 +563,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
             <button
               onClick={() => onRemoveFromFocus(swimmer.id)}
               className="h-9 w-9 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error-container hover:text-on-error-container transition-all cursor-pointer -me-1"
-              title="Remove from timing focus"
+              title={t('live.breakoutCard.removeFromFocus')}
             >
               <Icon name="close" size="sm" />
             </button>
@@ -660,7 +665,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
           : `Remove ${swimmer.name} from this lane? Their data is preserved in history.`
         }
         confirmLabel="Remove"
-        cancelLabel="Cancel"
+        cancelLabel={t('sessions.cancel')}
         destructive={true}
         onConfirm={handleRemoveSwimmer}
         onCancel={() => setShowRemoveConfirm(false)}

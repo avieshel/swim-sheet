@@ -135,7 +135,7 @@ export function RunDetail() {
       <div className="bg-surface-container-lowest rounded-xl p-5 md:p-6 border border-outline-variant mb-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0 truncate">
+            <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface m-0 truncate" dir="auto">
               {run.templateName}
             </h1>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2 text-label-sm text-on-surface-variant">
@@ -164,7 +164,7 @@ export function RunDetail() {
               </span>
             </div>
             {notes && (
-              <p className="font-body-md text-body-md text-on-surface-variant mt-3 whitespace-pre-wrap">{notes}</p>
+              <p className="font-body-md text-body-md text-on-surface-variant mt-3 whitespace-pre-wrap" dir="auto">{notes}</p>
             )}
           </div>
           <span className={`shrink-0 text-label-caps font-bold px-2 py-0.5 rounded-full ${
@@ -202,7 +202,7 @@ export function RunDetail() {
                   return (
                     <tr key={swimmer.swimmerId ?? swimmer.name} className="hover:bg-surface-container/60 transition-colors">
                       <td className="px-3 py-2.5">
-                        <span className="flex items-center gap-1.5 font-bold text-on-surface">
+                        <span className="flex items-center gap-1.5 font-bold text-on-surface" dir="auto">
                           {swimmer.name}
                           {swimmer.matchedByName === true && (
                             <span className="text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">

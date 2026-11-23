@@ -1,22 +1,24 @@
 import { useNavigate } from 'react-router-dom'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { Icon } from '../components/Icon'
+import { useI18n } from '../i18n'
 
 export function CoachAssistEntry() {
   const { isOwner, ownerLoading, coaches, coach, selectCoach, exit } = useCoachAssist()
   const navigate = useNavigate()
+  const { t } = useI18n()
 
   if (ownerLoading) {
-    return <div className="p-6 text-on-surface-variant">Loading…</div>
+    return <div className="p-6 text-on-surface-variant">{t('coachAssist.loading')}</div>
   }
 
   if (!isOwner) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
         <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant">
-          <h1 className="font-headline-md text-on-surface mb-2">Not authorized</h1>
+          <h1 className="font-headline-md text-on-surface mb-2">{t('coachAssist.notAuthorizedTitle')}</h1>
           <p className="text-on-surface-variant">
-            You do not have owner access to this tool.
+            {t('coachAssist.notAuthorizedMessage')}
           </p>
         </div>
       </div>
@@ -31,10 +33,9 @@ export function CoachAssistEntry() {
   return (
     <div className="p-4 md:p-6 max-w-2xl mx-auto space-y-6">
       <header>
-        <h1 className="font-headline-md text-on-surface">Coach Assist</h1>
+        <h1 className="font-headline-md text-on-surface">{t('coachAssist.title')}</h1>
         <p className="text-on-surface-variant">
-          Select a coach to manage their swimmers, sessions, and drills through the
-          app's normal tabs. Edits are written to the coach's account only.
+          {t('coachAssist.description')}
         </p>
       </header>
 
@@ -43,7 +44,7 @@ export function CoachAssistEntry() {
           <div className="flex items-center gap-2 min-w-0">
             <Icon name="supervisor_account" />
             <span className="font-body-md text-on-surface truncate">
-              Assisting {coach.name}
+              {t('coachAssist.assisting', { name: coach.name })}
             </span>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -52,14 +53,14 @@ export function CoachAssistEntry() {
               onClick={() => navigate('/sessions')}
               className="h-10 px-4 rounded-lg font-label-sm bg-primary text-on-primary cursor-pointer"
             >
-              Open tabs
+              {t('coachAssist.openTabs')}
             </button>
             <button
               type="button"
               onClick={exit}
               className="h-10 px-4 rounded-lg font-label-sm border border-outline text-on-surface cursor-pointer"
             >
-              Exit
+              {t('coachAssist.exit')}
             </button>
           </div>
         </section>
@@ -70,7 +71,7 @@ export function CoachAssistEntry() {
           className="block font-label-caps text-on-surface-variant mb-1"
           htmlFor="coach-select"
         >
-          Select coach
+          {t('coachAssist.selectCoach')}
         </label>
         <select
           id="coach-select"
@@ -80,7 +81,7 @@ export function CoachAssistEntry() {
             if (e.target.value) enterCoach(e.target.value)
           }}
         >
-          <option value="">Select coach</option>
+          <option value="">{t('coachAssist.selectCoach')}</option>
           {coaches.map((c) => (
             <option key={c.userId} value={c.userId}>
               {c.name}
@@ -88,7 +89,7 @@ export function CoachAssistEntry() {
           ))}
         </select>
         {coaches.length === 0 && (
-          <p className="text-label-sm text-on-surface-variant mt-1">No coaches available.</p>
+          <p className="text-label-sm text-on-surface-variant mt-1">{t('coachAssist.noCoaches')}</p>
         )}
       </section>
     </div>

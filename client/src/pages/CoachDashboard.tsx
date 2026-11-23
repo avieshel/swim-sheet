@@ -5,8 +5,10 @@ import { listSwimmers } from '../api/swimmers'
 import { listSessions, listCompletedRuns } from '../api/sessions'
 import { getRunDrill, getAllLaps } from '../api/runs'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useI18n } from '../i18n'
 
 export const CoachDashboard: React.FC = () => {
+  const { t } = useI18n()
   const [stats, setStats] = useState({
     templateCount: 0,
     swimmerCount: 0,
@@ -48,7 +50,7 @@ export const CoachDashboard: React.FC = () => {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <p className="text-on-surface-variant">Loading dashboard...</p>
+      <p className="text-on-surface-variant">{t('dashboard.loading')}</p>
     </div>
   )
 
@@ -62,11 +64,11 @@ export const CoachDashboard: React.FC = () => {
           </div>
           <div className="relative z-10">
             <span className="font-label-caps bg-white/20 px-3 py-1 rounded-full backdrop-blur-md mb-4 inline-block">
-              Coach Dashboard
+              {t('dashboard.badge')}
             </span>
-            <h2 className="font-headline-lg text-headline-lg mb-2">Ready to Coach</h2>
+            <h2 className="font-headline-lg text-headline-lg mb-2">{t('dashboard.heroTitle')}</h2>
             <p className="font-body-lg text-body-lg opacity-90 max-w-xl mb-6">
-              {stats.templateCount} templates ready &middot; {stats.swimmerCount} swimmers in the roster
+              {t('dashboard.heroSubtitle', { templates: stats.templateCount, swimmers: stats.swimmerCount })}
             </p>
 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
                 <Link
@@ -74,7 +76,7 @@ export const CoachDashboard: React.FC = () => {
                   className="bg-surface-container-lowest text-primary font-bold h-11 md:h-12 px-6 rounded-full flex items-center gap-2 hover:shadow-xl active:scale-95 transition-all no-underline"
                 >
                   <Icon name="bolt" fill />
-                  Quick Time Lap
+                  {t('dashboard.quickTimeLap')}
                 </Link>
                 {/* Duplicate of the primary /live CTA above (also the "Active Deck" hub tile). Kept commented until removal is confirmed.
                 <Link
@@ -100,13 +102,13 @@ export const CoachDashboard: React.FC = () => {
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-secondary-container flex items-center justify-center text-on-secondary-container mb-4 md:mb-6 group-hover:scale-110 transition-transform">
               <Icon name="groups" size="xl" className="md:text-3xl" />
             </div>
-            <h3 className="font-headline-md text-on-surface mb-1 md:mb-2">Team Management</h3>
+            <h3 className="font-headline-md text-on-surface mb-1 md:mb-2">{t('dashboard.teamManagement')}</h3>
             <p className="text-on-surface-variant font-body-md">
-              Manage {stats.swimmerCount} active swimmers, track attendance, and view performance history.
+              {t('dashboard.teamManagementDesc', { count: stats.swimmerCount })}
             </p>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-primary font-bold">Go to Swimmers</span>
+            <span className="text-primary font-bold">{t('dashboard.goToSwimmers')}</span>
             <Icon name="arrow_forward" color="primary" className="ltr:group-hover:translate-x-2 rtl:group-hover:-translate-x-2 transition-transform" />
           </div>
         </Link>
@@ -119,13 +121,13 @@ export const CoachDashboard: React.FC = () => {
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary-container/30 flex items-center justify-center text-primary mb-4 md:mb-6 group-hover:scale-110 transition-transform">
               <Icon name="event_note" size="xl" className="md:text-3xl" />
             </div>
-            <h3 className="font-headline-md text-on-surface mb-1 md:mb-2">Session Planner</h3>
+            <h3 className="font-headline-md text-on-surface mb-1 md:mb-2">{t('dashboard.sessionPlanner')}</h3>
             <p className="text-on-surface-variant font-body-md">
-              Design training templates with the Drill Library. {stats.templateCount} templates saved.
+              {t('dashboard.sessionPlannerDesc', { count: stats.templateCount })}
             </p>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-primary font-bold">Plan Next Set</span>
+            <span className="text-primary font-bold">{t('dashboard.planNextSet')}</span>
             <Icon name="arrow_forward" color="primary" className="ltr:group-hover:translate-x-2 rtl:group-hover:-translate-x-2 transition-transform" />
           </div>
         </Link>
@@ -138,13 +140,13 @@ export const CoachDashboard: React.FC = () => {
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-primary flex items-center justify-center text-white mb-4 md:mb-6 group-hover:scale-110 transition-transform animate-pulse">
               <Icon name="timer" size="xl" className="md:text-3xl" />
             </div>
-            <h3 className="font-headline-md text-white mb-1 md:mb-2">Active Deck</h3>
+            <h3 className="font-headline-md text-white mb-1 md:mb-2">{t('dashboard.activeDeck')}</h3>
             <p className="text-outline-variant font-body-md">
-              Enter live coaching mode. Choose a template, assign lanes, and track splits.
+              {t('dashboard.activeDeckDesc')}
             </p>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-primary-fixed-dim font-bold">Launch Deck</span>
+            <span className="text-primary-fixed-dim font-bold">{t('dashboard.launchDeck')}</span>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-error animate-pulse"></span>
               <Icon name="arrow_forward" color="on-surface-variant" className="ltr:group-hover:translate-x-2 rtl:group-hover:-translate-x-2 transition-transform" />
@@ -157,7 +159,7 @@ export const CoachDashboard: React.FC = () => {
       <div className="r-grid" style={{ '--grid-min': '200px' } as React.CSSProperties}>
         <div className="bg-surface-variant/30 p-5 md:p-6 rounded-3xl border border-outline-variant/50" style={{ gridColumn: 'span 2' }}>
           <div className="flex items-center justify-between mb-4">
-            <h4 className="font-label-caps text-on-surface-variant">Total Distance Recorded</h4>
+            <h4 className="font-label-caps text-on-surface-variant">{t('dashboard.totalDistance')}</h4>
             <span className="text-primary font-bold">{stats.totalDistance}m</span>
           </div>
           <div className="flex items-end gap-2 h-20 md:h-32 mb-4">
@@ -165,22 +167,22 @@ export const CoachDashboard: React.FC = () => {
               <div key={i} className={`flex-1 rounded-t-lg ${i === 4 ? 'bg-primary' : 'bg-primary/20'}`} style={{ height: `${h}%` }} />
             ))}
           </div>
-          <p className="text-on-surface-variant font-label-sm">Training volume across all completed sessions</p>
+          <p className="text-on-surface-variant font-label-sm">{t('dashboard.trainingVolume')}</p>
         </div>
 
         <div className="bg-surface-container-high p-5 md:p-6 rounded-3xl border border-outline-variant/50 flex flex-col justify-between">
-          <h4 className="font-label-caps text-on-surface-variant mb-2">Team Status</h4>
+          <h4 className="font-label-caps text-on-surface-variant mb-2">{t('dashboard.teamStatus')}</h4>
           <div>
             <div className="text-headline-lg font-headline-lg text-primary">{stats.swimmerCount}</div>
-            <p className="text-on-surface-variant font-body-md">Registered Swimmers</p>
+            <p className="text-on-surface-variant font-body-md">{t('dashboard.registeredSwimmers')}</p>
           </div>
         </div>
 
         <div className="bg-secondary-fixed p-5 md:p-6 rounded-3xl border border-outline-variant/50 flex flex-col justify-between">
-          <h4 className="font-label-caps text-on-secondary-fixed-variant mb-2">Completed Sessions</h4>
+          <h4 className="font-label-caps text-on-secondary-fixed-variant mb-2">{t('dashboard.completedSessions')}</h4>
           <div>
             <div className="text-headline-md font-headline-md text-on-secondary-fixed">{stats.completedRunCount}</div>
-            <p className="text-on-secondary-fixed-variant font-body-md">Training Runs Completed</p>
+            <p className="text-on-secondary-fixed-variant font-body-md">{t('dashboard.trainingRunsCompleted')}</p>
           </div>
           <div className="mt-4">
             <div className="w-full bg-on-secondary-fixed/10 h-2 rounded-full overflow-hidden">
