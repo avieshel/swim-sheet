@@ -37,3 +37,12 @@ describe('app engagement events', () => {
     })
   })
 })
+
+describe('search event', () => {
+  it('SearchPerformed carries scope enum and result_count', () => {
+    expect(Events.SearchPerformed('swimmers', 12)).toEqual({
+      name: 'search_performed',
+      properties: { scope: 'swimmers', result_count: 12 },
+    })
+  })
+})

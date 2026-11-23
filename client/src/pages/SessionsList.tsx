@@ -13,7 +13,7 @@ import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
 import { SessionPackageImportModal } from '../components/SessionPackageImportModal'
-import { Events, analytics } from '../services/analyticsEvents'
+import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 import type { Stroke } from '../types/swimming'
@@ -229,6 +229,24 @@ export const SessionsList: React.FC = () => {
     if (showAllRecent || recentSearch.trim()) return filteredRecent
     return filteredRecent.slice(0, 6)
   }, [filteredRecent, showAllRecent, recentSearch])
+
+  useEffect(() => {
+    const query = templateSearch.trim()
+    if (!query) return
+    const timer = setTimeout(() => {
+      analytics.track(Events.SearchPerformed('sessions', filteredTemplates.length))
+    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [templateSearch, filteredTemplates.length])
+
+  useEffect(() => {
+    const query = recentSearch.trim()
+    if (!query) return
+    const timer = setTimeout(() => {
+      analytics.track(Events.SearchPerformed('runs', filteredRecent.length))
+    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [recentSearch, filteredRecent.length])
 
   if (loading) return (
     <div>

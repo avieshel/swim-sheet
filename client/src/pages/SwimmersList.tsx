@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
-import { Events, analytics } from '../services/analyticsEvents'
+import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 
@@ -55,6 +55,15 @@ export const SwimmersList: React.FC = () => {
       (s.group && s.group.toLowerCase().includes(q))
     )
   }, [swimmers, search])
+
+  useEffect(() => {
+    const query = search.trim()
+    if (!query) return
+    const timer = setTimeout(() => {
+      analytics.track(Events.SearchPerformed('swimmers', filteredSwimmers.length))
+    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [search, filteredSwimmers.length])
 
   const loadSwimmerData = async (): Promise<Swimmer[]> => {
     return listSwimmers()

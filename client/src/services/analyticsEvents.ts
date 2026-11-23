@@ -25,6 +25,8 @@ interface StartDrillStats {
   totalDistance: number
 }
 
+export const ANALYTICS_SEARCH_DEBOUNCE_MS = 800
+
 export const Events = {
   AppOpened: (): TrackedEvent => ({
     name: 'app_opened',
@@ -75,6 +77,13 @@ export const Events = {
   ViewRunsHistory: (runCount: number, swimmerFilter: RunFilter): TrackedEvent => ({
     name: 'view_runs_history',
     properties: { run_count: runCount, swimmer_filter: swimmerFilter },
+  }),
+  SearchPerformed: (
+    scope: 'swimmers' | 'sessions' | 'drills' | 'runs',
+    resultCount: number
+  ): TrackedEvent => ({
+    name: 'search_performed',
+    properties: { scope, result_count: resultCount },
   }),
   SwimmerCreated: (source: SwimmerSource, swimmerCount: number): TrackedEvent => ({
     name: 'swimmer_created',

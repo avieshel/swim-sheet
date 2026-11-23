@@ -7,7 +7,7 @@ import { listSwimmers } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n'
-import { Events, analytics } from '../services/analyticsEvents'
+import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
 
@@ -81,6 +81,15 @@ export const RunsHistory: React.FC = () => {
       return true
     })
   }, [runs, fromDate, toDate])
+
+  useEffect(() => {
+    if (selected === '' && fromDate === '' && toDate === '') return
+    if (filteredRuns == null) return
+    const timer = setTimeout(() => {
+      analytics.track(Events.SearchPerformed('runs', filteredRuns.length))
+    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [selected, fromDate, toDate, filteredRuns?.length])
 
   const handleSwimmerChange = (value: string) => {
     setSelected(value)

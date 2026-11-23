@@ -9,7 +9,7 @@ import type { Session } from '../api/sessions'
 import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { Icon } from '../components/Icon'
-import { Events, analytics } from '../services/analyticsEvents'
+import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
 import { useI18n } from '../i18n'
 
 export const DrillBank: React.FC = () => {
@@ -176,6 +176,15 @@ export const DrillBank: React.FC = () => {
     }
     return a.name.localeCompare(b.name)
   })
+
+  useEffect(() => {
+    const query = filter.trim()
+    if (!query) return
+    const timer = setTimeout(() => {
+      analytics.track(Events.SearchPerformed('drills', filteredDrills.length))
+    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [filter, filteredDrills.length])
 
   if (loading) return (
     <div className="max-w-5xl mx-auto">
