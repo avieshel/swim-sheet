@@ -224,6 +224,7 @@ export function SavedSwimmerRow({ saved, savedData, group, runId, runDrillId, se
             onClick={handleNameClick}
             className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-start cursor-pointer hover:text-primary transition-colors"
             title={isVirtual ? t('live.swimmer.saveToRoster') : t('live.swimmer.editSwimmer')}
+            dir="auto"
           >
             {saved.name}
           </button>
@@ -523,6 +524,7 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
               onClick={handleNameClick}
               className="font-bold text-on-surface text-headline-md md:text-headline-lg truncate leading-tight text-start cursor-pointer hover:text-primary transition-colors"
               title={isVirtual ? t('live.swimmer.saveToRoster') : t('live.swimmer.editSwimmer')}
+              dir="auto"
             >
               {swimmer.name}
             </button>

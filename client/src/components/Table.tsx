@@ -52,7 +52,7 @@ function SessionCell({ run, lastAttended }: { run: RunSummary; lastAttended?: bo
     <div className="flex items-center justify-between gap-3">
       <div className="flex flex-col min-w-0">
         <span className="flex items-center gap-2 min-w-0">
-          <span className="font-bold text-on-surface truncate">{run.templateName}</span>
+          <span className="font-bold text-on-surface truncate" dir="auto">{run.templateName}</span>
           {lastAttended && (
             <span className="shrink-0 text-label-caps text-on-primary bg-primary px-1.5 py-0.5 rounded-full">
               {t('runs.table.lastAttended')}
@@ -92,7 +92,7 @@ function SwimmerDetail({ swimmer }: { swimmer: RunSwimmerSummary }) {
   return (
     <div className="px-4 py-3">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="font-bold text-on-surface">{swimmer.name}</span>
+        <span className="font-bold text-on-surface" dir="auto">{swimmer.name}</span>
         {swimmer.matchedByName === true && (
           <span className="text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full ms-1.5">
             {t('runs.table.likelyMatch')}
@@ -158,7 +158,7 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
             <Icon name="close" size="lg" />
           </button>
         </div>
-        <p className="font-body-md text-on-surface-variant mb-4 truncate">{run.templateName} · {run.date}</p>
+        <p className="font-body-md text-on-surface-variant mb-4 truncate" dir="auto">{run.templateName} · {run.date}</p>
         {run.swimmers.length === 0 ? (
           <p className="text-on-surface-variant font-body-md">{t('runs.table.noAttendees')}</p>
         ) : (
@@ -166,7 +166,7 @@ function AttendeesDialog({ run, onClose }: { run: RunSummary; onClose: () => voi
             {run.swimmers.map(s => (
               <li key={s.swimmerId ?? s.name} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="flex items-center gap-1.5 min-w-0">
-                  <span className="font-body-md text-on-surface truncate">{s.name}</span>
+                  <span className="font-body-md text-on-surface truncate" dir="auto">{s.name}</span>
                   {s.matchedByName === true && (
                     <span className="shrink-0 text-label-caps text-on-secondary-container bg-secondary-container/30 px-1.5 py-0.5 rounded-full">
                       {t('runs.table.likelyMatch')}
