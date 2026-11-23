@@ -97,10 +97,33 @@ Counts, enums, and action types only — no swimmer names, lap times, or free-te
 | `swimmer_completed` | `lane`, `swimmer_count` | GroupCard finish tap / lane stop |
 | `lap_recorded` | `lane`, `swimmer_count` | GroupCard lap tap (individual or group lap) |
 | `run_swimmer_added` | `lane`, `swimmer_count` (from live `groups`) | GroupCard add-to-lane (roster pick / create-new) |
-| `app_settings` | `action` (15 closed-set values), plus action-specific extras | Settings page + AccountSection |
+| `signed_in` | `method` (`google`\|`email`\|`test`\|`apple`) | AccountSection sign-in success |
+| `signed_out` | — | AccountSection sign-out success |
+| `app_backgrounded` | `foreground_ms` | `App.tsx` document `visibilitychange` → hidden |
+| `app_foregrounded` | `last_background_ms \| null` | `App.tsx` document `visibilitychange` → visible |
+| `search_performed` | `scope` (`swimmers`\|`sessions`\|`drills`\|`runs`), `result_count` | SwimmersList, SessionsList (templates/recent), DrillBank, RunsHistory; debounced, non-empty filters only |
+| `session_package_shared` | `drill_count`, `source` (`template`\|`run`) | SessionsList template export |
+| `session_package_imported` | `drill_count`, `source` (`share_link`\|`file`), `shared_by?` | SessionPackageImportModal successful import |
+| `share_failed` | `error_kind` | SessionsList template export failure |
+| `package_import_failed` | `error_kind`, `source` (`share_link`\|`file`) | SessionPackageImportModal import failure |
+| `backup_failed` | `error_kind` (`export`\|`import`) | Settings backup export/import failure |
+| `ai_draft_requested` | `source` (`harness`\|`direct`) | `api/sessionDraft.ts` before harness request |
+| `ai_draft_generated` | `drill_count`, `total_distance`, `source` (`harness`\|`direct`) | `api/sessionDraft.ts` on actionable draft result |
+| `ai_draft_accepted` | `drill_count` | AiSessionDraft save/apply success |
+| `ai_draft_rejected` | — | AiSessionDraft discard |
+| `ai_draft_failed` | `error_kind` | `api/sessionDraft.ts` on non-draft/failure outcome |
+| `session_paused` | — | LiveSessionHeader pause toggle |
+| `session_resumed` | — | LiveSessionHeader resume toggle (elapsed > 0) |
+| `view_exited` | `screen` (`swimmers`\|`swimmer_profile`\|`sessions`\|`session_template`\|`drill_bank`\|`dashboard`\|`runs_history`), `dwell_ms` | Page unmount/cleanup for tracked screens |
+| `app_settings` | `action` (13 closed-set values), plus action-specific extras | Settings page + AccountSection |
+
+Notes:
+- `signed_in`/`signed_out` replaced the previous `app_settings` `sign_in`/`sign_out` actions.
+- `Events.SessionOpenedViaShare` exists in the registry but is not wired because there is no share-link deep-link entry point yet.
+- `Events.AccountCreated` and `Events.TimingModeSelected` were not added: the app has no distinct sign-up flow or manual/automatic timing-mode selection control.
 
 Future upgrade candidates (not yet implemented): swimmers-with-session counts over
-7/30/60-day windows, timing-mode breakdowns, per-swimmer activity.
+7/30/60-day windows, timing-mode breakdowns, per-swimmer activity, owner usage rollup view.
 
 ## Related
 - Design system: `docs/context/UI-Design-System-Context.md`
