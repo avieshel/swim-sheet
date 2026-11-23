@@ -10,6 +10,7 @@ import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { Icon } from '../components/Icon'
 import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useI18n } from '../i18n'
 
 export const DrillBank: React.FC = () => {
@@ -70,13 +71,7 @@ export const DrillBank: React.FC = () => {
 
   const loadDrills = async () => applyDrills(await loadDrillsData())
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('drill_bank', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('drill_bank', dwellMs))
 
   useEffect(() => {
     let cancelled = false

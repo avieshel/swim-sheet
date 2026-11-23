@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listSwimmers, createSwimmerIfNotExists, updateSwimmer, deleteSwimmer } from '../api/swimmers'
 import { getRunHistory } from '../api/runs'
@@ -7,6 +7,7 @@ import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 
@@ -65,13 +66,7 @@ export const SwimmersList: React.FC = () => {
     return () => clearTimeout(timer)
   }, [search, filteredSwimmers.length])
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('swimmers', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('swimmers', dwellMs))
 
   const loadSwimmerData = async (): Promise<Swimmer[]> => {
     return listSwimmers()

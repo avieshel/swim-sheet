@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { DrillEditorModal, type DrillFormData } from '../components/DrillEditorModal'
@@ -14,6 +14,7 @@ import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrill
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 
@@ -92,13 +93,7 @@ export const SessionDetail: React.FC = () => {
     setLibraryDrills(lib)
   }
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('session_template', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('session_template', dwellMs))
 
   useEffect(() => {
     let cancelled = false

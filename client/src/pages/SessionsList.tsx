@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { listSessions, createSession, deleteSession, countCompletedRunsForSession } from '../api/sessions'
@@ -14,6 +14,7 @@ import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
 import { SessionPackageImportModal } from '../components/SessionPackageImportModal'
 import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 import type { Stroke } from '../types/swimming'
@@ -99,13 +100,7 @@ export const SessionsList: React.FC = () => {
     setRecentRuns(history)
   }, [loadRecentRuns, loadSessionData])
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('sessions', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('sessions', dwellMs))
 
   useEffect(() => {
     let cancelled = false

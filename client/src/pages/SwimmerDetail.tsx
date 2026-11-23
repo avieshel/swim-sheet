@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getSwimmer, updateSwimmer, deleteSwimmer, deleteSwimmerWithData, exportSwimmerData } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
@@ -7,6 +7,7 @@ import { RunHistoryTable } from '../components/Table'
 import { downloadBlob } from '../utils/downloadBlob'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useI18n } from '../i18n'
 
 export const SwimmerDetail: React.FC = () => {
@@ -30,13 +31,7 @@ export const SwimmerDetail: React.FC = () => {
     return () => { document.body.style.overflow = '' }
   }, [showDeleteConfirm, showEditModal])
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('swimmer_profile', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('swimmer_profile', dwellMs))
 
   useEffect(() => {
     const load = async () => {

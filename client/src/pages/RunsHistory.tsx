@@ -8,6 +8,7 @@ import type { Swimmer } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n'
 import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
 
@@ -51,13 +52,7 @@ export const RunsHistory: React.FC = () => {
     return () => { cancelled = true }
   }, [initialSwimmer])
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('runs_history', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('runs_history', dwellMs))
 
   useEffect(() => {
     let cancelled = false

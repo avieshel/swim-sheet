@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { listSwimmers } from '../api/swimmers'
 import { listSessions, listCompletedRuns } from '../api/sessions'
 import { getRunDrill, getAllLaps } from '../api/runs'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useI18n } from '../i18n'
 
 export const CoachDashboard: React.FC = () => {
@@ -18,13 +19,7 @@ export const CoachDashboard: React.FC = () => {
   })
   const [loading, setLoading] = useState(true)
 
-  const mountedAtRef = useRef(0)
-  useEffect(() => {
-    mountedAtRef.current = Date.now()
-    return () => {
-      analytics.track(Events.ViewExited('dashboard', Date.now() - mountedAtRef.current))
-    }
-  }, [])
+  useTrackDwell((dwellMs) => Events.ViewExited('dashboard', dwellMs))
 
   useEffect(() => {
     const load = async () => {
