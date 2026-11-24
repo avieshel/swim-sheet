@@ -7,6 +7,8 @@ import { SwimmerFormModal } from '../components/SwimmerFormModal'
 import type { Swimmer, RunSummary } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
+import { useTrackSearch } from '../hooks/useTrackSearch'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 
@@ -55,6 +57,10 @@ export const SwimmersList: React.FC = () => {
       (s.group && s.group.toLowerCase().includes(q))
     )
   }, [swimmers, search])
+
+  useTrackSearch('swimmers', search.trim(), filteredSwimmers.length)
+
+  useTrackDwell((dwellMs) => Events.ViewExited('swimmers', dwellMs))
 
   const loadSwimmerData = async (): Promise<Swimmer[]> => {
     return listSwimmers()

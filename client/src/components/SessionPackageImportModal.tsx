@@ -3,6 +3,7 @@ import { importSessionPackage, inspectSessionPackage } from '../api/sessionPacka
 import { SessionModalShell } from './session/SessionModalShell'
 import { getDrillTotalDistance } from '../utils/drillHelpers'
 import { readSessionPackageFile } from '../utils/sessionPackageFile'
+import { Events, analytics } from '../services/analyticsEvents'
 import { useI18n } from '../i18n'
 import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
 
@@ -70,9 +71,13 @@ export function SessionPackageImportModal({
         setSuggestedName(result.suggestedName)
         return
       }
+      analytics.track(
+        Events.SessionPackageImported(sessionPackage.drills.length, 'file')
+      )
       setCreatedSessionId(result.sessionId)
       onImported(result.sessionId)
     } catch {
+      analytics.track(Events.PackageImportFailed('import_error', 'file'))
       setError(t('sessions.import.importError'))
     } finally {
       setBusy(false)

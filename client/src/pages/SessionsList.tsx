@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { listSessions, createSession, deleteSession, countCompletedRunsForSession } from '../api/sessions'
@@ -14,6 +14,8 @@ import { Icon } from '../components/Icon'
 import { SessionCard } from '../components/SessionCard'
 import { SessionPackageImportModal } from '../components/SessionPackageImportModal'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
+import { useTrackSearch } from '../hooks/useTrackSearch'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 import type { Stroke } from '../types/swimming'
@@ -99,6 +101,8 @@ export const SessionsList: React.FC = () => {
     setRecentRuns(history)
   }, [loadRecentRuns, loadSessionData])
 
+  useTrackDwell((dwellMs) => Events.ViewExited('sessions', dwellMs))
+
   useEffect(() => {
     let cancelled = false
     Promise.all([loadSessionData(), loadRecentRuns()])
@@ -135,7 +139,9 @@ export const SessionsList: React.FC = () => {
     try {
       const sessionPackage = await exportSessionPackage(id)
       downloadSessionPackageFile(sessionPackage, name)
+      analytics.track(Events.SessionPackageShared(sessionPackage.drills.length, 'template'))
     } catch {
+      analytics.track(Events.ShareFailed('export_error'))
       setExportError(t('sessions.templates.exportError'))
     }
   }
@@ -229,6 +235,9 @@ export const SessionsList: React.FC = () => {
     if (showAllRecent || recentSearch.trim()) return filteredRecent
     return filteredRecent.slice(0, 6)
   }, [filteredRecent, showAllRecent, recentSearch])
+
+  useTrackSearch('sessions', templateSearch.trim(), filteredTemplates.length)
+  useTrackSearch('runs', recentSearch.trim(), filteredRecent.length)
 
   if (loading) return (
     <div>

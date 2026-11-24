@@ -7,6 +7,7 @@ import { RunHistoryTable } from '../components/Table'
 import { downloadBlob } from '../utils/downloadBlob'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useI18n } from '../i18n'
 
 export const SwimmerDetail: React.FC = () => {
@@ -29,6 +30,8 @@ export const SwimmerDetail: React.FC = () => {
     }
     return () => { document.body.style.overflow = '' }
   }, [showDeleteConfirm, showEditModal])
+
+  useTrackDwell((dwellMs) => Events.ViewExited('swimmer_profile', dwellMs))
 
   useEffect(() => {
     const load = async () => {

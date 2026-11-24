@@ -14,6 +14,7 @@ import { aggregateByStroke, detectFocus, getDrillTotalDistance, findSimilarDrill
 import { useStartLiveSession } from '../hooks/useStartLiveSession'
 import { useActiveRun } from '../hooks/useActiveRun'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useCoachAssist } from '../context/coachAssistShared'
 import { useI18n } from '../i18n'
 
@@ -91,6 +92,8 @@ export const SessionDetail: React.FC = () => {
     if (isCancelled?.()) return
     setLibraryDrills(lib)
   }
+
+  useTrackDwell((dwellMs) => Events.ViewExited('session_template', dwellMs))
 
   useEffect(() => {
     let cancelled = false

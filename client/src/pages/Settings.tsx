@@ -236,6 +236,7 @@ export const Settings: React.FC = () => {
       analytics.track(Events.AppSettings('backup_exported', { bytes: blob.size }))
     } catch (err) {
       setBackupMsg('Export failed: ' + (err instanceof Error ? err.message : String(err)))
+      analytics.track(Events.BackupFailed('export'))
     } finally {
       setExporting(false)
     }
@@ -262,6 +263,7 @@ export const Settings: React.FC = () => {
     } catch (err) {
       setImporting(false)
       setBackupMsg('Import failed: ' + (err instanceof Error ? err.message : 'invalid backup file'))
+      analytics.track(Events.BackupFailed('import'))
       setShowImportConfirm(false)
     }
   }

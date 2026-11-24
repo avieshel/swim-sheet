@@ -12,6 +12,7 @@ import {
   type PreparedSessionDraft,
   type SessionDraftResult,
 } from '../api/sessionDraft'
+import { Events, analytics } from '../services/analyticsEvents'
 import { useI18n } from '../i18n'
 import type { SessionDraftV1 } from '../../../shared/sessionDraft/types'
 
@@ -168,6 +169,7 @@ export const AiSessionDraft: React.FC = () => {
       // and returns to the sessions list, exactly like a manually built session.
       const applied = await applySessionDraft(draft, { libraryDrillMap: prepared?.libraryDrillMap ?? {} })
       if (applied.outcome === 'created') {
+        analytics.track(Events.AiDraftAccepted(draft.drills.length))
         navigate('/sessions')
         return
       }
@@ -327,7 +329,10 @@ export const AiSessionDraft: React.FC = () => {
               draft={draft}
               onChange={setDraft}
               onSave={handleSaveSession}
-              onDiscard={() => setDraft(null)}
+              onDiscard={() => {
+                analytics.track(Events.AiDraftRejected())
+                setDraft(null)
+              }}
               saving={loading}
             />
           ) : loading && streamingText.length > 0 ? (

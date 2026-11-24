@@ -10,6 +10,8 @@ import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { Icon } from '../components/Icon'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
+import { useTrackSearch } from '../hooks/useTrackSearch'
 import { useI18n } from '../i18n'
 
 export const DrillBank: React.FC = () => {
@@ -69,6 +71,8 @@ export const DrillBank: React.FC = () => {
   }
 
   const loadDrills = async () => applyDrills(await loadDrillsData())
+
+  useTrackDwell((dwellMs) => Events.ViewExited('drill_bank', dwellMs))
 
   useEffect(() => {
     let cancelled = false
@@ -176,6 +180,8 @@ export const DrillBank: React.FC = () => {
     }
     return a.name.localeCompare(b.name)
   })
+
+  useTrackSearch('drills', filter.trim(), filteredDrills.length)
 
   if (loading) return (
     <div className="max-w-5xl mx-auto">

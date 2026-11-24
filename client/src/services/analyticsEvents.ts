@@ -10,6 +10,14 @@ export type SwimmerManageSource = 'roster' | 'profile'
 export type DrillSource = 'library' | 'session'
 export type DrillAddedSource = 'drill_bank' | 'session_detail'
 export type RunFilter = 'all' | 'swimmer'
+export type ScreenName =
+  | 'swimmers'
+  | 'swimmer_profile'
+  | 'sessions'
+  | 'session_template'
+  | 'drill_bank'
+  | 'dashboard'
+  | 'runs_history'
 
 interface SessionCompletionStats {
   swimmerCount: number
@@ -24,6 +32,8 @@ interface StartDrillStats {
   drillCount: number
   totalDistance: number
 }
+
+export const ANALYTICS_SEARCH_DEBOUNCE_MS = 800
 
 export const Events = {
   AppOpened: (): TrackedEvent => ({
@@ -75,6 +85,72 @@ export const Events = {
   ViewRunsHistory: (runCount: number, swimmerFilter: RunFilter): TrackedEvent => ({
     name: 'view_runs_history',
     properties: { run_count: runCount, swimmer_filter: swimmerFilter },
+  }),
+  SearchPerformed: (
+    scope: 'swimmers' | 'sessions' | 'drills' | 'runs',
+    resultCount: number
+  ): TrackedEvent => ({
+    name: 'search_performed',
+    properties: { scope, result_count: resultCount },
+  }),
+  ViewExited: (screen: ScreenName, dwellMs: number): TrackedEvent => ({
+    name: 'view_exited',
+    properties: { screen, dwell_ms: Math.max(0, Math.round(dwellMs)) },
+  }),
+  SessionPackageShared: (
+    drillCount: number,
+    source: 'template' | 'run'
+  ): TrackedEvent => ({
+    name: 'session_package_shared',
+    properties: { drill_count: drillCount, source },
+  }),
+  SessionPackageImported: (
+    drillCount: number,
+    source: 'share_link' | 'file'
+  ): TrackedEvent => ({
+    name: 'session_package_imported',
+    properties: { drill_count: drillCount, source },
+  }),
+  SessionOpenedViaShare: (): TrackedEvent => ({
+    name: 'session_opened_via_share',
+  }),
+  ShareFailed: (errorKind: string): TrackedEvent => ({
+    name: 'share_failed',
+    properties: { error_kind: errorKind },
+  }),
+  PackageImportFailed: (
+    errorKind: string,
+    source: 'share_link' | 'file'
+  ): TrackedEvent => ({
+    name: 'package_import_failed',
+    properties: { error_kind: errorKind, source },
+  }),
+  BackupFailed: (errorKind: string): TrackedEvent => ({
+    name: 'backup_failed',
+    properties: { error_kind: errorKind },
+  }),
+  AiDraftRequested: (source: 'harness' | 'direct'): TrackedEvent => ({
+    name: 'ai_draft_requested',
+    properties: { source },
+  }),
+  AiDraftGenerated: (
+    drillCount: number,
+    totalDistance: number,
+    source: 'harness' | 'direct'
+  ): TrackedEvent => ({
+    name: 'ai_draft_generated',
+    properties: { drill_count: drillCount, total_distance: totalDistance, source },
+  }),
+  AiDraftAccepted: (drillCount: number): TrackedEvent => ({
+    name: 'ai_draft_accepted',
+    properties: { drill_count: drillCount },
+  }),
+  AiDraftRejected: (): TrackedEvent => ({
+    name: 'ai_draft_rejected',
+  }),
+  AiDraftFailed: (errorKind: string): TrackedEvent => ({
+    name: 'ai_draft_failed',
+    properties: { error_kind: errorKind },
   }),
   SwimmerCreated: (source: SwimmerSource, swimmerCount: number): TrackedEvent => ({
     name: 'swimmer_created',
@@ -145,6 +221,12 @@ export const Events = {
   SessionReset: (clearSwimmers: boolean): TrackedEvent => ({
     name: 'session_reset',
     properties: { clear_swimmers: clearSwimmers },
+  }),
+  SessionPaused: (): TrackedEvent => ({
+    name: 'session_paused',
+  }),
+  SessionResumed: (): TrackedEvent => ({
+    name: 'session_resumed',
   }),
   DrillCreated: (source: DrillSource, stroke: Stroke | '', distance: number): TrackedEvent => ({
     name: 'drill_created',
@@ -227,10 +309,26 @@ export const Events = {
     name: 'plan_updated_by_other',
     properties: { table: stats.table, row_id: stats.id, editor_id: stats.editorId },
   }),
+  SignedIn: (method: 'google' | 'email' | 'test' | 'apple'): TrackedEvent => ({
+    name: 'signed_in',
+    properties: { method },
+  }),
+  SignedOut: (): TrackedEvent => ({
+    name: 'signed_out',
+  }),
+  AppBackgrounded: (foregroundMs: number): TrackedEvent => ({
+    name: 'app_backgrounded',
+    properties: { foreground_ms: Math.max(0, Math.round(foregroundMs)) },
+  }),
+  AppForegrounded: (lastBackgroundMs: number | null): TrackedEvent => ({
+    name: 'app_foregrounded',
+    properties: {
+      last_background_ms:
+        lastBackgroundMs === null ? null : Math.max(0, Math.round(lastBackgroundMs)),
+    },
+  }),
   AppSettings: (
     action:
-      | 'sign_in'
-      | 'sign_out'
       | 'sync'
       | 'clear_data'
       | 'set_equipment'

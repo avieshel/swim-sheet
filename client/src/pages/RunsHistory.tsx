@@ -8,6 +8,8 @@ import type { Swimmer } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n'
 import { Events, analytics } from '../services/analyticsEvents'
+import { useTrackDwell } from '../hooks/useTrackDwell'
+import { useTrackSearch } from '../hooks/useTrackSearch'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
 
@@ -51,6 +53,8 @@ export const RunsHistory: React.FC = () => {
     return () => { cancelled = true }
   }, [initialSwimmer])
 
+  useTrackDwell((dwellMs) => Events.ViewExited('runs_history', dwellMs))
+
   useEffect(() => {
     let cancelled = false
     getRunHistory(selected || undefined)
@@ -81,6 +85,10 @@ export const RunsHistory: React.FC = () => {
       return true
     })
   }, [runs, fromDate, toDate])
+
+  const runFilterSignature =
+    selected === '' && fromDate === '' && toDate === '' ? '' : `${selected}|${fromDate}|${toDate}`
+  useTrackSearch('runs', runFilterSignature, filteredRuns?.length ?? null)
 
   const handleSwimmerChange = (value: string) => {
     setSelected(value)
