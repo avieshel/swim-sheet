@@ -307,6 +307,7 @@ export interface LiveSessionContextValue {
   dispatch: Dispatch<LiveSessionAction | TimerAction>
   store: LiveTimingStore
   sessionElapsed: number
+  getSessionElapsed: () => number
   sessionRunning: boolean
   groups: TimedGroup[]
 }
@@ -316,6 +317,7 @@ export const LiveSessionContext = createContext<LiveSessionContextValue>({
   dispatch: () => null,
   store: createLiveTimingStore(),
   sessionElapsed: 0,
+  getSessionElapsed: () => 0,
   sessionRunning: false,
   groups: [],
 })

@@ -59,7 +59,7 @@ function EmptyState({ icon, title, actionLabel, actionIcon, compact, onAction }:
 export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete: () => void }) {
   const navigate = useNavigate()
   const { t } = useI18n()
-  const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
+  const { dispatch, store, sessionElapsed, getSessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
   const [runDrills, setRunDrills] = useState<RunDrill[]>([])
   const [laneDrillResults, setLaneDrillResults] = useState<LaneDrillResult[]>([])
   const [templateName, setTemplateName] = useState('')
@@ -177,7 +177,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     const notStarted = group.swimmers.filter(s => s.dbId && store.getSwimmerTiming(run.id, groupId, drillId, s.dbId).startedAt == null).length
     ensureSessionRunning()
     analytics.track(Events.SwimmerStarted(group.lane, notStarted))
-    store.markSwimmerStart(run.id, groupId, drillId, swimmer.dbId, sessionElapsed)
+    store.markSwimmerStart(run.id, groupId, drillId, swimmer.dbId, getSessionElapsed())
   }
 
   const handleSwimmerLap = (groupId: string, swimmerId: number) => {
@@ -188,7 +188,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     const drillId = group.currentRunDrillId
     if (!drillId) return
     analytics.track(Events.LapRecorded(group.lane, 1))
-    store.markSwimmerLap(run.id, groupId, drillId, swimmer.dbId, sessionElapsed)
+    store.markSwimmerLap(run.id, groupId, drillId, swimmer.dbId, getSessionElapsed())
   }
 
   const handleSwimmerComplete = (groupId: string, swimmerId: number) => {
@@ -199,12 +199,12 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
     const drillId = group.currentRunDrillId
     if (!drillId) return
     analytics.track(Events.SwimmerCompleted(group.lane, 1))
-    store.markSwimmerDone(run.id, groupId, drillId, swimmer.dbId, sessionElapsed)
+    store.markSwimmerDone(run.id, groupId, drillId, swimmer.dbId, getSessionElapsed())
     dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId, swimmerId } })
     const otherActive = group.swimmers.filter(s => s.id !== swimmerId && !s.completed)
     if (otherActive.length === 0) {
       const remaining = group.swimmers.filter(s => s.dbId).map(s => s.dbId!)
-      store.batchStopSwimmers(run.id, groupId, drillId, remaining, sessionElapsed)
+      store.batchStopSwimmers(run.id, groupId, drillId, remaining, getSessionElapsed())
     }
     // The lane's drill is "complete" (and its check shows in the overview) once
     // every swimmer in the lane is accounted for on THIS drill — a live finish
@@ -343,7 +343,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       lapCount: lapsToSave.length,
       drillCount: runDrills.length,
       totalDistance,
-      durationMs: sessionElapsed,
+      durationMs: getSessionElapsed(),
       isQuickStart: isQuickStart(run),
     }))
     dispatch({ type: 'CLEAR' })
@@ -425,7 +425,7 @@ export function ActiveRunView({ run, onComplete }: { run: SessionRun; onComplete
       group.currentRunDrillId,
       store,
       sessionStartedAt,
-      sessionElapsed,
+      getSessionElapsed(),
       dispatch
     )
     setLaneDrillResults(refreshed)
