@@ -93,4 +93,16 @@ describe('LiveSessionProvider wall-clock timer', () => {
     })
     expect(result.current.sessionElapsed).toBeGreaterThanOrEqual(45000)
   })
+
+  it('returns current wall-clock elapsed on demand between refresh ticks', () => {
+    const { result } = renderHook(() => useLive(), { wrapper: LiveSessionProvider })
+    act(() => {
+      result.current.dispatch({ type: 'START_SESSION_TIMER' })
+    })
+    act(() => {
+      vi.setSystemTime(new Date('2026-11-23T10:00:00.120Z'))
+      vi.advanceTimersByTime(100)
+    })
+    expect(result.current.getSessionElapsed()).toBeGreaterThanOrEqual(120)
+  })
 })

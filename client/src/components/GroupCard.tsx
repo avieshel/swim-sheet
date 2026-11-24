@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
+import { useSmoothSessionElapsed } from '../hooks/useSmoothSessionElapsed'
 import type { LapEntry, SavedDrillData, SavedSwimmerData } from '../api/types'
 import { addSwimmerToRun } from '../api/runs'
 import type { RunDrill, LaneDrillResult, SwimmerDrillStatus } from '../api/runs'
@@ -355,7 +356,8 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
   hideDrillNav?: boolean;
 }) {
   const { t } = useI18n()
-  const { dispatch, store, sessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
+  const { dispatch, store, getSessionElapsed, sessionRunning, groups } = useContext(LiveSessionContext)
+  const sessionElapsed = useSmoothSessionElapsed()
   const liveGroup = groups.find(g => g.id === group.id) ?? group
 
   const ensureSessionRunning = () => {
@@ -481,7 +483,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
       .filter(s => s.dbId && started.has(s.dbId) && !s.completed)
       .map(s => s.dbId!)
     analytics.track(Events.SwimmerCompleted(liveGroup.lane, active.length))
-    store.batchStopSwimmers(runId, liveGroup.id, currentDrillId, active, sessionElapsed)
+    store.batchStopSwimmers(runId, liveGroup.id, currentDrillId, active, getSessionElapsed())
     for (const swimmer of liveGroup.swimmers) {
       if (!swimmer.completed) {
         dispatch({ type: 'SWIMMER_COMPLETE', payload: { groupId: liveGroup.id, swimmerId: swimmer.id } })
@@ -497,7 +499,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
       ensureSessionRunning()
       for (const swimmer of liveGroup.swimmers) {
         if (swimmer.dbId) {
-          store.markGroupStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, sessionElapsed)
+          store.markGroupStart(runId, liveGroup.id, liveGroup.currentRunDrillId, swimmer.dbId, getSessionElapsed())
         }
       }
       analytics.track(Events.SwimmerStarted(liveGroup.lane, liveGroup.swimmers.filter(s => s.dbId).length))
@@ -525,7 +527,7 @@ export function GroupCard({ group, runDrills, laneDrillResults, onAddSwimmer, on
       .filter(s => s.dbId && !s.completed)
       .map(s => s.dbId!)
     analytics.track(Events.LapRecorded(liveGroup.lane, active.length))
-    store.markGroupLap(runId, liveGroup.id, liveGroup.currentRunDrillId, active, sessionElapsed)
+    store.markGroupLap(runId, liveGroup.id, liveGroup.currentRunDrillId, active, getSessionElapsed())
   }
 
   const selectDrill = (runDrillId: string) => dispatch({ type: 'SET_GROUP_DRILL', payload: { groupId: liveGroup.id, runDrillId } })

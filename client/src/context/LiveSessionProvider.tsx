@@ -108,7 +108,7 @@ export const LiveSessionProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [syncElapsed])
 
   return (
-    <LiveSessionContext.Provider value={{ state, dispatch: wrappedDispatch, store, sessionElapsed, sessionRunning, groups: state.groups }}>
+    <LiveSessionContext.Provider value={{ state, dispatch: wrappedDispatch, store, sessionElapsed, getSessionElapsed: computeElapsed, sessionRunning, groups: state.groups }}>
       {children}
     </LiveSessionContext.Provider>
   )

@@ -85,7 +85,7 @@ function renderRow(props: Record<string, unknown>) {
   return render(
     React.createElement(
       LiveSessionContext.Provider,
-      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0 } },
+      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0, getSessionElapsed: () => 0 } },
       React.createElement(ActiveSwimmerRow, props as never),
     ),
   )
@@ -95,7 +95,7 @@ function renderSaved(props: Record<string, unknown>) {
   return render(
     React.createElement(
       LiveSessionContext.Provider,
-      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0 } },
+      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0, getSessionElapsed: () => 0 } },
       React.createElement(SavedSwimmerRow, props as never),
     ),
   )

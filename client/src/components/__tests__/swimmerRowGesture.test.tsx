@@ -62,7 +62,7 @@ function renderCard() {
   return render(
     React.createElement(
       LiveSessionContext.Provider,
-      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0, groups: [group] } },
+      { value: { dispatch: mockDispatch, store: mockStore, sessionElapsed: 0, getSessionElapsed: () => 0, groups: [group] } },
       React.createElement(SwimmerBreakoutCard, baseProps as never),
     ),
   )

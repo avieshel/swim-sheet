@@ -1,5 +1,6 @@
 import React, { useContext, useMemo, useRef, useState } from 'react'
 import { LiveSessionContext, type TimedGroup } from '../context/LiveSessionContext'
+import { useSmoothSessionElapsed } from '../hooks/useSmoothSessionElapsed'
 import { timestampSplits, removeLapEntry, updateStrokeCount } from '../utils/lapEditing'
 import { K } from '../timing/timestampStore'
 import { formatTime } from '../utils/formatTime'
@@ -389,8 +390,16 @@ interface ActiveSwimmerRowProps {
 
 export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, group, idx, runId, drillId, onStart, onLap, onComplete, onClear, onSkip, onMarkDone, handleMoveSwimmer, rosterSwimmers, onSwimmerSaved, currentGroupId, findExistingAllocation, onRemoveFromFocus, savedStatus }: ActiveSwimmerRowProps) {
   const { t } = useI18n()
-  const { dispatch, store, sessionElapsed } = useContext(LiveSessionContext)
+  const { dispatch, store } = useContext(LiveSessionContext)
   const storeVersion = store.version
+  const startedAt = useMemo(() =>
+    (runId && drillId && swimmer.dbId)
+      ? store.getSwimmerTiming(runId, group.id, drillId, swimmer.dbId).startedAt
+      : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [runId, group.id, drillId, swimmer.dbId, storeVersion]
+  )
+  const sessionElapsed = useSmoothSessionElapsed(startedAt != null && !swimmer.completed && savedStatus !== 'skipped')
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const longPress = useLongPressMenu()
@@ -432,14 +441,6 @@ export const ActiveSwimmerRow = React.memo(function ActiveSwimmerRow({ swimmer, 
   const handleDragEnd = () => {
     setIsDragging(false)
   }
-
-  const startedAt = useMemo(() =>
-    (runId && drillId && swimmer.dbId)
-      ? store.getSwimmerTiming(runId, group.id, drillId, swimmer.dbId).startedAt
-      : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [runId, group.id, drillId, swimmer.dbId, storeVersion]
-  )
 
   const displayTime = useMemo(() => {
     if (swimmer.completed && startedAt != null) {

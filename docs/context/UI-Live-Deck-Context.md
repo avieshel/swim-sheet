@@ -147,7 +147,7 @@ panel adds Start–Pause toggle, Lane Editor (pencil icon), Reset, and Complete 
 gated). Group cards in responsive grid (1–4 columns). Each group:
 name (pencil opens LaneEditorModal for name editing, swimmer management, lane reset),
 lane number, drill timer display, drill selector — no inline editing on the card. No
-per-lane timers — a single global session clock is derived from wall-clock time (`Date.now()`), refreshed on a coarse UI interval and on visibility/focus resume; no fixed-delta tick accumulation. `TimestampStore` is wrapped by a `LiveTimingStore`
+per-lane timers — a single global session clock is derived from wall-clock time (`Date.now()`); `sessionElapsed` state refreshes on a coarse UI interval and on visibility/focus resume, while centisecond timer displays read wall-clock elapsed on `requestAnimationFrame` for smooth rendering (`useSmoothSessionElapsed`). No fixed-delta tick accumulation. `TimestampStore` is wrapped by a `LiveTimingStore`
 (`timing/liveTiming.ts`) speaking drill/swimmer semantics (capture: markSwimmerStart/
 Lap/Done, markGroupStart/Lap, batchStopSwimmers; query: getSwimmerTiming, getDrillTiming).
 
