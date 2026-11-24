@@ -713,5 +713,17 @@
   "aiDraft.emptyMessage": "צור טיוטה מהתיאור שלך והיא תופיע כאן, מוכנה לכיוונון לפני שיישמר משהו.",
   "aiDraft.regenerateTitle": "ליצור טיוטה מחדש?",
   "aiDraft.regenerateMessage": "יצירה מחדש תחליף את ההצעה שעל המסך בטיוטה חדשה.",
-  "aiDraft.regenerate": "צור מחדש"
+  "aiDraft.regenerate": "צור מחדש",
+  "usage.title": "שימוש",
+  "usage.description": "אירועי אנליטיקה מצטברים עבור החשבון שלך.",
+  "usage.window7": "7 ימים",
+  "usage.window30": "30 ימים",
+  "usage.loading": "טוען נתוני שימוש…",
+  "usage.error": "לא ניתן לטעון נתוני שימוש.",
+  "usage.signInRequired": "התחבר כדי לצפות באנליטיקת שימוש.",
+  "usage.empty": "אין אירועי אנליטיקה בחלון זה.",
+  "usage.totalEvents": "סה״כ אירועים: {count}",
+  "usage.colEvent": "אירוע",
+  "usage.colDay": "יום",
+  "usage.colCount": "כמות"
 }

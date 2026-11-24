@@ -17,6 +17,7 @@ import { DrillBank } from './pages/DrillBank'
 import { CoachDashboard } from './pages/CoachDashboard'
 import { LiveDeck } from './pages/LiveDeck'
 import { Settings } from './pages/Settings'
+import { Usage } from './pages/Usage'
 import { RunsHistory } from './pages/RunsHistory'
 import { RunDetail } from './pages/RunDetail'
 import { Events, analytics, isNewSession } from './services/analyticsEvents'
@@ -82,6 +83,7 @@ function App() {
           {/* <Route path="/drills/:id" element={<DrillDetail />} /> */}
           <Route path="/live" element={<LiveDeck />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/usage" element={<Usage />} />
           <Route path="/runs" element={<RunsHistory />} />
           <Route path="/runs/:id" element={<RunDetail />} />
           <Route path="*" element={<Navigate to="/" replace />} />
