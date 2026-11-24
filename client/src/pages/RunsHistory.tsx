@@ -7,8 +7,9 @@ import { listSwimmers } from '../api/swimmers'
 import type { Swimmer } from '../api/runs'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../i18n'
-import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
+import { Events, analytics } from '../services/analyticsEvents'
 import { useTrackDwell } from '../hooks/useTrackDwell'
+import { useTrackSearch } from '../hooks/useTrackSearch'
 
 const fieldClass = 'w-full bg-surface text-on-surface px-4 py-3 rounded-xl border border-outline-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all'
 
@@ -85,21 +86,9 @@ export const RunsHistory: React.FC = () => {
     })
   }, [runs, fromDate, toDate])
 
-  const lastTrackedRunFilterRef = useRef('')
-  useEffect(() => {
-    const signature = `${selected}|${fromDate}|${toDate}`
-    if (selected === '' && fromDate === '' && toDate === '') {
-      lastTrackedRunFilterRef.current = ''
-      return
-    }
-    if (filteredRuns == null) return
-    if (signature === lastTrackedRunFilterRef.current) return
-    const timer = setTimeout(() => {
-      lastTrackedRunFilterRef.current = signature
-      analytics.track(Events.SearchPerformed('runs', filteredRuns.length))
-    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [selected, fromDate, toDate, filteredRuns?.length])
+  const runFilterSignature =
+    selected === '' && fromDate === '' && toDate === '' ? '' : `${selected}|${fromDate}|${toDate}`
+  useTrackSearch('runs', runFilterSignature, filteredRuns?.length ?? null)
 
   const handleSwimmerChange = (value: string) => {
     setSelected(value)

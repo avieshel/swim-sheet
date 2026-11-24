@@ -9,8 +9,9 @@ import type { Session } from '../api/sessions'
 import { strokeColors } from '../constants/drill'
 import { getDrillTotalDistance, findSimilarDrills, emptyDrillForm, type SimilarDrill } from '../utils/drillHelpers'
 import { Icon } from '../components/Icon'
-import { ANALYTICS_SEARCH_DEBOUNCE_MS, Events, analytics } from '../services/analyticsEvents'
+import { Events, analytics } from '../services/analyticsEvents'
 import { useTrackDwell } from '../hooks/useTrackDwell'
+import { useTrackSearch } from '../hooks/useTrackSearch'
 import { useI18n } from '../i18n'
 
 export const DrillBank: React.FC = () => {
@@ -180,20 +181,7 @@ export const DrillBank: React.FC = () => {
     return a.name.localeCompare(b.name)
   })
 
-  const lastTrackedFilterRef = useRef('')
-  useEffect(() => {
-    const query = filter.trim()
-    if (!query) {
-      lastTrackedFilterRef.current = ''
-      return
-    }
-    if (query === lastTrackedFilterRef.current) return
-    const timer = setTimeout(() => {
-      lastTrackedFilterRef.current = query
-      analytics.track(Events.SearchPerformed('drills', filteredDrills.length))
-    }, ANALYTICS_SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [filter, filteredDrills.length])
+  useTrackSearch('drills', filter.trim(), filteredDrills.length)
 
   if (loading) return (
     <div className="max-w-5xl mx-auto">
