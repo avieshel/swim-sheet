@@ -362,6 +362,7 @@ describe('analyticsService', () => {
     expect(dl).toHaveLength(1)
     expect(dl[0].event.event_name).toBe('view_swimmers')
     expect(dl[0].error_code).toBe('MAX_RETRIES_EXCEEDED')
+    expect(dl[0].count).toBe(1)
   })
 
   it('drops a batch to dead-letter on 4xx without retrying and continues flushing', async () => {
@@ -393,8 +394,17 @@ describe('analyticsService', () => {
     expect(queued()).toHaveLength(0)
 
     const dl = deadLetter()
-    expect(dl.length).toBeGreaterThanOrEqual(20)
-    expect(dl[dl.length - 1].error_code).toMatch(/^HTTP_4XX:PGRST102$/)
+    expect(dl).toHaveLength(1)
+    expect(dl[0].error_code).toBe('HTTP_4XX:PGRST102')
+    expect(dl[0].count).toBe(50)
+    expect(dl[0].event.event_name).toBe('bad-0')
+
+    const stats = analytics.getStats()
+    expect(stats.deadLetterDrops).toBe(50)
+    expect(stats.deadLetterCount).toBe(50)
+    expect(stats.lastDropReason).toBe('HTTP_4XX:PGRST102')
+    expect(stats.lastFlushErrorCode).toBeNull()
+    expect(stats.lastFlushSuccessAt).toEqual(expect.any(Number))
   })
 
   it('keeps retrying on network errors', async () => {
@@ -478,5 +488,177 @@ describe('analyticsService', () => {
     expect(ids).toHaveLength(2)
     expect(isUuid(ids[0])).toBe(true)
     expect(ids[1]).toBe(ids[0])
+  })
+
+  it('retries 429 responses with backoff instead of dead-lettering', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers(),
+      json: async () => ({ code: 'PGRST429', message: 'rate limited' }),
+    })
+    fetchMock.mockResolvedValueOnce(okResponse())
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(queued()).toHaveLength(1)
+    expect(deadLetter()).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(30000)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(0)
+    expect(deadLetter()).toHaveLength(0)
+  })
+
+  it('honors Retry-After seconds header on 429', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': '5' }),
+      json: async () => ({ code: 'PGRST429', message: 'rate limited' }),
+    })
+    fetchMock.mockResolvedValueOnce(okResponse())
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(queued()).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(0)
+  })
+
+  it('honors Retry-After HTTP-date header on 429', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-23T10:00:00Z'))
+    const retryAfter = new Date(Date.now() + 5000).toUTCString()
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'Retry-After': retryAfter }),
+      json: async () => ({ code: 'PGRST429', message: 'rate limited' }),
+    })
+    fetchMock.mockResolvedValueOnce(okResponse())
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(queued()).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(4999)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(queued()).toHaveLength(0)
+  })
+
+  it('drops queue to dead-letter with explicit reason after persistent 429 retries', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: new Headers(),
+      json: async () => ({ code: 'PGRST429', message: 'rate limited' }),
+    })
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(queued()).toHaveLength(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(60000)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+    await vi.advanceTimersByTimeAsync(120000)
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+
+    expect(queued()).toHaveLength(0)
+    const dl = deadLetter()
+    expect(dl).toHaveLength(1)
+    expect(dl[0].error_code).toBe('MAX_RETRIES_EXCEEDED:429')
+    expect(dl[0].count).toBe(1)
+  })
+
+  it('records queue overflow drops in persisted health stats', async () => {
+    fetchMock.mockResolvedValue(errResponse(500, 'XX000'))
+    const seeded = Array.from({ length: 500 }, (_, i) => ({
+      event_id: `seed-${i}`,
+      event_name: 'seed',
+      properties: {},
+      user_id: null,
+      session_id: 's',
+      app_version: 'dev',
+      platform: 'pwa',
+    }))
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(seeded))
+
+    analytics.track({ name: 'view_swimmers' })
+    await drain()
+
+    const stats = analytics.getStats()
+    expect(stats.queueOverflowDrops).toBe(1)
+    expect(stats.lastDropReason).toBe('QUEUE_OVERFLOW')
+    expect(stats.lastDropAt).toEqual(expect.any(Number))
+    expect(stats.deadLetterCount).toBe(0)
+  })
+
+  it('persists health stats across reload simulation', async () => {
+    fetchMock.mockResolvedValue(errResponse(500, 'XX000'))
+    const seeded = Array.from({ length: 500 }, (_, i) => ({
+      event_id: `seed-${i}`,
+      event_name: 'seed',
+      properties: {},
+      user_id: null,
+      session_id: 's',
+      app_version: 'dev',
+      platform: 'pwa',
+    }))
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(seeded))
+
+    analytics.track({ name: 'view_swimmers' })
+    await drain()
+
+    const reloaded = await freshAnalyticsService()
+    const stats = reloaded.getStats()
+    expect(stats.queueOverflowDrops).toBe(1)
+    expect(stats.lastDropReason).toBe('QUEUE_OVERFLOW')
+  })
+
+  it('records dead-letter drops and flush success in health stats', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockResolvedValue(errResponse(500, 'XX000'))
+
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(60000)
+    await vi.advanceTimersByTimeAsync(120000)
+    await vi.advanceTimersByTimeAsync(120000)
+
+    const stats = analytics.getStats()
+    expect(stats.deadLetterDrops).toBe(1)
+    expect(stats.lastDropReason).toBe('MAX_RETRIES_EXCEEDED')
+    expect(stats.deadLetterCount).toBe(1)
+
+    fetchMock.mockResolvedValue(okResponse())
+    analytics.track({ name: 'view_swimmers' })
+    await vi.advanceTimersByTimeAsync(0)
+
+    const afterSuccess = analytics.getStats()
+    expect(afterSuccess.lastFlushSuccessAt).toEqual(expect.any(Number))
   })
 })

@@ -6,6 +6,7 @@ import { v7 as uuidv7 } from 'uuid'
 const DEVICE_ID_KEY = 'swimsheet_device_id'
 const ANALYTICS_QUEUE_KEY = 'swimsheet_analytics_queue'
 const DEAD_LETTER_KEY = 'swimsheet_analytics_dead_letter'
+const HEALTH_KEY = 'swimsheet_analytics_health'
 const SESSION_ID_KEY = 'swimsheet_session_id'
 const SESSION_START_KEY = 'swimsheet_session_start'
 const SESSION_LAST_KEY = 'swimsheet_session_last'
@@ -45,6 +46,92 @@ interface DeadLetter {
   event: AnalyticsEvent
   error_code: string
   at: number
+  count?: number
+}
+
+interface AnalyticsHealth {
+  queueOverflowDrops: number
+  deadLetterDrops: number
+  lastDropAt: number | null
+  lastDropReason: string | null
+  lastFlushSuccessAt: number | null
+  lastFlushErrorCode: string | null
+}
+
+function defaultHealth(): AnalyticsHealth {
+  return {
+    queueOverflowDrops: 0,
+    deadLetterDrops: 0,
+    lastDropAt: null,
+    lastDropReason: null,
+    lastFlushSuccessAt: null,
+    lastFlushErrorCode: null,
+  }
+}
+
+function getHealth(): AnalyticsHealth {
+  try {
+    const raw = localStorage.getItem(HEALTH_KEY)
+    if (!raw) return defaultHealth()
+    const parsed = JSON.parse(raw) as Partial<AnalyticsHealth>
+    const base = defaultHealth()
+    return {
+      queueOverflowDrops: typeof parsed.queueOverflowDrops === 'number' ? parsed.queueOverflowDrops : base.queueOverflowDrops,
+      deadLetterDrops: typeof parsed.deadLetterDrops === 'number' ? parsed.deadLetterDrops : base.deadLetterDrops,
+      lastDropAt: typeof parsed.lastDropAt === 'number' ? parsed.lastDropAt : base.lastDropAt,
+      lastDropReason: typeof parsed.lastDropReason === 'string' ? parsed.lastDropReason : base.lastDropReason,
+      lastFlushSuccessAt: typeof parsed.lastFlushSuccessAt === 'number' ? parsed.lastFlushSuccessAt : base.lastFlushSuccessAt,
+      lastFlushErrorCode: typeof parsed.lastFlushErrorCode === 'string' ? parsed.lastFlushErrorCode : base.lastFlushErrorCode,
+    }
+  } catch {
+    return defaultHealth()
+  }
+}
+
+function saveHealth(health: AnalyticsHealth): void {
+  try {
+    localStorage.setItem(HEALTH_KEY, JSON.stringify(health))
+  } catch {
+    // storage unavailable — diagnostics are best-effort
+  }
+}
+
+function recordDrops(reason: string, count: number): void {
+  if (count <= 0) return
+  const health = getHealth()
+  if (reason === 'QUEUE_OVERFLOW') {
+    health.queueOverflowDrops += count
+  } else {
+    health.deadLetterDrops += count
+  }
+  health.lastDropAt = Date.now()
+  health.lastDropReason = reason
+  saveHealth(health)
+}
+
+function recordFlushSuccess(): void {
+  const health = getHealth()
+  health.lastFlushSuccessAt = Date.now()
+  health.lastFlushErrorCode = null
+  saveHealth(health)
+}
+
+function recordFlushError(code: string): void {
+  const health = getHealth()
+  health.lastFlushErrorCode = code
+  saveHealth(health)
+}
+
+function getDeadLetterCount(): number {
+  try {
+    const raw = localStorage.getItem(DEAD_LETTER_KEY)
+    if (!raw) return 0
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return 0
+    return (parsed as DeadLetter[]).reduce((sum, entry) => sum + (entry.count ?? 1), 0)
+  } catch {
+    return 0
+  }
 }
 
 interface BatchOutcome {
@@ -53,6 +140,8 @@ interface BatchOutcome {
   systemic: boolean
   retryable: boolean
   code?: string
+  retryAfterMs?: number
+  throttled?: boolean
 }
 
 function getTimezone(): string {
@@ -167,21 +256,28 @@ function getQueue(): AnalyticsEvent[] {
 
 function saveQueue(queue: AnalyticsEvent[]): void {
   try {
-    const capped =
-      queue.length > MAX_QUEUE ? queue.slice(queue.length - MAX_QUEUE) : queue
+    const overflow = Math.max(0, queue.length - MAX_QUEUE)
+    const capped = overflow > 0 ? queue.slice(queue.length - MAX_QUEUE) : queue
     localStorage.setItem(ANALYTICS_QUEUE_KEY, JSON.stringify(capped))
+    if (overflow > 0) recordDrops('QUEUE_OVERFLOW', overflow)
   } catch {
     // storage unavailable or full — drop rather than break the app
   }
 }
 
 function addDeadLetters(entries: DeadLetter[]): void {
+  if (entries.length === 0) return
   try {
     const raw = localStorage.getItem(DEAD_LETTER_KEY)
     const current: unknown = raw ? JSON.parse(raw) : []
     const list = Array.isArray(current) ? (current as DeadLetter[]) : []
     const next = [...list, ...entries].slice(-MAX_DEAD_LETTER)
     localStorage.setItem(DEAD_LETTER_KEY, JSON.stringify(next))
+    const reason = entries.every(e => e.error_code === entries[0].error_code)
+      ? entries[0].error_code
+      : 'DEAD_LETTER'
+    const droppedCount = entries.reduce((sum, entry) => sum + (entry.count ?? 1), 0)
+    recordDrops(reason, droppedCount)
   } catch {
     // ignore
   }
@@ -217,6 +313,8 @@ interface InsertResult {
   kind: InsertKind
   code: string
   retryable: boolean
+  retryAfterMs?: number
+  throttled?: boolean
 }
 
 async function insertRows(
@@ -258,6 +356,22 @@ async function insertRows(
     if (/^2[23]\d{3}$/.test(code)) {
       return { kind: 'poison', code, retryable: true }
     }
+    if (res.status === 429) {
+      const rawRetryAfter = res.headers?.get?.('Retry-After')
+      const retryAfterSeconds = rawRetryAfter ? Number(rawRetryAfter) : NaN
+      let retryAfterMs =
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+          ? Math.min(retryAfterSeconds * 1000, RETRY_MAX_MS)
+          : undefined
+      if (retryAfterMs === undefined && rawRetryAfter) {
+        const retryAfterDate = Date.parse(rawRetryAfter)
+        if (Number.isFinite(retryAfterDate)) {
+          const deltaMs = retryAfterDate - Date.now()
+          if (deltaMs > 0) retryAfterMs = Math.min(deltaMs, RETRY_MAX_MS)
+        }
+      }
+      return { kind: 'systemic', code: code || '429', retryable: true, retryAfterMs, throttled: true }
+    }
     // 5xx and no-response network errors are transient — worth retrying.
     // 4xx means the server rejected this payload shape; retrying with the
     // same payload produces the same failure, so drop instead.
@@ -279,7 +393,15 @@ async function sendBatch(
     return { sent: ids, dead: [], systemic: false, retryable: result.retryable }
   }
   if (result.kind === 'systemic') {
-    return { sent: [], dead: [], systemic: true, retryable: result.retryable, code: result.code }
+    return {
+      sent: [],
+      dead: [],
+      systemic: true,
+      retryable: result.retryable,
+      code: result.code,
+      retryAfterMs: result.retryAfterMs,
+      throttled: result.throttled,
+    }
   }
 
   if (batch.length === 1) {
@@ -300,6 +422,9 @@ async function sendBatch(
     dead: [...first.dead, ...second.dead],
     systemic: second.systemic,
     retryable: second.retryable,
+    code: second.code,
+    retryAfterMs: second.retryAfterMs,
+    throttled: second.throttled,
   }
 }
 
@@ -317,10 +442,14 @@ function cancelRetry(): void {
   }
 }
 
-function scheduleRetry(retryable: boolean): void {
+function scheduleRetry(retryable: boolean, retryAfterMs?: number): void {
   if (!retryable) return
   cancelRetry()
-  const delay = Math.min(RETRY_BASE_MS * 2 ** retryAttempts, RETRY_MAX_MS)
+  const backoffDelay = Math.min(RETRY_BASE_MS * 2 ** retryAttempts, RETRY_MAX_MS)
+  const delay =
+    retryAfterMs !== undefined && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? Math.min(retryAfterMs, RETRY_MAX_MS)
+      : backoffDelay
   retryAttempts = Math.min(retryAttempts + 1, RETRY_MAX_ATTEMPTS)
   retryTimer = setTimeout(() => {
     retryTimer = null
@@ -335,6 +464,10 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
   try {
     let systemic = false
     let retryable = true
+    let systemicCode: string | undefined
+    let systemicRetryAfterMs: number | undefined
+    let systemicThrottled = false
+    let flushErrorCode: string | undefined
     let iterations = 0
     for (;;) {
       const queue = getQueue()
@@ -350,28 +483,43 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
       }
       if (outcome.systemic) {
         if (!outcome.retryable) {
-          dropBatchToDeadLetter(batch, `HTTP_4XX:${outcome.code ?? 'UNKNOWN'}`)
+          const code = `HTTP_4XX:${outcome.code ?? 'UNKNOWN'}`
+          dropBatchToDeadLetter(batch, code)
           saveQueue(getQueue().filter(e => !batch.some(b => b.event_id === e.event_id)))
           eventsDeadLettered += batch.length
+          flushErrorCode = code
           continue
         }
         systemic = true
         retryable = outcome.retryable
+        systemicCode = outcome.code
+        systemicRetryAfterMs = outcome.retryAfterMs
+        systemicThrottled = outcome.throttled === true
         break
       }
       if (opts?.keepalive) break
     }
     if (systemic) {
+      if (systemicCode) recordFlushError(systemicCode)
       if (retryAttempts >= RETRY_MAX_ATTEMPTS) {
         const remaining = getQueue().length
-        dropQueueToDeadLetter('MAX_RETRIES_EXCEEDED')
+        const reason =
+          systemicThrottled || systemicCode === '429' || systemicCode === 'PGRST429'
+            ? 'MAX_RETRIES_EXCEEDED:429'
+            : 'MAX_RETRIES_EXCEEDED'
+        dropQueueToDeadLetter(reason)
         eventsDeadLettered += remaining
         cancelRetry()
         retryAttempts = 0
       } else {
-        scheduleRetry(retryable)
+        scheduleRetry(retryable, systemicRetryAfterMs)
       }
+    } else if (flushErrorCode) {
+      recordFlushError(flushErrorCode)
+      cancelRetry()
+      retryAttempts = 0
     } else {
+      recordFlushSuccess()
       cancelRetry()
       retryAttempts = 0
     }
@@ -382,13 +530,9 @@ async function flush(opts?: { keepalive?: boolean }): Promise<void> {
 
 function dropBatchToDeadLetter(batch: AnalyticsEvent[], errorCode: string): void {
   try {
+    if (batch.length === 0) return
     const now = Date.now()
-    const dead: DeadLetter[] = batch.map(event => ({
-      event,
-      error_code: errorCode,
-      at: now,
-    }))
-    addDeadLetters(dead)
+    addDeadLetters([{ event: batch[0], error_code: errorCode, at: now, count: batch.length }])
   } catch {
     // best-effort drop
   }
@@ -399,12 +543,7 @@ function dropQueueToDeadLetter(reason: string): void {
     const queue = getQueue()
     if (queue.length === 0) return
     const now = Date.now()
-    const dead: DeadLetter[] = queue.map(event => ({
-      event,
-      error_code: reason,
-      at: now,
-    }))
-    addDeadLetters(dead)
+    addDeadLetters([{ event: queue[0], error_code: reason, at: now, count: queue.length }])
     saveQueue([])
   } catch {
     // best-effort drop
@@ -417,16 +556,33 @@ export interface AnalyticsStats {
   eventsDeadLettered: number
   queued: number
   flushInProgress: boolean
+  queueOverflowDrops: number
+  deadLetterDrops: number
+  deadLetterCount: number
+  lastDropAt: number | null
+  lastDropReason: string | null
+  lastFlushSuccessAt: number | null
+  lastFlushErrorCode: string | null
 }
 
 export const analytics = {
-  getStats: (): AnalyticsStats => ({
-    eventsProduced,
-    eventsDelivered,
-    eventsDeadLettered,
-    queued: getQueue().length,
-    flushInProgress: flushing,
-  }),
+  getStats: (): AnalyticsStats => {
+    const health = getHealth()
+    return {
+      eventsProduced,
+      eventsDelivered,
+      eventsDeadLettered,
+      queued: getQueue().length,
+      flushInProgress: flushing,
+      queueOverflowDrops: health.queueOverflowDrops,
+      deadLetterDrops: health.deadLetterDrops,
+      deadLetterCount: getDeadLetterCount(),
+      lastDropAt: health.lastDropAt,
+      lastDropReason: health.lastDropReason,
+      lastFlushSuccessAt: health.lastFlushSuccessAt,
+      lastFlushErrorCode: health.lastFlushErrorCode,
+    }
+  },
 
   track: (event: TrackedEvent) => {
     try {
