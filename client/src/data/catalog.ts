@@ -5,12 +5,16 @@ import type { Stroke } from '../types/swimming'
 type CatalogFocus = 'technique' | 'fitness' | 'none'
 
 interface CatalogDrill {
+  slug: string
   name: string
+  heName?: string
+  popularity: number
   stroke: Stroke
   distance: number
   focus: CatalogFocus
   labels: string[]
   description: string
+  parentSlug?: string
 }
 
 interface CatalogDrillItem {
