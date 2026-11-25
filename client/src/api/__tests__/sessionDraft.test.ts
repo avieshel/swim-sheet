@@ -147,7 +147,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: '', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     })
     expect(result.outcome).toBe('invalid')
     expect(invoke).not.toHaveBeenCalled()
@@ -166,7 +166,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     })
     expect(result).toEqual({ outcome: 'auth' })
     expect(invoke).not.toHaveBeenCalled()
@@ -220,7 +220,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     })
     expect(result.outcome).toBe('invalid')
   })
@@ -230,7 +230,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     })
     expect(result).toEqual({ outcome: 'draft', draft: validDraft() })
   })
@@ -240,7 +240,7 @@ describe('requestSessionDraft', () => {
     const result = await requestSessionDraft({
       prompt: 'What is the weather', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
-      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {},
+      removedCategories: [], knownSwimmerNames: [], libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     })
     expect(result).toEqual({ outcome: 'not_actionable', message: 'Not a session.' })
   })
@@ -466,5 +466,22 @@ describe('buildLibraryCandidates payload', () => {
       defaultSessionDraftConfig.limits.maxAvailableDrills,
     )
     expect(prepared.slugToLibraryId['single-arm-pull']).toBe('lib-1')
+  })
+
+  it('every candidate has a defined non-empty slug and popularity; slugToDisplayName covers the full set', async () => {
+    vi.mocked(listLibraryDrills).mockResolvedValue(fixtureDrills())
+    const prepared = await prepareSessionDraft('x')
+    const candidates = prepared.context.libraryCandidates!
+    expect(candidates.length).toBeGreaterThan(0)
+    for (const c of candidates) {
+      expect(c.slug).toBeTruthy()
+      expect(typeof c.popularity === 'number' && c.popularity > 0).toBe(true)
+    }
+    const ids = prepared.slugToLibraryId
+    const names = prepared.slugToDisplayName
+    for (const c of candidates) {
+      expect(ids[c.slug]).toBeTruthy()
+      expect(names[c.slug]).toBeTruthy()
+    }
   })
 })
