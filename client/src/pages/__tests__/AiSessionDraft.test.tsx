@@ -52,6 +52,8 @@ const prepared = {
   removedCategories: [],
   knownSwimmerNames: [],
   libraryDrillMap: {},
+  slugToLibraryId: {},
+  slugToDisplayName: {},
 }
 
 function renderPage() {
@@ -102,7 +104,7 @@ describe('AiSessionDraft', () => {
     renderPage()
     await generateDraft()
     await user.click(await screen.findByRole('button', { name: /Save session/ }))
-    await waitFor(() => expect(applySessionDraft).toHaveBeenCalledWith(sampleDraft, { libraryDrillMap: {} }))
+    await waitFor(() => expect(applySessionDraft).toHaveBeenCalledWith(sampleDraft, { libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {} }))
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/sessions'))
   })
 
