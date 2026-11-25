@@ -316,8 +316,31 @@ Deno.test('the prompt forbids inventing numbers in the session name', () => {
 
 Deno.test('the prompt keeps names in English but plan lines and descriptions in the coach language', () => {
   const prompt = buildSystemPrompt(context)
-  assert(prompt.includes('canonical English'))
+  assert(prompt.includes('Reuse before inventing'))
+  assert(prompt.includes('heName'))
   assert(prompt.includes('language the coach wrote in'))
+})
+
+Deno.test('prompt instructs sourceSlug reuse and availableDrills scan', () => {
+  const p = buildSystemPrompt({
+    ...context,
+    availableDrills: [{ slug: 'single-arm-pull', name: 'Single Arm Pull', heName: 'שחייה ביד אחת', popularity: 9 }],
+  })
+  assert(p.includes('sourceSlug'))
+  assert(p.includes('availableDrills'))
+})
+
+Deno.test('user content injects Hebrew matching hints', () => {
+  const u = buildUserContent({
+    prompt: '4x50 יד-יד',
+    seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
+    context: {
+      ...context,
+      availableDrills: [{ slug: 'single-arm-pull', name: 'Single Arm Pull', heName: 'שחייה ביד אחת', popularity: 9 }],
+    },
+  })
+  assert(u.includes('single-arm-pull'))
+  assert(u.includes('שחייה ביד אחת'))
 })
 
 Deno.test('the prompt explains library candidate reuse when candidates are provided', () => {
