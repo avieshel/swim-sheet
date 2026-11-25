@@ -9,6 +9,7 @@ import type {
   HarnessResult,
   IntensityV1,
   RecentSessionShape,
+  SessionDraftAvailableDrillV1,
   SessionDraftContext,
   SessionDraftItemV1,
   SessionDraftLibraryCandidateV1,
@@ -187,7 +188,7 @@ export function validateSessionDraft(
     const drill = drills[d]
     const drillPath = `draft.drills[${d}]`
     if (!isPlainObject(drill)) return fail('invalid_shape', `${drillPath} must be an object`)
-    if (!hasOnlyKeys(drill, ['name', 'description', 'repeatCount', 'items', 'sourceCandidateId'])) {
+    if (!hasOnlyKeys(drill, ['name', 'description', 'repeatCount', 'items', 'sourceCandidateId', 'sourceSlug'])) {
       return fail('invalid_shape', `${drillPath} has an unsupported field`)
     }
     if (typeof drill.name !== 'string' || drill.name.trim().length === 0) {
@@ -220,6 +221,18 @@ export function validateSessionDraft(
         )
       }
     }
+    if (!isAbsent(drill.sourceSlug)) {
+      if (
+        typeof drill.sourceSlug !== 'string' ||
+        drill.sourceSlug.trim().length === 0 ||
+        drill.sourceSlug.length > config.limits.maxSlugLength
+      ) {
+        return fail(
+          'invalid_shape',
+          `${drillPath}.sourceSlug must be a non-empty string up to ${config.limits.maxSlugLength} characters`,
+        )
+      }
+    }
     const items = drill.items
     if (!Array.isArray(items) || items.length < 1) {
       return fail('invalid_shape', `${drillPath}.items must contain at least one item`)
@@ -239,6 +252,7 @@ export function validateSessionDraft(
       repeatCount: drill.repeatCount,
       items: validatedItems,
       sourceCandidateId: isAbsent(drill.sourceCandidateId) ? undefined : (drill.sourceCandidateId as string),
+      sourceSlug: isAbsent(drill.sourceSlug) ? undefined : (drill.sourceSlug as string),
     })
   }
 
@@ -384,7 +398,7 @@ function validateLibraryCandidate(
   path: string,
 ): ValidationOutcome<SessionDraftLibraryCandidateV1> {
   if (!isPlainObject(value)) return fail('invalid_shape', `${path} must be an object`)
-  if (!hasOnlyKeys(value, ['candidateId', 'name', 'description', 'stroke', 'distance', 'repeatCount', 'items', 'focus', 'labels'])) {
+  if (!hasOnlyKeys(value, ['candidateId', 'slug', 'name', 'heName', 'description', 'stroke', 'distance', 'repeatCount', 'items', 'popularity', 'focus', 'labels'])) {
     return fail('invalid_shape', `${path} has an unsupported field`)
   }
   if (
@@ -394,11 +408,28 @@ function validateLibraryCandidate(
   ) {
     return fail('invalid_shape', `${path}.candidateId must be a non-empty string up to ${config.limits.maxCandidateIdLength} characters`)
   }
+  if (!isAbsent(value.slug)) {
+    if (
+      typeof value.slug !== 'string' ||
+      value.slug.trim().length === 0 ||
+      value.slug.length > config.limits.maxSlugLength
+    ) {
+      return fail('invalid_shape', `${path}.slug must be a non-empty string up to ${config.limits.maxSlugLength} characters`)
+    }
+  }
   if (typeof value.name !== 'string' || value.name.trim().length === 0) {
     return fail('invalid_shape', `${path}.name must be a non-empty string`)
   }
   if (value.name.length > config.limits.maxDrillNameLength) {
     return fail('limit_exceeded', `${path}.name exceeds ${config.limits.maxDrillNameLength} characters`)
+  }
+  if (!isAbsent(value.heName)) {
+    if (typeof value.heName !== 'string') {
+      return fail('invalid_shape', `${path}.heName must be a string`)
+    }
+    if (value.heName.length > config.limits.maxDrillNameLength) {
+      return fail('limit_exceeded', `${path}.heName exceeds ${config.limits.maxDrillNameLength} characters`)
+    }
   }
   if (!isAbsent(value.description)) {
     if (typeof value.description !== 'string') {
@@ -450,25 +481,77 @@ function validateLibraryCandidate(
       return fail('invalid_shape', `${path}.labels must be an array of short strings within limits`)
     }
   }
+  if (!isAbsent(value.popularity)) {
+    if (typeof value.popularity !== 'number' || !Number.isInteger(value.popularity)) {
+      return fail('invalid_shape', `${path}.popularity must be an integer`)
+    }
+  }
   return {
     ok: true,
     value: {
       candidateId: value.candidateId as string,
       name: value.name as string,
+      ...(isAbsent(value.slug) ? {} : { slug: value.slug as string }),
+      heName: isAbsent(value.heName) ? undefined : (value.heName as string),
       description: isAbsent(value.description) ? undefined : (value.description as string),
       stroke: value.stroke as Stroke,
       distance: value.distance as number,
       repeatCount: value.repeatCount as number,
       items: validatedItems,
+      ...(isAbsent(value.popularity) ? {} : { popularity: value.popularity as number }),
       focus: isAbsent(value.focus) ? undefined : (value.focus as 'technique' | 'fitness' | 'none'),
       labels: isAbsent(value.labels) ? undefined : (value.labels as string[]),
     },
   }
 }
 
+function validateAvailableDrill(
+  config: SessionDraftConfig,
+  value: unknown,
+  path: string,
+): ValidationOutcome<SessionDraftAvailableDrillV1> {
+  if (!isPlainObject(value)) return fail('invalid_shape', `${path} must be an object`)
+  if (!hasOnlyKeys(value, ['slug', 'name', 'heName', 'popularity'])) {
+    return fail('invalid_shape', `${path} has an unsupported field`)
+  }
+  if (
+    typeof value.slug !== 'string' ||
+    value.slug.trim().length === 0 ||
+    value.slug.length > config.limits.maxSlugLength
+  ) {
+    return fail('invalid_shape', `${path}.slug must be a non-empty string up to ${config.limits.maxSlugLength} characters`)
+  }
+  if (typeof value.name !== 'string' || value.name.trim().length === 0) {
+    return fail('invalid_shape', `${path}.name must be a non-empty string`)
+  }
+  if (value.name.length > config.limits.maxDrillNameLength) {
+    return fail('limit_exceeded', `${path}.name exceeds ${config.limits.maxDrillNameLength} characters`)
+  }
+  if (!isAbsent(value.heName)) {
+    if (typeof value.heName !== 'string') {
+      return fail('invalid_shape', `${path}.heName must be a string`)
+    }
+    if (value.heName.length > config.limits.maxDrillNameLength) {
+      return fail('limit_exceeded', `${path}.heName exceeds ${config.limits.maxDrillNameLength} characters`)
+    }
+  }
+  if (typeof value.popularity !== 'number' || !Number.isInteger(value.popularity)) {
+    return fail('invalid_shape', `${path}.popularity must be an integer`)
+  }
+  return {
+    ok: true,
+    value: {
+      slug: value.slug as string,
+      name: value.name as string,
+      heName: isAbsent(value.heName) ? undefined : (value.heName as string),
+      popularity: value.popularity as number,
+    },
+  }
+}
+
 function validateRequestContext(config: SessionDraftConfig, value: unknown): ValidationOutcome<SessionDraftContext> {
   if (!isPlainObject(value)) return fail('invalid_shape', 'request.context must be an object')
-  if (!hasOnlyKeys(value, ['poolLength', 'distanceUnits', 'groupNames', 'equipmentOptions', 'recentSessions', 'libraryCandidates'])) {
+  if (!hasOnlyKeys(value, ['poolLength', 'distanceUnits', 'groupNames', 'equipmentOptions', 'recentSessions', 'libraryCandidates', 'availableDrills'])) {
     return fail('invalid_shape', 'request.context has an unsupported field')
   }
   const poolLength = value.poolLength
@@ -529,6 +612,19 @@ function validateRequestContext(config: SessionDraftConfig, value: unknown): Val
       validatedCandidates.push(result.value)
     }
   }
+  let validatedAvailableDrills: SessionDraftAvailableDrillV1[] | undefined
+  if (!isAbsent(value.availableDrills)) {
+    const availableDrills = value.availableDrills
+    if (!Array.isArray(availableDrills) || availableDrills.length > config.limits.maxAvailableDrills) {
+      return fail('limit_exceeded', `request.context.availableDrills exceeds ${config.limits.maxAvailableDrills}`)
+    }
+    validatedAvailableDrills = []
+    for (let i = 0; i < availableDrills.length; i++) {
+      const result = validateAvailableDrill(config, availableDrills[i], `request.context.availableDrills[${i}]`)
+      if (!result.ok) return result
+      validatedAvailableDrills.push(result.value)
+    }
+  }
   return {
     ok: true,
     value: {
@@ -538,6 +634,7 @@ function validateRequestContext(config: SessionDraftConfig, value: unknown): Val
       equipmentOptions: equipmentOptions as EquipmentId[],
       recentSessions: validatedSessions,
       ...(validatedCandidates !== undefined ? { libraryCandidates: validatedCandidates } : {}),
+      ...(validatedAvailableDrills !== undefined ? { availableDrills: validatedAvailableDrills } : {}),
     },
   }
 }

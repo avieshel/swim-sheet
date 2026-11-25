@@ -55,6 +55,11 @@ export interface SessionDraftLimits {
   maxLibraryCandidates: number
   maxCandidateIdLength: number
   maxCandidateLabels: number
+  // Bounds for the available-drills catalogue the model reads to match and reuse
+  // known drills. A slug is a short stable id; the list is capped so the whole
+  // known-drills catalogue stays a bounded request payload.
+  maxAvailableDrills: number
+  maxSlugLength: number
   // Retry window to tell the client to wait when the harness returns 429 without
   // a Retry-After value. Matches the per-user rate-limit window.
   rateLimitFallbackSeconds: number
@@ -96,6 +101,8 @@ export const defaultSessionDraftConfig: SessionDraftConfig = {
     maxLibraryCandidates: 12,
     maxCandidateIdLength: 64,
     maxCandidateLabels: 8,
+    maxAvailableDrills: 200,
+    maxSlugLength: 64,
     rateLimitFallbackSeconds: 3600,
   },
 }

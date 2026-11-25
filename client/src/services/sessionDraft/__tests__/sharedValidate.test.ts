@@ -439,6 +439,105 @@ describe('shared validateSessionDraftRequest (default config)', () => {
   })
 })
 
+describe('shared slug / availableDrills contract (default config)', () => {
+  function validRequest(overrides: Record<string, unknown> = {}): unknown {
+    return {
+      prompt: 'Plan a set',
+      seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
+      context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: [], recentSessions: [] },
+      ...overrides,
+    }
+  }
+
+  it('accepts a draft drill with sourceSlug present in availableDrills', () => {
+    const req = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        availableDrills: [{ slug: 'fingertip-drag', name: 'Fingertip Drag', popularity: 3 }],
+      },
+    }))
+    expect(req.ok).toBe(true)
+    const draft = validateSessionDraft(defaultSessionDraftConfig, {
+      schemaVersion: 1,
+      session: { name: 'Technique' },
+      drills: [
+        {
+          name: 'Fingertip Drag',
+          repeatCount: 1,
+          sourceSlug: 'fingertip-drag',
+          items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+        },
+      ],
+    })
+    expect(draft.ok).toBe(true)
+    if (draft.ok) expect(draft.value.drills[0].sourceSlug).toBe('fingertip-drag')
+  })
+
+  it('rejects request with too many availableDrills', () => {
+    const many = Array.from(
+      { length: defaultSessionDraftConfig.limits.maxAvailableDrills + 1 },
+      (_, i) => ({ slug: `slug-${i}`, name: `Drill ${i}`, popularity: i }),
+    )
+    const result = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        availableDrills: many,
+      },
+    }))
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.reason).toBe('invalid_request')
+  })
+
+  it('rejects an availableDrill missing slug or name', () => {
+    const missingName = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        availableDrills: [{ slug: 's1', popularity: 1 }],
+      },
+    }))
+    expect(missingName.ok).toBe(false)
+    const missingSlug = validateSessionDraftRequest(defaultSessionDraftConfig, validRequest({
+      context: {
+        poolLength: 25,
+        distanceUnits: 'm',
+        groupNames: [],
+        equipmentOptions: [],
+        recentSessions: [],
+        availableDrills: [{ name: 'Drill', popularity: 1 }],
+      },
+    }))
+    expect(missingSlug.ok).toBe(false)
+  })
+
+  it('rejects a draft drill sourceSlug exceeding maxSlugLength', () => {
+    const result = validateSessionDraft(defaultSessionDraftConfig, {
+      schemaVersion: 1,
+      session: { name: 'Technique' },
+      drills: [
+        {
+          name: 'Fingertip Drag',
+          repeatCount: 1,
+          sourceSlug: 'x'.repeat(defaultSessionDraftConfig.limits.maxSlugLength + 1),
+          items: [{ distance: 100, stroke: 'freestyle', repeatCount: 1 }],
+        },
+      ],
+    })
+    expect(result.ok).toBe(false)
+  })
+})
+
 describe('shared library reuse contract (default config)', () => {
   it('accepts a draft drill with sourceCandidateId', () => {
     const result = validateSessionDraft(defaultSessionDraftConfig, {

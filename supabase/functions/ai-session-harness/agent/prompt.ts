@@ -97,8 +97,22 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
           'Use only candidate IDs provided in context; never invent a DB ID. If no candidate fits,',
           'omit sourceCandidateId. Choose granularity from intent: separate drills for separate',
           'technique units, or one repeated composed drill when the coach describes a repeated block.',
-          'Candidates:',
+          'Each candidate carries a stable slug (its AI-facing effective id), a popularity rank',
+          '(higher means more commonly used — prefer reusing high-popularity candidates), and an',
+          'optional Hebrew display name (heName). Candidates:',
           JSON.stringify(context.libraryCandidates, null, 2),
+          '',
+        ]
+      : []),
+    ...(context.availableDrills && context.availableDrills.length > 0
+      ? [
+          'The full catalogue of known drills is provided in context.availableDrills. Each entry is',
+          'lightweight: a slug (stable id), a name, an optional Hebrew display name (heName), and a',
+          'popularity rank. Prefer reusing a known slug: when a requested drill matches a known one,',
+          'set the draft\'s sourceSlug to that slug so the client resolves it to a trusted library',
+          'drill. Use the popularity rank to bias toward well-known drills; invent a new drill only',
+          'when nothing in the catalogue fits. Known drills:',
+          JSON.stringify(context.availableDrills, null, 2),
           '',
         ]
       : []),

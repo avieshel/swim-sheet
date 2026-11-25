@@ -38,6 +38,11 @@ export interface SessionDraftDrillV1 {
   // the client resolves it to a trusted libraryDrillId; the model must never
   // emit a DB ID.
   sourceCandidateId?: string
+  // Optional. The stable, AI-facing effective id of the drill this draft reuses.
+  // Unlike sourceCandidateId (a per-request opaque id), the slug is a stable
+  // identity the model can carry across requests; the client resolves it to a
+  // trusted libraryDrillId. Keep sourceCandidateId for legacy compatibility.
+  sourceSlug?: string
 }
 
 export interface SessionDraftV1 {
@@ -59,14 +64,37 @@ export interface RecentSessionShape {
 
 export interface SessionDraftLibraryCandidateV1 {
   candidateId: string
+  // Stable, AI-facing effective id for the drill. The slug is the identity the
+  // model reuses across requests; the client resolves it to a trusted
+  // libraryDrillId. Optional on the candidate for backward compatibility with
+  // producers that have not yet populated it; availableDrills carries the same
+  // identity as a required field.
+  slug?: string
   name: string
+  // Optional Hebrew display name for the drill.
+  heName?: string
   description?: string
   stroke: Stroke
   distance: number
   repeatCount: number
   items: SessionDraftItemV1[]
+  // Popularity rank of the drill (higher means more commonly used). The model
+  // uses it to bias reuse toward well-known drills. Optional on the candidate
+  // until producers populate it.
+  popularity?: number
   focus?: 'technique' | 'fitness' | 'none'
   labels?: string[]
+}
+
+// A lightweight, full catalogue entry the model can read to match a requested
+// drill to a known one. Carries only what the model needs to match and display:
+// the stable slug, the display name, an optional Hebrew name, and the popularity
+// rank. Kept small so the whole known-drills list can travel in the request.
+export interface SessionDraftAvailableDrillV1 {
+  slug: string
+  name: string
+  heName?: string
+  popularity: number
 }
 
 export interface SessionDraftContext {
@@ -76,6 +104,10 @@ export interface SessionDraftContext {
   equipmentOptions: EquipmentId[]
   recentSessions: RecentSessionShape[]
   libraryCandidates?: SessionDraftLibraryCandidateV1[]
+  // The full catalogue of known drills, lightweight. The model reads slugs,
+  // names, optional Hebrew names, and popularity to match a requested drill to
+  // a known one and reuse its slug via a draft's sourceSlug.
+  availableDrills?: SessionDraftAvailableDrillV1[]
 }
 
 export interface ContextInput {
@@ -86,6 +118,7 @@ export interface ContextInput {
   equipmentOptions: EquipmentId[]
   recentSessions: RecentSessionShape[]
   libraryCandidates?: SessionDraftLibraryCandidateV1[]
+  availableDrills?: SessionDraftAvailableDrillV1[]
 }
 
 export interface SessionDraftRequest {
