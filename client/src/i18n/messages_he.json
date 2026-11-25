@@ -370,6 +370,8 @@
   "drills.bank.filterSpeed": "מהירות",
   "drills.bank.filterEndurance": "סיבולת",
   "drills.bank.filterRotation": "סיבוב",
+  "drills.bank.hebrewName": "עברית",
+  "drills.bank.englishName": "אנגלית",
   "drills.editor.drillName": "שם תרגיל",
   "drills.editor.drillNamePlaceholder": "לדוגמה: סט פירמידה או 8x100m התקדמות",
   "drills.editor.totalSetRepeats": "חזרות סט כוללות",

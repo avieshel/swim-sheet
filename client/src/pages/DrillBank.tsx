@@ -16,7 +16,7 @@ import { useI18n } from '../i18n'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [drills, setDrills] = useState<LibraryDrill[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -318,10 +318,26 @@ export const DrillBank: React.FC = () => {
             className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant hover:border-primary/40 transition-all flex flex-col h-full shadow-sm cursor-pointer"
           >
             <div className="flex-1 min-w-0 mb-3">
-              <h3 className="font-bold text-on-surface text-lg truncate m-0">{d.name}</h3>
-              {d.description && (
-                <p className="text-sm text-on-surface-variant italic line-clamp-2 mt-0.5">{d.description}</p>
-              )}
+              {(() => {
+                const isHe = locale === 'he'
+                const mainName = isHe && d.heName ? d.heName : d.name
+                const subtitle = d.heName ? (isHe ? d.name : d.heName) : null
+                const subtitleLabel = isHe ? t('drills.bank.englishName') : t('drills.bank.hebrewName')
+                return (
+                  <>
+                    <h3 className="font-bold text-on-surface text-lg truncate m-0" dir="auto">{mainName}</h3>
+                    {subtitle && (
+                      <p className="text-sm text-on-surface-variant mt-0.5 truncate" dir="auto">
+                        <span className="text-caption-caps uppercase me-1">{subtitleLabel}</span>
+                        {subtitle}
+                      </p>
+                    )}
+                    {d.description && (
+                      <p className="text-sm text-on-surface-variant italic line-clamp-2 mt-0.5">{d.description}</p>
+                    )}
+                  </>
+                )
+              })()}
             </div>
 
             <div className="mt-auto pt-3 border-t border-outline-variant/30">
@@ -490,7 +506,7 @@ export const DrillBank: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDetailDrill(null)}>
           <div className="bg-surface-container-lowest rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl border border-outline-variant" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-outline-variant/30">
-              <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1">{detailDrill.name}</h2>
+              <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1" dir="auto">{locale === 'he' && detailDrill.heName ? detailDrill.heName : detailDrill.name}</h2>
               <button onClick={() => setDetailDrill(null)} aria-label={t('common.close')} className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer bg-transparent border-none">
                 <Icon name="close" />
               </button>

@@ -370,6 +370,8 @@
   "drills.bank.filterSpeed": "Speed",
   "drills.bank.filterEndurance": "Endurance",
   "drills.bank.filterRotation": "Rotation",
+  "drills.bank.hebrewName": "Hebrew",
+  "drills.bank.englishName": "English",
   "drills.editor.drillName": "Drill Name",
   "drills.editor.drillNamePlaceholder": "e.g. Pyramid Set or 8x100m Progression",
   "drills.editor.totalSetRepeats": "Total Set Repeats",
