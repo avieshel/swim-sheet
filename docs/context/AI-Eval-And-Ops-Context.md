@@ -24,6 +24,14 @@ schema). The harness (`supabase/functions/ai-session-harness/`) splits LLM-facin
 code (`agent/`) from transport/auth/rate-limit (`harness/`). Keep them separate
 and testable with fakes.
 
+**Drill matching (drill-hebrew-localization)**: the request carries a lightweight
+`availableDrills` list (every known drill's `slug`/`name`/`heName`/`popularity`) plus
+`libraryCandidates` and `slugToLibraryId`/`slugToDisplayName` maps. The model reuses a
+known drill via a draft's `sourceSlug` rather than inventing one; Hebrew coach shorthand
+→ slug is mapped only in `agent/drillMatchIndex.ts` (product-owner-edited, not in drill
+data). `applySessionDraft` resolves `sourceSlug` → trusted `libraryDrillId` and locale
+display name on the client.
+
 **Standing caveat**: the `ai-session-harness` Edge Function deploys manually (CI only
 deploys the PWA). Production may run a stale build — redeploy before judging
 improvements on production traces. `PROVIDER_STRUCTURED_OUTPUTS` stays unset until
