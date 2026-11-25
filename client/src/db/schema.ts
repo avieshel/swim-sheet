@@ -182,6 +182,8 @@ export interface LibraryDrill {
   description?: string
   source?: 'builtin' | 'personal' | 'customized'
   catalogKey?: string
+  slug?: string
+  heName?: string
   popularity?: number
   createdAt: string
   updatedAt: string

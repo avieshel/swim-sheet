@@ -2,6 +2,7 @@ import { db, createBackupPayload, restoreAllTables, saveBackup, clearBackup, get
 import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
 import { drillCatalog, sessionsCatalog } from '../data/catalog'
 import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
+import { uuidFromSlug } from './slugUuid'
 
 // ── Swimmers ──────────────────────────────────────────────
 
@@ -451,7 +452,7 @@ export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
 
 export const DEFAULT_EQUIPMENT = ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard']
 
-export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
+export async function addLibraryDrill(data: SafeLibraryDrill & { id?: string }): Promise<string> {
   const now = new Date().toISOString()
 
   // Upsert by name: if a drill with the same name already exists, update it
@@ -465,12 +466,13 @@ export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
     return existing.id
   }
 
-  const id = crypto.randomUUID()
+  const id = data.id ?? crypto.randomUUID()
   const drill: LibraryDrill = {
     ...data,
     source: data.source || 'personal',
-    ...data,
     id,
+    slug: data.slug,
+    heName: data.heName,
     items: data.items || [
       {
         id: crypto.randomUUID(),
@@ -604,7 +606,10 @@ export async function seedLibraryDrills(): Promise<void> {
   if (count > 0) return
 
   for (const d of drillCatalog) {
-    await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
+    // Built-ins get a deterministic id derived from their slug so the same
+    // drill links identically across devices and re-seeds. Coach-created
+    // (non-builtin) drills keep a random uuid via addLibraryDrill's default.
+    await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name, id: uuidFromSlug(d.slug) })
   }
 }
 
