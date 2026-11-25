@@ -59,6 +59,7 @@ import { getSessionDrills, listLibraryDrills } from '../drills'
 import { prepareSessionDraft, requestSessionDraft, requestSessionDraftStream, applySessionDraft, type PreparedSessionDraft } from '../sessionDraft'
 import type { SessionDraftV1 } from '../../../../shared/sessionDraft/types'
 import { defaultSessionDraftConfig } from '../../../../shared/sessionDraft/config'
+import type { LibraryDrill } from '../../db/schema'
 
 const invoke = supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>
 
@@ -90,7 +91,7 @@ function prepared(overrides: Partial<PreparedSessionDraft> = {}): PreparedSessio
     context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
     removedCategories: [],
     knownSwimmerNames: [],
-    libraryDrillMap: {},
+    libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     ...overrides,
   }
 }
@@ -253,6 +254,7 @@ describe('requestSessionDraft', () => {
       prompt: 'A set', seed: { schemaVersion: 1, session: { name: '' }, drills: [] },
       context: { poolLength: 25, distanceUnits: 'm', groupNames: [], equipmentOptions: ['fins'], recentSessions: [] },
       removedCategories: [], knownSwimmerNames: ['Emma'],
+      libraryDrillMap: {}, slugToLibraryId: {}, slugToDisplayName: {},
     })
     expect(result).toEqual({ outcome: 'privacy' })
   })
@@ -419,5 +421,50 @@ describe('requestSessionDraftStream', () => {
       name: 'ai_draft_failed',
       properties: { error_kind: 'network' },
     })
+  })
+})
+
+describe('buildLibraryCandidates payload', () => {
+  function fixtureDrills(): LibraryDrill[] {
+    const make = (id: string, name: string, slug: string, popularity: number, heName?: string): LibraryDrill => ({
+      id,
+      name,
+      slug,
+      popularity,
+      heName,
+      stroke: 'freestyle',
+      distance: 100,
+      repeatCount: 1,
+      source: 'builtin',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    })
+    const drills: LibraryDrill[] = [
+      make('lib-1', 'Single Arm Pull', 'single-arm-pull', 90, 'שחייה ביד אחת'),
+      make('lib-2', 'Kick With Board', 'kick-with-board', 80),
+    ]
+    // Ensure well over the brief's >12 assertion and below maxAvailableDrills.
+    for (let i = 3; i <= 20; i++) {
+      drills.push(make(`lib-${i}`, `Drill ${i}`, `drill-${i}`, 100 - i))
+    }
+    return drills
+  }
+
+  it('candidate carries slug, popularity, heName', async () => {
+    vi.mocked(listLibraryDrills).mockResolvedValue(fixtureDrills())
+    const prepared = await prepareSessionDraft('4x50 יד-יד')
+    const cand = prepared.context.libraryCandidates!.find((c) => c.slug === 'single-arm-pull')!
+    expect(cand.popularity).toBeGreaterThan(0)
+    expect(cand.heName).toBe('שחייה ביד אחת')
+  })
+
+  it('availableDrills lists all drills and is bounded; slugToLibraryId maps slug', async () => {
+    vi.mocked(listLibraryDrills).mockResolvedValue(fixtureDrills())
+    const prepared = await prepareSessionDraft('x')
+    expect(prepared.context.availableDrills!.length).toBeGreaterThan(12)
+    expect(prepared.context.availableDrills!.length).toBeLessThanOrEqual(
+      defaultSessionDraftConfig.limits.maxAvailableDrills,
+    )
+    expect(prepared.slugToLibraryId['single-arm-pull']).toBe('lib-1')
   })
 })
