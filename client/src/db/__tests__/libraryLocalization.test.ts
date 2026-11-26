@@ -12,7 +12,7 @@ describe('library drill localization persistence', () => {
   it('seeded library drill carries slug and heName', async () => {
     await seedLibraryDrills()
     const lib = (await getAllLibraryDrills()).find(d => d.slug === 'single-arm-pull')
-    expect(lib?.heName).toBe('שחייה ביד אחת')
+    expect(lib?.heName).toBe('יד אחת')
     expect(lib?.id).toBeTruthy()
   })
 

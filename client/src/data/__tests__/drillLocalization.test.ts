@@ -4,11 +4,11 @@ import { drillCatalog } from '../catalog'
 it('reference drills carry slug + heName + popularity', () => {
   const sa = drillCatalog.find((d) => d.slug === 'single-arm-pull')!
   expect(sa.name).toBe('Single Arm Pull')
-  expect(sa.heName).toBe('שחייה ביד אחת')
+  expect(sa.heName).toBe('יד אחת')
   expect(sa.popularity).toBeGreaterThan(0)
 
   const ftd = drillCatalog.find((d) => d.slug === 'fingertip-drag')!
-  expect(ftd.heName).toBe('גרירת קצות האצבעות')
+  expect(ftd.heName).toBe('שריטת מים')
 })
 
 it('single-arm-pull has distinct variant slugs', () => {
