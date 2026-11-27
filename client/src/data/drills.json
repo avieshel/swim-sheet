@@ -41,6 +41,20 @@
     "popularity": 8
   },
   {
+    "name": "6-3-6 Drill",
+    "stroke": "freestyle",
+    "distance": 100,
+    "focus": "technique",
+    "labels": [
+      "body position",
+      "rotation",
+      "breathing"
+    ],
+    "description": "Kick 6 times on your side, take 3 full freestyle strokes, then kick 6 times on the other side. Repeat the cycle, focusing on balance, body rotation, and a smooth transition between kicking and swimming.",
+    "slug": "6-3-6-drill",
+    "popularity": 7
+  },
+  {
     "name": "Side Kicking",
     "stroke": "freestyle",
     "distance": 100,
@@ -191,7 +205,7 @@
   {
     "name": "Descending Set",
     "stroke": "freestyle",
-    "distance": 400,
+    "distance": 200,
     "focus": "fitness",
     "labels": [
       "pacing",

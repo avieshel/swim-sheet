@@ -23,6 +23,10 @@ export const DRILL_HEBREW: Record<string, DrillHebrewLocalization> = {
   '6-1-6-breathing': {
     heName: 'נשימה 6-1-6',
   },
+  '6-3-6-drill': {
+    heName: '6-3-6',
+    aliases: ['6 3 6'],
+  },
   'side-kicking': {
     heName: 'בעיטה על הצד',
   },
