@@ -544,14 +544,21 @@ export async function patchLibraryDrills(): Promise<void> {
       await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
       continue
     }
-    if (!existing.description || existing.labels?.length === 0 || existing.focus === 'none' || !existing.source) {
+
+    const patch: Partial<LibraryDrill> = {}
+    if (existing.focus !== d.focus) patch.focus = d.focus
+    if (!existing.labels || existing.labels.length === 0) patch.labels = d.labels
+    if (!existing.description) patch.description = d.description
+    if (!existing.source) patch.source = 'builtin'
+    if (existing.catalogKey !== d.name) patch.catalogKey = d.name
+    if (!existing.slug && d.slug) patch.slug = d.slug
+    if (!existing.heName && d.heName) patch.heName = d.heName
+    if (existing.popularity == null && d.popularity != null) patch.popularity = d.popularity
+
+    if (Object.keys(patch).length > 0) {
       await db.libraryDrills.update(existing.id, {
-        focus: d.focus,
-        labels: d.labels,
-        description: d.description,
-        source: 'builtin',
-        catalogKey: d.name,
-        updatedAt: new Date().toISOString()
+        ...patch,
+        updatedAt: new Date().toISOString(),
       })
     }
   }
