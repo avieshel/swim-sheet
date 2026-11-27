@@ -11,7 +11,6 @@
     ],
     "description": "Focus on high elbow recovery by dragging fingertips along the water surface. Improves arm recovery and shoulder rotation.",
     "slug": "fingertip-drag",
-    "heName": "שריטת מים",
     "popularity": 8
   },
   {
@@ -25,7 +24,6 @@
     ],
     "description": "Wait for the recovering arm to almost touch the leading hand before starting the next stroke. Improves glide and stroke timing.",
     "slug": "catch-up-drill",
-    "heName": "יד מחכה ליד",
     "popularity": 9
   },
   {
@@ -40,7 +38,6 @@
     ],
     "description": "6 kicks on the side, 1 full stroke, 6 kicks on the other side. Focus on rotation, body alignment, and breath timing.",
     "slug": "6-1-6-breathing",
-    "heName": "נשימה 6-1-6",
     "popularity": 8
   },
   {
@@ -54,7 +51,6 @@
     ],
     "description": "Kick on your side with one arm extended and the other at your side. Focus on a narrow, fast kick and stable body position.",
     "slug": "side-kicking",
-    "heName": "בעיטה על הצד",
     "popularity": 7
   },
   {
@@ -69,7 +65,6 @@
     ],
     "description": "Swim with one arm only, keeping the other arm extended forward or at your side. Focus on the pull phase and rotation.",
     "slug": "single-arm-pull",
-    "heName": "יד אחת",
     "popularity": 9
   },
   {
@@ -84,7 +79,6 @@
     ],
     "description": "Swim with one arm only while keeping the other arm extended forward. Focus on the pull phase and rotation.",
     "slug": "single-arm-pull-arm-extended",
-    "heName": "יד אחת - יד מוארכת קדימה",
     "popularity": 4,
     "parentSlug": "single-arm-pull"
   },
@@ -100,7 +94,6 @@
     ],
     "description": "Swim with one arm only while keeping the other arm at your side. Focus on the pull phase and rotation.",
     "slug": "single-arm-pull-arm-by-side",
-    "heName": "יד אחת - יד לצד הגוף",
     "popularity": 4,
     "parentSlug": "single-arm-pull"
   },
@@ -114,7 +107,6 @@
     ],
     "description": "Swim with closed fists to increase awareness of forearm pressure on the water. Teaches you to use your whole arm for the pull.",
     "slug": "fist-drill",
-    "heName": "אגרופים",
     "popularity": 7
   },
   {
@@ -129,7 +121,6 @@
     ],
     "description": "Swim with head out of the water, looking forward. Improves catch, high elbow, and stroke power.",
     "slug": "tarzan-drill",
-    "heName": "כדור מים",
     "popularity": 5
   },
   {
@@ -142,7 +133,6 @@
     ],
     "description": "Use small figure-8 hand motions to feel the water pressure. Focus on maintaining a strong \"feel\" for the water throughout the path.",
     "slug": "sculling",
-    "heName": "סקאלינג",
     "popularity": 7
   },
   {
@@ -155,7 +145,6 @@
     ],
     "description": "Focus on rotating the whole body as a single unit from the hips. Improves efficiency and power.",
     "slug": "body-rotation-drill",
-    "heName": "פוקוס גלגול גוף",
     "popularity": 6
   },
   {
@@ -169,7 +158,6 @@
     ],
     "description": "Dolphin kick on your side. Focus on the upward phase of the kick and core engagement.",
     "slug": "dolphin-kick",
-    "heName": "דולפין",
     "popularity": 7
   },
   {
@@ -183,7 +171,6 @@
     ],
     "description": "Dolphin kick on your back in a streamlined position. Focus on core-driven movement and steady rhythm.",
     "slug": "dolphin-kick-on-back",
-    "heName": "דולפין על הגב",
     "popularity": 6,
     "parentSlug": "dolphin-kick"
   },
@@ -199,7 +186,6 @@
     ],
     "description": "50m of each stroke in IM order (Fly, Back, Breast, Free). Focus on stroke transitions.",
     "slug": "im-order-practice",
-    "heName": "מעורב",
     "popularity": 6
   },
   {
@@ -213,7 +199,6 @@
     ],
     "description": "Each subsequent 100m or 50m repeat should be faster than the previous one. Build effort throughout.",
     "slug": "descending-set",
-    "heName": "דיסנד",
     "popularity": 6
   },
   {
@@ -227,7 +212,6 @@
     ],
     "description": "Run thumb up your side during recovery to promote body rotation and keep recovery hand close to body. Improves stroke compactness and rotation.",
     "slug": "zipper-drill",
-    "heName": "זיפרים",
     "popularity": 5
   },
   {
@@ -242,7 +226,6 @@
     ],
     "description": "6 kicks on side, 1 stroke, switch sides. Builds continuous rotation from side to side and develops balance on the stroke axis.",
     "slug": "6-kick-switch",
-    "heName": "החלפה כל 6 בעיטות",
     "popularity": 7
   },
   {
@@ -256,7 +239,6 @@
     ],
     "description": "Push off in streamlined position, hold 3-5 seconds. Develops core stability and horizontal alignment to minimize drag.",
     "slug": "superman-glide",
-    "heName": "סופרמן",
     "popularity": 6
   },
   {
@@ -270,7 +252,6 @@
     ],
     "description": "Recovery arm forms a shark fin shape with elbow high. Promotes high-elbow recovery and proper hand entry angle.",
     "slug": "shark-fin",
-    "heName": "סנפיר כריש",
     "popularity": 5
   },
   {
@@ -284,7 +265,6 @@
     ],
     "description": "Both arms pull simultaneously. Focus on symmetrical catch and pull, feeling the water pressure evenly.",
     "slug": "double-arm-pulls",
-    "heName": "גריפה בשתי ידיים בו זמנית",
     "popularity": 5
   },
   {
@@ -298,7 +278,6 @@
     ],
     "description": "Swim on front with arms extended, kicking gently. Focus on long, streamlined body position and hip-driven kick.",
     "slug": "long-dog",
-    "heName": "כלב",
     "popularity": 4
   },
   {
@@ -313,7 +292,6 @@
     ],
     "description": "Pull buoy between ankles, arms at sides. Focus on body rotation and catch mechanics without kick propulsion.",
     "slug": "pull-buoy-between-ankles",
-    "heName": "פולי בקרסוליים",
     "popularity": 4
   },
   {
@@ -327,7 +305,6 @@
     ],
     "description": "Swim freestyle with straight-arm recovery. Focus on body rotation and a relaxed, wide recovery over the water.",
     "slug": "straight-arm-pull",
-    "heName": "תחנת רוח",
     "popularity": 5
   },
   {
@@ -341,7 +318,6 @@
     ],
     "description": "Swim freestyle breathing on every stroke. Focus on quick, balanced breaths and consistent body rotation.",
     "slug": "breath-every-stroke",
-    "heName": "נשימה בכל חתירה",
     "popularity": 5
   },
   {
@@ -355,7 +331,6 @@
     ],
     "description": "Freestyle arms with dolphin kick instead of flutter kick. Develops stroke rhythm and high-elbow catch timing.",
     "slug": "freestyle-with-dolphin-kicks",
-    "heName": "ידיים חתירה רגלים פרפר",
     "popularity": 5
   }
 ]

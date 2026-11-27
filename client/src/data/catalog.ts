@@ -1,5 +1,6 @@
 import drillCatalogJson from './drills.json'
 import sessionsCatalogJson from './sessions.json'
+import { DRILL_HEBREW } from '../../../shared/drillLocalization'
 import type { Stroke } from '../types/swimming'
 
 type CatalogFocus = 'technique' | 'fitness' | 'none'
@@ -45,5 +46,11 @@ interface CatalogSession {
   drills: CatalogSessionDrill[]
 }
 
-export const drillCatalog = drillCatalogJson as CatalogDrill[]
+type CatalogDrillJson = Omit<CatalogDrill, 'heName'> & { heName?: string }
+
+export const drillCatalog: CatalogDrill[] = (drillCatalogJson as CatalogDrillJson[]).map((drill) => {
+  const heName = DRILL_HEBREW[drill.slug]?.heName ?? drill.heName
+  return heName ? { ...drill, heName } : { ...drill }
+})
+
 export const sessionsCatalog = sessionsCatalogJson as CatalogSession[]

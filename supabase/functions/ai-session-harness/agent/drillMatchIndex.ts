@@ -1,10 +1,11 @@
-// Controlled, easily-editable Hebrew → slug matching index for the harness.
+// Hebrew → slug matching index for the AI session harness.
 //
-// The product owner maintains this map. Each KEY is the normalized form of a
-// Hebrew coach shorthand (see normalizeHe); each VALUE names the known drill
-// slug the model should reuse via sourceSlug. Entries whose slug is absent from
-// the request's availableDrills are ignored at match time, so stale entries are
-// harmless.
+// The product owner maintains the source data in shared/drillLocalization.ts.
+// This module normalizes those terms and builds the runtime lookup index.
+// Entries whose slug is absent from the request's availableDrills are ignored
+// at match time, so stale entries are harmless.
+
+import { DRILL_HEBREW } from '../shared/drillLocalization.ts'
 
 export function normalizeHe(input: string): string {
   return input
@@ -20,14 +21,17 @@ export interface DrillMatchEntry {
   hint?: string
 }
 
-export const drillMatchIndex: Record<string, DrillMatchEntry> = {
-  [normalizeHe('יד-יד')]: { slug: 'single-arm-pull' },
-  [normalizeHe('יד אחת')]: { slug: 'single-arm-pull' },
-  [normalizeHe('יד-יד יד מוארכת')]: { slug: 'single-arm-pull-arm-extended', hint: 'other arm extended forward' },
-  [normalizeHe('גרירת אצבעות')]: { slug: 'fingertip-drag' },
-  [normalizeHe('שריטת מים')]: { slug: 'sculling' },
-  [normalizeHe('אגרופים')]: { slug: 'fist-drill' },
-  [normalizeHe('בעיטות')]: { slug: 'kick' },
-  [normalizeHe('זחילה')]: { slug: 'crawl' },
-  [normalizeHe('נשימה')]: { slug: 'breathing' },
+function buildDrillMatchIndex(): Record<string, DrillMatchEntry> {
+  const index: Record<string, DrillMatchEntry> = {}
+  for (const [slug, loc] of Object.entries(DRILL_HEBREW)) {
+    const terms = [loc.heName, ...(loc.aliases ?? [])]
+    for (const term of terms) {
+      const key = normalizeHe(term)
+      if (!key) continue
+      index[key] = loc.hint ? { slug, hint: loc.hint } : { slug }
+    }
+  }
+  return index
 }
+
+export const drillMatchIndex: Record<string, DrillMatchEntry> = buildDrillMatchIndex()
