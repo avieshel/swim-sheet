@@ -53,6 +53,8 @@ export interface Drill {
   // The libraryDrills entry this copy was created from. Soft reference: the
   // library row may be deleted while this drill survives.
   libraryDrillId?: string
+  // Stable AI-facing provenance identity (canonical slug or coach-owned slug).
+  sourceSlug?: string
   name: string
   stroke: Stroke
   distance: number
@@ -170,6 +172,9 @@ interface DbMeta {
   value: string
 }
 
+export type LibraryDrillScope = 'canonical' | 'coach'
+export type LibraryDrillVisibility = 'global' | 'org' | 'private'
+
 export interface LibraryDrill {
   id: string
   name: string
@@ -180,11 +185,16 @@ export interface LibraryDrill {
   focus?: 'technique' | 'fitness' | 'none'
   labels?: string[]
   description?: string
-  source?: 'builtin' | 'personal' | 'customized'
+  source?: 'builtin' | 'personal' | 'customized' | 'ai' | 'admin'
   catalogKey?: string
   slug?: string
   heName?: string
   popularity?: number
+  scope?: LibraryDrillScope
+  ownerId?: string | null
+  derivedFromSlug?: string
+  visibility?: LibraryDrillVisibility
+  defaultEquipment?: string[]
   createdAt: string
   updatedAt: string
 }

@@ -21,6 +21,7 @@ import {
   type SessionDraftV1,
 } from '../../../shared/sessionDraft/types'
 import { getCurrentLocale } from '../i18n'
+import { resolveDrillHeName } from '../services/drillLocalizationOverrides'
 import { EQUIPMENT_IDS, defaultSessionDraftConfig } from '../../../shared/sessionDraft/config'
 import { settingsService } from '../services/settingsService'
 import { getAllSwimmers } from '../db/dao'
@@ -137,8 +138,9 @@ async function buildLibraryCandidates(
   const isHebrew = locale === 'he'
   for (const drill of drills) {
     const slug = drill.slug ?? drill.id
+    const effectiveHeName = resolveDrillHeName(drill.slug, drill.heName)
     slugToLibraryId[slug] = drill.id
-    slugToDisplayName[slug] = isHebrew ? (drill.heName ?? drill.name) : drill.name
+    slugToDisplayName[slug] = isHebrew ? (effectiveHeName ?? drill.name) : drill.name
   }
 
   const candidates: SessionDraftLibraryCandidateV1[] = []
@@ -155,11 +157,12 @@ async function buildLibraryCandidates(
     if (items.length === 0) continue
     const candidateId = `cand_${candidates.length + 1}`
     const slug = drill.slug ?? drill.id
+    const effectiveHeName = resolveDrillHeName(drill.slug, drill.heName)
     candidates.push({
       candidateId,
       slug,
       name: drill.name,
-      ...(drill.heName ? { heName: drill.heName } : {}),
+      ...(effectiveHeName ? { heName: effectiveHeName } : {}),
       ...(drill.description ? { description: drill.description } : {}),
       stroke: drill.stroke,
       distance: drill.distance,
@@ -175,10 +178,11 @@ async function buildLibraryCandidates(
   const availableDrills: SessionDraftAvailableDrillV1[] = drills
     .map((drill) => {
       const slug = drill.slug ?? drill.id
+      const effectiveHeName = resolveDrillHeName(drill.slug, drill.heName)
       return {
         slug,
         name: drill.name,
-        ...(drill.heName ? { heName: drill.heName } : {}),
+        ...(effectiveHeName ? { heName: effectiveHeName } : {}),
         popularity: drill.popularity ?? 0,
       }
     })

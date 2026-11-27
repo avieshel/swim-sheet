@@ -225,4 +225,79 @@ describe('completed history mapping', () => {
     expect(cloud.data).toEqual({ drillStart: 0, drillEnd: 120000, swimmers: [] })
     expect(local).toMatchObject({ id: 'lane-result-1', data })
   })
+
+  test('round-trips libraryDrills canonical metadata', () => {
+    const change: LocalChange = {
+      table: 'libraryDrills',
+      id: 'lib-1',
+      op: 'upsert',
+      payload: {
+        id: 'lib-1',
+        name: 'Single Arm Pull',
+        stroke: 'freestyle',
+        distance: 100,
+        items: [],
+        repeatCount: 1,
+        focus: 'technique',
+        labels: ['pull'],
+        description: 'desc',
+        source: 'builtin',
+        catalogKey: 'single-arm-pull',
+        popularity: 7,
+        slug: 'single-arm-pull',
+        heName: 'יד אחת',
+        scope: 'canonical',
+        ownerId: null,
+        derivedFromSlug: undefined,
+        visibility: 'global',
+        defaultEquipment: ['paddles'],
+        createdAt: 'created',
+        updatedAt: 'updated',
+      },
+      rev: null,
+    }
+
+    const cloud = toCloudRow('libraryDrills', change, 'org-A', 'u1')
+    expect(cloud).toMatchObject({
+      slug: 'single-arm-pull',
+      he_name: 'יד אחת',
+      scope: 'canonical',
+      owner_id: null,
+      derived_from_slug: null,
+      visibility: 'global',
+      default_equipment: '["paddles"]',
+    })
+
+    const local = fromCloudRow('libraryDrills', cloud)
+    expect(local).toMatchObject({
+      slug: 'single-arm-pull',
+      heName: 'יד אחת',
+      scope: 'canonical',
+      ownerId: undefined,
+      derivedFromSlug: undefined,
+      visibility: 'global',
+      defaultEquipment: ['paddles'],
+    })
+  })
+
+  test('round-trips drill sourceSlug provenance', () => {
+    const change: LocalChange = {
+      table: 'drills',
+      id: 'drill-1',
+      op: 'upsert',
+      payload: {
+        id: 'drill-1', sessionId: 'session-1', libraryDrillId: 'lib-1', sourceSlug: 'single-arm-pull',
+        name: 'Single Arm Pull', stroke: 'freestyle', distance: 100, order: 0,
+        items: [], repeatCount: 1, focus: 'none', labels: [], description: '',
+        createdAt: 'created', updatedAt: 'updated',
+      },
+      rev: null,
+    }
+
+    const cloud = toCloudRow('drills', change, 'org-A', 'u1')
+    expect(cloud).toMatchObject({ library_drill_id: 'lib-1', source_slug: 'single-arm-pull' })
+
+    const local = fromCloudRow('drills', cloud)
+    expect(local).toMatchObject({ libraryDrillId: 'lib-1', sourceSlug: 'single-arm-pull' })
+  })
 })

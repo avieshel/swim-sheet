@@ -55,6 +55,7 @@ export function mapDraftToSessionAndDrills(
     // locale-aware display name (Hebrew when the locale is he).
     let libraryDrillId: string | undefined
     let name = drill.name
+    const sourceSlug = drill.sourceSlug
     if (drill.sourceSlug) {
       const resolvedId = slugToLibraryId[drill.sourceSlug]
       if (resolvedId) {
@@ -85,6 +86,7 @@ export function mapDraftToSessionAndDrills(
       labels: [],
       description: drill.description ?? '',
       ...(libraryDrillId ? { libraryDrillId } : {}),
+      ...(sourceSlug ? { sourceSlug } : {}),
     }
   })
 
