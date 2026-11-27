@@ -153,6 +153,7 @@ A single exercise within a Session template.
 | `id` | `id` | string/TEXT PK | UUID |
 | `sessionId` | `session_id` | string/TEXT | FK → Session |
 | `libraryDrillId` | `library_drill_id` | string/TEXT \| undefined | Optional soft reference → LibraryDrill (no FK, no cascade) |
+| `sourceSlug` | `source_slug` | string/TEXT \| undefined | Stable provenance slug for AI/canonical/derived linking |
 | `name` | `name` | string/TEXT | Required |
 | `stroke` | `stroke` | `Stroke`/TEXT | freestyle/backstroke/breaststroke/butterfly/im |
 | `distance` | `distance` | number/INTEGER | Total distance in meters |
@@ -340,6 +341,13 @@ the single source of truth for both `patchLibraryDrills` (upsert-by-name) and
 in `dao.ts` were removed — editing builtin content means editing the JSON, not code. All
 built-in data is external to business logic/DAO.
 
+**Canonical vs coach-owned boundary**: canonical drills are global/admin-controlled
+(`scope='canonical'`, `visibility='global'`, `ownerId=null`, `organization_id` null in
+cloud). Coach-owned drills are org-scoped (`scope='coach'`, `visibility='org'|'private'`,
+`ownerId` set). Canonical rows are read-only cache on the client; structural edits create
+a derived coach-owned drill with `derivedFromSlug`. Hebrew display overrides are local
+(keyed by `slug`) and do not mutate the canonical record.
+
 | Field | Type | Notes |
 |-------|------|-------|
 | `id` | string PK | UUID |
@@ -351,7 +359,16 @@ built-in data is external to business logic/DAO.
 | `focus` | 'technique' \| 'fitness' \| 'none' | Training focus |
 | `labels` | string[] | Classification labels |
 | `description` | string | Optional description |
-| `source` | 'builtin' \| 'personal' \| 'customized' | Origin |
+| `source` | 'builtin' \| 'personal' \| 'customized' \| 'ai' \| 'admin' | Origin |
+| `catalogKey` | string | Optional starter-catalog dedupe key |
+| `slug` | string | Stable AI-facing identity; required for canonical |
+| `heName` | string | Optional Hebrew display name |
+| `popularity` | number | Reuse/popularity rank |
+| `scope` | 'canonical' \| 'coach' | Ownership boundary |
+| `ownerId` | string \| null | null/system for canonical |
+| `derivedFromSlug` | string | Canonical slug this coach drill was derived from |
+| `visibility` | 'global' \| 'org' \| 'private' | Visibility |
+| `defaultEquipment` | string[] | Optional default equipment |
 | `createdAt` | string | ISO 8601 |
 | `updatedAt` | string | ISO 8601 |
 

@@ -83,6 +83,14 @@ precede template `drills`; completed `session_runs` precede `run_drills`/`run_sw
 which precede `laps`/`lane_drill_results`. Pending metadata key order is not a valid
 dependency order.
 
+## Canonical LibraryDrills Sync
+
+`libraryDrills` rows with `scope='canonical'` / `visibility='global'` are server-authoritative
+and read-only on the client. Pull includes global canonical rows (`organization_id IS NULL`)
+in addition to org-scoped rows. Push skips canonical/global library drills so clients never
+overwrite the canonical cache. `sync_pulse` considers global library drill updates. Bundled
+catalog data remains the offline fallback when cloud catalog rows are unavailable.
+
 ## Completed-History Sync
 
 Swimmers, reusable session content, and completed run history sync through the
@@ -266,6 +274,11 @@ Hosted project `pcdmtsafwmlqdwjxbajc`,
   `20261020000000` entry, so `supabase migration up` cannot run until that divergence
   is resolved. Do not deploy code that calls the RPC until the migration is applied
   to the intended hosted project.
+- `20261127000000_canonical_drill_boundary.sql` adds canonical/coach library-drill
+  metadata (`slug`, `he_name`, `scope`, `owner_id`, `derived_from_slug`, `visibility`,
+  `default_equipment`), session drill provenance (`source_slug`), canonical slug indexes,
+  and updates `sync_pulse` to consider global `library_drills` rows. Not yet applied to
+  hosted.
 
 ## Migration Ordering Rule
 
