@@ -113,6 +113,7 @@ export function toCloudRow(
         ...base,
         session_id: p.sessionId,
         library_drill_id: p.libraryDrillId ?? null,
+        source_slug: p.sourceSlug ?? null,
         name: p.name,
         stroke: p.stroke,
         distance: p.distance,
@@ -139,6 +140,13 @@ export function toCloudRow(
         source: p.source,
         catalog_key: p.catalogKey ?? null,
         popularity: p.popularity,
+        slug: p.slug ?? null,
+        he_name: p.heName ?? null,
+        scope: p.scope ?? null,
+        owner_id: p.ownerId ?? null,
+        derived_from_slug: p.derivedFromSlug ?? null,
+        visibility: p.visibility ?? null,
+        default_equipment: p.defaultEquipment === undefined ? null : JSON.stringify(p.defaultEquipment),
         created_at: p.createdAt,
         updated_at: p.updatedAt,
       }
@@ -240,6 +248,7 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
         id: row.id,
         sessionId: row.session_id,
         libraryDrillId: (row.library_drill_id as string | null) ?? undefined,
+        sourceSlug: (row.source_slug as string | null) ?? undefined,
         name: row.name,
         stroke: row.stroke,
         distance: row.distance,
@@ -266,6 +275,13 @@ export function fromCloudRow(table: SyncTable, row: Row): Row {
         source: row.source,
         catalogKey: (row.catalog_key as string) ?? undefined,
         popularity: row.popularity,
+        slug: (row.slug as string | null) ?? undefined,
+        heName: (row.he_name as string | null) ?? undefined,
+        scope: (row.scope as 'canonical' | 'coach' | null) ?? undefined,
+        ownerId: (row.owner_id as string | null) ?? undefined,
+        derivedFromSlug: (row.derived_from_slug as string | null) ?? undefined,
+        visibility: (row.visibility as 'global' | 'org' | 'private' | null) ?? undefined,
+        defaultEquipment: row.default_equipment == null ? undefined : safeJson(row.default_equipment, []),
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       }
@@ -369,6 +385,19 @@ export class SupabaseSyncTransport implements SyncTransport {
     const conflicts: SyncConflict[] = []
     const applied: { table: SyncTable; id: string; updatedAt: string }[] = []
     for (const change of changes) {
+      if (change.table === 'libraryDrills') {
+        const payload = (change.payload ?? {}) as Record<string, unknown>
+        const scope = payload.scope
+        const visibility = payload.visibility
+        if (scope === 'canonical' || visibility === 'global') {
+          const updatedAt =
+            typeof payload.updatedAt === 'string' && payload.updatedAt.length > 0
+              ? payload.updatedAt
+              : new Date().toISOString()
+          applied.push({ table: change.table, id: change.id, updatedAt })
+          continue
+        }
+      }
       const result = await this.pushOne(change, orgId, userId)
       if (result.conflict) conflicts.push(result.conflict)
       if (result.updatedAt !== null) {
@@ -546,10 +575,12 @@ export class SupabaseSyncTransport implements SyncTransport {
           ? '*,session_runs!inner(status)'
           : '*'
       const cursorParsed = parseCursor(cursor)
-      let query = this.client
-        .from(CLOUD_TABLE[table])
-        .select(columns)
-        .eq('organization_id', orgId)
+      let query = this.client.from(CLOUD_TABLE[table]).select(columns)
+      if (table === 'libraryDrills') {
+        query = query.or(`organization_id.eq.${orgId},organization_id.is.null`)
+      } else {
+        query = query.eq('organization_id', orgId)
+      }
       if (cursorParsed.id === null) {
         // Legacy single-timestamp cursor (or first sync): an inclusive bound so
         // any rows sharing the boundary timestamp are re-captured idempotently.
@@ -558,9 +589,14 @@ export class SupabaseSyncTransport implements SyncTransport {
         // Composite (updated_at, id) cursor: rows that share a timestamp are
         // never skipped, which the plain gt(updated_at) bound could drop across a
         // page boundary when a bulk insert stamps them all with the same value.
-        query = query.or(
-          `updated_at.gt.${cursorParsed.updatedAt},and(updated_at.eq.${cursorParsed.updatedAt},id.gt.${cursorParsed.id})`,
-        )
+        const cursorFilter = `updated_at.gt.${cursorParsed.updatedAt},and(updated_at.eq.${cursorParsed.updatedAt},id.gt.${cursorParsed.id})`
+        if (table === 'libraryDrills') {
+          query = query.or(
+            `and(or(organization_id.eq.${orgId},organization_id.is.null),or(${cursorFilter}))`,
+          )
+        } else {
+          query = query.or(cursorFilter)
+        }
       }
       if (table === 'sessionRuns') query = query.eq('status', 'completed')
       else if (table === 'laps') query = query.eq('run_drills.session_runs.status', 'completed')

@@ -157,6 +157,14 @@ describe('buildDraftJsonSchema', () => {
     expect(schema.properties?.session?.properties?.name?.maxLength).toBe(config.limits.maxSessionNameLength)
   })
 
+  it('documents the draft drill sourceSlug field', () => {
+    const schema = buildDraftJsonSchema(config, context)
+    const sourceSlug = schema.properties?.drills?.items?.properties?.sourceSlug
+    expect(sourceSlug?.type).toBe('string')
+    expect(sourceSlug?.description && sourceSlug.description.trim().length > 0).toBe(true)
+    expect(sourceSlug?.maxLength).toBe(config.limits.maxSlugLength)
+  })
+
   it('requires exactly the fields the validator requires', () => {
     const schema = buildDraftJsonSchema(config, context)
     expect(schema.required).toEqual(['schemaVersion', 'session', 'drills'])

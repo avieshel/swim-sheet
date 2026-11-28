@@ -375,10 +375,15 @@ export const SessionDetail: React.FC = () => {
             libraryDrills.filter(d => d.id !== excludeId),
           )
           const dataWithLibraryLink = highConfidenceLibraryMatch
-            ? { ...data, name: highConfidenceLibraryMatch.name, libraryDrillId: highConfidenceLibraryMatch.id }
+            ? {
+                ...data,
+                name: highConfidenceLibraryMatch.name,
+                libraryDrillId: highConfidenceLibraryMatch.id,
+                ...(highConfidenceLibraryMatch.slug ? { sourceSlug: highConfidenceLibraryMatch.slug } : {}),
+              }
             : data
 
-          const save = async (saveData: DrillFormData & { libraryDrillId?: string } = dataWithLibraryLink) => {
+          const save = async (saveData: DrillFormData & { libraryDrillId?: string; sourceSlug?: string } = dataWithLibraryLink) => {
             if (!id || !saveData.name?.trim()) return
             const nextOrder = drills.length > 0 ? Math.max(...drills.map(d => d.order)) + 1 : 0
             const drillData = { ...saveData, sessionId: id, order: saveData.id ? (richDrill.order ?? nextOrder) : nextOrder }

@@ -173,6 +173,15 @@ export function buildDraftJsonSchema(
           'candidate fits.',
         maxLength: limits.maxCandidateIdLength,
       },
+      sourceSlug: {
+        type: 'string',
+        description:
+          'Optional. The stable slug of a known drill this block reuses. Unlike sourceCandidateId ' +
+          '(a per-request opaque id), the slug is a stable identity the model reuses across requests; ' +
+          'the client resolves it to a trusted library drill from context.availableDrills. Prefer ' +
+          'reusing a known slug over inventing a new drill when one fits. Omit when no known drill matches.',
+        maxLength: limits.maxSlugLength,
+      },
       repeatCount: {
         type: 'integer',
         description:

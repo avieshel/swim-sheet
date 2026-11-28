@@ -10,6 +10,8 @@ interface DrillMetrics {
 }
 
 interface SnapshotDrill {
+  libraryDrillId?: string
+  sourceSlug?: string
   name: string
   stroke: Stroke
   items: DrillItem[]
@@ -71,6 +73,8 @@ export function buildSessionSnapshot(session: Session, drills: Drill[]): Session
     name: session.name,
     notes: session.notes,
     drills: (drills ?? []).map(drill => ({
+      libraryDrillId: drill.libraryDrillId,
+      sourceSlug: drill.sourceSlug,
       name: drill.name,
       stroke: drill.stroke,
       items: drill.items ?? [],

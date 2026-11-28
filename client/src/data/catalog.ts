@@ -5,12 +5,16 @@ import type { Stroke } from '../types/swimming'
 type CatalogFocus = 'technique' | 'fitness' | 'none'
 
 interface CatalogDrill {
+  slug: string
   name: string
+  heName?: string
+  popularity: number
   stroke: Stroke
   distance: number
   focus: CatalogFocus
   labels: string[]
   description: string
+  parentSlug?: string
 }
 
 interface CatalogDrillItem {
@@ -41,5 +45,11 @@ interface CatalogSession {
   drills: CatalogSessionDrill[]
 }
 
-export const drillCatalog = drillCatalogJson as CatalogDrill[]
+type CatalogDrillJson = Omit<CatalogDrill, 'heName'> & { heName?: string }
+
+export const drillCatalog: CatalogDrill[] = (drillCatalogJson as CatalogDrillJson[]).map((drill) => {
+  const heName = drill.heName
+  return heName ? { ...drill, heName } : { ...drill }
+})
+
 export const sessionsCatalog = sessionsCatalogJson as CatalogSession[]

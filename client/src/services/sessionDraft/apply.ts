@@ -16,6 +16,7 @@ export type ApplyDraftResult =
 
 export interface ApplySessionDraftOptions {
   libraryDrillMap?: Record<string, string>
+  slugToLibraryId?: Record<string, string>
 }
 
 // ── Draft → session/drills mapping ───────────────────────────
@@ -44,10 +45,26 @@ export function mapDraftToSessionAndDrills(
   options: ApplySessionDraftOptions = {},
 ): { session: SafeSession; drills: Array<Omit<SafeDrill, 'sessionId'>> } {
   const libraryDrillMap = options.libraryDrillMap ?? {}
+  const slugToLibraryId = options.slugToLibraryId ?? {}
   const drills: Array<Omit<SafeDrill, 'sessionId'>> = draft.drills.map((drill, order) => {
-    const libraryDrillId = drill.sourceCandidateId ? libraryDrillMap[drill.sourceCandidateId] : undefined
+    // sourceSlug is the stable, AI-facing identity and takes precedence over the
+    // legacy per-request candidate id. When it resolves we link the drill to the
+    // trusted library id. The display name is the harness-emitted name: the model
+    // produced it guided by the edge-function's authoritative Hebrew hints, so the
+    // client trusts it rather than overriding from a bundled map.
+    let libraryDrillId: string | undefined
+    const name = drill.name
+    const sourceSlug = drill.sourceSlug
+    if (drill.sourceSlug) {
+      const resolvedId = slugToLibraryId[drill.sourceSlug]
+      if (resolvedId) {
+        libraryDrillId = resolvedId
+      }
+    } else if (drill.sourceCandidateId) {
+      libraryDrillId = libraryDrillMap[drill.sourceCandidateId]
+    }
     return {
-      name: drill.name,
+      name,
       stroke: deriveDominantStroke(drill.items),
       distance: draftDrillDistance(drill.items, drill.repeatCount),
       order,
@@ -66,6 +83,7 @@ export function mapDraftToSessionAndDrills(
       labels: [],
       description: drill.description ?? '',
       ...(libraryDrillId ? { libraryDrillId } : {}),
+      ...(sourceSlug ? { sourceSlug } : {}),
     }
   })
 

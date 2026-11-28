@@ -2,6 +2,7 @@ import { db, createBackupPayload, restoreAllTables, saveBackup, clearBackup, get
 import type { Swimmer, Session, Drill, SessionRun, RunDrill, RunSwimmer, Lap, LaneDrillResult, LibraryDrill, SafeSwimmer, SafeSession, SafeDrill, SafeSessionRun, SafeRunDrill, SafeLap, SafeLibraryDrill } from './schema'
 import { drillCatalog, sessionsCatalog } from '../data/catalog'
 import type { SessionPackageV1 } from '../../../shared/sessionPackage/types'
+import { uuidFromSlug } from './slugUuid'
 
 // ── Swimmers ──────────────────────────────────────────────
 
@@ -165,9 +166,15 @@ export async function updateLibraryDrill(id: string, data: Partial<SafeLibraryDr
 export async function addDrill(data: SafeDrill): Promise<string> {
   const now = new Date().toISOString()
   const id = crypto.randomUUID()
+  let sourceSlug = data.sourceSlug
+  if (data.libraryDrillId && !sourceSlug) {
+    const lib = await db.libraryDrills.get(data.libraryDrillId)
+    sourceSlug = lib?.slug
+  }
   const drill: Drill = {
     ...data,
     id,
+    ...(sourceSlug ? { sourceSlug } : {}),
     items: data.items || [
       {
         id: crypto.randomUUID(),
@@ -188,7 +195,7 @@ export async function addDrill(data: SafeDrill): Promise<string> {
   // When caller already resolved a canonical library drill (AI reuse or high-confidence
   // convergence), keep that link instead of creating/upserting by name.
   if (data.libraryDrillId) {
-    await db.drills.update(id, { libraryDrillId: data.libraryDrillId })
+    await db.drills.update(id, { libraryDrillId: data.libraryDrillId, ...(sourceSlug ? { sourceSlug } : {}) })
     return id
   }
 
@@ -207,7 +214,8 @@ export async function addDrill(data: SafeDrill): Promise<string> {
   // warn about the sessions still using it. addLibraryDrill upserts by name, so
   // this may resolve to an existing entry rather than a new one.
   const libraryDrillId = await addLibraryDrill(libDrill)
-  await db.drills.update(id, { libraryDrillId })
+  const linked = await db.libraryDrills.get(libraryDrillId)
+  await db.drills.update(id, { libraryDrillId, ...(linked?.slug ? { sourceSlug: linked.slug } : {}) })
 
   return id
 }
@@ -451,7 +459,7 @@ export async function getAllLibraryDrills(): Promise<LibraryDrill[]> {
 
 export const DEFAULT_EQUIPMENT = ['fins', 'zoomers', 'paddles', 'pullbuoy', 'snorkel', 'kickboard']
 
-export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
+export async function addLibraryDrill(data: SafeLibraryDrill & { id?: string }): Promise<string> {
   const now = new Date().toISOString()
 
   // Upsert by name: if a drill with the same name already exists, update it
@@ -465,12 +473,18 @@ export async function addLibraryDrill(data: SafeLibraryDrill): Promise<string> {
     return existing.id
   }
 
-  const id = crypto.randomUUID()
+  const id = data.id ?? crypto.randomUUID()
   const drill: LibraryDrill = {
     ...data,
     source: data.source || 'personal',
-    ...data,
     id,
+    slug: data.slug,
+    heName: data.heName,
+    scope: data.scope,
+    ownerId: data.ownerId,
+    derivedFromSlug: data.derivedFromSlug,
+    visibility: data.visibility,
+    defaultEquipment: data.defaultEquipment,
     items: data.items || [
       {
         id: crypto.randomUUID(),
@@ -539,17 +553,35 @@ export async function patchLibraryDrills(): Promise<void> {
   for (const d of drillCatalog) {
     const existing = await db.libraryDrills.where('name').equals(d.name).first()
     if (!existing) {
-      await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
-      continue
-    }
-    if (!existing.description || existing.labels?.length === 0 || existing.focus === 'none' || !existing.source) {
-      await db.libraryDrills.update(existing.id, {
-        focus: d.focus,
-        labels: d.labels,
-        description: d.description,
+      await addLibraryDrill({
+        ...d,
         source: 'builtin',
         catalogKey: d.name,
-        updatedAt: new Date().toISOString()
+        id: uuidFromSlug(d.slug),
+        scope: 'canonical',
+        visibility: 'global',
+        ownerId: null,
+      })
+      continue
+    }
+
+    const patch: Partial<LibraryDrill> = {}
+    if (existing.focus !== d.focus) patch.focus = d.focus
+    if (!existing.labels || existing.labels.length === 0) patch.labels = d.labels
+    if (!existing.description) patch.description = d.description
+    if (!existing.source) patch.source = 'builtin'
+    if (existing.catalogKey !== d.name) patch.catalogKey = d.name
+    if (!existing.slug && d.slug) patch.slug = d.slug
+    if (!existing.heName && d.heName) patch.heName = d.heName
+    if (existing.popularity == null && d.popularity != null) patch.popularity = d.popularity
+    if (existing.source === 'builtin' && existing.scope !== 'canonical') patch.scope = 'canonical'
+    if (existing.source === 'builtin' && existing.visibility !== 'global') patch.visibility = 'global'
+    if (existing.source === 'builtin' && existing.ownerId === undefined) patch.ownerId = null
+
+    if (Object.keys(patch).length > 0) {
+      await db.libraryDrills.update(existing.id, {
+        ...patch,
+        updatedAt: new Date().toISOString(),
       })
     }
   }
@@ -604,7 +636,18 @@ export async function seedLibraryDrills(): Promise<void> {
   if (count > 0) return
 
   for (const d of drillCatalog) {
-    await addLibraryDrill({ ...d, source: 'builtin', catalogKey: d.name })
+    // Built-ins get a deterministic id derived from their slug so the same
+    // drill links identically across devices and re-seeds. Coach-created
+    // (non-builtin) drills keep a random uuid via addLibraryDrill's default.
+    await addLibraryDrill({
+      ...d,
+      source: 'builtin',
+      catalogKey: d.name,
+      id: uuidFromSlug(d.slug),
+      scope: 'canonical',
+      visibility: 'global',
+      ownerId: null,
+    })
   }
 }
 

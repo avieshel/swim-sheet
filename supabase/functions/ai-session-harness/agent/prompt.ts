@@ -8,6 +8,7 @@ import type {
   SessionDraftRequest,
   SessionDraftV1,
 } from './contract.ts'
+import { matchDrillHints } from './matchDrills.ts'
 import type { IntensityV1 } from '../shared/sessionDraft/types.ts'
 import { defaultSessionDraftConfig } from '../shared/sessionDraft/config.ts'
 import { buildDraftJsonSchema } from '../shared/sessionDraft/schema.ts'
@@ -97,8 +98,22 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
           'Use only candidate IDs provided in context; never invent a DB ID. If no candidate fits,',
           'omit sourceCandidateId. Choose granularity from intent: separate drills for separate',
           'technique units, or one repeated composed drill when the coach describes a repeated block.',
-          'Candidates:',
+          'Each candidate carries a stable slug (its AI-facing effective id), a popularity rank',
+          '(higher means more commonly used — prefer reusing high-popularity candidates), and an',
+          'optional Hebrew display name (heName). Candidates:',
           JSON.stringify(context.libraryCandidates, null, 2),
+          '',
+        ]
+      : []),
+    ...(context.availableDrills && context.availableDrills.length > 0
+      ? [
+          'The full catalogue of known drills is provided in context.availableDrills. Each entry is',
+          'lightweight: a slug (stable id), a name, an optional Hebrew display name (heName), and a',
+          'popularity rank. Prefer reusing a known slug: when a requested drill matches a known one,',
+          'set the draft\'s sourceSlug to that slug so the client resolves it to a trusted library',
+          'drill. Use the popularity rank to bias toward well-known drills; invent a new drill only',
+          'when nothing in the catalogue fits. Known drills:',
+          JSON.stringify(context.availableDrills, null, 2),
           '',
         ]
       : []),
@@ -127,11 +142,17 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
     'v2 and v4 to reflect where the set sits. Never flatten a gradation to v1.',
     '',
     'Language: mirror the coach. Write the plan lines and drill descriptions in',
-    'the language the coach wrote in (Hebrew input gets Hebrew sentences); keep',
-    'drill names in canonical English so they match the library catalogue.',
+    'the language the coach wrote in (Hebrew input gets Hebrew sentences).',
+    'Reuse before inventing: you receive libraryCandidates (each with a slug and a',
+    'popularity rank) and availableDrills (every known drill: slug, name, heName,',
+    'popularity). Prefer a libraryCandidates match first; if none fits, scan',
+    'availableDrills by slug and set sourceSlug to the matched slug; only if no slug',
+    'fits, create a new drill. Use popularity to break ties and prefer the most',
+    "specific slug (a variant over its parent). For Hebrew input, use the drill's",
+    "heName as the display name — e.g. 'Fist (אגרופים)', 'Scull (שריטת מים)'.",
     'Step descriptions follow the same rule: the coach\'s words in their language,',
-    'preferring the canonical catalogue technique name when one fits, with the',
-    "coach's own wording alongside it — e.g. 'Fist (אגרופים)', 'Scull (שריטת מים)'.",
+    'preferring the catalogue technique name when one fits, with the coach\'s own',
+    'wording alongside it.',
     '',
     'The session name must be trustworthy. Quote only numbers the coach did',
     'state. Never put a distance in the name the coach did not state, and never',
@@ -193,7 +214,7 @@ export function buildSystemPrompt(context: SessionDraftContext): string {
 }
 
 export function buildUserContent(request: SessionDraftRequest): string {
-  return [
+  const parts = [
     `Prompt: ${request.prompt}`,
     '',
     'Context (structural only, no swimmer data):',
@@ -201,7 +222,19 @@ export function buildUserContent(request: SessionDraftRequest): string {
     '',
     'Seed template to complete (return the full object, do not omit fields):',
     JSON.stringify(request.seed),
-  ].join('\n')
+  ]
+  const hints = matchDrillHints(request.prompt, request.context.availableDrills ?? [])
+  if (hints.length > 0) {
+    parts.push(
+      '',
+      '[Drill matching hints]',
+      ...hints.map(
+        (hint) =>
+          `- Hebrew '${hint.term}' → slug '${hint.slug}' (HE: ${hint.heName ?? hint.name}). Reuse via sourceSlug: '${hint.slug}'.`,
+      ),
+    )
+  }
+  return parts.join('\n')
 }
 
 // Appended as a follow-up user turn when a prior attempt failed validation. It

@@ -13,12 +13,14 @@ import {
   type ContextInput,
   type EquipmentId,
   type HarnessResult,
+  type SessionDraftAvailableDrillV1,
   type SessionDraftContext,
   type SessionDraftLibraryCandidateV1,
   type SessionDraftRequest,
   type SessionDraftSeedV1,
   type SessionDraftV1,
 } from '../../../shared/sessionDraft/types'
+import { resolveDrillHeName } from '../services/drillLocalizationOverrides'
 import { EQUIPMENT_IDS, defaultSessionDraftConfig } from '../../../shared/sessionDraft/config'
 import { settingsService } from '../services/settingsService'
 import { getAllSwimmers } from '../db/dao'
@@ -38,6 +40,7 @@ export interface PreparedSessionDraft {
   removedCategories: SessionDraftContext['recentSessions'] extends never ? never : Array<'known_name' | 'email' | 'phone'>
   knownSwimmerNames: string[]
   libraryDrillMap: Record<string, string>
+  slugToLibraryId: Record<string, string>
 }
 
 export type SessionDraftResult =
@@ -106,7 +109,12 @@ function toCandidateItem(item: { distance: number; stroke: string; repeatCount: 
   }
 }
 
-async function buildLibraryCandidates(): Promise<{ candidates: SessionDraftLibraryCandidateV1[]; libraryDrillMap: Record<string, string> }> {
+async function buildLibraryCandidates(): Promise<{
+  candidates: SessionDraftLibraryCandidateV1[]
+  libraryDrillMap: Record<string, string>
+  availableDrills: SessionDraftAvailableDrillV1[]
+  slugToLibraryId: Record<string, string>
+}> {
   const drills = await listLibraryDrills()
   const ranked = [...drills].sort((a, b) => {
     const pop = (b.popularity ?? 0) - (a.popularity ?? 0)
@@ -115,6 +123,15 @@ async function buildLibraryCandidates(): Promise<{ candidates: SessionDraftLibra
     if (updated !== 0) return updated
     return a.name.localeCompare(b.name)
   })
+
+  // Full-set slug→libraryId map the model can use to resolve any slug, not just
+  // the top candidates. A built-in always carries a slug; if it is missing that
+  // is a data bug, so fall back to the id rather than leaving the slug undefined.
+  const slugToLibraryId: Record<string, string> = {}
+  for (const drill of drills) {
+    const slug = drill.slug ?? drill.id
+    slugToLibraryId[slug] = drill.id
+  }
 
   const candidates: SessionDraftLibraryCandidateV1[] = []
   const libraryDrillMap: Record<string, string> = {}
@@ -129,20 +146,39 @@ async function buildLibraryCandidates(): Promise<{ candidates: SessionDraftLibra
       .slice(0, defaultSessionDraftConfig.limits.maxStepsPerDrill)
     if (items.length === 0) continue
     const candidateId = `cand_${candidates.length + 1}`
+    const slug = drill.slug ?? drill.id
+    const effectiveHeName = resolveDrillHeName(drill.slug, drill.heName)
     candidates.push({
       candidateId,
+      slug,
       name: drill.name,
+      ...(effectiveHeName ? { heName: effectiveHeName } : {}),
       ...(drill.description ? { description: drill.description } : {}),
       stroke: drill.stroke,
       distance: drill.distance,
       repeatCount: drill.repeatCount ?? 1,
       items,
+      popularity: drill.popularity ?? 0,
       ...(drill.focus ? { focus: drill.focus } : {}),
       ...(drill.labels && drill.labels.length > 0 ? { labels: drill.labels.slice(0, defaultSessionDraftConfig.limits.maxCandidateLabels) } : {}),
     })
     libraryDrillMap[candidateId] = drill.id
   }
-  return { candidates, libraryDrillMap }
+
+  const availableDrills: SessionDraftAvailableDrillV1[] = drills
+    .map((drill) => {
+      const slug = drill.slug ?? drill.id
+      const effectiveHeName = resolveDrillHeName(drill.slug, drill.heName)
+      return {
+        slug,
+        name: drill.name,
+        ...(effectiveHeName ? { heName: effectiveHeName } : {}),
+        popularity: drill.popularity ?? 0,
+      }
+    })
+    .slice(0, defaultSessionDraftConfig.limits.maxAvailableDrills)
+
+  return { candidates, libraryDrillMap, availableDrills, slugToLibraryId }
 }
 
 export async function prepareSessionDraft(prompt: string): Promise<PreparedSessionDraft> {
@@ -156,7 +192,12 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     .filter((option) => (EQUIPMENT_IDS as readonly string[]).includes(option))
     .map((option) => option as EquipmentId)
 
-  const { candidates: libraryCandidates, libraryDrillMap } = await buildLibraryCandidates()
+  const {
+    candidates: libraryCandidates,
+    libraryDrillMap,
+    availableDrills,
+    slugToLibraryId,
+  } = await buildLibraryCandidates()
 
   const contextInput: ContextInput = {
     poolLength: settings.pool_length,
@@ -166,6 +207,7 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     equipmentOptions,
     recentSessions: await buildRecentSessions(),
     libraryCandidates,
+    availableDrills,
   }
 
   const context = buildSessionDraftContext(contextInput)
@@ -178,6 +220,7 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     removedCategories: sanitized.removedCategories,
     knownSwimmerNames,
     libraryDrillMap,
+    slugToLibraryId,
   }
 }
 

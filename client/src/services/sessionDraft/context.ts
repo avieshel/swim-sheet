@@ -17,6 +17,8 @@ export function buildSessionDraftContext(input: ContextInput): SessionDraftConte
 
   const libraryCandidates = input.libraryCandidates?.slice(0, defaultSessionDraftConfig.limits.maxLibraryCandidates)
 
+  const availableDrills = input.availableDrills?.slice(0, defaultSessionDraftConfig.limits.maxAvailableDrills)
+
   return {
     poolLength: input.poolLength,
     distanceUnits: input.distanceUnits,
@@ -24,5 +26,6 @@ export function buildSessionDraftContext(input: ContextInput): SessionDraftConte
     equipmentOptions: input.equipmentOptions,
     recentSessions,
     ...(libraryCandidates && libraryCandidates.length > 0 ? { libraryCandidates } : {}),
+    ...(availableDrills && availableDrills.length > 0 ? { availableDrills } : {}),
   }
 }

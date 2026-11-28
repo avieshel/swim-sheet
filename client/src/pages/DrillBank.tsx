@@ -13,10 +13,12 @@ import { Events, analytics } from '../services/analyticsEvents'
 import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useTrackSearch } from '../hooks/useTrackSearch'
 import { useI18n } from '../i18n'
+import { clearDrillHeNameOverride, resolveDrillHeName, setDrillHeNameOverride } from '../services/drillLocalizationOverrides'
+import { fetchDrillLocalization, resolveDrillDisplayName } from '../services/drillLocalizationService'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [drills, setDrills] = useState<LibraryDrill[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
@@ -41,9 +43,12 @@ export const DrillBank: React.FC = () => {
 
   // Detail Modal
   const [detailDrill, setDetailDrill] = useState<LibraryDrill | null>(null)
+  const [heNameDraft, setHeNameDraft] = useState('')
   const [showSessionPicker, setShowSessionPicker] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [addingToSession, setAddingToSession] = useState(false)
+  // Bumped after the server Hebrew map loads so display names re-render.
+  const [, setLocalizationVersion] = useState(0)
 
   // Confirmation state
   const [confirmState, setConfirmState] = useState<{
@@ -79,11 +84,17 @@ export const DrillBank: React.FC = () => {
     loadDrillsData()
       .then(data => { if (!cancelled) { applyDrills(data); analytics.track(Events.ViewDrillBank(data.length)) } })
       .catch(() => { if (!cancelled) setLoading(false) })
+    // Fetch the canonical Hebrew map from the edge function so names resolve from
+    // the server (single source of truth) rather than a client bundle.
+    fetchDrillLocalization()
+      .then(() => { if (!cancelled) setLocalizationVersion(v => v + 1) })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
   const openDetail = (drill: LibraryDrill) => {
     setDetailDrill(drill)
+    setHeNameDraft(resolveDrillDisplayName(drill.slug, drill.heName) ?? '')
     setShowSessionPicker(false)
   }
 
@@ -318,10 +329,27 @@ export const DrillBank: React.FC = () => {
             className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant hover:border-primary/40 transition-all flex flex-col h-full shadow-sm cursor-pointer"
           >
             <div className="flex-1 min-w-0 mb-3">
-              <h3 className="font-bold text-on-surface text-lg truncate m-0">{d.name}</h3>
-              {d.description && (
-                <p className="text-sm text-on-surface-variant italic line-clamp-2 mt-0.5">{d.description}</p>
-              )}
+              {(() => {
+                const isHe = locale === 'he'
+                const effectiveHeName = resolveDrillDisplayName(d.slug, d.heName)
+                const mainName = isHe && effectiveHeName ? effectiveHeName : d.name
+                const subtitle = effectiveHeName ? (isHe ? d.name : effectiveHeName) : null
+                const subtitleLabel = isHe ? t('drills.bank.englishName') : t('drills.bank.hebrewName')
+                return (
+                  <>
+                    <h3 className="font-bold text-on-surface text-lg truncate m-0" dir="auto">{mainName}</h3>
+                    {subtitle && (
+                      <p className="text-sm text-on-surface-variant mt-0.5 truncate" dir="auto">
+                        <span className="text-caption-caps uppercase me-1">{subtitleLabel}</span>
+                        {subtitle}
+                      </p>
+                    )}
+                    {d.description && (
+                      <p className="text-sm text-on-surface-variant italic line-clamp-2 mt-0.5">{d.description}</p>
+                    )}
+                  </>
+                )
+              })()}
             </div>
 
             <div className="mt-auto pt-3 border-t border-outline-variant/30">
@@ -444,9 +472,21 @@ export const DrillBank: React.FC = () => {
          onSave={async (data, asVariant) => {
            const save = async () => {
              if (editingDrill.id) {
-               await updateLibraryDrill(editingDrill.id, data as unknown as Partial<SafeLibraryDrill>)
+               const isCanonical = editingDrill.scope === 'canonical' || editingDrill.source === 'builtin'
+               if (isCanonical) {
+                 await createLibraryDrill({
+                   ...(data as unknown as SafeLibraryDrill),
+                   source: 'customized',
+                   scope: 'coach',
+                   derivedFromSlug: editingDrill.slug,
+                   visibility: 'org',
+                 })
+                 analytics.track(Events.DrillCreated('library', data.stroke ?? '', data.distance ?? 0))
+               } else {
+                 await updateLibraryDrill(editingDrill.id, data as unknown as Partial<SafeLibraryDrill>)
+                 analytics.track(Events.DrillUpdated('library'))
+               }
                if (asVariant) await bumpDrillPopularity(editingDrill.id!)
-               analytics.track(Events.DrillUpdated('library'))
              } else {
                await createLibraryDrill(data as unknown as SafeLibraryDrill)
                analytics.track(Events.DrillCreated('library', data.stroke ?? '', data.distance ?? 0))
@@ -490,7 +530,7 @@ export const DrillBank: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDetailDrill(null)}>
           <div className="bg-surface-container-lowest rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl border border-outline-variant" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-outline-variant/30">
-              <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1">{detailDrill.name}</h2>
+              <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1" dir="auto">{locale === 'he' && resolveDrillDisplayName(detailDrill.slug, detailDrill.heName) ? resolveDrillDisplayName(detailDrill.slug, detailDrill.heName) : detailDrill.name}</h2>
               <button onClick={() => setDetailDrill(null)} aria-label={t('common.close')} className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer bg-transparent border-none">
                 <Icon name="close" />
               </button>
@@ -517,6 +557,44 @@ export const DrillBank: React.FC = () => {
                 <div>
                   <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">{t('drills.bank.description')}</span>
                   <p className="text-sm text-on-surface-variant italic">{detailDrill.description}</p>
+                </div>
+              )}
+
+              {detailDrill.slug && (
+                <div>
+                  <span className="font-label-caps text-label-caps text-on-surface-variant block mb-1">{t('drills.bank.hebrewNameOverride')}</span>
+                  <p className="text-xs text-on-surface-variant mb-2">{t('drills.bank.hebrewNameOverrideHint')}</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={heNameDraft}
+                      onChange={(e) => setHeNameDraft(e.target.value)}
+                      dir="auto"
+                      className="flex-1 px-3 py-2 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface"
+                    />
+                    <button
+                      onClick={() => {
+                        if (!detailDrill.slug) return
+                        setDrillHeNameOverride(detailDrill.slug, heNameDraft)
+                        setDetailDrill({ ...detailDrill, heName: resolveDrillHeName(detailDrill.slug, detailDrill.heName) ?? detailDrill.heName })
+                        void loadDrills()
+                      }}
+                      className="px-3 py-2 rounded-lg bg-primary text-on-primary font-bold cursor-pointer border-none"
+                    >
+                      {t('drills.bank.saveHebrewNameOverride')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!detailDrill.slug) return
+                        clearDrillHeNameOverride(detailDrill.slug)
+                        setHeNameDraft(detailDrill.heName ?? '')
+                        setDetailDrill({ ...detailDrill })
+                        void loadDrills()
+                      }}
+                      className="px-3 py-2 rounded-lg bg-surface-container-high text-on-surface font-bold cursor-pointer border-none"
+                    >
+                      {t('drills.bank.resetHebrewNameOverride')}
+                    </button>
+                  </div>
                 </div>
               )}
 

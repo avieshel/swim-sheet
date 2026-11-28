@@ -41,11 +41,44 @@ Consequences worth holding onto:
 
 | Field | Required | Meaning |
 |---|---|---|
-| `name` | **yes** | The drill's identity. "Fingertip Drag", "Single Arm Pull", "3-5-7 Breathing". |
+| `name` | **yes** | The drill's display identity. "Fingertip Drag", "Single Arm Pull", "3-5-7 Breathing". |
+| `slug` | no* | The **AI-facing effective id** (see "Localization & slug"). Stable across requests; the model reuses it via a draft's `sourceSlug`. Built-ins derive a deterministic uuid from it. |
 | `description` | no | What the technique actually is, when the name alone would not tell a coach what to do. |
+
+\* `slug` is populated for built-in catalogue drills and for any draft drill the model
+links to a known drill. User-coined drills may still have only a `name`.
 
 A **dedicated typed field may replace `description` later.** For now name plus optional
 description carry identity, and the library catalogue is the taxonomy of known techniques.
+
+### Localization & slug
+
+The drill's **slug** is the canonical AI-facing identity, distinct from the human-facing
+`name`. It is the string the model carries in a draft's `sourceSlug` to reuse a known
+drill rather than inventing a near-duplicate. Built-in drills get their `slug` from the
+catalogue; the persisted built-in `LibraryDrill.id` is `uuidFromSlug(slug)` —
+`client/src/db/slugUuid.ts` — a deterministic, stable 36-char uuid-format string so a
+re-seeded built-in keeps the same id across devices (no network round-trip needed for
+linking).
+
+- **`heName`** is a *display-only* Hebrew translation of the drill name. It is never part
+  of drill identity and the model never invents it. The client carries `heName` in the
+  request context (candidates + `availableDrills` + `slugToDisplayName`) and
+  `applySessionDraft` overrides the persisted display name with the locale-appropriate
+  `heName`/`name` when a `sourceSlug` resolves. The DrillBank renders it locale-aware
+  (Hebrew prominent, English subtitle) and bidi-safe.
+- **`popularity`** is a rank (higher = more commonly used) attached to every known drill;
+  the model uses it to bias reuse toward well-known drills when matching a request.
+- **`parentSlug`** links a variant drill (e.g. `single-arm-pull-arm-extended`) to its base
+  (`single-arm-pull`). Variants are **distinct slug entries** — each has its own slug,
+  uuid, `heName`, and `popularity`; variant linkage is metadata, not identity.
+- **Hebrew matching slang lives ONLY in the harness index** —
+  `supabase/functions/ai-session-harness/agent/drillMatchIndex.ts`. This is the controlled,
+  product-owner-edited map from normalized Hebrew coach shorthand to a known `slug`. It is
+  **not** stored in drill data (`drills.json` / `catalog.ts` carry no Hebrew slang), so the
+  matching vocabulary can be tuned without touching the catalogue or redeploying the client.
+  Entries whose slug is absent from the request's `availableDrills` are ignored at match
+  time, so stale entries are harmless.
 
 ### Naming rules
 
@@ -257,8 +290,14 @@ That distinction matters: built-in drills carry no privacy cost to include in a 
 whereas a coach's own library drills are author-written free text and are a different
 proposition. Keeping the two separate is deliberate.
 
-The library is currently **not** sent to the agent. Wiring it in is pending a decision on
-how matching should work — see "Open decisions" below.
+The library **is** sent to the agent, as the lightweight `availableDrills` list in the
+session-draft request context (see `shared/sessionDraft/types.ts`,
+`SessionDraftAvailableDrillV1`): every known drill's `slug`, `name`, optional `heName`, and
+`popularity`. The client also sends `libraryCandidates` (richer, per-request) plus
+`slugToLibraryId` / `slugToDisplayName` maps so `applySessionDraft` can resolve a model's
+`sourceSlug` to a trusted `libraryDrillId` and the locale-appropriate display name. The
+harness matches Hebrew coach shorthand to a slug via
+`agent/drillMatchIndex.ts` (see "Localization & slug").
 
 ---
 
@@ -280,14 +319,16 @@ schema takes every label verbatim from the config.
 
 ## Open decisions
 
-- **How the library reaches the agent.** The built-in 57 could be rendered into the prompt
-  as a compact index (~1k tokens, no privacy cost), or fetched on demand via a tool call
-  (costs an extra model round-trip). The index is the cheaper option; the tool is the
-  better answer once coach-authored drills are in play.
-- **Whether a match is recorded.** `Drill.libraryDrillId` exists and is never populated by
-  the draft path. Recording a match is what stops a coach re-creating the same drill, but
-  presenting ids to the model risks it forcing the session into the nearest catalogue entry
-  rather than recognising when nothing fits.
+- **How the library reaches the agent.** *Resolved (drill-hebrew-localization plan):* the
+  built-in 57 travel as a compact `availableDrills` index (~1k tokens, no privacy cost) in
+  the request context, and the model reuses a known drill via `sourceSlug` rather than
+  inventing one. A tool-call fetch remains the better answer once coach-authored drills are
+  in play.
+- **Whether a match is recorded.** *Resolved (drill-hebrew-localization plan):* the draft
+  path now records a match via `sourceSlug` → `libraryDrillId` (resolved on the client by
+  `applySessionDraft` from `slugToLibraryId`). Presentation of a model-facing stable slug
+  (not a DB id) avoids forcing sessions into the nearest catalogue entry while still letting
+  the model reuse known drills. `Drill.libraryDrillId` is populated for linked drafts.
 - **`description` as identity vs a typed field.** Currently free text. A typed technique
   field would make matching machine-readable but costs a contract change across schema,
   validator, prompt, mapping and UI.

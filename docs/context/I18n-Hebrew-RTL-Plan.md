@@ -6,7 +6,7 @@
 - **Date**: 2026-11-22
 - **Scope owner decision needed before Phase 1 merge**: language persistence (local-only vs synced setting)
 - **Primary goal**: Deliver full Hebrew UI support with correct RTL layout, in mergeable phases, without blocking unrelated product/server work.
-- **Progress**: P1-P2 foundation/RTL merged (#48, #49). P3 core flows complete (#48-#58). P4 in progress on `feat/i18n-p4-remaining`: missed live/shared strings, RouteMeta, CoachDashboard, CoachAssist, Catalog, AI draft localized; Heebo Hebrew font fallback added; `dir="auto"` added to key user-generated content. Deferred by product decision: Landing/Privacy/Terms body content stays English for now; seeded drills/sessions/catalog Hebrew content keywords out of scope for this story. P5 guardrails/docs being folded into same PR: i18n/RTL conventions documented in UI design system context; key parity covered by existing i18n coverage tests; `npm run check` green.
+- **Progress**: P1-P2 foundation/RTL merged (#48, #49). P3 core flows complete (#48-#58). P4 in progress on `feat/i18n-p4-remaining`: missed live/shared strings, RouteMeta, CoachDashboard, CoachAssist, Catalog, AI draft localized; Heebo Hebrew font fallback added; `dir="auto"` added to key user-generated content. Deferred by product decision: Landing/Privacy/Terms body content stays English for now. **Built-in drill Hebrew display is delivered by a separate, already-merged effort on `feat/drill-hebrew-localization`** (drill `slug` + `heName` + `popularity` in the catalogue; client carries `heName` and overrides the DrillBank display name per locale; Hebrew matching slang lives only in the harness `drillMatchIndex`). Seeded *sessions*/catalog content remains English/RTL-safe per product decision. P5 guardrails/docs being folded into same PR: i18n/RTL conventions documented in UI design system context; key parity covered by existing i18n coverage tests; `npm run check` green.
 
 ## Executive summary
 
@@ -78,7 +78,7 @@ Rules for parallel work:
 
 | Item | Option A (minimum) | Option B (full) | Recommendation |
 |---|---|---|---|
-| Built-in drills/sessions/catalog content | Keep content English, render correctly in RTL | Provide Hebrew content/fields and fallback | Decide before Phase 4; Option A can ship earlier |
+| Built-in drills/sessions/catalog content | Keep content English, render correctly in RTL | Provide Hebrew content/fields and fallback | **Drills**: done on `feat/drill-hebrew-localization` via catalogue `slug` + `heName` + `popularity` and a locale-aware DrillBank display; sessions/catalog body content still English/RTL-safe per product decision |
 | Public legal/marketing pages (`/about`, `/privacy`, `/terms`) | Keep English copy, RTL-safe layout | Full Hebrew copy + localized SEO/meta | Treat as content deliverable; can be separate merge |
 | AI-generated content | No change; model may respond in Hebrew/English depending prompt | Explicit Hebrew output mode/prompting | Out of UI-layout scope except rendering/bidi |
 | Language persistence | Local-only localStorage | Synced in settings/DB | **Local-only for this plan** |
