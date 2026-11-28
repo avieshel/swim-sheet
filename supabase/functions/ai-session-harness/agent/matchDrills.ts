@@ -5,6 +5,7 @@
 // the matched drill's popularity, so the most likely hit leads.
 
 import { drillMatchIndex, normalizeHe } from './drillMatchIndex.ts'
+import { DRILL_HEBREW } from '../shared/drillLocalization.ts'
 
 export interface DrillHint {
   slug: string
@@ -26,8 +27,11 @@ export function matchDrillHints(
     if (!normalizedPrompt.includes(key)) continue
     const drill = bySlug.get(entry.slug)
     if (!drill) continue
+    // Prefer the edge-function's authoritative Hebrew name; fall back to whatever
+    // the client sent (its catalog/localStorage value) only if the index lacks it.
+    const displayHeName = DRILL_HEBREW[entry.slug]?.heName ?? drill.heName
     hits.push({
-      hint: { slug: entry.slug, term: key, name: drill.name, heName: drill.heName, hint: entry.hint },
+      hint: { slug: entry.slug, term: key, name: drill.name, heName: displayHeName, hint: entry.hint },
       termLength: key.length,
       popularity: drill.popularity,
     })

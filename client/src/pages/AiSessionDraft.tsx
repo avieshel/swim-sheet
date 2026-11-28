@@ -170,7 +170,6 @@ export const AiSessionDraft: React.FC = () => {
       const applied = await applySessionDraft(draft, {
         libraryDrillMap: prepared?.libraryDrillMap ?? {},
         slugToLibraryId: prepared?.slugToLibraryId ?? {},
-        slugToDisplayName: prepared?.slugToDisplayName ?? {},
       })
       if (applied.outcome === 'created') {
         analytics.track(Events.AiDraftAccepted(draft.drills.length))

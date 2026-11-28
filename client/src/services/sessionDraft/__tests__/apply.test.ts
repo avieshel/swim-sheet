@@ -60,17 +60,19 @@ describe('mapDraftToSessionAndDrills', () => {
     expect(drills[0].items.every((i) => typeof i.id === 'string' && i.id.length > 0)).toBe(true)
   })
 
-  it('resolves sourceSlug to libraryDrillId and overrides name with Hebrew', () => {
+  it('resolves sourceSlug to libraryDrillId and keeps the harness-emitted name', () => {
     const sourceDraft: SessionDraftV1 = {
       ...draft,
       drills: [{ ...draft.drills[0], name: 'whatever', sourceSlug: 'single-arm-pull' }],
     }
     const { drills } = mapDraftToSessionAndDrills(sourceDraft, {
       slugToLibraryId: { 'single-arm-pull': 'lib-1' },
-      slugToDisplayName: { 'single-arm-pull': 'שחייה ביד אחת' },
     })
     expect(drills[0].libraryDrillId).toBe('lib-1')
-    expect(drills[0].name).toBe('שחייה ביד אחת')
+    // The display name is the harness-emitted name, trusted as-is (the edge
+    // function guides it via authoritative Hebrew hints); the client no longer
+    // overrides it from a bundled map.
+    expect(drills[0].name).toBe('whatever')
   })
 
   it('links a slug that was only in availableDrills, not candidates', () => {
@@ -80,7 +82,6 @@ describe('mapDraftToSessionAndDrills', () => {
     }
     const { drills } = mapDraftToSessionAndDrills(sourceDraft, {
       slugToLibraryId: { 'single-arm-pull-arm-extended': 'lib-2' },
-      slugToDisplayName: {},
     })
     expect(drills[0].libraryDrillId).toBe('lib-2')
   })
@@ -92,7 +93,6 @@ describe('mapDraftToSessionAndDrills', () => {
     }
     const { drills } = mapDraftToSessionAndDrills(sourceDraft, {
       slugToLibraryId: {},
-      slugToDisplayName: {},
     })
     expect(drills[0].libraryDrillId).toBeUndefined()
     expect(drills[0].name).toBe('model name')
@@ -111,10 +111,9 @@ describe('mapDraftToSessionAndDrills', () => {
     const { drills } = mapDraftToSessionAndDrills(sourceDraft, {
       libraryDrillMap: { cand_1: 'lib-legacy' },
       slugToLibraryId: { 'single-arm-pull': 'lib-1' },
-      slugToDisplayName: { 'single-arm-pull': 'שחייה ביד אחת' },
     })
     expect(drills[0].libraryDrillId).toBe('lib-1')
-    expect(drills[0].name).toBe('שחייה ביד אחת')
+    expect(drills[0].name).toBe('model name')
   })
 })
 
@@ -235,13 +234,12 @@ describe('end-to-end sourceSlug resolution', () => {
     }
     const res = await applySessionDraft(sourceDraft, {
       slugToLibraryId: { 'single-arm-pull': 'lib-1' },
-      slugToDisplayName: { 'single-arm-pull': 'שחייה ביד אחת' },
     })
     expect(res.outcome).toBe('created')
     if (res.outcome === 'created') {
       const saved = await db.drills.where('sessionId').equals(res.sessionId).toArray()
       expect(saved[0].libraryDrillId).toBe('lib-1')
-      expect(saved[0].name).toBe('שחייה ביד אחת')
+      expect(saved[0].name).toBe('x')
     }
     const lib = await db.libraryDrills.get('lib-1')
     expect((lib?.popularity ?? 0)).toBe(3)
@@ -260,7 +258,6 @@ describe('end-to-end sourceSlug resolution', () => {
     }
     const res = await applySessionDraft(sourceDraft, {
       slugToLibraryId: { 'single-arm-pull-arm-extended': 'lib-2' },
-      slugToDisplayName: {},
     })
     expect(res.outcome).toBe('created')
     if (res.outcome === 'created') {

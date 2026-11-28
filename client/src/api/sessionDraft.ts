@@ -20,7 +20,6 @@ import {
   type SessionDraftSeedV1,
   type SessionDraftV1,
 } from '../../../shared/sessionDraft/types'
-import { getCurrentLocale } from '../i18n'
 import { resolveDrillHeName } from '../services/drillLocalizationOverrides'
 import { EQUIPMENT_IDS, defaultSessionDraftConfig } from '../../../shared/sessionDraft/config'
 import { settingsService } from '../services/settingsService'
@@ -42,7 +41,6 @@ export interface PreparedSessionDraft {
   knownSwimmerNames: string[]
   libraryDrillMap: Record<string, string>
   slugToLibraryId: Record<string, string>
-  slugToDisplayName: Record<string, string>
 }
 
 export type SessionDraftResult =
@@ -111,15 +109,11 @@ function toCandidateItem(item: { distance: number; stroke: string; repeatCount: 
   }
 }
 
-async function buildLibraryCandidates(
-  _prompt: string,
-  locale: string,
-): Promise<{
+async function buildLibraryCandidates(): Promise<{
   candidates: SessionDraftLibraryCandidateV1[]
   libraryDrillMap: Record<string, string>
   availableDrills: SessionDraftAvailableDrillV1[]
   slugToLibraryId: Record<string, string>
-  slugToDisplayName: Record<string, string>
 }> {
   const drills = await listLibraryDrills()
   const ranked = [...drills].sort((a, b) => {
@@ -130,17 +124,13 @@ async function buildLibraryCandidates(
     return a.name.localeCompare(b.name)
   })
 
-  // Full-set maps the model can use to resolve any slug, not just the top
-  // candidates. A built-in always carries a slug; if it is missing that is a
-  // data bug, so fall back to the id rather than leaving the slug undefined.
+  // Full-set slug→libraryId map the model can use to resolve any slug, not just
+  // the top candidates. A built-in always carries a slug; if it is missing that
+  // is a data bug, so fall back to the id rather than leaving the slug undefined.
   const slugToLibraryId: Record<string, string> = {}
-  const slugToDisplayName: Record<string, string> = {}
-  const isHebrew = locale === 'he'
   for (const drill of drills) {
     const slug = drill.slug ?? drill.id
-    const effectiveHeName = resolveDrillHeName(drill.slug, drill.heName)
     slugToLibraryId[slug] = drill.id
-    slugToDisplayName[slug] = isHebrew ? (effectiveHeName ?? drill.name) : drill.name
   }
 
   const candidates: SessionDraftLibraryCandidateV1[] = []
@@ -188,7 +178,7 @@ async function buildLibraryCandidates(
     })
     .slice(0, defaultSessionDraftConfig.limits.maxAvailableDrills)
 
-  return { candidates, libraryDrillMap, availableDrills, slugToLibraryId, slugToDisplayName }
+  return { candidates, libraryDrillMap, availableDrills, slugToLibraryId }
 }
 
 export async function prepareSessionDraft(prompt: string): Promise<PreparedSessionDraft> {
@@ -207,8 +197,7 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     libraryDrillMap,
     availableDrills,
     slugToLibraryId,
-    slugToDisplayName,
-  } = await buildLibraryCandidates(prompt, getCurrentLocale())
+  } = await buildLibraryCandidates()
 
   const contextInput: ContextInput = {
     poolLength: settings.pool_length,
@@ -232,7 +221,6 @@ export async function prepareSessionDraft(prompt: string): Promise<PreparedSessi
     knownSwimmerNames,
     libraryDrillMap,
     slugToLibraryId,
-    slugToDisplayName,
   }
 }
 

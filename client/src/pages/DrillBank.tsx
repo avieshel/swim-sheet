@@ -14,6 +14,7 @@ import { useTrackDwell } from '../hooks/useTrackDwell'
 import { useTrackSearch } from '../hooks/useTrackSearch'
 import { useI18n } from '../i18n'
 import { clearDrillHeNameOverride, resolveDrillHeName, setDrillHeNameOverride } from '../services/drillLocalizationOverrides'
+import { fetchDrillLocalization, resolveDrillDisplayName } from '../services/drillLocalizationService'
 
 export const DrillBank: React.FC = () => {
   const navigate = useNavigate()
@@ -46,6 +47,8 @@ export const DrillBank: React.FC = () => {
   const [showSessionPicker, setShowSessionPicker] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
   const [addingToSession, setAddingToSession] = useState(false)
+  // Bumped after the server Hebrew map loads so display names re-render.
+  const [, setLocalizationVersion] = useState(0)
 
   // Confirmation state
   const [confirmState, setConfirmState] = useState<{
@@ -81,12 +84,17 @@ export const DrillBank: React.FC = () => {
     loadDrillsData()
       .then(data => { if (!cancelled) { applyDrills(data); analytics.track(Events.ViewDrillBank(data.length)) } })
       .catch(() => { if (!cancelled) setLoading(false) })
+    // Fetch the canonical Hebrew map from the edge function so names resolve from
+    // the server (single source of truth) rather than a client bundle.
+    fetchDrillLocalization()
+      .then(() => { if (!cancelled) setLocalizationVersion(v => v + 1) })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [])
 
   const openDetail = (drill: LibraryDrill) => {
     setDetailDrill(drill)
-    setHeNameDraft(resolveDrillHeName(drill.slug, drill.heName) ?? '')
+    setHeNameDraft(resolveDrillDisplayName(drill.slug, drill.heName) ?? '')
     setShowSessionPicker(false)
   }
 
@@ -323,7 +331,7 @@ export const DrillBank: React.FC = () => {
             <div className="flex-1 min-w-0 mb-3">
               {(() => {
                 const isHe = locale === 'he'
-                const effectiveHeName = resolveDrillHeName(d.slug, d.heName)
+                const effectiveHeName = resolveDrillDisplayName(d.slug, d.heName)
                 const mainName = isHe && effectiveHeName ? effectiveHeName : d.name
                 const subtitle = effectiveHeName ? (isHe ? d.name : effectiveHeName) : null
                 const subtitleLabel = isHe ? t('drills.bank.englishName') : t('drills.bank.hebrewName')
@@ -522,7 +530,7 @@ export const DrillBank: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDetailDrill(null)}>
           <div className="bg-surface-container-lowest rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl border border-outline-variant" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-outline-variant/30">
-              <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1" dir="auto">{locale === 'he' && resolveDrillHeName(detailDrill.slug, detailDrill.heName) ? resolveDrillHeName(detailDrill.slug, detailDrill.heName) : detailDrill.name}</h2>
+              <h2 className="font-headline-md text-headline-md text-on-surface truncate flex-1" dir="auto">{locale === 'he' && resolveDrillDisplayName(detailDrill.slug, detailDrill.heName) ? resolveDrillDisplayName(detailDrill.slug, detailDrill.heName) : detailDrill.name}</h2>
               <button onClick={() => setDetailDrill(null)} aria-label={t('common.close')} className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-lg transition-colors cursor-pointer bg-transparent border-none">
                 <Icon name="close" />
               </button>

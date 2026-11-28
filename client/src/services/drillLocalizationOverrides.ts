@@ -31,10 +31,6 @@ export function getDrillHeNameOverride(slug: string): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined
 }
 
-export function getAllDrillHeNameOverrides(): OverrideMap {
-  return readOverrides()
-}
-
 export function setDrillHeNameOverride(slug: string, heName: string): void {
   const overrides = readOverrides()
   const trimmed = heName.trim()

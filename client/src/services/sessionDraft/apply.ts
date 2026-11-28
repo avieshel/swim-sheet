@@ -17,7 +17,6 @@ export type ApplyDraftResult =
 export interface ApplySessionDraftOptions {
   libraryDrillMap?: Record<string, string>
   slugToLibraryId?: Record<string, string>
-  slugToDisplayName?: Record<string, string>
 }
 
 // ── Draft → session/drills mapping ───────────────────────────
@@ -47,21 +46,19 @@ export function mapDraftToSessionAndDrills(
 ): { session: SafeSession; drills: Array<Omit<SafeDrill, 'sessionId'>> } {
   const libraryDrillMap = options.libraryDrillMap ?? {}
   const slugToLibraryId = options.slugToLibraryId ?? {}
-  const slugToDisplayName = options.slugToDisplayName ?? {}
   const drills: Array<Omit<SafeDrill, 'sessionId'>> = draft.drills.map((drill, order) => {
     // sourceSlug is the stable, AI-facing identity and takes precedence over the
     // legacy per-request candidate id. When it resolves we link the drill to the
-    // trusted library id and override its display name with the prepared,
-    // locale-aware display name (Hebrew when the locale is he).
+    // trusted library id. The display name is the harness-emitted name: the model
+    // produced it guided by the edge-function's authoritative Hebrew hints, so the
+    // client trusts it rather than overriding from a bundled map.
     let libraryDrillId: string | undefined
-    let name = drill.name
+    const name = drill.name
     const sourceSlug = drill.sourceSlug
     if (drill.sourceSlug) {
       const resolvedId = slugToLibraryId[drill.sourceSlug]
       if (resolvedId) {
         libraryDrillId = resolvedId
-        const displayName = slugToDisplayName[drill.sourceSlug]
-        if (displayName) name = displayName
       }
     } else if (drill.sourceCandidateId) {
       libraryDrillId = libraryDrillMap[drill.sourceCandidateId]

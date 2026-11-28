@@ -9,11 +9,14 @@ describe('library drill localization persistence', () => {
     await db.open()
   })
 
-  it('seeded library drill carries slug and heName', async () => {
+  it('seeded built-in carries slug but no bundled Hebrew name', async () => {
     await seedLibraryDrills()
     const lib = (await getAllLibraryDrills()).find(d => d.slug === 'single-arm-pull')
-    expect(lib?.heName).toBe('יד אחת')
+    expect(lib?.slug).toBe('single-arm-pull')
     expect(lib?.id).toBeTruthy()
+    // Hebrew names are fetched from the edge function at runtime, not bundled in
+    // the client catalog, so a fresh seed carries no heName.
+    expect(lib?.heName).toBeUndefined()
   })
 
   it('built-in uuid is deterministic from slug across reseeds', async () => {
